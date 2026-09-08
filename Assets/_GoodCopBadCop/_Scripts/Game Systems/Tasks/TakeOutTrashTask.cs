@@ -155,6 +155,14 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Whether this task is currently active on every client (mirrors <see cref="_isActive"/>).
+    /// Used by <see cref="CompassController"/> to gate the compass junk pips — a junk item glows
+    /// collectible independently of this task, but should only show on the compass while an
+    /// active cleanup task is asking the player to deal with it.
+    /// </summary>
+    public bool IsActive => _isActive.Value;
+
     // ── Local state (server-only) ─────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedItems = new();

@@ -202,6 +202,22 @@ public class CampaignManager : NetworkBehaviour
         // Keep an immutable reference before day activation. Activation may schedule a fresh task
         // and autosave it, but it must never replace the state selected for this resume.
         _pendingWorkdayRestore = IsServer ? SaveDataManager.Instance?.GetWorkdayState(_currentDay) : null;
+
+        // Day 1 safety net: a generic mid-shift restore resumes the suspect lineup at the next
+        // unprocessed slot via the normal population path — it does NOT re-arm Vlad's scripted
+        // spawn intercept (that only happens inside Day_01.Day1OpeningSequence, which runs once
+        // on clock-in and never again on resume). If the save was made before Vlad's tutorial
+        // appearance was fully processed, resuming this way spawns a random suspect into slot 0
+        // while Day_01's Vlad-only dialogue hooks (keyed off lineup index 0) still fire on them.
+        // Discard the stale restore instead so Day 1 falls through to its normal fresh-start path
+        // and the opening sequence (Vlad first, as usual) runs from the beginning.
+        if (IsServer && _currentDay == 1 && _pendingWorkdayRestore != null &&
+            !(SaveDataManager.Instance?.Day1VladProcessed ?? false))
+        {
+            Debug.Log("[CampaignManager] Day 1 resumed before Vlad's tutorial was processed — discarding mid-shift restore so the opening sequence restarts from the beginning.");
+            _pendingWorkdayRestore = null;
+        }
+
         ApplyDay(_currentDay);
 
         if (IsServer && _pendingWorkdayRestore != null)

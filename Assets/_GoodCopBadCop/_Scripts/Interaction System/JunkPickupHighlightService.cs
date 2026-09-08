@@ -165,6 +165,7 @@ public static class JunkPickupHighlightService
         if (!_registered.Remove(junk)) return;
 
         junk.SetForceHighlight(false, HighlightHold.PickupAffordance);
+        CompassMarkerRegistry.Unregister(junk.transform);
     }
 
     /// <summary>Re-applies the affordance to every tracked item.</summary>
@@ -197,7 +198,10 @@ public static class JunkPickupHighlightService
         foreach (JunkItem junk in snapshot)
         {
             if (junk != null)
+            {
                 junk.SetForceHighlight(false, HighlightHold.PickupAffordance);
+                CompassMarkerRegistry.Unregister(junk.transform);
+            }
         }
     }
 
@@ -205,6 +209,15 @@ public static class JunkPickupHighlightService
 
     private static void Apply(JunkItem junk)
     {
-        junk.SetForceHighlight(_enabled && junk.CanBeCollected, HighlightHold.PickupAffordance);
+        bool collectible = _enabled && junk.CanBeCollected;
+
+        junk.SetForceHighlight(collectible, HighlightHold.PickupAffordance);
+
+        // Mirror the same "is this glowing as collectible junk" state onto the compass — one
+        // fewer place callers need to remember to update when junk becomes (un)collectible.
+        if (collectible)
+            CompassMarkerRegistry.Register(junk.transform, CompassMarkerCategory.Junk);
+        else
+            CompassMarkerRegistry.Unregister(junk.transform);
     }
 }

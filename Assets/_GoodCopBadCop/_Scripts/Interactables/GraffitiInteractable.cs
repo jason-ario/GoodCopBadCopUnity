@@ -49,6 +49,12 @@ public class GraffitiInteractable : NetworkBehaviour
              "Assign a material using a URP Lit or Unlit shader with Transparent surface type.")]
     [SerializeField] private Renderer _graffitiRenderer;
 
+    [Header("Compass")]
+    [Tooltip("This component is shared by both wall graffiti (CleanGraffitiTask) and blood decals " +
+             "(CleanBloodTask) — set this per-prefab so each shows the right colored pip on the " +
+             "bottom-of-screen compass while unscrubbed.")]
+    [SerializeField] private CompassMarkerCategory _compassCategory = CompassMarkerCategory.Graffiti;
+
     // ── Networked state ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -98,12 +104,17 @@ public class GraffitiInteractable : NetworkBehaviour
         _scrubProgress.OnValueChanged += OnScrubProgressChanged;
         // Apply initial visual in case of a late-joining client.
         ApplyScrubVisual(_scrubProgress.Value);
+
+        // Unscrubbed the moment it exists — every peer registers locally, so a late joiner still
+        // sees the compass pip even though it missed the spawn moment on other clients.
+        CompassMarkerRegistry.Register(transform, _compassCategory);
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         _scrubProgress.OnValueChanged -= OnScrubProgressChanged;
+        CompassMarkerRegistry.Unregister(transform);
     }
 
     // ── Scrub control (called from Mop) ───────────────────────────────────────

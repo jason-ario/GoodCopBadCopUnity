@@ -46,7 +46,9 @@ public class PlayerTutorialUI : MonoBehaviour
 
     /// <summary>
     /// Fires once when the local player's NetworkObject spawns. Shows the movement tutorial
-    /// on Day 1 only; one-shot so respawns never re-trigger it.
+    /// on Day 1 only, and only the first time this save slot ever reaches Day 1 — one-shot so
+    /// respawns and Day 1 reloads/resumes never re-trigger it (a returning player already knows
+    /// how to move, even if they haven't finished the tutorial with Vlad yet).
     /// </summary>
     private void OnLocalPlayerSpawned()
     {
@@ -54,6 +56,12 @@ public class PlayerTutorialUI : MonoBehaviour
 
         if (DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady) return;
         if (CampaignManager.Instance == null || CampaignManager.Instance.CurrentDay != 1) return;
+
+        if (SaveDataManager.Instance != null)
+        {
+            if (SaveDataManager.Instance.HasSeenIntroTutorial) return;
+            SaveDataManager.Instance.HasSeenIntroTutorial = true;
+        }
 
         gameObject.SetActive(true);
         StartCoroutine(DelayedShowBoothMessage(3f));

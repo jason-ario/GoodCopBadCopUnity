@@ -206,6 +206,15 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     /// <summary>
+    /// Whether this task is currently active on every client (mirrors <see cref="_isActive"/>).
+    /// Used by <see cref="CompassController"/> to gate the compass fence pips — a broken fence
+    /// segment should only show on the compass while a repair task is actually active, not any
+    /// time <see cref="PerimiterFence.IsBroken"/> happens to be true (e.g. between a mutant breach
+    /// and this task actually being triggered).
+    /// </summary>
+    public bool IsActive => _isActive.Value;
+
+    /// <summary>
     /// Replicated completion latch. Networked (rather than a local bool set by a ClientRpc) so a
     /// client that connects after the final repair still reports the task complete instead of
     /// showing a permanently stalled "n/n" row.

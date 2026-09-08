@@ -2066,6 +2066,12 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnClosingDialogueComplete()
     {
+        // Mark Vlad's tutorial appearance as fully processed. Read by CampaignManager.StartCampaign
+        // on a future load/resume to decide whether Day 1 can safely resume mid-shift or must
+        // restart its opening sequence from the beginning (see Day1VladProcessed doc comment).
+        if (SaveDataManager.Instance != null)
+            SaveDataManager.Instance.Day1VladProcessed = true;
+
         // Silence Vlad's generic exit bark — his story ends with "Don't fuck it up."
         SuspectController.ForceNextSuspectSkipExitDialogue = true;
 

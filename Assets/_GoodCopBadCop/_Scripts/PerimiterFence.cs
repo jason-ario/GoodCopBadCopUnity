@@ -218,6 +218,7 @@ public class PerimiterFence : NetworkBehaviour
         _health.OnValueChanged -= OnHealthChanged;
         _initialized = false;
         _fallbackHealth = UninitializedHealth;
+        CompassMarkerRegistry.Unregister(transform);
     }
 
     // ── Explicit client resync ─────────────────────────────────────────────────
@@ -275,6 +276,14 @@ public class PerimiterFence : NetworkBehaviour
     private void ApplyHealthState(float health, bool force = false)
     {
         int state = GetDamageState(health);
+
+        // Compass pip: mirrors IsBroken (damage state > 0), independent of the force/early-out
+        // below so it stays correct even on the ApplyHealthState(force:true) calls used purely
+        // for a late-joining client's initial sync.
+        if (state > 0)
+            CompassMarkerRegistry.Register(transform, CompassMarkerCategory.Fence);
+        else
+            CompassMarkerRegistry.Unregister(transform);
 
         if (!force && state == _appliedState) return;
 

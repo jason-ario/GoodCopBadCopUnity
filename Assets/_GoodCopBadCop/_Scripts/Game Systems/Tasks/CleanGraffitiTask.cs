@@ -58,6 +58,14 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly NetworkVariable<bool> _isActive = new(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Whether this task is currently active on every client (mirrors <see cref="_isActive"/>).
+    /// Used by <see cref="CompassController"/> to gate the compass graffiti pips — an unscrubbed
+    /// piece should only show on the compass while this task is actually asking the player to
+    /// clean it (e.g. not during <see cref="SpawnGraffitiEarly"/>'s pre-spawn window).
+    /// </summary>
+    public bool IsActive => _isActive.Value;
+
     // ── Local state ───────────────────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedGraffiti = new();

@@ -26,6 +26,17 @@ public class GuardPurchasePoint : Interactable
     [Tooltip("Child GameObject with the sign mesh and its interaction collider. Hidden and " +
              "non-interactable while locked, alongside the post and soldier.")]
     [SerializeField] private GameObject _guardSign;
+    [Tooltip("Placeholder world-space TextMeshPro shown on the post once a guard has been " +
+             "purchased but hasn't arrived yet (scheduled to spawn at the next day start). " +
+             "Simple text stand-in for a proper 'purchased, arriving tomorrow' visual.")]
+    [SerializeField] private TMPro.TextMeshPro _pendingArrivalText;
+
+    [Header("Persistence")]
+    [Tooltip("Stable, unique ID for this purchase point (e.g. 'GuardPost_Checkpoint'). Used to " +
+             "persist purchase/arrival state to the save file so a guard bought right before " +
+             "quitting still arrives on the next day after reloading. Leave empty to disable " +
+             "persistence for this point (not recommended).")]
+    [SerializeField] private string _guardPointId;
 
     private readonly NetworkVariable<bool> _guardPurchased = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -48,6 +59,12 @@ public class GuardPurchasePoint : Interactable
         _guardPurchased.OnValueChanged += OnGuardPurchasedChanged;
         _guardArrived.OnValueChanged += OnGuardArrivedChanged;
         _unlocked.OnValueChanged += OnUnlockedChanged;
+
+        // Restore purchase/arrival state saved before the last quit, before anyone reads the
+        // NetworkVariables below — so a guard purchased but not yet arrived resumes correctly
+        // (still scheduled to arrive at the next OnDayStart) instead of the purchase being lost.
+        if (IsServer)
+            ApplySavedPurchaseState();
 
         // Apply state immediately for late-joining clients.
         RefreshVisualState();
@@ -102,12 +119,16 @@ public class GuardPurchasePoint : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void SetGuardPurchasedServerRpc()
     {
-        if (!_guardPurchased.Value)
-            _guardPurchased.Value = true;
+        if (_guardPurchased.Value) return;
+
+        _guardPurchased.Value = true;
+        PersistState();
     }
 
     private void OnGuardPurchasedChanged(bool previousValue, bool newValue)
     {
+        RefreshVisualState();
+
         if (!newValue) return;
         UIController.Instance.ShowShopNotification("Guard hired! Will arrive tomorrow.");
     }
@@ -116,8 +137,10 @@ public class GuardPurchasePoint : Interactable
     private void OnDayStart()
     {
         if (!IsServer) return;
-        if (_guardPurchased.Value && !_guardArrived.Value)
-            _guardArrived.Value = true;
+        if (!_guardPurchased.Value || _guardArrived.Value) return;
+
+        _guardArrived.Value = true;
+        PersistState();
     }
 
     private void OnGuardArrivedChanged(bool previousValue, bool newValue) => RefreshVisualState();
@@ -142,19 +165,55 @@ public class GuardPurchasePoint : Interactable
         _guardArrived.Value = false;
         _guardPurchased.Value = false;
         _unlocked.Value = true;
+        PersistState();
+    }
+
+    // -------------------------------------------------------------------------
+    // Persistence
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only. Restores purchase/arrival state from the save file for <see cref="_guardPointId"/>,
+    /// so a guard purchased just before quitting is not silently lost on reload. A saved
+    /// "purchased but not yet arrived" state is restored exactly as-is — the guard remains
+    /// scheduled to arrive at the next <see cref="ShiftManager.OnDayStart"/> rather than spawning
+    /// immediately or reverting to unpurchased.
+    /// </summary>
+    private void ApplySavedPurchaseState()
+    {
+        if (string.IsNullOrEmpty(_guardPointId) || SaveDataManager.Instance == null) return;
+
+        GuardPurchasePointSaveEntry saved = SaveDataManager.Instance.GetGuardPurchasePointState(_guardPointId);
+        if (saved == null) return;
+
+        _guardPurchased.Value = saved.Purchased;
+        _guardArrived.Value = saved.Arrived;
     }
 
     /// <summary>
-    /// Applies the correct visibility for the sign/post/soldier children based on the current
-    /// locked/purchased/arrived state:
-    ///   - Locked: sign, post, and soldier all hidden — nothing is visible or interactable.
-    ///   - Unlocked, not yet arrived: sign and post visible, soldier hidden.
-    ///   - Unlocked, guard arrived: sign and soldier visible, post hidden.
+    /// Server-only. Persists the current purchased/arrived state for <see cref="_guardPointId"/>
+    /// to the save file, if a persistent ID is configured. No-op otherwise.
+    /// </summary>
+    private void PersistState()
+    {
+        if (string.IsNullOrEmpty(_guardPointId) || SaveDataManager.Instance == null) return;
+        SaveDataManager.Instance.SaveGuardPurchasePointState(_guardPointId, _guardPurchased.Value, _guardArrived.Value);
+    }
+
+    /// <summary>
+    /// Applies the correct visibility for the sign/post/soldier/pending-text children based on the
+    /// current locked/purchased/arrived state:
+    ///   - Locked: sign, post, soldier, and pending text all hidden — nothing is visible or interactable.
+    ///   - Unlocked, not purchased, not arrived: sign and post visible (buyable), soldier and pending text hidden.
+    ///   - Unlocked, purchased, not yet arrived: sign and post visible, plus the pending-arrival
+    ///     placeholder text ("purchased, arriving tomorrow"); soldier still hidden.
+    ///   - Unlocked, guard arrived: sign and soldier visible, post and pending text hidden.
     /// </summary>
     private void RefreshVisualState()
     {
         bool showSoldier = _unlocked.Value && _guardArrived.Value;
         bool showPost = _unlocked.Value && !_guardArrived.Value;
+        bool showPendingArrival = showPost && _guardPurchased.Value;
 
         if (_suspectSoldier != null)
             _suspectSoldier.SetActive(showSoldier);
@@ -164,5 +223,8 @@ public class GuardPurchasePoint : Interactable
 
         if (_guardSign != null)
             _guardSign.SetActive(_unlocked.Value);
+
+        if (_pendingArrivalText != null)
+            _pendingArrivalText.gameObject.SetActive(showPendingArrival);
     }
 }

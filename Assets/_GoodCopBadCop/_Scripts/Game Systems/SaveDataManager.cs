@@ -165,6 +165,21 @@ public class SaveDataManager : MonoBehaviour
         set { if (ActiveSlot == null) return; ActiveSlot.Day1TutorialComplete = value; Save(); }
     }
 
+    /// <summary>
+    /// True once Vlad's scripted Day 1 tutorial appearance has been fully processed this save
+    /// (his closing dialogue played and his deferred verdict delivered — see
+    /// <see cref="Day_01.OnClosingDialogueComplete"/>). <see cref="CampaignManager.StartCampaign"/>
+    /// reads this on resume: if a Day 1 save was loaded before this became true, any mid-shift
+    /// <see cref="WorkdaySaveState"/> is discarded so the Day 1 opening sequence restarts from
+    /// the beginning with Vlad spawned correctly as the first suspect, rather than resuming with
+    /// a random suspect standing in for him.
+    /// </summary>
+    public bool Day1VladProcessed
+    {
+        get => ActiveSlot?.Day1VladProcessed ?? false;
+        set { if (ActiveSlot == null) return; ActiveSlot.Day1VladProcessed = value; Save(); }
+    }
+
     // -------------------------------------------------------------------------
     // Shop Item Unlocks
     // -------------------------------------------------------------------------
@@ -222,6 +237,49 @@ public class SaveDataManager : MonoBehaviour
         ActiveSlot.UnlockedWorldObjectIds = list.ToArray();
         Save();
         Debug.Log($"[SaveDataManager] World object unlocked and saved: '{objectId}'.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Guard Purchase Points
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the persisted purchase/arrival state for the guard purchase point with the given ID,
+    /// or null if no entry exists yet (never purchased on this save, or no ID configured).
+    /// </summary>
+    public GuardPurchasePointSaveEntry GetGuardPurchasePointState(string pointId)
+    {
+        if (string.IsNullOrEmpty(pointId)) return null;
+        GuardPurchasePointSaveEntry[] entries = ActiveSlot?.GuardPurchasePoints;
+        if (entries == null) return null;
+        return Array.Find(entries, e => e.PointId == pointId);
+    }
+
+    /// <summary>
+    /// Records the purchase/arrival state for the guard purchase point with the given ID and
+    /// persists to disk immediately, so a purchase made just before quitting is never lost —
+    /// including the "purchased but not yet arrived" state, which must resolve into an arrival at
+    /// the next day start after the save is reloaded rather than silently reverting to unpurchased.
+    /// Safe to call repeatedly; updates the existing entry in place.
+    /// </summary>
+    public void SaveGuardPurchasePointState(string pointId, bool purchased, bool arrived)
+    {
+        if (ActiveSlot == null || string.IsNullOrEmpty(pointId)) return;
+
+        var list = new System.Collections.Generic.List<GuardPurchasePointSaveEntry>(
+            ActiveSlot.GuardPurchasePoints ?? Array.Empty<GuardPurchasePointSaveEntry>());
+        GuardPurchasePointSaveEntry entry = list.Find(e => e.PointId == pointId);
+        if (entry == null)
+        {
+            entry = new GuardPurchasePointSaveEntry { PointId = pointId };
+            list.Add(entry);
+        }
+        entry.Purchased = purchased;
+        entry.Arrived = arrived;
+
+        ActiveSlot.GuardPurchasePoints = list.ToArray();
+        Save();
+        Debug.Log($"[SaveDataManager] Guard purchase point saved: '{pointId}' (purchased={purchased}, arrived={arrived}).");
     }
 
     // -------------------------------------------------------------------------
@@ -817,6 +875,25 @@ public class SuspectSaveEntry
     public int LastDayShown;
 }
 
+/// <summary>
+/// Persistent purchase/arrival state for a single <see cref="GuardPurchasePoint"/>, keyed by its
+/// stable, designer-assigned ID. Lets a save reload resume a guard that was purchased but had not
+/// yet arrived, instead of forgetting the purchase — and remembers an already-arrived guard so it
+/// doesn't reappear as purchasable while its slot is occupied.
+/// </summary>
+[Serializable]
+public class GuardPurchasePointSaveEntry
+{
+    /// <summary>Matches the owning <see cref="GuardPurchasePoint"/>'s serialized persistent ID.</summary>
+    public string PointId;
+
+    /// <summary>True once a guard has been purchased at this point and not yet reset (e.g. by corpse collection).</summary>
+    public bool Purchased;
+
+    /// <summary>True once the purchased guard has arrived (spawned) in the world.</summary>
+    public bool Arrived;
+}
+
 [Serializable]
 public class SaveSlot
 {
@@ -838,6 +915,16 @@ public class SaveSlot
     /// Causes Day 1 to skip all tutorial gating on subsequent runs.
     /// </summary>
     public bool Day1TutorialComplete;
+
+    /// <summary>
+    /// True once Vlad's scripted Day 1 tutorial appearance (index 0) has been fully processed —
+    /// his closing dialogue has played and his deferred verdict delivered. See
+    /// <see cref="SaveDataManager.Day1VladProcessed"/> for the guarded wrapper. Used by
+    /// <see cref="CampaignManager.StartCampaign"/> to detect a save reloaded mid-Day-1 before
+    /// Vlad was processed, so the Day 1 opening sequence can be restarted from the beginning
+    /// instead of resuming mid-shift with the wrong suspect standing in for Vlad.
+    /// </summary>
+    public bool Day1VladProcessed;
 
     /// <summary>
     /// True once the player has ever killed a suspect on this save slot, across all sessions.
@@ -886,6 +973,14 @@ public class SaveSlot
 
     /// <summary>Aggregate town population state for the active campaign run.</summary>
     public PopulationSaveData Population = new PopulationSaveData();
+
+    /// <summary>
+    /// Per-<see cref="GuardPurchasePoint"/> purchase/arrival state, keyed by each point's stable
+    /// persistent ID. Persists a guard purchase made just before the guard has arrived, so
+    /// reloading a save resumes with the guard still scheduled to arrive at the next day start
+    /// instead of losing the purchase.
+    /// </summary>
+    public GuardPurchasePointSaveEntry[] GuardPurchasePoints = Array.Empty<GuardPurchasePointSaveEntry>();
 
     /// <summary>
     /// True when the booth window glass has been fully smashed and not yet repaired.

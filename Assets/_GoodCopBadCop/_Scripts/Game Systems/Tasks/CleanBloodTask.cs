@@ -84,6 +84,14 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly NetworkVariable<bool> _isActive = new(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Whether this task is currently active on every client (mirrors <see cref="_isActive"/>).
+    /// Used by <see cref="CompassController"/> to gate the compass blood pips — an unscrubbed
+    /// splatter should only show on the compass while this task is active (including once
+    /// <see cref="ActivateDynamically"/> flips it on).
+    /// </summary>
+    public bool IsActive => _isActive.Value;
+
     // ── Local state (server-only) ─────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedSplatters = new();
