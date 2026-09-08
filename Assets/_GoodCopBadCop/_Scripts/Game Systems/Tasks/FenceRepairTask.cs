@@ -66,8 +66,9 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
              "Min 1 (slightly damaged) — must not exceed the fence's MaxDamageLevel.")]
     [SerializeField] private Vector2Int _damageRange = new Vector2Int(1, 3);
 
-    [Tooltip("Whether broken fence segments show a compass highlight while this task is active. " +
-             "See CompassController.IsCategoryTaskActive.")]
+    [Tooltip("Whether broken fence segments show a HighlightPlus outline on their mesh while this " +
+             "task is active. Does not affect the compass pip (see CompassController), only the " +
+             "in-world glow on the fence itself. See PerimiterFence.RefreshRepairHighlight.")]
     [SerializeField] private bool _showRepairHighlights = true;
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -219,9 +220,10 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     public bool IsActive => _isActive.Value;
 
     /// <summary>
-    /// Whether broken fence segments should show a compass highlight while this task is active
-    /// (see <see cref="CompassController.IsCategoryTaskActive"/>). Toggle off to run the fence
-    /// repair objective without pointing players at every broken segment.
+    /// Whether broken fence segments should show a HighlightPlus outline on their mesh while this
+    /// task is active (see <see cref="PerimiterFence.RefreshRepairHighlight"/>). Toggle off to run
+    /// the fence repair objective without visually glowing every broken segment. Independent of
+    /// the compass pip, which is unaffected by this flag.
     /// </summary>
     public bool ShowRepairHighlights => _showRepairHighlights;
 
@@ -423,6 +425,26 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
             TaskRegistry.Instance?.AddThreat(this);
         else
             TaskRegistry.Instance?.RemoveThreat(this);
+
+        RefreshFenceHighlights();
+    }
+
+    /// <summary>
+    /// Re-syncs every fence's HighlightPlus outline (see
+    /// <see cref="PerimiterFence.RefreshRepairHighlight"/>) to the current active/toggle state.
+    /// Runs on every peer, since <see cref="_isActive"/>'s OnValueChanged callback fires on all of
+    /// them — a broken segment must light up the instant the task starts on every client, and go
+    /// dark the instant it completes, not just on whichever peer is the server.
+    /// </summary>
+    private void RefreshFenceHighlights()
+    {
+        if (_allFences == null) return;
+
+        foreach (PerimiterFence fence in _allFences)
+        {
+            if (fence != null)
+                fence.RefreshRepairHighlight();
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

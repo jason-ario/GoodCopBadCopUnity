@@ -3,6 +3,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 using DG.Tweening;
+using HighlightPlus;
 
 /// <summary>
 /// A single perimeter fence segment that can be damaged by mutants and repaired by players.
@@ -98,6 +99,14 @@ public class PerimiterFence : NetworkBehaviour
     private NavMeshObstacle _navMeshObstacle;
 
     /// <summary>
+    /// Optional HighlightPlus outline shown while this segment is broken and
+    /// <see cref="FenceRepairTask.ShowRepairHighlights"/> is enabled — see
+    /// <see cref="RefreshRepairHighlight"/>. Null-safe throughout: a fence prefab without this
+    /// component simply never glows.
+    /// </summary>
+    private HighlightEffect _highlightEffect;
+
+    /// <summary>
     /// Value delivered by <see cref="SyncStateClientRpc"/>. Only consulted while
     /// <see cref="_health"/> is still un-replicated, as a safety net against a
     /// NetworkVariable snapshot that arrives after this client's OnNetworkSpawn.
@@ -185,6 +194,16 @@ public class PerimiterFence : NetworkBehaviour
     private void Awake()
     {
         _navMeshObstacle = GetComponent<NavMeshObstacle>();
+
+        _highlightEffect = GetComponent<HighlightEffect>();
+        if (_highlightEffect != null)
+        {
+            // Force enabled so Start()/SetupMaterial() always run — a prefab saved with the
+            // component disabled would otherwise silently never render on first activation.
+            // Visibility is driven solely through 'highlighted' (see RefreshRepairHighlight).
+            _highlightEffect.enabled = true;
+            _highlightEffect.highlighted = false;
+        }
     }
 
     public override void OnNetworkSpawn()
@@ -352,6 +371,38 @@ public class PerimiterFence : NetworkBehaviour
         _activeMeshRoot = (state >= 0 && state < _damageStateMeshRoots.Length)
             ? _damageStateMeshRoots[state]
             : null;
+
+        // The active mesh root just changed — rebuild HighlightPlus's cached renderer list so the
+        // outline follows the newly visible mesh instead of staying targeted at the previous
+        // (now-inactive) one.
+        if (_highlightEffect != null)
+            _highlightEffect.Refresh(true);
+
+        RefreshRepairHighlight();
+    }
+
+    /// <summary>
+    /// Syncs this fence's HighlightPlus outline to whether it currently needs repair. No-ops if
+    /// this prefab has no <see cref="HighlightEffect"/> component.
+    ///
+    /// Called after every damage-state change (this segment breaking or getting repaired) and by
+    /// <see cref="FenceRepairTask"/> whenever its active state flips, so:
+    ///   - a segment broken between a mutant breach and the repair task actually being triggered
+    ///     stays dark, matching the compass pip's "only glow while the task is live" rule, and
+    ///   - every currently-broken tracked segment lights up the instant the task starts, and goes
+    ///     dark the instant it's repaired or the task completes.
+    ///
+    /// Independent of the compass pip (<see cref="CompassMarkerRegistry"/>/<see cref="CompassController"/>)
+    /// — <see cref="FenceRepairTask.ShowRepairHighlights"/> only gates this in-world glow.
+    /// </summary>
+    public void RefreshRepairHighlight()
+    {
+        if (_highlightEffect == null) return;
+
+        bool taskActive = FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive;
+        bool highlightsEnabled = FenceRepairTask.Instance == null || FenceRepairTask.Instance.ShowRepairHighlights;
+
+        _highlightEffect.highlighted = IsBroken && taskActive && highlightsEnabled;
     }
 
     /// <summary>
