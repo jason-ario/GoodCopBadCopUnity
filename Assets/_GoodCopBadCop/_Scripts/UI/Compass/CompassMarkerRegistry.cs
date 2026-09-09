@@ -23,7 +23,16 @@ public static class CompassMarkerRegistry
     private static readonly Dictionary<Transform, CompassMarkerCategory> _markers = new();
 
     /// <summary>Live view of every currently-registered target and its category. Do not mutate.</summary>
-    public static IReadOnlyDictionary<Transform, CompassMarkerCategory> Markers => _markers;
+    public static IReadOnlyDictionary<Transform, CompassMarkerCategory> Markers
+    {
+        get
+        {
+            RemoveDestroyedTargets();
+            return _markers;
+        }
+    }
+
+    private static readonly List<Transform> _destroyedTargets = new();
 
     /// <summary>
     /// Registers (or re-categorizes) <paramref name="target"/> so it shows a compass pip.
@@ -38,10 +47,25 @@ public static class CompassMarkerRegistry
     /// <summary>Removes <paramref name="target"/>'s compass pip, if any. Safe to call with a target that isn't registered.</summary>
     public static void Unregister(Transform target)
     {
-        if (target == null) return;
+        // Destroyed Unity Objects compare equal to null but still retain their managed reference.
+        // Removing that reference is required when an item was despawned by another player.
+        if (ReferenceEquals(target, null)) return;
         _markers.Remove(target);
     }
 
     /// <summary>Clears every registered marker. Call on scene teardown so nothing lingers across a scene reload.</summary>
     public static void Clear() => _markers.Clear();
+
+    private static void RemoveDestroyedTargets()
+    {
+        _destroyedTargets.Clear();
+        foreach (Transform target in _markers.Keys)
+        {
+            if (target == null)
+                _destroyedTargets.Add(target);
+        }
+
+        foreach (Transform target in _destroyedTargets)
+            _markers.Remove(target);
+    }
 }

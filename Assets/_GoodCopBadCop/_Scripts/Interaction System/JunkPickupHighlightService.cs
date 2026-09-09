@@ -3,13 +3,14 @@ using HighlightPlus;
 using UnityEngine;
 
 /// <summary>
-/// Keeps every collectible <see cref="JunkItem"/> in the scene highlighted for as long as it is
-/// live, pickable junk — gore chunks, mutant corpses, and ordinary trash alike.
+/// Keeps junk highlighted only while an active task requires it. Gore chunks, mutant corpses,
+/// and ordinary trash remain baggable whenever their <see cref="JunkItem.CanBeCollected"/>
+/// predicate allows it, but unneeded environmental debris does not advertise itself as an
+/// objective.
 ///
-/// Players consistently struggled to FIND junk during clean-up: gore reads as scenery against a
+/// Players can still find required junk reliably during clean-up: gore reads as scenery against a
 /// dark, prop-heavy 1989 yard, and the hover highlight only fires once the reticle is already on the
-/// item, which is no help when the problem is not knowing where to look. Anything that is ready to
-/// be collected simply glows, so clean-up is a route rather than a hunt.
+/// item. Task-owned junk therefore glows, while unrelated collectible debris remains visually quiet.
 ///
 /// Deliberately NOT conditioned on what the player is holding. The glow means "this is collectible
 /// junk", not "you can grab it this instant" — a player who hasn't fetched a trash bag yet is
@@ -209,13 +210,13 @@ public static class JunkPickupHighlightService
 
     private static void Apply(JunkItem junk)
     {
-        bool collectible = _enabled && junk.CanBeCollected;
+        bool requiredByTask = junk.IsTaskRequired.Value && junk.CanBeCollected;
 
-        junk.SetForceHighlight(collectible, HighlightHold.PickupAffordance);
+        junk.SetForceHighlight(_enabled && requiredByTask, HighlightHold.PickupAffordance);
 
-        // Mirror the same "is this glowing as collectible junk" state onto the compass — one
-        // fewer place callers need to remember to update when junk becomes (un)collectible.
-        if (collectible)
+        // Objective markers follow the same replicated task-ownership state as the persistent
+        // highlight. Pickup availability remains independent: unmarked debris is still baggable.
+        if (_enabled && requiredByTask)
             CompassMarkerRegistry.Register(junk.transform, CompassMarkerCategory.Junk);
         else
             CompassMarkerRegistry.Unregister(junk.transform);

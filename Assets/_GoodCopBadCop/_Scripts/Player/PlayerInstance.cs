@@ -177,20 +177,38 @@ public class PlayerInstance : NetworkBehaviour
 
     private IEnumerator RestoreLocalGameplayStateAfterSpawnRoutine()
     {
-        const int maxAttempts = 30; // ~0.5s at 60fps — generous margin over the detach/spawn race.
+        const int maxAttempts = 60; // Covers detach/spawn and scene UI initialization races at low frame rates.
         int attempts = 0;
 
-        while ((ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
-               && attempts < maxAttempts)
+        while (attempts < maxAttempts)
         {
-            attempts++;
-            yield return null;
+            if (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
+            {
+                attempts++;
+                yield return null;
+                continue;
+            }
+
+            if (UIController.Instance == null ||
+                GameObject.FindFirstObjectByType<ReticleController>() == null)
+            {
+                attempts++;
+                yield return null;
+                continue;
+            }
+
+            break;
         }
 
-        // If scripted/dialogue mode is genuinely still active after the grace period, respect it —
+        // If a scripted/dialogue mode is genuinely still active after the grace period, respect it —
         // its own exit path is responsible for restoring state once it actually finishes.
         if (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
             yield break;
+
+        if (UIController.Instance == null)
+        {
+            Debug.LogWarning("[PlayerInstance] Revive recovery could not find UIController; gameplay controls were restored without HUD setup.");
+        }
 
         if (_characterController != null)
             _characterController.enabled = true;

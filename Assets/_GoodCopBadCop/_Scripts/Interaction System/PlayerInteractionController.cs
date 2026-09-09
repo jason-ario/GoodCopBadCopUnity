@@ -90,7 +90,16 @@ public class PlayerInteractionController : NetworkBehaviour
     {
         _canInteract = value;
 
-        if (value == false)
+        // The player object can spawn before the scene-owned reticle/HUD has initialized,
+        // particularly when replacing a dead player over the network. Update() will acquire
+        // the reticle and apply the current interaction state on its first valid frame.
+        if (reticle == null)
+            reticle = GameObject.FindFirstObjectByType<ReticleController>();
+
+        if (reticle == null)
+            return;
+
+        if (!value)
         {
             if (lastInteractable != null)
             {
@@ -120,7 +129,7 @@ public class PlayerInteractionController : NetworkBehaviour
             }
         }
 
-        if (UIController.Instance.IsPaused) return;
+        if (UIController.Instance == null || UIController.Instance.IsPaused) return;
 
         HandleReticle();
         

@@ -426,6 +426,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _depositedCount.Value = 0;
         _totalCount.Value = count;
         _pendingBonusCollected = 0;
+        SetTaskRequired(_countedExistingItems, true);
 
         UpdateThreatLevel();
 
@@ -488,6 +489,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer) return;
 
         DespawnExistingItems();
+        // A new task run rescans the current world. Clear the previous run's ownership first so
+        // anything no longer counted cannot regain an objective highlight later.
+        SetTaskRequired(_countedExistingItems, false);
         _isGoreTask = useGorePrefabs;
         _taskActive = true;
         _depositedCount.Value = 0;
@@ -509,6 +513,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Total = actually spawned (may be less than spawnCount on error) + pre-existing.
         _totalCount.Value = _spawnedItems.Count + preExistingCount;
+        SetTaskRequired(_countedExistingItems, true);
 
         UpdateThreatLevel();
 
@@ -716,6 +721,19 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     /// <summary>
+    /// Replicates task ownership onto the supplied junk so presentation follows the same server
+    /// authority as task scoring. This never changes whether an item can be bagged.
+    /// </summary>
+    private static void SetTaskRequired(IEnumerable<NetworkObject> items, bool required)
+    {
+        foreach (NetworkObject netObj in items)
+        {
+            if (netObj != null && netObj.TryGetComponent(out JunkItem junk))
+                junk.SetTaskRequired(required);
+        }
+    }
+
+    /// <summary>
     /// Registers an externally-spawned <see cref="JunkItem"/>'s NetworkObject with this task
     /// Only items currently inside the <see cref="CheckpointCleanupArea"/> are registered. Items
     /// outside it remain fully baggable but cannot affect this task's required total or progress.
@@ -753,6 +771,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         }
 
         _spawnedItems.Add(netObj);
+        if (netObj.TryGetComponent(out JunkItem junk))
+            junk.SetTaskRequired(true);
         _totalCount.Value++;
         UpdateThreatLevel();
     }
@@ -770,6 +790,12 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Non-short-circuiting '|' so the item is removed from BOTH tracking lists.
         bool wasTracked = _spawnedItems.Remove(netObj) | _countedExistingItems.Remove(netObj);
         if (!wasTracked) return;
+
+        if (netObj.TryGetComponent(out JunkItem junk))
+        {
+            junk.SetTaskRequired(false);
+            junk.SetTutorialHighlight(false);
+        }
 
         _totalCount.Value = Mathf.Max(_depositedCount.Value, _totalCount.Value - 1);
         UpdateThreatLevel();
@@ -826,6 +852,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         _taskActive = false;
         _pendingBonusCollected = 0;
+        SetTaskRequired(_spawnedItems, false);
+        SetTaskRequired(_countedExistingItems, false);
         _countedExistingItems.Clear();
         JunkItem.OnAnyJunkItemCollected          -= OnJunkItemCollected;
         DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
@@ -925,6 +953,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         netObj.Spawn(destroyWithScene: true);
         _spawnedItems.Add(netObj);
+        if (itemGo.TryGetComponent(out JunkItem junk))
+            junk.SetTaskRequired(true);
         _itemPlacements[netObj] = new WorldObjectPlacementSaveData
         {
             PrefabIndex = prefabIndex,
@@ -987,7 +1017,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// the task and despawned outright, so it can never be both required and unreachable. Once
     /// its Rigidbody settles (or <see cref="_goreSettleTimeout"/> elapses), a piece resting
     /// outside the <see cref="CheckpointCleanupArea"/> is unregistered from the task total but
-    /// remains collectible and highlighted. It is switched to kinematic because it is no longer
+    /// remains collectible but loses its objective highlight and compass marker. It is switched to kinematic because it is no longer
     /// task-scored; a piece that settles inside the region stays dynamic and tracked. No-op once the
     /// item is collected (despawned) before either check fires.
     /// </summary>
@@ -1154,6 +1184,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         netObj.Spawn(destroyWithScene: true);
         _spawnedItems.Add(netObj);
+        if (_taskActive && go.TryGetComponent(out JunkItem junk))
+            junk.SetTaskRequired(true);
         _itemPlacements[netObj] = placement;
         if (useGorePrefabs)
             BeginGoreSettleWatchdog(go, placement.Position);

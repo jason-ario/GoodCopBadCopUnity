@@ -59,6 +59,16 @@ public class JunkItem : Interactable
     // Cleanup-zone membership is owned by TakeOutTrashTask; it never disables pickup affordances.
 
     /// <summary>
+    /// Server-authoritative task-ownership flag. A junk item can always be baggable when
+    /// <see cref="CanBeCollected"/> is true, but it only receives the persistent objective
+    /// highlight and compass marker while an active task requires it.
+    /// </summary>
+    public readonly NetworkVariable<bool> IsTaskRequired = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
     /// Server-authoritative tutorial call-out glow, driven by
     /// <see cref="TakeOutTrashTask.HighlightAllItemsForTutorial"/>.
     ///
@@ -79,6 +89,16 @@ public class JunkItem : Interactable
     {
         if (!IsServer) return;
         TutorialHighlight.Value = highlight;
+    }
+
+    /// <summary>
+    /// Server-only. Marks whether a currently collectible item is required by an active task.
+    /// This controls only objective presentation, never bag pickup availability.
+    /// </summary>
+    public void SetTaskRequired(bool required)
+    {
+        if (!IsServer) return;
+        IsTaskRequired.Value = required;
     }
 
     /// <summary>
@@ -116,10 +136,9 @@ public class JunkItem : Interactable
     /// remain baggable wherever they land, while <see cref="TakeOutTrashTask"/> separately decides
     /// whether an item advances a cleanup task.
     ///
-    /// This is THE single predicate for junk: it drives whether the item can be targeted at all
-    /// (<see cref="IsInteractable"/>) and whether it glows (<see cref="JunkPickupHighlightService"/>).
-    /// Keeping those two answers from the same source is deliberate — the original bug report that
-    /// started this work was gore that looked interactable and wasn't.
+    /// This is the single pickup-affordance predicate: it drives whether the item can be targeted
+    /// at all (<see cref="IsInteractable"/>). Objective presentation additionally requires the
+    /// replicated <see cref="IsTaskRequired"/> flag in <see cref="JunkPickupHighlightService"/>.
     ///
     /// Collection additionally requires a non-full trash bag (see <see cref="Interact"/>); that is a
     /// property of the player, not of the junk, so it is intentionally not part of this.
@@ -153,10 +172,8 @@ public class JunkItem : Interactable
     }
 
     /// <summary>
-    /// Junk glowing merely because it is collectible uses the softer amber profile, so a yard
-    /// scattered with lit-up gore reads as "there's mess over there" rather than as a screenful of
-    /// active interaction prompts. Aiming at an item swaps it back to the standard highlight (handled
-    /// by <see cref="Interactable"/>), which keeps targeting feedback unambiguous.
+    /// Junk glowing because an active task requires it uses the softer amber profile, so a yard
+    /// scattered with optional gore reads as scenery rather than as a screenful of objectives.
     /// </summary>
     protected override HighlightProfile ForceHighlightProfile => JunkPickupHighlightService.CollectibleProfile;
 
@@ -169,6 +186,7 @@ public class JunkItem : Interactable
         // Re-evaluate the glow when a body becomes (or stops being) collectible mid-run — e.g. a
         // suspect corpse on death or a reusable guard corpse being cleared after collection.
         IsCollectible.OnValueChanged += OnIsCollectibleChanged;
+        IsTaskRequired.OnValueChanged += OnIsTaskRequiredChanged;
         TutorialHighlight.OnValueChanged += OnTutorialHighlightChanged;
 
         // Apply the current value for late joiners — an item already called out by the tutorial
@@ -184,6 +202,7 @@ public class JunkItem : Interactable
         base.OnNetworkDespawn();
 
         IsCollectible.OnValueChanged -= OnIsCollectibleChanged;
+        IsTaskRequired.OnValueChanged -= OnIsTaskRequiredChanged;
         TutorialHighlight.OnValueChanged -= OnTutorialHighlightChanged;
 
         JunkPickupHighlightService.Unregister(this);
@@ -220,6 +239,13 @@ public class JunkItem : Interactable
     private void OnDisable()
     {
         JunkPickupHighlightService.Unregister(this);
+    }
+
+    private void OnIsTaskRequiredChanged(bool previous, bool current)
+    {
+        if (!IsSpawned) return;
+
+        JunkPickupHighlightService.Refresh(this);
     }
 
     private void OnIsCollectibleChanged(bool previous, bool current)
@@ -297,7 +323,11 @@ public class JunkItem : Interactable
         if (_destroyOnCollect)
             NetworkObject.Despawn(destroy: true);
         else
+        {
+            IsTaskRequired.Value = false;
+            TutorialHighlight.Value = false;
             IsCollectible.Value = false;
+        }
 
         OnCollected?.Invoke();
         OnAnyJunkItemCollected?.Invoke(this);

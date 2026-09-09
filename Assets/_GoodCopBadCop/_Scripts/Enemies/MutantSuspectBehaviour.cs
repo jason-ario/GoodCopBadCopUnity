@@ -58,7 +58,12 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     // ── State ──────────────────────────────────────────────────────────────────
 
     private Tween _activeTween;
+    private Coroutine _postHitLineupReleaseCoroutine;
     private bool _isDone;
+    private bool _isAtBoothWindow;
+    private bool _lineupSlotReleasedAtWindow;
+
+    private const float PostHitNoCombatReleaseSeconds = 5f;
 
     /// <summary>
     /// Optional callback fired on the server when the lineup sequence completes.
@@ -106,6 +111,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+        _isAtBoothWindow = false;
+        _postHitLineupReleaseCoroutine = null;
         _activeTween?.Kill();
         StopAllCoroutines();
     }
@@ -125,6 +132,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         SuspectController controller)
     {
         if (!IsServer) return;
+
+        _isDone = false;
+        _isAtBoothWindow = false;
+        _lineupSlotReleasedAtWindow = false;
 
         _data = data;
         _standPos = standPos;
@@ -157,6 +168,106 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         StartCoroutine(LineupSequence());
     }
+
+    /// <summary>
+    /// Immediately hands a window-banging mutant to <see cref="MutantEnemy"/> after a player
+    /// damages it. The active booth coroutine is cancelled so it cannot keep striking the window
+    /// once normal hostile AI has taken over. Server only.
+    /// </summary>
+    public bool TryActivateFromWindowHit()
+    {
+        if (!IsServer || _isDone || !_isAtBoothWindow || _mutantEnemy == null || _mutantEnemy.IsActive)
+            return false;
+
+        _isAtBoothWindow = false;
+        _isDone = true;
+        _activeTween?.Kill();
+        _activeTween = null;
+        StopAllCoroutines();
+
+        SetAttackClientRpc(false);
+        SetWalkingClientRpc(false);
+        SetClimbingClientRpc(false);
+        SetAnimBool(GroundedAnimBool, true);
+        SetLegsAnimatorsBlendClientRpc(1f);
+
+        if (_agent != null && !_agent.enabled)
+            _agent.enabled = true;
+
+        // Match the normal climb-through handoff: the mutant is hostile immediately, while its
+        // standard target selection still prioritises nearby players over the booth target.
+        if (_controller != null)
+            _mutantEnemy.SetAggroTarget(_controller.transform);
+        _mutantEnemy.SetForceAggro(true);
+        _mutantEnemy.InitialiseServer();
+
+        if (!_mutantEnemy.IsActive)
+            return false;
+
+        SubscribeBreakthroughRemovalHandler();
+        if (!_lineupSlotReleasedAtWindow)
+            _postHitLineupReleaseCoroutine = StartCoroutine(ReleaseLineupAfterCombatLoss());
+        return true;
+    }
+
+    /// <summary>
+    /// Switches the lineup safety-net callback to the post-breach completion callback. Once the
+    /// mutant is under hostile AI control, its eventual removal counts as a breakthrough.
+    /// </summary>
+    private void SubscribeBreakthroughRemovalHandler()
+    {
+        if (_mutantEnemy == null) return;
+
+        UnsubscribeLineupDeathSafetyNet();
+        _mutantEnemy.OnRemovedFromPlay -= HandleRemovedFromPlayAfterBreakthrough;
+        _mutantEnemy.OnRemovedFromPlay += HandleRemovedFromPlayAfterBreakthrough;
+    }
+
+    private void HandleRemovedFromPlayAfterBreakthrough()
+    {
+        ReleaseLineupAfterWindowHit();
+        OnSequenceComplete?.Invoke(true);
+    }
+
+    /// <summary>
+    /// Waits until this post-hit mutant has spent five continuous seconds without a combat target,
+    /// then releases the next-suspect button while the hostile mutant remains in play.
+    /// </summary>
+    private IEnumerator ReleaseLineupAfterCombatLoss()
+    {
+        float noCombatSince = Time.time;
+
+        while (_mutantEnemy != null && !_mutantEnemy.IsDead)
+        {
+            if (_mutantEnemy.HasCombatTarget)
+                noCombatSince = Time.time;
+            else if (Time.time >= noCombatSince + PostHitNoCombatReleaseSeconds)
+            {
+                ReleaseLineupAfterWindowHit();
+                yield break;
+            }
+
+            yield return null;
+        }
+    }
+
+    /// <summary>
+    /// Releases the lineup only once after a window-hit activation. The mutant remains active and
+    /// may continue fighting after the next suspect is available.
+    /// </summary>
+    private void ReleaseLineupAfterWindowHit()
+    {
+        if (_lineupSlotReleasedAtWindow)
+            return;
+
+        _lineupSlotReleasedAtWindow = true;
+        if (_postHitLineupReleaseCoroutine != null)
+            StopCoroutine(_postHitLineupReleaseCoroutine);
+        _postHitLineupReleaseCoroutine = null;
+        _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
+    }
+
+    // ── Safety Net ─────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Safety net for a mutant killed (or that flees) while still under
@@ -253,6 +364,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (!IsServer || _isDone) yield break;
 
+        _isAtBoothWindow = false;
+
         SetClimbingClientRpc(true);
         PlayClimbThroughSoundClientRpc();
 
@@ -310,12 +423,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
             // Swap the lineup death safety net for the breakthrough-specific handler — from
             // here on the mutant is loose in the player area, so removal counts as brokeThrough.
-            UnsubscribeLineupDeathSafetyNet();
-            _mutantEnemy.OnRemovedFromPlay += () =>
-            {
-                _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
-                OnSequenceComplete?.Invoke(true);
-            };
+            SubscribeBreakthroughRemovalHandler();
         }
 
         _isDone = true;
@@ -337,10 +445,13 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     {
         if (!IsServer || _isDone) yield break;
 
+        _isAtBoothWindow = true;
+
         if (!canClimb)
         {
             // Release the lineup slot right away — this mutant stays at the window as a persistent threat
             // while the rest of the shift continues normally.
+            _lineupSlotReleasedAtWindow = true;
             _controller?.OnMutantIntruderComplete(this, brokeThrough: false, staysAtWindow: true);
 
             // The slot is released for good at this point — unsubscribe the lineup death safety
@@ -430,6 +541,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private IEnumerator GlassAttackSequence()
     {
         if (!IsServer || _isDone) yield break;
+
+        _isAtBoothWindow = true;
 
         var glass = BreakableGlassController.Instance;
 
@@ -581,6 +694,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         SuspectController controller)
     {
         if (!IsServer) return;
+
+        _isDone = false;
+        _isAtBoothWindow = false;
+        _lineupSlotReleasedAtWindow = false;
 
         _data = data;
         _standPos = standPos;

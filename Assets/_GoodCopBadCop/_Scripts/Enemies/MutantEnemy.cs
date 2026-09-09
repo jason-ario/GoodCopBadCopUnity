@@ -369,6 +369,12 @@ public class MutantEnemy : NetworkBehaviour
     public bool IsActive => _isActive.Value;
 
     /// <summary>
+    /// Server-side: whether this active mutant currently has a living player or responder target.
+    /// Callers can use this to distinguish active pursuit/attack from aggroing on static world targets.
+    /// </summary>
+    public bool HasCombatTarget => _currentTarget != null;
+
+    /// <summary>
     /// True when this mutant is outdoors, false when indoors. Controls which footstep clip set
     /// (<see cref="_outsideFootstepClips"/> vs <see cref="_insideFootstepClips"/>) is used.
     /// Mirrors <see cref="SuspectFootstepsAudio.IsOutside"/> — set externally if a mutant needs
@@ -1510,14 +1516,10 @@ public class MutantEnemy : NetworkBehaviour
 
     /// <summary>
     /// Apply damage to this enemy. Call from the server (e.g. from a weapon script).
-    /// No-op entirely when <see cref="_ignoreFriendlyFireDamage"/> is set on this instance, or
-    /// while this mutant is still dormant (<see cref="_isActive"/> false) — suspects carry a
-    /// MutantEnemy component from the moment they spawn, kept dormant until their booth
-    /// transition calls <see cref="InitialiseServer"/>, but this component's own Unity
-    /// 'enabled' flag stays true the whole time (see the comment on <see cref="_isActive"/>).
-    /// Weapon scripts find this component via GetComponentInParent regardless of dormancy, so
-    /// without this guard, hitting a suspect that hasn't mutated yet would silently
-    /// damage/kill/flee the dormant MutantEnemy underneath it.
+    /// No-op when <see cref="_ignoreFriendlyFireDamage"/> is set. Dormant mutants normally
+    /// ignore damage, except while a <see cref="MutantSuspectBehaviour"/> is actively banging
+    /// on the booth window: that first hit immediately hands them to hostile AI, then applies
+    /// the triggering damage through this same method.
     /// </summary>
     /// <param name="amount">Damage to apply.</param>
     /// <param name="hitPoint">World-space point of impact used to position the hit particle.</param>
@@ -1534,8 +1536,15 @@ public class MutantEnemy : NetworkBehaviour
     /// </param>
     public void TakeDamage(float amount, Vector3 hitPoint, bool isFireDamage = false, Vector3? knockbackDirection = null)
     {
-        if (!IsServer || _isDead || _ignoreFriendlyFireDamage || !enabled || !_isActive.Value)
+        if (!IsServer || _isDead || _ignoreFriendlyFireDamage || !enabled)
             return;
+
+        if (!_isActive.Value)
+        {
+            MutantSuspectBehaviour suspectBehaviour = GetComponent<MutantSuspectBehaviour>();
+            if (suspectBehaviour == null || !suspectBehaviour.TryActivateFromWindowHit())
+                return;
+        }
 
         _health -= amount;
 

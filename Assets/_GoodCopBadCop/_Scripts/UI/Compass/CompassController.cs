@@ -199,7 +199,8 @@ public class CompassController : MonoBehaviour
         switch (category)
         {
             case CompassMarkerCategory.Junk:
-                return TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsActive;
+                return (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.IsActive)
+                    || (CleanBoothMessTask.Instance != null && CleanBoothMessTask.Instance.IsActive);
             case CompassMarkerCategory.Graffiti:
                 return CleanGraffitiTask.Instance != null && CleanGraffitiTask.Instance.IsActive;
             case CompassMarkerCategory.Fence:
@@ -228,7 +229,9 @@ public class CompassController : MonoBehaviour
 
     private void ReleaseIcon(Transform target)
     {
-        if (target == null) return;
+        // A destroyed Unity Object compares equal to null but is still the dictionary key that
+        // owns a pooled icon. Do not early-out on Unity's overloaded null check here, otherwise
+        // a remote player's despawn can leave that icon visible forever.
         if (!_activeIcons.TryGetValue(target, out RectTransform icon)) return;
 
         _activeIcons.Remove(target);

@@ -79,6 +79,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
     public string ThreatName  => _taskName;
     public float  ScoreWeight => _scoreWeight;
     public float  ThreatLevel => _networkThreatLevel.Value;
+    public bool IsActive => _isActive.Value;
 
     public BoothMessTaskSaveState CaptureSaveState() => new()
     {
@@ -312,6 +313,8 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
                 junkItem.OnCollected += OnJunkCollected;
 
             netObj.Spawn(destroyWithScene: true);
+            if (junkItem != null)
+                junkItem.SetTaskRequired(true);
             _spawnedJunk.Add(netObj);
             _networkRemainingJunk.Value++;
         }
