@@ -3,6 +3,10 @@ using UnityEngine;
 
 public class TrashCan : Interactable
 {
+    private const string DocumentationCategory = "Documentation";
+    private const string DocumentationTutorialIncompleteMessage =
+        "Finish the documentation tutorial before throwing this away.";
+
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip throwTrashSound;
     
@@ -17,6 +21,15 @@ public class TrashCan : Interactable
 
         if (item is SupplyBox supplyBox && !supplyBox.IsEmpty)
         {
+            return;
+        }
+
+        if (item is ExamNotebook examNotebook &&
+            examNotebook.CategoryName == DocumentationCategory &&
+            Day_01.Instance != null &&
+            !Day_01.Instance.DocumentationExamTutorialComplete)
+        {
+            UIController.Instance?.ShowShopNotification(DocumentationTutorialIncompleteMessage);
             return;
         }
 

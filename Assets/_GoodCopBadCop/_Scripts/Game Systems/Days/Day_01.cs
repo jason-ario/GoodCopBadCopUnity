@@ -105,6 +105,12 @@ public class Day_01 : DayBase
     /// </summary>
     public SuspectCharacter SoldierCharacter => _soldierCharacter;
 
+    /// <summary>
+    /// True once the documentation-exam tutorial's final quarantine hand-off has completed on
+    /// this client. The trash can reads this to protect documentation notebooks mid-tutorial.
+    /// </summary>
+    public bool DocumentationExamTutorialComplete { get; private set; }
+
     [Tooltip("Scripted dialogue sequence to play once the Soldier sequence begins.")]
     [SerializeField] private ScriptedDialogue _soldierDialogue;
 
@@ -559,6 +565,7 @@ public class Day_01 : DayBase
 
         _dayStartedFired = false;
         _debugSkipActive = false;
+        DocumentationExamTutorialComplete = SaveDataManager.Instance?.DocumentationExamTutorialComplete ?? false;
 
         // Claim the trash/graffiti objectives for the WHOLE day — before TriggerEndOfShiftSetup
         // ever calls TriggerTask()/TriggerDailyTask() on them — so HUDTaskList's generic
@@ -684,6 +691,7 @@ public class Day_01 : DayBase
     public override void DayDeactivated()
     {
         base.DayDeactivated();
+        DocumentationExamTutorialComplete = true;
 
         // Restore notebooks so Day 2+ can manage them normally.
         _mutationNotebook?.SetVisible(true);
@@ -1588,6 +1596,15 @@ public class Day_01 : DayBase
         // Hide the task list, then show the accuracy-payout overlay.
         // ReshowSubjectCounter runs after the player closes the overlay.
         HideObjectiveListThenRun(1.5f, ShowAccuracyPayoutOverlay);
+
+        // The documentation tutorial is now fully resolved. Persist the milestone on the server
+        // while setting the local state on every client through this shared hand-off event.
+        DocumentationExamTutorialComplete = true;
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer &&
+            SaveDataManager.Instance != null)
+        {
+            SaveDataManager.Instance.DocumentationExamTutorialComplete = true;
+        }
 
         Debug.Log("[Day_01] Quarantine tutorial complete — folder handed off.");
     }
@@ -3459,6 +3476,7 @@ public class Day_01 : DayBase
         // Unlock everything that DayActivated locked behind tutorial gates.
         _stackOfFolders?.SetInteractable(true);
         _documentationExamShopItem?.SetAvailable(true);
+        DocumentationExamTutorialComplete = true;
         _greenStampSlot?.SetSlotInteractable(true);
         _yellowStampSlot?.SetSlotInteractable(true);
         _redStampSlot?.SetSlotInteractable(true);
@@ -3487,6 +3505,7 @@ public class Day_01 : DayBase
 
         _stackOfFolders?.SetInteractable(true);
         _documentationExamShopItem?.SetAvailable(true);
+        DocumentationExamTutorialComplete = true;
         _greenStampSlot?.SetSlotInteractable(true);
         _yellowStampSlot?.SetSlotInteractable(true);
         _redStampSlot?.SetSlotInteractable(true);

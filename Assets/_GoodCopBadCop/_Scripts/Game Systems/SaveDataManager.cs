@@ -166,6 +166,17 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>
+    /// True once the Day 1 documentation-exam tutorial has reached its final folder hand-off.
+    /// This narrower milestone persists independently of the full Day 1 tutorial so the tutorial
+    /// notebook cannot be discarded before the player has used it to process the quarantine suspect.
+    /// </summary>
+    public bool DocumentationExamTutorialComplete
+    {
+        get => ActiveSlot?.DocumentationExamTutorialComplete ?? false;
+        set { if (ActiveSlot == null) return; ActiveSlot.DocumentationExamTutorialComplete = value; Save(); }
+    }
+
+    /// <summary>
     /// True once Vlad's scripted Day 1 tutorial appearance has been fully processed this save
     /// (his closing dialogue played and his deferred verdict delivered — see
     /// <see cref="Day_01.OnClosingDialogueComplete"/>). <see cref="CampaignManager.StartCampaign"/>
@@ -915,6 +926,11 @@ public class SaveSlot
     /// Causes Day 1 to skip all tutorial gating on subsequent runs.
     /// </summary>
     public bool Day1TutorialComplete;
+
+    /// <summary>
+    /// Set after the player completes the documentation-exam tutorial's final quarantine hand-off.
+    /// </summary>
+    public bool DocumentationExamTutorialComplete;
 
     /// <summary>
     /// True once Vlad's scripted Day 1 tutorial appearance (index 0) has been fully processed —
