@@ -186,21 +186,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly List<NetworkObject> _countedExistingItems = new();
 
     /// <summary>
-    /// Number of junk items collected into bags this run that were NOT part of this task's counted
-    /// total.
-    ///
-    /// Gore and corpses outside the <see cref="CheckpointCleanupArea"/> can no longer produce these:
-    /// countability and interactability are one rule again, so anything outside the region is inert
-    /// scenery (see <see cref="UnregisterExternalJunkItem"/> and
-    /// <c>MutantEnemy.EnableCorpseJunkPickupAfterSettle</c>). What remains are pickups belonging to
-    /// OTHER systems — booth-mess junk, a reusable guard corpse — collected into a bag while this task
-    /// happens to be running.
-    ///
-    /// This is a safety valve, not a feature: without it, a bag containing junk this task never
-    /// counted would push <see cref="_depositedCount"/> toward a <see cref="_totalCount"/> it didn't
-    /// earn and complete the task early (or have the deposit silently swallowed by the clamp).
-    /// Reconciling at DEPOSIT time by incrementing both counters together (+1/+1) keeps the readout
-    /// honest without moving the goalpost.
+    /// Tracks junk collected into bags this run that was not part of this task's in-zone total.
+    /// This includes out-of-region mutant gore/corpses and junk owned by other systems. The count
+    /// is consumed when a bag is deposited so those items are disposed of without advancing this
+    /// cleanup objective.
     /// </summary>
     private int _pendingBonusCollected;
 
@@ -657,11 +646,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     ///    (see <see cref="JunkItem"/>'s class doc) — only <see cref="JunkItem.IsCollectible"/>
     ///    flips true once <see cref="SuspectCharacter.EnableJunkPickup"/> runs on death. Skip
     ///    any JunkItem still attached to a live suspect so alive characters are never counted.
-    /// 3. Any JunkItem that isn't currently collectible — a gore chunk that was never activated as
-    ///    collectible junk, or one that has been ruled out of the cleanup because it came to rest
-    ///    outside the region (<see cref="JunkItem.IsCleanupEligible"/>). Delegated to
-    ///    <see cref="JunkItem.CanBeCollected"/>, the same predicate that drives interactability and
-    ///    the findability glow, so the sweep can never count something the player can't touch.
+    /// 3. Any JunkItem that isn't currently collectible — e.g. a gore chunk that was never activated
+    ///    as collectible junk. Delegated to <see cref="JunkItem.CanBeCollected"/>, the same predicate
+    ///    that drives interactability and the findability glow, so the sweep can never count something
+    ///    the player can't touch.
     /// </summary>
     /// <param name="includeSuspects">
     /// When false, any JunkItem attached to a <see cref="SuspectCharacter"/> is excluded
@@ -677,10 +665,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!includeSuspects && junk.GetComponent<SuspectCharacter>() != null)
             return false;
 
-        // Covers all of the above: activeInHierarchy, the suspect-only IsCollectible rule (a
-        // suspect's own Unity 'enabled' flag is deliberately never toggled — see JunkItem's class
-        // doc — so testing it here would wrongly exclude every suspect corpse, dead or alive), the
-        // plain 'enabled' rule for everything else, and the IsCleanupEligible veto.
+        // Covers activeInHierarchy, the suspect-only IsCollectible rule (a suspect's own Unity
+        // 'enabled' flag is deliberately never toggled — see JunkItem's class doc), and the plain
+        // 'enabled' rule for everything else. Zone membership is tested separately below.
         if (!junk.CanBeCollected)
             return false;
 
@@ -730,10 +717,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     /// <summary>
     /// Registers an externally-spawned <see cref="JunkItem"/>'s NetworkObject with this task
-    /// (e.g. a gore chunk dropped by a killed mutant that landed inside the yard, or a corpse
-    /// that just became collectible junk). Collection is already tracked generically via the
-    /// static <see cref="JunkItem.OnAnyJunkItemCollected"/> event, so this only needs to keep
-    /// the HUD denominator accurate.
+    /// Only items currently inside the <see cref="CheckpointCleanupArea"/> are registered. Items
+    /// outside it remain fully baggable but cannot affect this task's required total or progress.
     ///
     /// If the task is already active, the item is added to the tracked list and the total
     /// count is incremented immediately. If no trash task is currently running, this call
@@ -746,6 +731,16 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer || netObj == null)
             return;
+
+        if (IsCountedItem(netObj))
+            return;
+
+        if (!CountsTowardCleanup(netObj.transform.position))
+        {
+            Debug.Log($"[TakeOutTrashTask] External junk item '{netObj.name}' is outside the " +
+                      "checkpoint cleanup area — left collectible but excluded from task scoring.");
+            return;
+        }
 
         if (!_taskActive)
         {
@@ -763,19 +758,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     /// <summary>
-    /// Removes a previously-registered external <see cref="JunkItem"/> from this task's total —
-    /// used when a gore chunk registered via <see cref="RegisterExternalJunkItem"/> (based on
-    /// its initial in-region launch position) later comes to rest outside the
-    /// <see cref="CheckpointCleanupArea"/> once physics settles (e.g. it rolled or bounced past
-    /// the fence line). Decrements the total so the task no longer requires collecting it and
-    /// completes the task if it was the last outstanding item.
-    ///
-    /// The item is also ruled out of the cleanup entirely via
-    /// <see cref="JunkItem.SetCleanupEligible"/>: leaving the checkpoint means it stops being
-    /// interactable and stops being highlighted, not merely uncounted. Countability and
-    /// interactability are one rule — inside the region it is collectible gore, outside it is
-    /// scenery — so the player is never shown an affordance that doesn't contribute to anything.
-    /// No-op if the item was never tracked (e.g. already collected). Server-only.
+    /// Removes an item from this task's total when it leaves the
+    /// <see cref="CheckpointCleanupArea"/>. The item remains fully collectible; it is simply no
+    /// longer required by or credited toward this cleanup task. No-op if the item was never tracked
+    /// (e.g. it spawned outside the region or was already collected). Server-only.
     /// </summary>
     public void UnregisterExternalJunkItem(NetworkObject netObj)
     {
@@ -785,15 +771,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         bool wasTracked = _spawnedItems.Remove(netObj) | _countedExistingItems.Remove(netObj);
         if (!wasTracked) return;
 
-        JunkItem junk = netObj.GetComponent<JunkItem>();
-        if (junk != null)
-            junk.SetCleanupEligible(false);
-
         _totalCount.Value = Mathf.Max(_depositedCount.Value, _totalCount.Value - 1);
         UpdateThreatLevel();
 
-        Debug.Log($"[TakeOutTrashTask] External junk item is resting outside the checkpoint — " +
-                  $"unregistered and made inert. New total {_totalCount.Value}.");
+        Debug.Log($"[TakeOutTrashTask] External junk item is outside the checkpoint — " +
+                  $"unregistered from task scoring. New total {_totalCount.Value}.");
 
         if (_taskActive && _depositedCount.Value >= _totalCount.Value)
             CompleteTask();
@@ -807,12 +789,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// When all items are deposited, fires <see cref="OnAllItemsDeposited"/> and removes
     /// the task from the HUD on all clients.
     ///
-    /// Bonus reconciliation: any items in this bag that were collected from OUTSIDE the
-    /// <see cref="CheckpointCleanupArea"/> (see <see cref="_pendingBonusCollected"/>) are added to
-    /// BOTH <see cref="_totalCount"/> and <see cref="_depositedCount"/>, so the player's extra
-    /// work shows up in the HUD readout ("3/5" becomes "4/6") while leaving the amount still
-    /// outstanding inside the checkpoint completely unchanged. This is what makes out-of-region
-    /// corpses safe to pick up: they can never be required, and they can never block completion.
+    /// Out-of-region pickups are removed from the bag normally, but are excluded from objective
+    /// progress. <see cref="_pendingBonusCollected"/> identifies them so a mixed bag credits only
+    /// the items that were part of this task's in-zone total.
     /// </summary>
     private void OnTrashBagDeposited(int junkCount)
     {
@@ -820,20 +799,14 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // stranded piece can never hold the objective at e.g. 12/13 (see ReconcileOutOfYardItems).
         ReconcileOutOfYardItems();
 
-        int bonus = Mathf.Clamp(_pendingBonusCollected, 0, junkCount);
-        if (bonus > 0)
-        {
-            _pendingBonusCollected -= bonus;
-            _totalCount.Value += bonus;
+        int uncounted = Mathf.Clamp(_pendingBonusCollected, 0, junkCount);
+        _pendingBonusCollected -= uncounted;
+        int counted = junkCount - uncounted;
 
-            Debug.Log($"[TakeOutTrashTask] {bonus} bonus item(s) from outside the checkpoint " +
-                      $"deposited — total raised to {_totalCount.Value} so they credit without " +
-                      "changing what's still required inside.");
-        }
-
-        _depositedCount.Value = Mathf.Min(_depositedCount.Value + junkCount, _totalCount.Value);
-        Debug.Log($"[TakeOutTrashTask] {junkCount} item(s) deposited. " +
-                  $"Total deposited: {_depositedCount.Value}/{_totalCount.Value}");
+        _depositedCount.Value = Mathf.Min(_depositedCount.Value + counted, _totalCount.Value);
+        Debug.Log($"[TakeOutTrashTask] {junkCount} item(s) deposited ({counted} task item(s), " +
+                  $"{uncounted} outside the checkpoint). Total deposited: " +
+                  $"{_depositedCount.Value}/{_totalCount.Value}");
 
         if (_depositedCount.Value < _totalCount.Value) return;
 
@@ -1013,12 +986,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Every frame: if the piece has fallen below <paramref name="minY"/> it is unregistered from
     /// the task and despawned outright, so it can never be both required and unreachable. Once
     /// its Rigidbody settles (or <see cref="_goreSettleTimeout"/> elapses), a piece resting
-    /// outside the <see cref="CheckpointCleanupArea"/> is unregistered — which also rules it out of
-    /// the cleanup entirely (not counted, not interactable, not highlighted; see
-    /// <see cref="UnregisterExternalJunkItem"/>) — and switched to kinematic, since it no longer
-    /// counts and there's no reason to keep simulating it. A piece that settles inside the region
-    /// stays dynamic and tracked. No-op once the item is collected (despawned) before either check
-    /// fires.
+    /// outside the <see cref="CheckpointCleanupArea"/> is unregistered from the task total but
+    /// remains collectible and highlighted. It is switched to kinematic because it is no longer
+    /// task-scored; a piece that settles inside the region stays dynamic and tracked. No-op once the
+    /// item is collected (despawned) before either check fires.
     /// </summary>
     private IEnumerator MonitorGoreJunkItem(NetworkObject netObj, Rigidbody rb, float minY)
     {

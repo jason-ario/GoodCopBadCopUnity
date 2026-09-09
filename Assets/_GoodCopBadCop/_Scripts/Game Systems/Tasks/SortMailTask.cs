@@ -477,18 +477,52 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// </summary>
     public void TriggerTask()
     {
-        if (!IsServer) return;
+        TryTriggerTask();
+    }
 
-        DespawnExistingPackages();
-        _taskActive = true;
-        _sortedCount.Value = 0;
+    /// <summary>
+    /// Attempts to spawn a fresh mail delivery. Returns <see langword="true"/> only after at
+    /// least one package has been spawned and the task is registered. The delivery truck uses the
+    /// result to retry a transient startup-order failure after the crate has landed.
+    /// </summary>
+    public bool TryTriggerTask()
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning("[SortMailTask] Tried to trigger mail delivery outside the server.");
+            return false;
+        }
+
+        if (_packagePrefab == null)
+        {
+            Debug.LogError("[SortMailTask] Cannot trigger mail delivery: _packagePrefab is not assigned.");
+            return false;
+        }
 
         List<SuspectRecord> addressPool = BuildAddressablePool();
         if (addressPool.Count == 0)
         {
-            Debug.LogWarning("[SortMailTask] No eligible residents to address packages to — mail delivery skipped.");
-            return;
+            string reason = SuspectRunRecords.Instance == null
+                ? "SuspectRunRecords is not available yet"
+                : "there are no living residents in the runtime record pool";
+            Debug.LogWarning($"[SortMailTask] Mail delivery postponed: {reason}.");
+            return false;
         }
+
+        // A deferred/manual delivery can arrive without the regular day-change goods roll.
+        // Do not attempt Random.Range with an empty category cache.
+        if (_todaysAllowedGoods.Count + _todaysProhibitedGoods.Count == 0)
+            ChooseTodaysProhibitedGoods();
+
+        if (_todaysAllowedGoods.Count + _todaysProhibitedGoods.Count == 0)
+        {
+            Debug.LogError("[SortMailTask] Cannot trigger mail delivery: no valid goods categories are configured.");
+            return false;
+        }
+
+        DespawnExistingPackages();
+        _taskActive = true;
+        _sortedCount.Value = 0;
 
         int packageCount = Random.Range(_minPackageCount, _maxPackageCount + 1);
 
@@ -510,6 +544,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         List<SuspectRecord> residentDrawOrder = new List<SuspectRecord>(addressPool);
         Shuffle(residentDrawOrder);
         int residentCursor = 0;
+        int failedSpawnCount = 0;
 
         for (int i = 0; i < packageCount; i++)
         {
@@ -519,11 +554,21 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 residentCursor = 0;
             }
 
-            SpawnSinglePackage(residentDrawOrder[residentCursor]);
+            if (!SpawnSinglePackage(residentDrawOrder[residentCursor]))
+                failedSpawnCount++;
             residentCursor++;
         }
 
         _totalCount.Value = _spawnedPackages.Count;
+        if (_spawnedPackages.Count == 0)
+        {
+            _taskActive = false;
+            _isActive.Value = false;
+            UpdateThreatLevel();
+            Debug.LogWarning($"[SortMailTask] Mail delivery spawned no packages ({failedSpawnCount}/{packageCount} attempts failed); it can be retried.");
+            return false;
+        }
+
         UpdateThreatLevel();
 
         _isActive.Value = true;
@@ -535,8 +580,12 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         OnMailDelivered?.Invoke();
         SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
-        Debug.Log($"[SortMailTask] Delivery triggered — spawned {_spawnedPackages.Count} package(s). " +
+        string spawnResult = failedSpawnCount > 0
+            ? $"spawned {_spawnedPackages.Count} package(s); {failedSpawnCount} attempt(s) failed"
+            : $"spawned {_spawnedPackages.Count} package(s)";
+        Debug.Log($"[SortMailTask] Delivery triggered — {spawnResult}. " +
                   $"Prohibited today: {string.Join(", ", _todaysProhibitedGoods)}");
+        return true;
     }
 
     /// <summary>
@@ -658,45 +707,60 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         return pool;
     }
 
-    private void SpawnSinglePackage(SuspectRecord resident)
+    private bool SpawnSinglePackage(SuspectRecord resident)
     {
-        if (_packagePrefab == null)
+        if (resident == null || resident.SuspectData == null)
         {
-            Debug.LogError("[SortMailTask] _packagePrefab is not assigned.");
-            return;
+            Debug.LogWarning("[SortMailTask] Skipped package spawn for an invalid resident record.");
+            return false;
         }
 
-        string residentName = $"{resident.SuspectData.FirstName} {resident.SuspectData.LastName}".Trim();
-
-        bool isProhibited = Random.Range(0, _todaysAllowedGoods.Count + _todaysProhibitedGoods.Count) >= _todaysAllowedGoods.Count;
-        string goodsLabel = isProhibited
-            ? _todaysProhibitedGoods[Random.Range(0, _todaysProhibitedGoods.Count)]
-            : _todaysAllowedGoods[Random.Range(0, _todaysAllowedGoods.Count)];
-
-        // Quarantine sorting has been removed from this task — mail is only ever Confiscate
-        // (prohibited goods) or Delivery (everything else), regardless of the addressee's
-        // quarantine status.
-        MailSortBinType correctBin = isProhibited
-            ? MailSortBinType.Confiscate
-            : MailSortBinType.Delivery;
-
-        Vector3    spawnPos = GetRandomSpawnPosition();
-        Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-
-        GameObject itemGo = Instantiate(_packagePrefab, spawnPos, spawnRot);
-        NetworkObject netObj = itemGo.GetComponent<NetworkObject>();
-        MailPackageItem package = itemGo.GetComponent<MailPackageItem>();
-
-        if (netObj == null || package == null)
+        GameObject itemGo = null;
+        NetworkObject netObj = null;
+        try
         {
-            Debug.LogError("[SortMailTask] Package prefab is missing a NetworkObject or MailPackageItem component.");
-            Destroy(itemGo);
-            return;
-        }
+            string residentName = $"{resident.SuspectData.FirstName} {resident.SuspectData.LastName}".Trim();
 
-        netObj.Spawn(destroyWithScene: true);
-        package.ServerInitialize(resident.SuspectData, residentName, goodsLabel, correctBin);
-        _spawnedPackages.Add(netObj);
+            bool isProhibited = Random.Range(0, _todaysAllowedGoods.Count + _todaysProhibitedGoods.Count) >= _todaysAllowedGoods.Count;
+            string goodsLabel = isProhibited
+                ? _todaysProhibitedGoods[Random.Range(0, _todaysProhibitedGoods.Count)]
+                : _todaysAllowedGoods[Random.Range(0, _todaysAllowedGoods.Count)];
+
+            // Quarantine sorting has been removed from this task — mail is only ever Confiscate
+            // (prohibited goods) or Delivery (everything else), regardless of the addressee's
+            // quarantine status.
+            MailSortBinType correctBin = isProhibited
+                ? MailSortBinType.Confiscate
+                : MailSortBinType.Delivery;
+
+            Vector3    spawnPos = GetRandomSpawnPosition();
+            Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+            itemGo = Instantiate(_packagePrefab, spawnPos, spawnRot);
+            netObj = itemGo.GetComponent<NetworkObject>();
+            MailPackageItem package = itemGo.GetComponent<MailPackageItem>();
+
+            if (netObj == null || package == null)
+            {
+                Debug.LogError("[SortMailTask] Package prefab is missing a NetworkObject or MailPackageItem component.");
+                Destroy(itemGo);
+                return false;
+            }
+
+            netObj.Spawn(destroyWithScene: true);
+            package.ServerInitialize(resident.SuspectData, residentName, goodsLabel, correctBin);
+            _spawnedPackages.Add(netObj);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError($"[SortMailTask] Failed to spawn a package for '{resident.SuspectData.name}': {exception.Message}");
+            if (netObj != null && netObj.IsSpawned)
+                netObj.Despawn(destroy: true);
+            else if (itemGo != null)
+                Destroy(itemGo);
+            return false;
+        }
     }
 
     /// <summary>

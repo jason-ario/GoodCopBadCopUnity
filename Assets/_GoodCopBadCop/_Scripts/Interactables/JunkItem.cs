@@ -56,33 +56,7 @@ public class JunkItem : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    /// <summary>
-    /// Server-authoritative veto used to take a piece of junk out of the cleanup entirely: false
-    /// means "not part of the checkpoint cleanup", and the item stops being interactable, stops being
-    /// highlighted, and stops counting — it is scenery.
-    ///
-    /// Set false by <see cref="TakeOutTrashTask.UnregisterExternalJunkItem"/> when a gore chunk that
-    /// was launched from inside the <see cref="CheckpointCleanupArea"/> comes to rest outside it. That
-    /// case can't be handled by toggling this component's own 'enabled' flag — doing so after spawn
-    /// desynchronises Netcode's behaviour ordering for late joiners (see <see cref="IsCollectible"/>) —
-    /// and it can't be handled by disabling the collider either, since gore uses one collider for both
-    /// physics and interaction. Being a NetworkVariable, late joiners get the correct value too, which
-    /// an RPC could never guarantee.
-    ///
-    /// Defaults true so ordinary junk (trash props, booth mess, guard corpses) is unaffected: only
-    /// something explicitly ruled out of the cleanup ever flips it.
-    /// </summary>
-    public readonly NetworkVariable<bool> IsCleanupEligible = new NetworkVariable<bool>(
-        true,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
-
-    /// <summary>Server-only. Rules this item in or out of the checkpoint cleanup — see <see cref="IsCleanupEligible"/>.</summary>
-    public void SetCleanupEligible(bool eligible)
-    {
-        if (!IsServer) return;
-        IsCleanupEligible.Value = eligible;
-    }
+    // Cleanup-zone membership is owned by TakeOutTrashTask; it never disables pickup affordances.
 
     /// <summary>
     /// Server-authoritative tutorial call-out glow, driven by
@@ -137,12 +111,10 @@ public class JunkItem : Interactable
     private SuspectCharacter _suspect;
 
     /// <summary>
-    /// True when this is live, collectible junk — i.e. the object is a real piece of mess that is part
-    /// of the checkpoint cleanup, rather than a dormant component, a still-living character, or debris
-    /// that came to rest outside the <see cref="CheckpointCleanupArea"/>. Mirrors the rules
-    /// <see cref="TakeOutTrashTask"/> uses when sweeping the scene: a suspect body is collectible
-    /// only once <see cref="IsCollectible"/> flips true on death, while everything else is gated on
-    /// this component's own 'enabled' flag — and either way, <see cref="IsCleanupEligible"/> can veto.
+    /// True when this is live, collectible junk rather than a dormant component or a still-living
+    /// character. Zone membership is intentionally not part of this predicate: dead mutants and gore
+    /// remain baggable wherever they land, while <see cref="TakeOutTrashTask"/> separately decides
+    /// whether an item advances a cleanup task.
     ///
     /// This is THE single predicate for junk: it drives whether the item can be targeted at all
     /// (<see cref="IsInteractable"/>) and whether it glows (<see cref="JunkPickupHighlightService"/>).
@@ -158,8 +130,6 @@ public class JunkItem : Interactable
         {
             if (!gameObject.activeInHierarchy) return false;
 
-            if (!IsCleanupEligible.Value) return false;
-
             if (_suspect != null) return IsCollectible.Value;
 
             return enabled;
@@ -168,8 +138,7 @@ public class JunkItem : Interactable
 
     /// <summary>
     /// Junk is targetable exactly when it is collectible, so the reticle can never offer a pickup the
-    /// item will refuse — and gore ruled out of the cleanup is inert scenery that the ray passes over
-    /// (it still physically blocks the ray as solid geometry, it just isn't a target).
+    /// item will refuse. Cleanup-zone membership affects task credit only, never this affordance.
     /// </summary>
     public override bool IsInteractable => CanBeCollected;
 
@@ -198,10 +167,8 @@ public class JunkItem : Interactable
         base.OnNetworkSpawn();
 
         // Re-evaluate the glow when a body becomes (or stops being) collectible mid-run — e.g. a
-        // suspect corpse on death, a reusable guard corpse being cleared after collection, or gore
-        // that rolled out of the cleanup area and has been ruled out of it.
+        // suspect corpse on death or a reusable guard corpse being cleared after collection.
         IsCollectible.OnValueChanged += OnIsCollectibleChanged;
-        IsCleanupEligible.OnValueChanged += OnIsCollectibleChanged;
         TutorialHighlight.OnValueChanged += OnTutorialHighlightChanged;
 
         // Apply the current value for late joiners — an item already called out by the tutorial
@@ -217,7 +184,6 @@ public class JunkItem : Interactable
         base.OnNetworkDespawn();
 
         IsCollectible.OnValueChanged -= OnIsCollectibleChanged;
-        IsCleanupEligible.OnValueChanged -= OnIsCollectibleChanged;
         TutorialHighlight.OnValueChanged -= OnTutorialHighlightChanged;
 
         JunkPickupHighlightService.Unregister(this);

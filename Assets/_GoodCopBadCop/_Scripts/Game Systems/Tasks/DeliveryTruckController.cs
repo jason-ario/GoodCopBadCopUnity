@@ -123,6 +123,9 @@ public class DeliveryTruckController : NetworkBehaviour
     [Tooltip("Peak MachineShake.positionStrength reached while driving at full speed.")]
     [SerializeField] private float peakShakeStrength = 0.05f;
 
+    private const int MailDeliveryTriggerAttempts = 5;
+    private const float MailDeliveryTriggerRetryDelay = 0.5f;
+
     private bool _sequenceRunning;
     private Vector3 _crateRestPosition;
     private Quaternion _crateRestRotation;
@@ -285,8 +288,10 @@ public class DeliveryTruckController : NetworkBehaviour
         // connect later still see it (see _crateDropped).
         _crateDropped.Value = true;
 
-        // Crate has settled — this is the moment the mail delivery spawns.
-        SortMailTask.Instance?.TriggerTask();
+        // Crate has settled — this is the moment the mail delivery spawns. The task's dynamic
+        // resident pool can still be initializing during startup/restore, so retry briefly
+        // instead of silently leaving a dropped crate with no packages.
+        yield return StartCoroutine(TriggerMailTaskAfterCrateLanding());
 
         // Call out where to deliver the mail until a player drops a package into any cubby —
         // cleared automatically as soon as that happens, see SortMailTask.EvaluateSort.
@@ -303,6 +308,29 @@ public class DeliveryTruckController : NetworkBehaviour
         DeactivateClientRpc();
 
         _sequenceRunning = false;
+    }
+
+    /// <summary>
+    /// Attempts the mail-task handoff after the crate lands. A short retry window handles a
+    /// transient dependency startup/restore race without restarting the visual delivery sequence.
+    /// Permanent configuration or population failures remain visible in the task's diagnostic log.
+    /// </summary>
+    private IEnumerator TriggerMailTaskAfterCrateLanding()
+    {
+        for (int attempt = 1; attempt <= MailDeliveryTriggerAttempts; attempt++)
+        {
+            SortMailTask task = SortMailTask.Instance;
+            if (task != null && task.TryTriggerTask())
+                yield break;
+
+            if (attempt < MailDeliveryTriggerAttempts)
+            {
+                Debug.LogWarning($"[DeliveryTruckController] Mail task was not ready after crate landing; retrying ({attempt}/{MailDeliveryTriggerAttempts}).");
+                yield return new WaitForSeconds(MailDeliveryTriggerRetryDelay);
+            }
+        }
+
+        Debug.LogError("[DeliveryTruckController] Mail delivery failed after the crate landed. See preceding SortMailTask diagnostics for the cause.");
     }
 
     /// <summary>

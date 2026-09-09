@@ -132,22 +132,26 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
 
-        // LMB / RT triggers primary interaction (Interact — pickup, use).
-        // E triggers alternate interaction (InteractAlternate — extract, secondary action).
-        // When holding an item, both keys route to TryItemUse regardless.
+        // LMB / RT is the only input that may use or place a held item.
+        // The rebindable Interact key remains reserved for alternate world interaction,
+        // including while an item is being carried.
         // Exception: when the cursor is visible (e.g. notebook draw mode), LMB belongs to the
         // ClickDetector — skip TryItemUse so it doesn't double-fire and call OnStartUse again.
-        if (LmbDown || EKeyDown)
+        if (LmbDown)
         {
             if (_playerPickupController.HeldObject == null)
-                TryWorldInteract(alternate: EKeyDown);
+                TryWorldInteract();
             else if (TryPlaceHeldObjectAtGhost())
             {
                 // Handled: an aim-shown ghost (e.g. a mail cubby's PlacementSlot) was active
-                // and in range, so LMB/E committed the placement — skip TryItemUse below.
+                // and in range, so LMB committed the placement — skip TryItemUse below.
             }
-            else if (!Cursor.visible || EKeyDown)
+            else if (!Cursor.visible)
                 TryItemUse();
+        }
+        else if (EKeyDown)
+        {
+            TryWorldInteract(alternate: true);
         }
 
         HandleThrowInput();

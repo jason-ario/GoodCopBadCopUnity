@@ -448,7 +448,13 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity;
 
         // Apply movement
-        _characterController.Move(moveVector * Time.deltaTime);
+        CollisionFlags collisionFlags = _characterController.Move(moveVector * Time.deltaTime);
+
+        // A CharacterController stops at a ceiling but leaves the upward velocity intact.
+        // Clear it immediately so the next frame applies gravity and the player falls instead
+        // of repeatedly pushing into (or clipping through) the overhead collider.
+        if (_verticalVelocity > 0f && (collisionFlags & CollisionFlags.Above) != 0)
+            _verticalVelocity = 0f;
     }
 
     /// <summary>

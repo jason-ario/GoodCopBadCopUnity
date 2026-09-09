@@ -1581,13 +1581,12 @@ public class MutantEnemy : NetworkBehaviour
 
     /// <summary>
     /// Rolls a random piece count within <paramref name="countRange"/> and builds randomized
-    /// spawn data for each piece. Pieces that land inside the Trash Task's yard area are
-    /// spawned server-side as real <see cref="JunkItem"/> NetworkObjects that count toward the
-    /// task; all other pieces are purely cosmetic and broadcast in a single RPC so every client
-    /// spawns the same non-networked result. Every piece — yard or not (e.g. gore from a
-    /// checkpoint breach fight) — also gets a server-authoritative, networked blood-splatter
-    /// decal via <see cref="SpawnGoreBloodDecal"/>, which applies the same yard-bounds rule to
-    /// the splatter: in-yard blood counts toward <see cref="CleanBloodTask"/> and blocks
+    /// spawn data for each piece. Every supported piece is spawned server-side as a real
+    /// <see cref="JunkItem"/> NetworkObject so it can be bagged. The trash task independently
+    /// scores only pieces that settle inside its cleanup check zones; unsupported prefabs fall
+    /// back to cosmetic-only debris. Every piece also gets a server-authoritative, networked
+    /// blood-splatter decal via <see cref="SpawnGoreBloodDecal"/>, which applies the same yard-bounds
+    /// rule to the splatter: in-yard blood counts toward <see cref="CleanBloodTask"/> and blocks
     /// clock-out, out-of-yard blood is cosmetic-only and despawns automatically the next day.
     /// </summary>
     private void SpawnGoreBurst(Vector2Int countRange, Vector2 speedRange)
@@ -1609,8 +1608,7 @@ public class MutantEnemy : NetworkBehaviour
 
             SpawnGoreBloodDecal(position);
 
-            if (TakeOutTrashTask.Instance != null && TakeOutTrashTask.Instance.CountsTowardCleanup(position)
-                && SpawnGoreJunkItem(position, prefabIndex, velocity))
+            if (SpawnGoreJunkItem(position, prefabIndex, velocity))
             {
                 continue;
             }
@@ -1625,14 +1623,10 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Server-side spawn for a gore piece that landed inside the Trash Task's yard area.
-    /// Instantiates the prefab, spawns it as a real NetworkObject (so it replicates to every
-    /// client like any other <see cref="JunkItem"/>), enables its (pre-attached, disabled)
-    /// <see cref="JunkItem"/> component, and registers it with <see cref="TakeOutTrashTask"/>.
-    /// Rigidbody stays dynamic for as long as it counts toward the yard task — see
-    /// <see cref="MonitorGoreJunkItem"/>, which only switches it to kinematic once it settles
-    /// outside every yard SpawnZone (at which point it no longer counts and there's no reason
-    /// to keep simulating it).
+    /// Server-side spawn for a gore piece from a killed mutant. Every supported gore prefab is
+    /// instantiated as a real NetworkObject and enabled as a <see cref="JunkItem"/> so players can
+    /// bag it wherever it lands. <see cref="TakeOutTrashTask"/> independently decides whether its
+    /// position is inside a cleanup check zone and therefore task-scored.
     ///
     /// Requires the gore prefab to already have a NetworkObject (registered as a Network Prefab
     /// in the NetworkManager) and a disabled <see cref="JunkItem"/> component, matching the same
@@ -1658,7 +1652,7 @@ public class MutantEnemy : NetworkBehaviour
 
         if (netObj == null || junk == null)
         {
-            Debug.LogWarning("[MutantEnemy] Gore prefab landed in the yard but is missing a NetworkObject " +
+            Debug.LogWarning("[MutantEnemy] Gore prefab is missing a NetworkObject " +
                               "and/or a disabled JunkItem component — it must have both to count toward the " +
                               "Trash Task. Falling back to cosmetic debris instead.");
             Destroy(piece);
@@ -1698,13 +1692,11 @@ public class MutantEnemy : NetworkBehaviour
     /// below <paramref name="minY"/> (e.g. it clipped through the floor and is falling forever,
     /// out of reach — this piece is unregistered from the task first so it never soft-locks the
     /// player by staying required-but-unreachable). Otherwise, once its Rigidbody settles (or a
-    /// timeout elapses), a piece whose final resting position is outside the
-    /// <see cref="CheckpointCleanupArea"/> is unregistered — which also rules it out of the cleanup
-    /// entirely (see <see cref="TakeOutTrashTask.UnregisterExternalJunkItem"/>), leaving it as inert
-    /// scenery: not counted, not interactable, not highlighted. Its Rigidbody is switched to
-    /// kinematic at the same time, since nothing about it matters any more. A piece that settles
-    /// inside the region stays dynamic and tracked. No-op once the item is collected (despawned)
-    /// before either check fires.
+    /// timeout elapses), the piece's settled position is re-evaluated. A piece inside a
+    /// <see cref="CheckpointCleanupArea"/> is registered with the trash task; one outside is
+    /// unregistered from scoring but remains baggable and highlighted. The outside piece is switched
+    /// to kinematic once settled. No-op once the item is collected (despawned) before either check
+    /// fires.
     /// </summary>
     private IEnumerator MonitorGoreJunkItem(NetworkObject netObj, Rigidbody rb, float minY)
     {
@@ -1741,16 +1733,27 @@ public class MutantEnemy : NetworkBehaviour
         if (netObj == null || !netObj.IsSpawned)
             yield break;
 
-        if (TakeOutTrashTask.Instance != null && !TakeOutTrashTask.Instance.CountsTowardCleanup(netObj.transform.position))
-        {
-            TakeOutTrashTask.Instance.UnregisterExternalJunkItem(netObj);
+        TakeOutTrashTask task = TakeOutTrashTask.Instance;
+        if (task == null)
+            yield break;
 
-            if (rb != null)
-            {
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-                rb.isKinematic = true;
-            }
+        // Re-evaluate at the settled position. Registration is idempotent, so this retains an
+        // in-zone launch that stayed in-zone while also catching a piece launched outside that
+        // bounced into a check zone. A piece that settled outside is removed from task scoring but
+        // remains collectible.
+        if (task.CountsTowardCleanup(netObj.transform.position))
+        {
+            task.RegisterExternalJunkItem(netObj);
+            yield break;
+        }
+
+        task.UnregisterExternalJunkItem(netObj);
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
         }
     }
 
@@ -2083,9 +2086,8 @@ public class MutantEnemy : NetworkBehaviour
     /// <c>SuspectCharacter.EnableJunkPickup</c>/<c>ApplyJunkPickupState</c> for a body that becomes
     /// pickable trash once its owner is confirmed dead.
     ///
-    /// Only bodies that come to rest inside the <see cref="CheckpointCleanupArea"/> become
-    /// collectible — see <see cref="EnableCorpseJunkPickupAfterSettle"/>. A body outside it stays an
-    /// inert prop: not interactable, not highlighted, not counted.
+    /// Every permanently-dead body becomes collectible after settling. The cleanup zone determines
+    /// whether it is registered as required task work, not whether a player may put it in a bag.
     /// </summary>
     private void EnableCorpseJunkPickup()
     {
@@ -2096,20 +2098,10 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Waits for the just-activated ragdoll to come to rest (or a timeout) before deciding whether
-    /// this corpse is part of the checkpoint cleanup, then judges it by <see cref="corpseJunkItem"/>'s
-    /// own settled position rather than the mutant root's <c>transform.position</c> — called the
-    /// instant ragdoll physics is enabled (before Physics has even simulated a single step), the
-    /// root can end up far from where the body actually flops to rest, especially for a mutant that
-    /// dies straddling the checkpoint boundary.
-    ///
-    /// Collectibility and countability are ONE decision, made here: a corpse inside the
-    /// <see cref="CheckpointCleanupArea"/> is made interactable (and therefore highlighted by
-    /// <see cref="JunkPickupHighlightService"/>) and registered with the task; a corpse outside it is
-    /// left entirely alone — <see cref="JunkItem"/> and interaction collider stay disabled, so it is
-    /// scenery. The region is authored wider than the item spawn zones precisely so that "inside the
-    /// fence" and "counts" agree with what the player perceives; anything beyond it is deliberately
-    /// out of scope for cleanup rather than an uncounted bonus.
+    /// Waits for the just-activated ragdoll to come to rest (or a timeout) before enabling corpse
+    /// pickup. Its settled position is then passed to <see cref="TakeOutTrashTask"/>, which decides
+    /// whether the corpse counts toward cleanup. This split keeps every corpse baggable without
+    /// allowing out-of-zone bodies to alter task progress.
     /// </summary>
     private IEnumerator EnableCorpseJunkPickupAfterSettle()
     {
@@ -2135,18 +2127,11 @@ public class MutantEnemy : NetworkBehaviour
             yield break;
         }
 
-        if (!TakeOutTrashTask.Instance.CountsTowardCleanup(corpseJunkItem.transform.position))
-        {
-            Debug.Log($"[MutantEnemy] '{name}' came to rest outside the checkpoint cleanup area — " +
-                      "corpse left as scenery: not collectible, not highlighted, not counted.");
-            yield break;
-        }
-
-        // Interactable (and highlighted) and counted, together, from the same settled position — so
-        // the two can never disagree.
         ApplyCorpseJunkPickupState();
         EnableCorpseJunkPickupClientRpc();
 
+        // RegisterExternalJunkItem owns the zone check. An out-of-zone corpse stays baggable but
+        // is left out of the task total.
         TakeOutTrashTask.Instance.RegisterExternalJunkItem(NetworkObject);
     }
 
