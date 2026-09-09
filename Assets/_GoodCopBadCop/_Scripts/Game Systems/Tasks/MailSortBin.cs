@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -55,6 +56,21 @@ public class MailSortBin : Interactable
              "Leave empty to skip the throw animation.")]
     [SerializeField] private string _throwAnimTrigger = "";
 
+    [Header("Confiscate Settlement")]
+    [Tooltip("Minimum clearance between the package bounds and the trigger volume edge before a contraband package can settle. Prevents a package caught on the bin lip from locking there.")]
+    [SerializeField, Min(0f)] private float _interiorClearance = 0.08f;
+
+    [Tooltip("Maximum linear speed (m/s) a fully-inside contraband package may have while it is considered settled.")]
+    [SerializeField, Min(0f)] private float _settleLinearSpeed = 0.12f;
+
+    [Tooltip("Maximum angular speed (rad/s) a fully-inside contraband package may have while it is considered settled.")]
+    [SerializeField, Min(0f)] private float _settleAngularSpeed = 0.35f;
+
+    [Tooltip("How long a contraband package must remain fully inside and below the motion thresholds before it locks in place.")]
+    [SerializeField, Min(0f)] private float _settleDuration = 0.35f;
+
+    private readonly HashSet<MailPackageItem> _pendingSettlements = new();
+
     public MailSortBinType BinType => _binType;
 
     protected override void Awake()
@@ -95,7 +111,99 @@ public class MailSortBin : Interactable
         // it's a server-authoritative NetworkVariable that hasn't round-tripped back yet.
         if (package.IsResolved) return;
 
+        if (_binType == MailSortBinType.Confiscate)
+        {
+            NetworkObject binNetworkObject = GetComponent<NetworkObject>();
+            if (binNetworkObject != null)
+                package.RequestConfiscateSettleServerRpc(new NetworkObjectReference(binNetworkObject));
+            return;
+        }
+
         package.RequestSortServerRpc((int)_binType, -1);
+    }
+
+    /// <summary>
+    /// Server-only. Correct contraband remains a dynamic physics object until every corner of its
+    /// bounds has moved beyond the trigger volume's inset and it has stayed still for the configured
+    /// duration. Leaving the volume cancels the pending deposit; a later re-entry begins a fresh
+    /// observation window.
+    /// </summary>
+    public void BeginPackageSettlement(MailPackageItem package)
+    {
+        if (!IsServer || package == null || package.IsResolved) return;
+
+        if (package.CorrectBin != MailSortBinType.Confiscate)
+        {
+            SortMailTask.Instance?.EvaluateSort(package, _binType);
+            return;
+        }
+
+        if (_pendingSettlements.Add(package))
+            StartCoroutine(WaitForPackageSettlement(package));
+    }
+
+    private IEnumerator WaitForPackageSettlement(MailPackageItem package)
+    {
+        float settledTime = 0f;
+        Rigidbody packageRigidbody = package != null ? package.GetComponent<Rigidbody>() : null;
+
+        while (package != null && package.IsSpawned && !package.IsResolved)
+        {
+            if (!IsPackageComfortablyInside(package))
+            {
+                _pendingSettlements.Remove(package);
+                yield break;
+            }
+
+            bool isStill = packageRigidbody == null ||
+                           (packageRigidbody.linearVelocity.sqrMagnitude <= _settleLinearSpeed * _settleLinearSpeed &&
+                            packageRigidbody.angularVelocity.sqrMagnitude <= _settleAngularSpeed * _settleAngularSpeed);
+            settledTime = isStill ? settledTime + Time.fixedDeltaTime : 0f;
+
+            if (settledTime >= _settleDuration)
+            {
+                SortMailTask.Instance?.EvaluateSort(package, _binType);
+                break;
+            }
+
+            yield return new WaitForFixedUpdate();
+        }
+
+        if (package != null)
+            _pendingSettlements.Remove(package);
+    }
+
+    private bool IsPackageComfortablyInside(MailPackageItem package)
+    {
+        if (_triggerZone == null) return false;
+
+        Collider packageCollider = package.GetComponent<Collider>();
+        if (packageCollider == null) return false;
+
+        Bounds packageBounds = packageCollider.bounds;
+        if (_triggerZone is BoxCollider box)
+        {
+            Vector3 halfSize = box.size * 0.5f - Vector3.one * _interiorClearance;
+            if (halfSize.x <= 0f || halfSize.y <= 0f || halfSize.z <= 0f) return false;
+
+            for (int x = -1; x <= 1; x += 2)
+            for (int y = -1; y <= 1; y += 2)
+            for (int z = -1; z <= 1; z += 2)
+            {
+                Vector3 worldCorner = packageBounds.center + Vector3.Scale(packageBounds.extents, new Vector3(x, y, z));
+                Vector3 localCorner = box.transform.InverseTransformPoint(worldCorner) - box.center;
+                if (Mathf.Abs(localCorner.x) > halfSize.x ||
+                    Mathf.Abs(localCorner.y) > halfSize.y ||
+                    Mathf.Abs(localCorner.z) > halfSize.z)
+                    return false;
+            }
+
+            return true;
+        }
+
+        Bounds innerBounds = _triggerZone.bounds;
+        innerBounds.Expand(-_interiorClearance * 2f);
+        return innerBounds.Contains(packageBounds.min) && innerBounds.Contains(packageBounds.max);
     }
 
     // ── Interact-based deposit (holding a MailPackageItem) ────────────────────
@@ -212,7 +320,11 @@ public class MailSortBin : Interactable
         if (package == null || !package.IsSpawned || package.IsResolved) yield break;
 
         package.ResumePhysicsAfterScriptedThrow(landPosition);
-        SortMailTask.Instance?.EvaluateSort(package, _binType);
+
+        if (_binType == MailSortBinType.Confiscate)
+            BeginPackageSettlement(package);
+        else
+            SortMailTask.Instance?.EvaluateSort(package, _binType);
     }
 }
 

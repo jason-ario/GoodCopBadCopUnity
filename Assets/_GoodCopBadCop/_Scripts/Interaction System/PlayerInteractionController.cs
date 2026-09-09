@@ -38,7 +38,7 @@ public class PlayerInteractionController : NetworkBehaviour
     private const float MaxPlacementSlopeAngle = 30f;
     private bool _placerBlocked;
     private bool _canInteract = true;
-    public bool CanInteract => _canInteract;
+    public bool CanInteract => _canInteract && !_suspectCamActive;
 
     // ── Controller trigger helpers ─────────────────────────────────────────────
     // RT  (rightTrigger)  = LMB — primary interact / item use
@@ -61,14 +61,15 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool _suspectCamActive = false;
 
     /// <summary>
-    /// Suppresses all interaction and hides the reticle while the suspect cam is active.
+    /// Suppresses all interaction and hides the reticle while the suspect camera is active.
+    /// This lock is independent of the base gameplay interaction permission, so UI or gameplay
+    /// state changes cannot re-enable item pickup while a dialogue cutscene is still active.
     /// Safe to call before the reticle reference is assigned — the guard in HandleReticle
     /// will enforce the hidden state as soon as the reference is populated.
     /// </summary>
     public void SetSuspectCamMode(bool active)
     {
         _suspectCamActive = active;
-        _canInteract = !active;
         if (reticle != null)
         {
             if (active)
@@ -99,7 +100,7 @@ public class PlayerInteractionController : NetworkBehaviour
         if (reticle == null)
             return;
 
-        if (!value)
+        if (!CanInteract)
         {
             if (lastInteractable != null)
             {

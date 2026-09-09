@@ -42,6 +42,12 @@ public enum HighlightHold
     /// see <see cref="JunkPickupHighlightService"/>.
     /// </summary>
     PickupAffordance = 1 << 1,
+
+    /// <summary>
+    /// Persistent findability glow for a package that is part of an active mail delivery.
+    /// Cleared only when that package is correctly sorted or despawned.
+    /// </summary>
+    MailDelivery = 1 << 2,
 }
 
 [RequireComponent(typeof(HighlightEffect))]

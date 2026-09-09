@@ -1011,11 +1011,23 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnClockInAllClientsLocal() => ShowClockInArrow(false);
 
-    /// <summary>Shows or hides the world-space arrow pointing at the Time Card Machine.</summary>
+    /// <summary>
+    /// Shows or hides the world-space arrow pointing at the Time Card Machine and its matching
+    /// tutorial pip on the compass. The machine uses a pre-placed arrow for its precise visual
+    /// placement, so the compass marker is registered independently rather than using
+    /// TutorialMarkerManager (which would create a second floating arrow).
+    /// </summary>
     private void ShowClockInArrow(bool show)
     {
         if (_clockInTutorialArrow != null)
             _clockInTutorialArrow.SetActive(show);
+
+        if (_timeCardMachine == null) return;
+
+        if (show)
+            CompassMarkerRegistry.Register(_timeCardMachine.transform, CompassMarkerCategory.Tutorial);
+        else
+            CompassMarkerRegistry.Unregister(_timeCardMachine.transform);
     }
 
     /// <summary>

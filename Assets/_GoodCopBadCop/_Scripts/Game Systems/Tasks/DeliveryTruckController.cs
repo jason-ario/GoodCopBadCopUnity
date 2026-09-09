@@ -293,9 +293,8 @@ public class DeliveryTruckController : NetworkBehaviour
         // instead of silently leaving a dropped crate with no packages.
         yield return StartCoroutine(TriggerMailTaskAfterCrateLanding());
 
-        // Call out where to deliver the mail until a player drops a package into any cubby —
-        // cleared automatically as soon as that happens, see SortMailTask.EvaluateSort.
-        MailCubbyManager.Instance?.HighlightAllActiveCubbies();
+        // Destination highlights are activated by SortMailTask only after at least one package
+        // successfully spawns, covering truck, deferred, immediate, and restored deliveries.
 
         yield return new WaitForSeconds(idleDurationAtDestination);
 

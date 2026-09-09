@@ -1,3 +1,4 @@
+using HighlightPlus;
 using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Components;
@@ -93,8 +94,20 @@ public class MailPackageItem : PickableObject
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Controls the persistent findability glow for this unresolved delivery package. Networked so
+    /// every client — including late joiners — sees the same active-package call-out.
+    /// </summary>
+    private readonly NetworkVariable<bool> _deliveryHighlightActive = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     /// <summary>True once this package has been correctly sorted and is pending despawn. Server-only guard against double-counting.</summary>
     public bool IsResolved { get; private set; }
+
+    /// <summary>Uses the existing soft amber pickup style for the persistent mail-package glow.</summary>
+    protected override HighlightProfile ForceHighlightProfile => JunkPickupHighlightService.CollectibleProfile;
 
     public string ResidentName => _residentName.Value.ToString();
     public string GoodsLabel   => _goodsLabel.Value.ToString();
@@ -106,13 +119,22 @@ public class MailPackageItem : PickableObject
         base.OnNetworkSpawn();
         _residentName.OnValueChanged += (_, _) => RefreshLabel();
         _goodsLabel.OnValueChanged   += (_, _) => RefreshLabel();
+        _deliveryHighlightActive.OnValueChanged += OnDeliveryHighlightChanged;
         RefreshLabel();
+        ApplyDeliveryHighlight(_deliveryHighlightActive.Value);
     }
 
     public override void OnNetworkDespawn()
     {
+        _deliveryHighlightActive.OnValueChanged -= OnDeliveryHighlightChanged;
+        ApplyDeliveryHighlight(false);
         base.OnNetworkDespawn();
     }
+
+    private void OnDeliveryHighlightChanged(bool previous, bool current) => ApplyDeliveryHighlight(current);
+
+    private void ApplyDeliveryHighlight(bool highlight) =>
+        SetForceHighlight(highlight, HighlightHold.MailDelivery);
 
     /// <summary>
     /// Server-only. Assigns this package's addressee, goods category, and correct sorting bin.
@@ -134,6 +156,8 @@ public class MailPackageItem : PickableObject
         _residentName.Value        = residentName;
         _goodsLabel.Value          = goodsLabel;
         _correctBin.Value          = (int)correctBin;
+        _deliveryHighlightActive.Value = true;
+        ApplyDeliveryHighlight(true);
         IsResolved                 = false;
 
         RefreshLabel();
@@ -185,6 +209,8 @@ public class MailPackageItem : PickableObject
         Quaternion rotation = hasSnapPose ? snapRotation : transform.rotation;
 
         SnapAndFreeze(position, rotation);
+        _deliveryHighlightActive.Value = false;
+        ApplyDeliveryHighlight(false);
         MarkResolved();
         LockInteractableNetworked();
         PlaySortSuccessSfx();
@@ -285,6 +311,22 @@ public class MailPackageItem : PickableObject
     }
 
     /// <summary>
+    /// Called by a <see cref="MailSortBin"/> when a Confiscate-bin trigger first overlaps this
+    /// package. Resolves the referenced bin on the server so the bin can keep this package dynamic
+    /// until it is fully inside and settled, rather than freezing it at the opening lip.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestConfiscateSettleServerRpc(NetworkObjectReference binReference)
+    {
+        if (!binReference.TryGet(out NetworkObject binNetworkObject)) return;
+
+        MailSortBin bin = binNetworkObject.GetComponent<MailSortBin>();
+        if (bin == null || bin.BinType != MailSortBinType.Confiscate) return;
+
+        bin.BeginPackageSettlement(this);
+    }
+
+    /// <summary>
     /// Called by <see cref="MailSortBin"/> or <see cref="MailCubbySlot"/> (any client) when this
     /// package is dropped into a bin or cubby slot. Routes the sort attempt to the server, which
     /// owns <see cref="SortMailTask"/> and decides whether the placement was correct.
@@ -303,7 +345,8 @@ public class MailPackageItem : PickableObject
     /// True if the caller (a <see cref="MailCubbySlot"/>) supplied a fixed placement pose this
     /// package should snap to if the sort turns out to be correct — see
     /// <see cref="MarkDelivered"/>/<see cref="MarkConfiscated"/>. Always false for a generic
-    /// <see cref="MailSortBin"/> trigger drop, which just freezes the package wherever it landed.
+    /// <see cref="MailSortBin"/> trigger drop, which freezes only after the bin confirms the
+    /// package has fully entered and settled.
     /// </param>
     [ServerRpc(RequireOwnership = false)]
     public void RequestSortServerRpc(int binType, int slotResidentPoolIndex = -1, bool hasSnapPose = false, Vector3 snapPosition = default, Quaternion snapRotation = default)

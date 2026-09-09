@@ -64,6 +64,12 @@ public class MailCubbyManager : NetworkBehaviour
         "grandchildren). Order does not matter.")]
     [SerializeField] private MailCubbySlot[] _mailCubbySlots;
 
+    [Tooltip("Outline effects on the mail destinations players need to find after a delivery: every Mail Cubbies stand and the Confiscate mail bin. Assigned explicitly because these props are scene siblings, not children of this manager.")]
+    [SerializeField] private HighlightEffect[] _deliveryDestinationHighlights;
+
+    private readonly NetworkVariable<bool> _deliveryDestinationsHighlighted = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     /// <summary>Scene-wide singleton, mirroring <see cref="SortMailTask.Instance"/> — there is only ever one Mail Cubby manager in the scene.</summary>
     public static MailCubbyManager Instance { get; private set; }
 
@@ -86,6 +92,8 @@ public class MailCubbyManager : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        _deliveryDestinationsHighlighted.OnValueChanged += OnDeliveryDestinationHighlightChanged;
+        ApplyDeliveryDestinationHighlights(_deliveryDestinationsHighlighted.Value);
 
         if (IsServer)
         {
@@ -96,6 +104,8 @@ public class MailCubbyManager : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        _deliveryDestinationsHighlighted.OnValueChanged -= OnDeliveryDestinationHighlightChanged;
+
         if (IsServer)
         {
             if (NetworkManager.Singleton != null)
@@ -118,40 +128,71 @@ public class MailCubbyManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Server-only. Turns on the outline highlight on every physical "Mail Cubbies" stand (the
-    /// <see cref="HighlightEffect"/> lives on each stand's root GameObject, not on the individual
-    /// <see cref="MailCubbySlot"/> cubbies) on every client. Intended to be called right after a
-    /// delivery arrives (see <see cref="DeliveryTruckController"/>) so players can immediately spot
-    /// where to go — cleared again as soon as any package is dropped into any cubby, via
-    /// <see cref="ClearAllHighlights"/> (see <see cref="SortMailTask.EvaluateSort"/>).
+    /// Server-only. Highlights every delivery destination — all mail-cubby stands and the
+    /// confiscate mail bin — once packages have spawned. The replicated state also applies to
+    /// late joiners.
     /// </summary>
-    public void HighlightAllActiveCubbies()
+    public void HighlightDeliveryDestinations()
     {
         if (!IsServer) return;
-        SetHighlightClientRpc(true);
+        _deliveryDestinationsHighlighted.Value = true;
+        ApplyDeliveryDestinationHighlights(true);
     }
 
     /// <summary>
-    /// Server-only. Turns off the outline highlight on every "Mail Cubbies" stand root on every
-    /// client. Safe to call even if nothing is currently highlighted.
+    /// Server-only. Clears the delivery-destination call-out as soon as any package is placed
+    /// into a cubby or mail bin. Safe to call when the call-out is already clear.
     /// </summary>
-    public void ClearAllHighlights()
+    public void ClearDeliveryDestinationHighlights()
     {
         if (!IsServer) return;
-        SetHighlightClientRpc(false);
+        _deliveryDestinationsHighlighted.Value = false;
+        ApplyDeliveryDestinationHighlights(false);
     }
 
-    [ClientRpc]
-    private void SetHighlightClientRpc(bool highlight)
+    private void OnDeliveryDestinationHighlightChanged(bool previous, bool current) =>
+        ApplyDeliveryDestinationHighlights(current);
+
+    private void ApplyDeliveryDestinationHighlights(bool highlight)
     {
-        // The outline highlight lives on each "Mail Cubbies" stand's root GameObject (see the
-        // "Mail Cubbies" prefab), not on the individual MailCubbySlot cubbies — this points the
-        // player at the whole stand rather than calling out every slot separately.
-        HighlightEffect[] cubbyHighlights = GetComponentsInChildren<HighlightEffect>(true);
-        foreach (HighlightEffect fx in cubbyHighlights)
+        var highlights = new HashSet<HighlightEffect>();
+
+        if (_deliveryDestinationHighlights != null)
         {
-            fx.enabled = true;
-            fx.highlighted = highlight;
+            foreach (HighlightEffect effect in _deliveryDestinationHighlights)
+            {
+                if (effect != null)
+                    highlights.Add(effect);
+            }
+        }
+
+        // Keep legacy scenes functional when their explicit destination list has not been wired
+        // yet: cubby roots are discoverable through the managed slot references. The mail-bin
+        // outline additionally requires the explicit scene reference above because it is a sibling.
+        if (highlights.Count == 0)
+        {
+            foreach (MailCubbySlot slot in GetSlots())
+            {
+                HighlightEffect effect = slot != null ? slot.GetComponentInParent<HighlightEffect>() : null;
+                if (effect != null)
+                    highlights.Add(effect);
+            }
+        }
+
+        foreach (HighlightEffect effect in highlights)
+        {
+            // The mail bin is an Interactable, so claim its hold through the same composable API
+            // as packages. Raw HighlightEffect writes would be cleared by normal reticle hover
+            // updates. The cubby roots are plain scene props and use the effect directly.
+            Interactable interactable = effect.GetComponent<Interactable>();
+            if (interactable != null)
+            {
+                interactable.SetForceHighlight(highlight, HighlightHold.MailDelivery);
+                continue;
+            }
+
+            effect.enabled = true;
+            effect.highlighted = highlight;
         }
     }
 

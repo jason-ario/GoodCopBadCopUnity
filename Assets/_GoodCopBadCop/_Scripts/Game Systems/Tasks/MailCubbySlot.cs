@@ -45,7 +45,7 @@ public class MailCubbySlot : MonoBehaviour
     [Tooltip("TMP text displaying the assigned resident's name on the cubby's tape label. Falls back to the first TMP_Text found in children if unassigned.")]
     [SerializeField] private TMP_Text _label;
 
-    [Tooltip("Optional per-cubby outline highlight. Not used by MailCubbyManager (which highlights the whole \"Mail Cubbies\" stand root instead — see MailCubbyManager.HighlightAllActiveCubbies) — kept here only for callers that want to call out one specific cubby. Falls back to GetComponent<HighlightEffect>() if unassigned. SetHighlight() is a no-op if this is left unassigned and no HighlightEffect is found.")]
+    [Tooltip("Optional per-cubby outline highlight. Not used by MailCubbyManager (which highlights the configured Mail Cubbies stand roots and Confiscate mail bin together — see MailCubbyManager.HighlightDeliveryDestinations) — kept here only for callers that want to call out one specific cubby. Falls back to GetComponent<HighlightEffect>() if unassigned. SetHighlight() is a no-op if this is left unassigned and no HighlightEffect is found.")]
     [SerializeField] private HighlightEffect _highlightEffect;
 
     [Tooltip("Optional locker door guarding this cubby's opening (see \"Door Hinge/Locker Door\"). While assigned and closed, packages are rejected even if something manages to clip into the trigger zone — the door's own collider is what normally blocks physical entry, this is just a defensive backstop. Falls back to GetComponentInChildren<LockerDoorInteractable>() if unassigned.")]
@@ -158,8 +158,8 @@ public class MailCubbySlot : MonoBehaviour
 
     /// <summary>
     /// Turns this cubby's own outline highlight on or off, if it has one assigned. Not called by
-    /// <see cref="MailCubbyManager"/> — see <see cref="MailCubbyManager.HighlightAllActiveCubbies"/>,
-    /// which highlights the whole "Mail Cubbies" stand root instead. No-op if this cubby has no
+    /// <see cref="MailCubbyManager"/> — see <see cref="MailCubbyManager.HighlightDeliveryDestinations"/>,
+    /// which highlights every configured delivery destination together. No-op if this cubby has no
     /// <see cref="HighlightEffect"/> assigned or found.
     /// </summary>
     public void SetHighlight(bool highlight)

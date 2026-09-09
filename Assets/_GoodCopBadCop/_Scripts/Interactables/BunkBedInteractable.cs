@@ -190,10 +190,15 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         UIController.Instance.OpenEndDayPopup(OnConfirmEndDay, OnCancelEndDay);
     }
 
-    /// <summary>Queues the go-to-bed task on the HUD once the shift ends.</summary>
+    /// <summary>
+    /// Queues Day 1's bunker directive once the shift ends. Later days use the standard
+    /// go-to-bed tutorial objective instead, so the checklist never presents both routes.
+    /// </summary>
     private void HandleShiftEnd()
     {
-        GoToBunkerTask.CreateAndRegister();
+        if (IsDayOne())
+            GoToBunkerTask.CreateAndRegister();
+
         UpdateInteractText();
     }
 
@@ -222,12 +227,23 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     }
 
     /// <summary>
+    /// Resolves the active day from campaign state, with ShiftManager as a fallback while the
+    /// campaign manager is still being initialized.
+    /// </summary>
+    private static bool IsDayOne()
+    {
+        if (CampaignManager.Instance != null)
+            return CampaignManager.Instance.CurrentDay == 1;
+
+        return ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1;
+    }
+
+    /// <summary>
     /// Syncs <see cref="Interactable.interactText"/> with the current <see cref="CanSleep"/> state,
     /// and — the first time <see cref="CanSleep"/> becomes true for the current cycle — adds the
-    /// "go to bed" row to the tutorial objective overlay (skipped on Day 1; see
-    /// <see cref="_goToBedObjective"/>). Called on shift-end, on spawn (so a late joiner resolves
-    /// it from replicated state), whenever the replicated clock-out flag changes, and whenever
-    /// <see cref="TaskRegistry"/> reports a state change.
+    /// standard "go to bed" row on every day after Day 1. Called on shift-end, on spawn (so a
+    /// late joiner resolves it from replicated state), whenever the replicated clock-out flag
+    /// changes, and whenever <see cref="TaskRegistry"/> reports a state change.
     /// </summary>
     private void UpdateInteractText()
     {
@@ -242,8 +258,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         bool canSleep = CanSleep;
         interactText = canSleep ? InteractTextReady : InteractTextNotReady;
 
-        if (canSleep && _goToBedObjective == null &&
-            !(ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1))
+        if (canSleep && _goToBedObjective == null && !IsDayOne())
         {
             _goToBedObjective = TutorialObjectiveList.Instance?.AddObjective(_goToBedObjectiveText);
         }

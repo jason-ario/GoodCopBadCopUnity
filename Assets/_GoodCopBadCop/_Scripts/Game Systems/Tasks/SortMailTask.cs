@@ -271,7 +271,10 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         UpdateThreatLevel();
 
         if (_taskActive)
+        {
             ShiftManager.Instance?.RegisterPendingDailyTask(this);
+            MailCubbyManager.Instance?.HighlightDeliveryDestinations();
+        }
     }
 
     private void SpawnSavedPackage(MailPackageSaveData state)
@@ -576,6 +579,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
         NotifyDeliveryAlertClientRpc();
+        MailCubbyManager.Instance?.HighlightDeliveryDestinations();
 
         OnMailDelivered?.Invoke();
         SaveDataManager.Instance?.SaveCurrentWorkdayState();
@@ -618,12 +622,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer) return;
         if (package == null || package.IsResolved) return;
 
-        // A package has been dropped into *some* cubby (right or wrong) — the tutorial-style
-        // "drop mail here" highlight has done its job, so clear it on every client now rather
-        // than waiting for a *correct* sort. See MailCubbyManager.HighlightAllActiveCubbies,
-        // called from DeliveryTruckController once the mail arrives.
-        if (binType == MailSortBinType.Delivery)
-            MailCubbyManager.Instance?.ClearAllHighlights();
+        // The destination call-out has done its job as soon as any package is placed in a cubby
+        // or the confiscate mail bin, even if the package turns out to be incorrect and bounces
+        // back out. Individual unresolved packages remain highlighted until they are sorted.
+        if (binType == MailSortBinType.Delivery || binType == MailSortBinType.Confiscate)
+            MailCubbyManager.Instance?.ClearDeliveryDestinationHighlights();
 
         SuspectData slotResident = binType == MailSortBinType.Delivery
             ? MailCubbyManager.Instance?.ResolveResident(slotResidentPoolIndex)
