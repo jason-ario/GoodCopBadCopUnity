@@ -82,6 +82,14 @@ public class WorldShopItemInteractable : Interactable
 
     // ─── Interactable override ────────────────────────────────────────────────
 
+    /// <summary>
+    /// Keeps unavailable world shop items out of the player's targeting pass as well as blocking
+    /// their purchase popup. This prevents tutorial-gated piles from showing an interaction prompt
+    /// before the relevant tutorial unlocks their <see cref="ShopItem"/>.
+    /// </summary>
+    public override bool IsInteractable => base.IsInteractable && _shopItem != null && _shopItem.IsAvailable;
+
+
     /// <summary>Opens the purchase view when the player clicks or presses E on this item.</summary>
     public override void Interact(PlayerInteractionController player)
     {

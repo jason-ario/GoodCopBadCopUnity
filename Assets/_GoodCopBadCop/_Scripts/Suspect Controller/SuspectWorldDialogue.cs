@@ -203,7 +203,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (!string.IsNullOrEmpty(_greetingLineForCurrentConversation) && speaking != null)
         {
             _state = ConversationState.ShowingGreeting;
-            speaking.Say(_greetingLineForCurrentConversation, waitForInput: true);
+            speaking.SayWorldDialogue(_greetingLineForCurrentConversation, waitForInput: true);
         }
         else
         {
@@ -239,7 +239,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (speaking != null)
         {
             _state = ConversationState.ShowingResponse;
-            speaking.Say(chosen.npcResponse, waitForInput: true);
+            speaking.SayWorldDialogue(chosen.npcResponse, waitForInput: true);
         }
         else
         {
@@ -328,6 +328,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         UIController.Instance.HideBackButton();
         DialogueChoiceSystem.Instance.HideChoicePanel();
         DialogueManager.Instance?.ClearHistory();
+        speaking?.HideWorldDialogueSubtitle();
         DialogueChoiceSystem.Instance.ExitScriptedDialogueModeOutside();
         UIController.Instance.ShowPlayerUI();
         StartCoroutine(RestoreGameplayCursorAfterExit());

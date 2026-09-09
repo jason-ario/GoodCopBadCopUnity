@@ -12,8 +12,12 @@ public class MutantLineupSet : ScriptableObject
     [Tooltip("All mutant prefabs that can be randomly selected for a lineup slot.")]
     public List<MutantSuspectBehaviour> mutants = new List<MutantSuspectBehaviour>();
 
-    /// <summary>Returns a random entry from the pool. Logs an error and returns null if the list is empty.</summary>
-    public MutantSuspectBehaviour GetRandom()
+    /// <summary>
+    /// Returns a random valid entry from the pool, avoiding <paramref name="excludedPrefab"/>
+    /// whenever another valid mutant is available. If the excluded prefab is the only valid
+    /// entry, it remains eligible so a single-mutant pool can still spawn.
+    /// </summary>
+    public MutantSuspectBehaviour GetRandomExcluding(MutantSuspectBehaviour excludedPrefab)
     {
         if (mutants == null || mutants.Count == 0)
         {
@@ -21,6 +25,35 @@ public class MutantLineupSet : ScriptableObject
             return null;
         }
 
-        return mutants[Random.Range(0, mutants.Count)];
+        int validCount = 0;
+        int nonExcludedCount = 0;
+        foreach (MutantSuspectBehaviour mutant in mutants)
+        {
+            if (mutant == null) continue;
+
+            validCount++;
+            if (mutant != excludedPrefab)
+                nonExcludedCount++;
+        }
+
+        if (validCount == 0)
+        {
+            Debug.LogError($"[MutantLineupSet] '{name}' has no valid mutant prefabs assigned.");
+            return null;
+        }
+
+        bool avoidExcludedPrefab = excludedPrefab != null && nonExcludedCount > 0;
+        int selectionIndex = Random.Range(0, avoidExcludedPrefab ? nonExcludedCount : validCount);
+
+        foreach (MutantSuspectBehaviour mutant in mutants)
+        {
+            if (mutant == null || (avoidExcludedPrefab && mutant == excludedPrefab))
+                continue;
+
+            if (selectionIndex-- == 0)
+                return mutant;
+        }
+
+        return null;
     }
 }

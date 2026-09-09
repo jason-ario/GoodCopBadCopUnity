@@ -123,6 +123,84 @@ public class SpeakingInteraction : NetworkBehaviour
     }
 
     /// <summary>
+    /// Plays a direct world-dialogue line. The player who initiated the conversation receives the
+    /// regular dialogue subtitle; every other client receives the same line as a floating bubble
+    /// over this speaker instead, so their HUD is not interrupted by another player's conversation.
+    /// </summary>
+    public void SayWorldDialogue(string dialogue, bool clearHistory = false, bool waitForInput = false)
+    {
+        if (IsServer)
+        {
+            SayWorldDialogueClientRpc(dialogue, NetworkManager.Singleton.LocalClientId, clearHistory, waitForInput);
+        }
+        else
+        {
+            SayWorldDialogueServerRpc(dialogue, clearHistory, waitForInput);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SayWorldDialogueServerRpc(string dialogue, bool clearHistory, bool waitForInput,
+        ServerRpcParams rpcParams = default)
+    {
+        SayWorldDialogueClientRpc(dialogue, rpcParams.Receive.SenderClientId, clearHistory, waitForInput);
+    }
+
+    [ClientRpc]
+    private void SayWorldDialogueClientRpc(string dialogue, ulong engagedClientId, bool clearHistory,
+        bool waitForInput)
+    {
+        bool isEngagedPlayer = NetworkManager.Singleton != null &&
+                               NetworkManager.Singleton.LocalClientId == engagedClientId;
+
+        if (isEngagedPlayer)
+        {
+            DialogueManager.Instance?.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory,
+                waitForInput);
+        }
+        else
+        {
+            if (clearHistory)
+                DialogueManager.Instance?.ClearHistory();
+
+            GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.ShowLine(dialogue, speakerName, Color.white);
+        }
+
+        AudioClip[] clips = VoiceAudioClips;
+        if (!_isLaughing && clips != null && clips.Length > 0 && audioSource != null)
+        {
+            DialogueManager.Instance?.PlayDialogueAudio(dialogue, clips, audioSource, isMutant: _isMutantVoiceActive);
+        }
+    }
+
+    /// <summary>Hides this speaker's floating world-dialogue subtitle on every connected client.</summary>
+    public void HideWorldDialogueSubtitle()
+    {
+        if (IsServer)
+        {
+            HideWorldDialogueSubtitleClientRpc();
+        }
+        else
+        {
+            HideWorldDialogueSubtitleServerRpc();
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void HideWorldDialogueSubtitleServerRpc()
+    {
+        HideWorldDialogueSubtitleClientRpc();
+    }
+
+    [ClientRpc]
+    private void HideWorldDialogueSubtitleClientRpc()
+    {
+        GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.Hide();
+    }
+
+
+
+    /// <summary>
     /// Opens the player-facing dialogue choice UI. When a SuspectData asset is assigned,
     /// question text is sourced from its questionResponses array. Falls back to the
     /// dialogueChoices Inspector field for non-suspect speakers such as Guard.

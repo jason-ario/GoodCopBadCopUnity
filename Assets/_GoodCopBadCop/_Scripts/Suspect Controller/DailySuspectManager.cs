@@ -48,6 +48,7 @@ public class DailySuspectManager : MonoBehaviour
 
     private readonly HashSet<int> _mutantSlotIndices = new HashSet<int>();
     private readonly Dictionary<int, DoppelgangerData> _doppelgangerSlots = new Dictionary<int, DoppelgangerData>();
+    private MutantSuspectBehaviour _lastSpawnedMutantPrefab;
 
     /// <summary>
     /// Tracks which lineup slot indices belong to full-mutant civilians — either freshly
@@ -364,11 +365,23 @@ public class DailySuspectManager : MonoBehaviour
         _doppelgangerSlots.Clear();
         _fullMutantSlotIndices.Clear();
         _replacementSlotIndices.Clear();
+        _lastSpawnedMutantPrefab = null;
     }
 
     /// <summary>
-    /// Returns a random mutant prefab and config from the current pool, ignoring slot indices.
-    /// Used by debug tools to force a mutant spawn outside of the normal lineup injection flow.
+    /// Records the mutant that successfully entered the lineup so the next mutant selection can
+    /// avoid repeating the same prefab when another pool entry is available.
+    /// </summary>
+    public void RecordMutantSpawn(MutantSuspectBehaviour mutantPrefab)
+    {
+        if (mutantPrefab != null)
+            _lastSpawnedMutantPrefab = mutantPrefab;
+    }
+
+    /// <summary>
+    /// Returns a random mutant prefab and config from the current pool, avoiding the most recently
+    /// spawned mutant whenever the pool contains an alternative. Used by debug tools to force a
+    /// mutant spawn outside of the normal lineup injection flow.
     /// Returns false (with null outs) if no pool or config is assigned.
     /// </summary>
     public bool TryGetRandomMutant(out MutantSuspectBehaviour selectedPrefab, out MutantIntruderData data)
@@ -382,7 +395,7 @@ public class DailySuspectManager : MonoBehaviour
             return false;
         }
 
-        selectedPrefab = lineupMutants.GetRandom();
+        selectedPrefab = lineupMutants.GetRandomExcluding(_lastSpawnedMutantPrefab);
         return selectedPrefab != null;
     }
 
@@ -407,7 +420,8 @@ public class DailySuspectManager : MonoBehaviour
 
     /// <summary>
     /// Returns true if the given lineup index is a mutant intrusion slot.
-    /// Outputs the randomly selected prefab from the pool and the shared config data.
+    /// Outputs a random prefab which avoids the most recently spawned mutant whenever another
+    /// valid mutant exists in the current pool, plus the shared config data.
     /// </summary>
     public bool IsMutantSlot(int lineupIndex, out MutantSuspectBehaviour selectedPrefab, out MutantIntruderData data)
     {
@@ -417,7 +431,7 @@ public class DailySuspectManager : MonoBehaviour
         if (!_mutantSlotIndices.Contains(lineupIndex) || lineupMutants == null)
             return false;
 
-        selectedPrefab = lineupMutants.GetRandom();
+        selectedPrefab = lineupMutants.GetRandomExcluding(_lastSpawnedMutantPrefab);
         return selectedPrefab != null;
     }
 

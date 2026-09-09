@@ -1929,6 +1929,7 @@ public class SuspectController : NetworkBehaviour
         Transform mutantStandPos = mutantBoothPos != null ? mutantBoothPos : standPos;
         behaviour.BeginLineup(data, mutantStandPos, despawnPos, climbThroughTargetPos, shutterController, this);
         _currentMutant = behaviour;
+        dailySuspectManager?.RecordMutantSpawn(prefab);
 
         // Reuse the existing booth-waiting notification so players are alerted.
         NotifySuspectArrivingClientRpc();
