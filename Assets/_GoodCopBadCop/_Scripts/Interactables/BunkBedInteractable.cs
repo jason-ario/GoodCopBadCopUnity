@@ -209,6 +209,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         interactText = InteractTextNotReady;
         _goToBedObjective = null;
         ClearEndDayConfirmed();
+        ForceCloseBedViewIfStuck();
     }
 
     /// <summary>Resets end-of-day state as soon as a new day begins, before the next shift starts.</summary>
@@ -217,6 +218,7 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         interactText = InteractTextNotReady;
         _goToBedObjective = null;
         ClearEndDayConfirmed();
+        ForceCloseBedViewIfStuck();
     }
 
     /// <summary>Server-only clear of the end-of-day latch; replicates the reset to every peer.</summary>
@@ -224,6 +226,50 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     {
         if (!IsSpawned || !IsServer) return;
         _endDayConfirmed.Value = false;
+    }
+
+    /// <summary>
+    /// Last-resort teardown run on every peer at the start of a new shift/day. Normal cleanup
+    /// (<see cref="ApplyEndDayConfirmed"/> / <see cref="OnCancelEndDay"/>) only ever closes the bed
+    /// view for whichever local player is cached in <see cref="_interactingPlayer"/> — but that
+    /// cache can go stale (the interacting player disconnects, dies/respawns, or is otherwise
+    /// interrupted before pressing Back/Yes) while the visible/blocking side effects it opened
+    /// (the bed Cinemachine camera, the local player's suspect-cam lock, cursor/back button) are
+    /// left switched on. Left alone, that surfaces one day-transition later: the fade-in for the
+    /// new day reveals a player still parked on the bed camera, unable to move, on a day they
+    /// never even interacted with the bed for. This checks the actual switched-on state instead of
+    /// trusting the cache, and restores the local player directly if the cache has nothing to
+    /// offer, so a new day can never start with anyone stuck behind this view.
+    /// </summary>
+    private void ForceCloseBedViewIfStuck()
+    {
+        bool bedCameraStuckOn = _bedCamera != null && _bedCamera.gameObject.activeSelf;
+        if (!bedCameraStuckOn && _interactingPlayer == null) return;
+
+        Debug.LogWarning("[BunkBedInteractable] ForceCloseBedViewIfStuck — bed view was still open at " +
+                          "shift/day start; forcing it closed so the new day doesn't start with a player stuck on it.");
+
+        if (_interactingPlayer != null)
+        {
+            CloseBedView();
+            return;
+        }
+
+        // No cached interacting player for this cycle, but the camera/UI were still left on —
+        // restore whatever they were locking out directly instead of leaving them stranded.
+        UIController.Instance.CloseEndDayPopup();
+        UIController.Instance.HideBackButton();
+        UIController.Instance.HideCursor();
+
+        if (_bedCamera != null)
+            _bedCamera.gameObject.SetActive(false);
+
+        PlayerInteractionController localController = PlayerInstance.Instance?.PlayerInteractionController;
+        if (localController != null)
+        {
+            localController.SetSuspectCamMode(false);
+            localController.playerMovementController.SetCanControl(true);
+        }
     }
 
     /// <summary>

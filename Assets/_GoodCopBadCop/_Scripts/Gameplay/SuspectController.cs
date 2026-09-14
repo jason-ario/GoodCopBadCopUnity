@@ -1275,16 +1275,35 @@ public class SuspectController : NetworkBehaviour
         yield return new WaitForSeconds(2f);
 
         thisCharacter.SetLocomotionState(true);
-        thisCharacter.NavigateTo(despawnPos.position, () =>
-        {
-            if (IsServer) DespawnSuspect(thisCharacter);
-        });
+        bool despawnArrived = false;
+        thisCharacter.NavigateTo(despawnPos.position, () => despawnArrived = true);
 
-        
-        yield return new WaitForSeconds(2f);
+        // Wait for the suspect to actually reach despawnPos before closing the gate. Closing on a
+        // fixed timer (the old behavior) could re-carve the gate's NavMeshObstacle underneath a
+        // suspect who hadn't finished walking yet, invalidating their in-progress path — the
+        // NavMeshAgent would then reroute away from the obstacle instead of reaching despawnPos,
+        // so the onArrived callback (and DespawnSuspect) never fired and the suspect was stranded.
+        // A safety timeout still closes the gate and forces the despawn if pathing ever gets stuck.
+        const float despawnTimeout = 8f;
+        float elapsed = 0f;
+        while (!despawnArrived && elapsed < despawnTimeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        thisCharacter.SetLocomotionState(false);
 
         if (IsServer)
         {
+            if (!despawnArrived)
+            {
+                Debug.LogWarning($"[SuspectController] {thisCharacter.name} did not reach despawnPos " +
+                                  $"within {despawnTimeout}s (stuck NavMeshAgent path) — forcing despawn.");
+                thisCharacter.StopNavigation();
+            }
+
+            DespawnSuspect(thisCharacter);
             GameManager.Instance.GateController.CloseGate();
         }
     }

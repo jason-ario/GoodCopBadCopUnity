@@ -1,9 +1,14 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
 /// A 3D world-space arrow that hovers above a target Transform and bobs up and down.
-/// Managed exclusively by <see cref="TutorialMarkerManager"/>. Do not instantiate directly.
+/// Usually managed by <see cref="TutorialMarkerManager"/>'s pool, but some tutorial beats
+/// (e.g. Day 1's clock-in and lever arrows) instead pre-place a <see cref="TutorialMarker"/>
+/// directly in the scene and toggle it with plain <c>SetActive</c> calls. Every enabled instance —
+/// pooled or pre-placed — self-registers in <see cref="ActiveInstances"/> so systems like
+/// <see cref="TutorialArrowScreenIndicator"/> can find all of them uniformly.
 /// </summary>
 public class TutorialMarker : MonoBehaviour
 {
@@ -36,12 +41,36 @@ public class TutorialMarker : MonoBehaviour
     private float _bobOffset;   // per-instance phase offset to desync multiple markers
     private Vector3 _baseLocalScale; // authored scale at referenceDistance, before distance scaling
 
+    private static readonly HashSet<TutorialMarker> _activeInstances = new();
+
+    /// <summary>
+    /// Every <see cref="TutorialMarker"/> currently enabled in the scene, whether it was shown via
+    /// <see cref="TutorialMarkerManager"/>'s pool or is a pre-placed scene arrow toggled directly by
+    /// a Day script. Do not mutate the returned collection.
+    /// </summary>
+    public static IReadOnlyCollection<TutorialMarker> ActiveInstances => _activeInstances;
+
+    /// <summary>
+    /// World-space point to aim at that ignores the bob animation, so dependents like
+    /// <see cref="TutorialArrowScreenIndicator"/> don't jitter every frame. For a marker tracking a
+    /// moving target, this is the bottom of its bob range (target pivot + hoverHeight - bobAmplitude).
+    /// For a pre-placed marker with no target, this is just its authored (unanimated) transform
+    /// position, since the bob for those comes from an Animator clip on a child mesh, not this root.
+    /// </summary>
+    public Vector3 StableAnchorPosition => _target != null
+        ? _target.position + Vector3.up * (hoverHeight - bobAmplitude)
+        : transform.position;
+
     // ── Unity ────────────────────────────────────────────────────────────────
     private void Awake()
     {
         _renderers = GetComponentsInChildren<Renderer>(true);
         _baseLocalScale = transform.localScale;
     }
+
+    private void OnEnable() => _activeInstances.Add(this);
+
+    private void OnDisable() => _activeInstances.Remove(this);
 
     private void LateUpdate()
     {

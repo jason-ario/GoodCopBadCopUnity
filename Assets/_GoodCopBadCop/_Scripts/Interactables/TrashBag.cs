@@ -117,12 +117,41 @@ public class TrashBag : PickableObject, IAmmoProvider
         // Apply the current value immediately so late-joining clients start with
         // the correct blend shape weight rather than the default empty pose.
         SnapBlendShape(_junkCount.Value);
+
+        // Late-joining clients (and scene-placed bags restored with saved junk) need to
+        // start with the correct compass pip state, not just once something changes.
+        UpdateCompassPip();
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         _junkCount.OnValueChanged -= OnJunkCountChanged;
+
+        CompassMarkerRegistry.Unregister(transform);
+    }
+
+    // ── Compass pip ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A dropped bag that still holds junk is just as much an objective as the loose junk
+    /// items it collected — without a pip, junk "vanishes" into a bag left in the field and
+    /// becomes unfindable. Reuses <see cref="CompassMarkerCategory.Junk"/> so it reads as the
+    /// same objective type as the loose junk pips from <see cref="JunkPickupHighlightService"/>.
+    /// A bag currently held by a player shows no pip — the player already knows where it is.
+    /// </summary>
+    private void UpdateCompassPip()
+    {
+        if (!IsHeld && _junkCount.Value > 0)
+            CompassMarkerRegistry.Register(transform, CompassMarkerCategory.Junk);
+        else
+            CompassMarkerRegistry.Unregister(transform);
+    }
+
+    protected override void OnHeldStateChanged(bool isHeld)
+    {
+        base.OnHeldStateChanged(isHeld);
+        UpdateCompassPip();
     }
 
     // ── Junk collection ───────────────────────────────────────────────────────
@@ -159,6 +188,7 @@ public class TrashBag : PickableObject, IAmmoProvider
     {
         OnAmmoChanged?.Invoke();
         UpdateBlendShapeSmooth(current);
+        UpdateCompassPip();
 
         if (SFXController.Instance == null) return;
 

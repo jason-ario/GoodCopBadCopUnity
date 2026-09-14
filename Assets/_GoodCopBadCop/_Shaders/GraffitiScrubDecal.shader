@@ -12,6 +12,11 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
     {
         [MainTexture] _BaseMap      ("Graffiti Texture",          2D)            = "white" {}
         [MainColor]   _BaseColor    ("Base Tint",                 Color)         = (1, 1, 1, 1)
+        [Normal]      _NormalMap    ("Normal Map",                2D)            = "bump" {}
+        _NormalScale    ("Normal Scale",           Range(0, 2))                   = 1.0
+
+        // --- Surface ---
+        _Smoothness     ("Smoothness",             Range(0, 1))                   = 0.5
 
         // --- Scrub Controls ---
         _ScrubProgress  ("Scrub Progress",        Range(0, 1))                   = 0.0
@@ -84,6 +89,9 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
 
+            TEXTURE2D(_NormalMap);
+            SAMPLER(sampler_NormalMap);
+
             // Depth texture — always available in URP (Camera > Depth Texture is on by default).
             #if defined(SHADER_API_GLES)
                 TEXTURE2D(_CameraDepthTexture);
@@ -105,6 +113,8 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half   _NoiseScale;
                 half   _NoiseSpeed;
                 half   _WarpStrength;
+                half   _NormalScale;
+                half   _Smoothness;
             CBUFFER_END
 
             // ----------------------------------------------------------------
@@ -248,8 +258,20 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 // --- Lighting (Lambert diffuse + shadow + ambient SH) ---
                 // Use the projector's local +Y as the approximate surface normal, since the
                 // real surface normal isn't available for a depth-reconstructed decal.
+                // The box's local X/Z axes (which the projected UV is built from) double as
+                // the tangent/bitangent, so a normal map can still perturb this base normal.
                 float3 normalWS   = normalize(TransformObjectToWorldDir(float3(0, 1, 0)));
                 float3 positionWS = TransformObjectToWorld(positionOS);
+
+                half3 normalTS = UnpackNormalScale(
+                    SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, uv), _NormalScale);
+                float3 tangentWS   = normalize(TransformObjectToWorldDir(float3(1, 0, 0)));
+                float3 bitangentWS = normalize(TransformObjectToWorldDir(float3(0, 0, 1)));
+                normalWS = normalize(
+                    normalTS.x * tangentWS + normalTS.y * bitangentWS + normalTS.z * normalWS);
+
+                float3 viewDirWS = normalize(GetCameraPositionWS() - positionWS);
+                float  shininess = exp2(10.0 * _Smoothness + 1.0);
 
                 // Main directional light with shadow attenuation
                 float4 shadowCoord = TransformWorldToShadowCoord(positionWS);
@@ -258,10 +280,15 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half  NdotL    = saturate(dot(normalWS, mainLight.direction));
                 half3 diffuse  = mainLight.color * (mainLight.shadowAttenuation * mainLight.distanceAttenuation) * NdotL;
 
+                half3 halfDirMain = normalize(mainLight.direction + viewDirWS);
+                half  NdotHMain   = saturate(dot(normalWS, halfDirMain));
+                half  specMain    = pow(NdotHMain, shininess) * _Smoothness * step(0.0001, NdotL);
+
                 // Spherical harmonics ambient
                 half3 ambient = SampleSH(normalWS);
 
-                half3 finalRGB = albedo * (diffuse + ambient);
+                half3 finalRGB = albedo * (diffuse + ambient)
+                    + mainLight.color * (mainLight.shadowAttenuation * mainLight.distanceAttenuation) * specMain;
 
                 // --- Additional point/spot lights ---
 #ifdef _ADDITIONAL_LIGHTS
@@ -270,7 +297,13 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 {
                     Light light  = GetAdditionalLight(li, positionWS);
                     half  NdotLi = saturate(dot(normalWS, light.direction));
-                    finalRGB += albedo * light.color * (light.shadowAttenuation * light.distanceAttenuation) * NdotLi;
+                    half3 lightAtten = light.color * (light.shadowAttenuation * light.distanceAttenuation);
+                    finalRGB += albedo * lightAtten * NdotLi;
+
+                    half3 halfDirI = normalize(light.direction + viewDirWS);
+                    half  NdotHi   = saturate(dot(normalWS, halfDirI));
+                    half  specI    = pow(NdotHi, shininess) * _Smoothness * step(0.0001, NdotLi);
+                    finalRGB += lightAtten * specI;
                 }
 #endif
 

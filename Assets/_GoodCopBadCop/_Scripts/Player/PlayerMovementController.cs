@@ -243,7 +243,27 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             cameraTransform.gameObject.SetActive(false);
             // Deactivate the Unity Camera (CinemachineBrain + AudioListener) so remote
             // players don't produce extra render passes or duplicate AudioListener warnings.
-            if (camera != null) camera.gameObject.SetActive(false);
+            if (camera != null)
+            {
+                camera.gameObject.SetActive(false);
+
+                // Belt-and-suspenders: explicitly disable the AudioListener too, rather than
+                // relying solely on the GameObject's active state cascading to it. This is the
+                // exact component PlayerInstance.EnsureRemotePlayerCamerasDisabled re-affirms on
+                // an interval to self-heal the relay-latency race documented there.
+                AudioListener remoteListener = camera.GetComponent<AudioListener>();
+                if (remoteListener != null)
+                    remoteListener.enabled = false;
+            }
+        }
+        else if (camera != null)
+        {
+            // Defensive: guarantee the local player's own AudioListener starts enabled, in case
+            // this object is a revive replacement whose camera/listener was left disabled by the
+            // previous PlayerObject's death/spectate state.
+            AudioListener ownListener = camera.GetComponent<AudioListener>();
+            if (ownListener != null)
+                ownListener.enabled = true;
         }
 
         if (IsLocalPlayer)

@@ -60,6 +60,44 @@ public class GameSettings : ScriptableObject
         set => _openSurveyOnGameExit = value;
     }
 
+    /// <summary>
+    /// How a non-engaged client overhears a <see cref="SuspectWorldDialogue"/> conversation that
+    /// another player is having with an NPC (see <see cref="SpeakingInteraction.SayWorldDialogue"/>).
+    /// </summary>
+    public enum OverhearSubtitleMode
+    {
+        /// <summary>Floating bubble anchored above the speaking NPC's head, shown only while within <see cref="OverhearSubtitleProximity"/>.</summary>
+        InWorldSubtitles,
+
+        /// <summary>Standard bottom-of-screen subtitle, shown only while within <see cref="OverhearSubtitleProximity"/>.</summary>
+        NormalSubtitles
+    }
+
+    [Header("World Dialogue Overhearing")]
+    [Tooltip("How a client who is NOT the engaged player sees another player's world-dialogue conversation " +
+             "with an NPC, while within OverhearSubtitleProximity of the speaker. InWorldSubtitles shows a " +
+             "floating bubble above the NPC's head. NormalSubtitles shows the regular bottom-of-screen " +
+             "subtitle instead. Outside that proximity, the conversation is not shown at all.")]
+    [SerializeField] private OverhearSubtitleMode _overhearSubtitleMode = OverhearSubtitleMode.InWorldSubtitles;
+
+    [Tooltip("Max distance (meters) at which a non-engaged player can overhear another player's world-dialogue " +
+             "conversation at all, shown either as an in-world bubble or as NormalSubtitles depending on OverhearSubtitleMode.")]
+    [SerializeField] private float _overhearSubtitleProximity = 8f;
+
+    /// <summary>How non-engaged players overhear another player's world-dialogue conversation.</summary>
+    public OverhearSubtitleMode WorldDialogueOverhearMode
+    {
+        get => _overhearSubtitleMode;
+        set => _overhearSubtitleMode = value;
+    }
+
+    /// <summary>Max distance (meters) at which an overheard conversation is shown at all (in either mode).</summary>
+    public float OverhearSubtitleProximity
+    {
+        get => _overhearSubtitleProximity;
+        set => _overhearSubtitleProximity = value;
+    }
+
     public bool GuidebookEnabled
     {
         get => _guidebookEnabled;

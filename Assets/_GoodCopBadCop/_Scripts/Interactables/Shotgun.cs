@@ -176,35 +176,66 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         {
             Vector3 pelletDirection = RandomConeDirection(rayDirection, _spreadAngle);
 
-            if (!Physics.Raycast(rayOrigin, pelletDirection, out RaycastHit hit, _bulletRange))
+            // Uses RaycastAll (sorted by distance) instead of a plain Raycast so trigger colliders
+            // can be inspected without letting them silently block the pellet. A resurrected
+            // corpse (see CorpseResurrectionController) exposes its ragdoll limb colliders as
+            // trigger hitboxes so individual limbs/body parts can be hit — but this project also
+            // uses trigger colliders everywhere for non-physical logic volumes (interaction zones,
+            // click detectors, task areas, etc.), and those must stay completely transparent to
+            // pellets, exactly like before.
+            RaycastHit[] pelletHits = Physics.RaycastAll(rayOrigin, pelletDirection, _bulletRange, Physics.AllLayers, QueryTriggerInteraction.Collide);
+            if (pelletHits.Length == 0)
                 continue;
 
-            MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            if (enemy != null && enemy.NetworkObject != null)
-            {
-                mutantHits.TryGetValue(enemy.NetworkObject, out int mCount);
-                mutantHits[enemy.NetworkObject] = mCount + 1;
-                continue;
-            }
+            System.Array.Sort(pelletHits, (a, b) => a.distance.CompareTo(b.distance));
 
-            Transform root = hit.collider.transform.root;
-            if (root.CompareTag("Player"))
+            foreach (RaycastHit hit in pelletHits)
             {
-                NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
-                if (playerNetObj == null || playerNetObj.OwnerClientId == localClientId)
+                // IsActive matters here: every Player prefab carries a dormant MutantEnemy (see
+                // CorpseResurrectionController) so it can later resurrect into a chasing mutant
+                // while still alive/uninfected. Without the IsActive check, a pellet hitting a
+                // perfectly living player would always be misclassified as a mutant hit and
+                // silently swallowed by MutantEnemy's own dormancy guard, never reaching
+                // PlayerHealth at all.
+                MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
+                if (enemy != null && enemy.IsActive)
+                {
+                    if (enemy.NetworkObject != null)
+                    {
+                        mutantHits.TryGetValue(enemy.NetworkObject, out int mCount);
+                        mutantHits[enemy.NetworkObject] = mCount + 1;
+                    }
+                    break;
+                }
+
+                // An irrelevant trigger (interaction zone, click detector, task area, etc.) —
+                // pellets must pass straight through it, exactly as if
+                // QueryTriggerInteraction.Collide had never been requested.
+                if (hit.collider.isTrigger)
                     continue;
 
-                if (hit.collider.GetComponentInParent<PlayerHealth>() != null)
+                Transform root = hit.collider.transform.root;
+                if (root.CompareTag("Player"))
                 {
-                    playerHits.TryGetValue(playerNetObj, out int pCount);
-                    playerHits[playerNetObj] = pCount + 1;
-                }
-                continue;
-            }
+                    NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
+                    if (playerNetObj == null || playerNetObj.OwnerClientId == localClientId)
+                        break;
 
-            BreakableGlassController glassHit = hit.collider.GetComponentInParent<BreakableGlassController>();
-            if (glassHit != null && !glassHit.IsSmashed)
-                hitGlass = true;
+                    if (hit.collider.GetComponentInParent<PlayerHealth>() != null)
+                    {
+                        playerHits.TryGetValue(playerNetObj, out int pCount);
+                        playerHits[playerNetObj] = pCount + 1;
+                    }
+                    break;
+                }
+
+                BreakableGlassController glassHit = hit.collider.GetComponentInParent<BreakableGlassController>();
+                if (glassHit != null && !glassHit.IsSmashed)
+                    hitGlass = true;
+
+                // Solid geometry (or handled glass) — this blocks the pellet either way.
+                break;
+            }
         }
 
         ToArrays(mutantHits, out mutantRefs, out mutantPellets);

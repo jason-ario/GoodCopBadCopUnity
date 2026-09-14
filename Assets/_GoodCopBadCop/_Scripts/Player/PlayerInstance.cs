@@ -154,6 +154,47 @@ public class PlayerInstance : NetworkBehaviour
             RestoreLocalGameplayStateAfterSpawn();
 
             OnLocalPlayerSpawned?.Invoke();
+
+            // Continuously self-heals the "exactly one active AudioListener" invariant for the
+            // lifetime of this local player object. See EnforceAudioListenerInvariantRoutine.
+            if (_audioListenerEnforcementRoutine != null)
+                StopCoroutine(_audioListenerEnforcementRoutine);
+            _audioListenerEnforcementRoutine = StartCoroutine(EnforceAudioListenerInvariantRoutine());
+        }
+    }
+
+    private Coroutine _audioListenerEnforcementRoutine;
+
+    /// <summary>
+    /// Guarantees this client always has exactly one active AudioListener: the local player's
+    /// own camera. <see cref="PlayerMovementController.OnNetworkSpawn"/> disables a remote
+    /// player's Camera/AudioListener the moment that remote player's spawn message is processed
+    /// locally, but on higher-latency relay transports (e.g. Steam Relay/SDR) that one-shot
+    /// disable can still be pending well after this local player is already active — see
+    /// <see cref="EnsureRemotePlayerCamerasDisabled"/> for the documented race. Rather than
+    /// patching every call site that could race with it, this re-affirms the invariant on an
+    /// interval for as long as this object is the local player, so it self-heals no matter what
+    /// caused the drift (relay latency, a revive, a scripted sequence, etc.).
+    /// </summary>
+    private IEnumerator EnforceAudioListenerInvariantRoutine()
+    {
+        var wait = new WaitForSeconds(1f);
+        while (this == Instance)
+        {
+            EnsureRemotePlayerCamerasDisabled();
+
+            Camera ownCamera = _playerMovementController?.Camera;
+            if (ownCamera != null)
+            {
+                if (!ownCamera.gameObject.activeSelf)
+                    ownCamera.gameObject.SetActive(true);
+
+                AudioListener ownListener = ownCamera.GetComponent<AudioListener>();
+                if (ownListener != null && !ownListener.enabled)
+                    ownListener.enabled = true;
+            }
+
+            yield return wait;
         }
     }
 
@@ -256,6 +297,12 @@ public class PlayerInstance : NetworkBehaviour
         {
             PlayerHealth.OnDeath -= Die;
             PlayerHealth.OnRespawn -= Respawn;
+        }
+
+        if (_audioListenerEnforcementRoutine != null)
+        {
+            StopCoroutine(_audioListenerEnforcementRoutine);
+            _audioListenerEnforcementRoutine = null;
         }
 
         Instance = null;
@@ -408,7 +455,15 @@ public class PlayerInstance : NetworkBehaviour
 
         Camera camera = _playerMovementController?.Camera;
         if (camera != null)
+        {
             camera.gameObject.SetActive(false);
+
+            // Belt-and-suspenders: explicitly disable the AudioListener too, rather than relying
+            // solely on the GameObject's active state cascading to it.
+            AudioListener listener = camera.GetComponent<AudioListener>();
+            if (listener != null)
+                listener.enabled = false;
+        }
     }
 
     /// <summary>

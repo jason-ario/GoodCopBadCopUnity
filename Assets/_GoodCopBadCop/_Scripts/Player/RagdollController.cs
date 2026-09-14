@@ -195,7 +195,41 @@ public class RagdollController : MonoBehaviour
         foreach (var col in ragdollColliders)
         {
             if (col.gameObject != gameObject)
+            {
                 col.enabled = active;
+
+                // Real ragdoll physics needs solid (non-trigger) colliders to collide with the
+                // world. SetLimbHitboxesActive() below flips these to triggers so weapon hit-scans
+                // can register per-limb hits while the resurrected mutant walks under
+                // Animator/CharacterController control; restore the solid flag here whenever we
+                // (re-)enter true ragdoll physics (e.g. a permanent kill re-ragdolls the corpse).
+                if (active)
+                    col.isTrigger = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Enables/disables the ragdoll bone colliders as non-physical trigger hitboxes so weapon
+    /// hit-scans (pistol/shotgun raycasts with QueryTriggerInteraction.Collide, melee's
+    /// OverlapSphere) can register hits on individual limbs/body parts — head, arms, legs, etc. —
+    /// instead of only the single root CharacterController capsule. Rigidbodies are left kinematic
+    /// (as set by <see cref="SetRagdollActive"/>) so the colliders passively follow the animated
+    /// bones without simulating physics or pushing anything. Intended for use once a corpse has
+    /// resurrected into a MutantEnemy (see CorpseResurrectionController.Resurrect/ResurrectClientRpc),
+    /// walking under CharacterController + Animator control rather than full ragdoll physics.
+    /// Call SetLimbHitboxesActive(false) (or let SetRagdollActive(true) reset isTrigger) before
+    /// re-entering true ragdoll physics.
+    /// </summary>
+    public void SetLimbHitboxesActive(bool active)
+    {
+        foreach (var col in ragdollColliders)
+        {
+            if (col == null || col.gameObject == gameObject)
+                continue;
+
+            col.enabled = active;
+            col.isTrigger = active;
         }
     }
 

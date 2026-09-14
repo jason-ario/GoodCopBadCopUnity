@@ -13,8 +13,9 @@ using UnityEngine.Serialization;
 ///      fires → <see cref="OnDayStarted"/> runs. A tutorial arrow points the player to the
 ///      Time Card Machine and clock-in is enabled server-side via <see cref="TimecardMachine.EnableClockIn"/>.
 ///   3. Once the player clocks in (<see cref="TimecardMachine.OnClockInServer"/>), the tutorial
-///      arrow is dismissed and, after a short hold, the rolling shutter opens automatically and
-///      is locked open via <see cref="ShutterController.ShutterLockedOpen"/>.
+///      arrow is dismissed and, after a short hold, the rolling shutter opens automatically.
+///      The lever remains interactable throughout, so the player is free to close/open it
+///      before the scripted sequence instructs them to.
 ///   4. The shift starts automatically (no switch press required on Day 1).
 ///      <see cref="SuspectController.InterceptNextSuspectSpawn"/> is armed so the
 ///      first suspect slot calls <see cref="SuspectController.SpawnScriptedSuspect"/>
@@ -145,6 +146,14 @@ public class Day_01 : DayBase
 
     [Tooltip("Objective label shown after the trash task is done, prompting the player to open the bunker door.")]
     [SerializeField] private string _taskOpenBunkerText = "Open the bunker";
+
+    [Tooltip("Objective label shown after the bunker door opens, prompting the player to go to bed. " +
+             "Keeps the end-of-day task (and its compass pip) visible for the rest of the bunker sequence, " +
+             "matching the 'go to bed' row shown on every day after Day 1 (see BunkBedInteractable).")]
+    [SerializeField] private string _taskGoToBedText = "Go to bed for the night";
+
+    [Tooltip("Seconds the completed 'Go to bed' row stays visible (struck through) before it is removed.")]
+    [SerializeField] private float _goToBedObjectiveCompletedLingerDuration = 1f;
 
     [Tooltip("Objective label shown after the trash and graffiti tasks are done, prompting the player " +
              "to clock out on the Time Card Machine before heading to the bunker.")]
@@ -464,6 +473,7 @@ public class Day_01 : DayBase
     private TutorialObjectiveItem _taskThrowTrash;
     private TutorialObjectiveItem _taskClockOut;
     private TutorialObjectiveItem _taskOpenBunker;
+    private TutorialObjectiveItem _taskGoToBed;
 
     // End-of-shift graffiti task, shown alongside the trash task (see OnTrashTaskReadySync).
     // Owned here (rather than inside CleanGraffitiTask) so this day script controls exactly
@@ -816,6 +826,8 @@ public class Day_01 : DayBase
         _taskTakeOutGore = null;
         _taskCleanBloodSplatter = null;
         _taskClockOut = null;
+        _taskOpenBunker = null;
+        _taskGoToBed = null;
         _breachEpilogueAdvanced = false;
         _clockOutTaskShown = false;
 
@@ -1044,14 +1056,15 @@ public class Day_01 : DayBase
     {
         yield return new WaitForSeconds(_shutterOpenDelay);
 
-        // Open and lock the shutter — it must stay open while Vlad is at the window.
+        // Open the shutter. Left unlocked (ShutterLockedOpen no longer forced true) so the
+        // player is free to close/open it with the lever even before the megaphone instructs
+        // them to use it.
         ShutterController.Instance.OpenShutter();
-        ShutterController.Instance.ShutterLockedOpen = true;
 
-        // Animate the lever arm to the up/open position so it matches the shutter state,
-        // and lock it non-interactable until the megaphone instructs the player to use it.
+        // Animate the lever arm to the up/open position so it matches the shutter state.
+        // Left interactable throughout — the player is free to open/close it even before
+        // the megaphone instructs them to use it.
         _lever?.AnimateOpenServerSide(1f);
-        _lever?.SetInteractable(false);
 
         // Arm the Vlad intercept so the first suspect slot sends him to the window.
         // ForceNextSuspectNoPaperwork suppresses document hand-off for this appearance only.
@@ -2798,7 +2811,14 @@ public class Day_01 : DayBase
         TutorialObjectiveList.Instance?.CompleteObjective(_taskOpenBunker);
         _taskOpenBunker = null;
 
-        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
+        // Let the "Open the bunker" row's strike-through linger, then hide/clear the panel and
+        // add the "Go to bed" row once it's fully gone — so the end-of-day task (and its compass
+        // pip) is never left without a matching entry in the checklist between the bunker door
+        // opening and the player actually sleeping. See ShowGoToBedMarker.
+        TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f, onComplete: () =>
+        {
+            _taskGoToBed = TutorialObjectiveList.Instance?.AddObjective(_taskGoToBedText);
+        });
 
         ShowGoToBedMarker();
     }
@@ -2807,8 +2827,14 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Shows a world-space arrow above the bunk bed and highlights it, pointing the player
-    /// toward the bed without adding a checklist objective. Called immediately after the
-    /// bunker door opens.
+    /// toward the bed. Called immediately after the bunker door opens.
+    ///
+    /// Also keeps the end-of-day task alive: unlike earlier scripted Day 1 steps, this one is
+    /// paired with the "Go to bed" checklist row added by <see cref="OnBunkerDoorOpened"/>'s
+    /// HideAndClear callback, so the player never loses the task (and its compass pip) for
+    /// ending the day after entering the bunker — matching every day after Day 1, where
+    /// <see cref="BunkBedInteractable.UpdateInteractText"/> keeps an equivalent row up from
+    /// clock-out until the player confirms sleeping.
     /// </summary>
     private void ShowGoToBedMarker()
     {
@@ -2836,6 +2862,9 @@ public class Day_01 : DayBase
             TutorialMarkerManager.Instance.Unmark(_markerBunkBed);
 
         _bunkBedInteractable?.Highlight(false);
+
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskGoToBed, _goToBedObjectiveCompletedLingerDuration);
+        _taskGoToBed = null;
 
         // Safety net: the objective list should already be hidden by OnBunkerDoorOpened, but
         // if any upstream tutorial step failed to clear it (e.g. a completion notification
@@ -3383,15 +3412,14 @@ public class Day_01 : DayBase
         SuspectController.OnSuspectArrived -= OnDocAnomalySuspectArrivedAtWindow;
         SuspectController.OnSuspectArrived -= OnStampsRestoredAtWindow;
 
-        // Open and lock the shutter so the Soldier can walk up to the window.
+        // Open the shutter so the Soldier can walk up to the window. Left unlocked so the
+        // player can freely operate the lever during the debug-skip path too.
         ShutterController.Instance?.OpenShutter();
-        if (ShutterController.Instance != null)
-            ShutterController.Instance.ShutterLockedOpen = true;
 
-        // Animate the lever to the open position and lock it — mirrors Day1OpeningSequence
-        // since the opening sequence is bypassed on the debug-skip path.
+        // Animate the lever to the open position — mirrors Day1OpeningSequence since the
+        // opening sequence is bypassed on the debug-skip path. Left interactable (see
+        // Day1OpeningSequence for why the lever is never locked here anymore).
         _lever?.AnimateOpenServerSide(0.3f);
-        _lever?.SetInteractable(false);
 
         // Vlad's closing dialogue will never play, so unblock the verdict on every client
         // (not just the server) — see ClearBlockVerdictAcrossAllClients for why a

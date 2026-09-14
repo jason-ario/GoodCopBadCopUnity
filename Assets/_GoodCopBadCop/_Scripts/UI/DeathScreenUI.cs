@@ -108,28 +108,48 @@ public class DeathScreenUI : MonoBehaviour
     // Keeps the Restart Day button visible state updated while the death screen
     // is open — e.g. the host dies first (button hidden) and later the second
     // player dies, which should reveal the button for the host.
+    //
+    // Also listens for client disconnects so the Spectate button deactivates
+    // if the teammate (e.g. the host) leaves the server while the death
+    // screen is still up.
     // -------------------------------------------------------------------------
 
     private void SubscribeToDeathEvents()
     {
         if (NetworkManager.Singleton == null) return;
+
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
             PlayerHealth health = GetClientHealth(client);
             if (health != null)
                 health.OnDeath += RefreshButtonVisibility;
         }
+
+        NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
     }
 
     private void UnsubscribeFromDeathEvents()
     {
         if (NetworkManager.Singleton == null) return;
+
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
             PlayerHealth health = GetClientHealth(client);
             if (health != null)
                 health.OnDeath -= RefreshButtonVisibility;
         }
+
+        NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnect;
+    }
+
+    /// <summary>
+    /// Invoked when any client (including the host) disconnects. Re-evaluates
+    /// button visibility so the Spectate button disappears if the teammate it
+    /// was pointing at just left the server.
+    /// </summary>
+    private void OnClientDisconnect(ulong clientId)
+    {
+        RefreshButtonVisibility();
     }
 
     // -------------------------------------------------------------------------

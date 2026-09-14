@@ -82,6 +82,19 @@ public class SoldierMutantResponder : NetworkBehaviour
 
     private float _health;
 
+    /// <summary>
+    /// Server-authoritative "has this standalone guard's corpse been disposed of" flag.
+    /// <see cref="HandleCorpseCollected"/> used to hide the corpse by calling
+    /// <c>gameObject.SetActive(false)</c> directly, which only ever ran on the server —
+    /// a client that joined afterward loaded a fresh copy of the scene where this guard was
+    /// still active, so the already-disposed-of corpse reappeared for them. Being a
+    /// NetworkVariable, its current value is applied to every client — including late
+    /// joiners — the same way <see cref="GuardPurchasePoint"/> already does for guards that
+    /// live under a purchase point.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isDisposed = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private NavMeshAgent _agent;
     private SuspectCharacter _suspect;
     private MutantEnemy _selfMutantEnemy;
@@ -111,9 +124,18 @@ public class SoldierMutantResponder : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        _isDisposed.OnValueChanged += OnIsDisposedChanged;
+
         if (!IsServer)
         {
             enabled = false;
+
+            // Apply the current disposal state immediately for a late-joining client — a
+            // standalone guard already disposed of before this client connected must load in
+            // hidden, not reappear until the next time _isDisposed happens to change.
+            if (_isDisposed.Value)
+                gameObject.SetActive(false);
+
             return;
         }
 
@@ -135,8 +157,16 @@ public class SoldierMutantResponder : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        _isDisposed.OnValueChanged -= OnIsDisposedChanged;
         StopCombatRoutine();
         base.OnNetworkDespawn();
+    }
+
+    /// <summary>Hides the corpse on every client (server included) the instant it becomes disposed.</summary>
+    private void OnIsDisposedChanged(bool previousValue, bool newValue)
+    {
+        if (newValue)
+            gameObject.SetActive(false);
     }
 
     /// <summary>True while this soldier can still be targeted/damaged by mutants.</summary>
@@ -190,9 +220,11 @@ public class SoldierMutantResponder : NetworkBehaviour
     /// guard lives under a GuardPurchasePoint (its soldier slot), that point is notified so the
     /// slot frees up and the purchase post reappears — the slot itself is reused, so it must NOT
     /// be destroyed (see <see cref="JunkItem"/>'s _destroyOnCollect). Otherwise (a standalone
-    /// default guard) this guard's own GameObject is hidden directly, and its optional
-    /// <see cref="_associatedPurchasePoint"/> is unlocked so it can be bought as a replacement —
-    /// even if no day script has ever unlocked it before (e.g. a Day 1 default guard).
+    /// default guard) <see cref="_isDisposed"/> is flipped, which hides this guard's GameObject
+    /// on every client via <see cref="OnIsDisposedChanged"/> — including clients that join after
+    /// this fires, since the current value is re-applied on <see cref="OnNetworkSpawn"/>. Its
+    /// optional <see cref="_associatedPurchasePoint"/> is also unlocked so it can be bought as a
+    /// replacement — even if no day script has ever unlocked it before (e.g. a Day 1 default guard).
     /// </summary>
     private void HandleCorpseCollected()
     {
@@ -203,7 +235,7 @@ public class SoldierMutantResponder : NetworkBehaviour
             return;
         }
 
-        gameObject.SetActive(false);
+        _isDisposed.Value = true;
 
         if (_associatedPurchasePoint != null)
             _associatedPurchasePoint.SetUnlocked(true);

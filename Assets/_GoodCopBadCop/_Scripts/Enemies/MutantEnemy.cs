@@ -1237,6 +1237,31 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
+    /// Searches for any unlocked <see cref="IMutantPassable"/> obstacle within
+    /// <see cref="doorDetectionRadius"/>, regardless of direction, and forces it open. Used while
+    /// fleeing, where there is no single chase target to bias the search toward — the mutant
+    /// just needs to get past whatever closed door (e.g. the booth door) is carving the NavMesh
+    /// and blocking its escape route. Applies the same cooldown as <see cref="TryOpenBlockingDoor"/>
+    /// to avoid spamming the open call every tick.
+    /// </summary>
+    private void TryOpenNearbyBlockingDoor()
+    {
+        if (Time.time < _doorOpenCooldownTimer) return;
+
+        Collider[] nearby = Physics.OverlapSphere(transform.position, doorDetectionRadius);
+        foreach (Collider col in nearby)
+        {
+            IMutantPassable passable = col.GetComponentInParent<IMutantPassable>();
+            if (passable == null || !passable.IsBlockingMutant)
+                continue;
+
+            passable.OpenForMutant();
+            _doorOpenCooldownTimer = Time.time + doorOpenCooldownDuration;
+            return;
+        }
+    }
+
+    /// <summary>
     /// Searches within <see cref="doorDetectionRadius"/> for any physically-closed
     /// <see cref="DoorController"/> (locked or not) in the direction of <paramref name="target"/>,
     /// and bangs on it at the standard attack rate. Used when the chase path is blocked by a
@@ -1781,14 +1806,18 @@ public class MutantEnemy : NetworkBehaviour
         if (yardBloodDecalPrefabs == null || yardBloodDecalPrefabs.Length == 0)
             return;
 
-        Vector3 groundPoint = originPosition;
-        Vector3 groundNormal = Vector3.up;
-
-        Vector3 castOrigin = originPosition + Vector3.up * 5f;
-        if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, goreGroundLayer, QueryTriggerInteraction.Ignore))
+        // originPosition is a random point on the mutant's OWN body-collider surface (torso/
+        // shoulder/head height), not a ground point, so the downward raycast below is required to
+        // snap it onto the floor. That first raycast can miss near walls, doorway gaps, or stair
+        // edges (originPosition is offset sideways from the mutant's actual footprint), so retry
+        // once from the mutant's own root position — which is reliably standing on the floor —
+        // before giving up. If both miss (e.g. killed mid-air over a gap), skip the decal entirely
+        // rather than spawning it floating at body height.
+        if (!TryFindGroundBelow(originPosition, out Vector3 groundPoint, out Vector3 groundNormal) &&
+            !TryFindGroundBelow(transform.position, out groundPoint, out groundNormal))
         {
-            groundPoint = hit.point;
-            groundNormal = hit.normal;
+            Debug.LogWarning("[MutantEnemy] SpawnGoreBloodDecal: no ground found below the mutant — skipping blood splatter instead of spawning it in the air.");
+            return;
         }
 
         GameObject prefab = yardBloodDecalPrefabs[UnityEngine.Random.Range(0, yardBloodDecalPrefabs.Length)];
@@ -1817,6 +1846,27 @@ public class MutantEnemy : NetworkBehaviour
         CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
 
         SpawnBloodParticleClientRpc(groundPoint, rotation);
+    }
+
+    /// <summary>
+    /// Raycasts downward from 5 units above <paramref name="fromPosition"/> against
+    /// <see cref="goreGroundLayer"/> to find the floor directly below it. Used by
+    /// <see cref="SpawnGoreBloodDecal"/> to snap a blood-splatter decal onto the ground instead of
+    /// leaving it floating at the height it was cast from.
+    /// </summary>
+    private bool TryFindGroundBelow(Vector3 fromPosition, out Vector3 groundPoint, out Vector3 groundNormal)
+    {
+        Vector3 castOrigin = fromPosition + Vector3.up * 5f;
+        if (Physics.Raycast(castOrigin, Vector3.down, out RaycastHit hit, 20f, goreGroundLayer, QueryTriggerInteraction.Ignore))
+        {
+            groundPoint = hit.point;
+            groundNormal = hit.normal;
+            return true;
+        }
+
+        groundPoint = default;
+        groundNormal = Vector3.up;
+        return false;
     }
 
     /// <summary>
@@ -2186,6 +2236,11 @@ public class MutantEnemy : NetworkBehaviour
 
         while (elapsed < fleeDespawnTimeout)
         {
+            // A closed door (e.g. the booth door) blocking the escape route carves a NavMesh
+            // obstacle that the agent cannot path through on its own — force it open first so
+            // the flee path isn't stuck waiting on a player to open it manually.
+            TryOpenNearbyBlockingDoor();
+
             // Continuously update destination away from the nearest player.
             Transform player = FindNearestLivingPlayer();
             if (player != null)

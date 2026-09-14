@@ -169,6 +169,30 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
             Transform root = col.transform.root;
 
+            // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter - no tag
+            // dependency. This MUST be checked before the "Player" tag below: a resurrected
+            // corpse (see CorpseResurrectionController) keeps its original "Player" tag and its
+            // (now-dormant-turned-active) PlayerHealth component forever, so if the tag check ran
+            // first every swing would be misclassified as friendly-fire on an already-dead
+            // PlayerHealth (which silently no-ops all further damage) and the resurrected mutant
+            // would never take damage or even flinch. Checking MutantEnemy/SuspectCharacter first
+            // ensures an active mutant is always damaged as a mutant, tag notwithstanding.
+            MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
+            if (enemy != null && enemy.IsActive)
+            {
+                target   = enemy;
+                hitPoint = col.ClosestPoint(attackOrigin);
+                return HitKind.Mutant;
+            }
+
+            SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
+            if (suspect != null && !suspect.IsDead)
+            {
+                target   = suspect;
+                hitPoint = col.ClosestPoint(attackOrigin);
+                return HitKind.Suspect;
+            }
+
             // Check for a fellow player hit (friendly fire).
             if (root.CompareTag(PlayerTag))
             {
@@ -207,27 +231,6 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             {
                 hitPoint = col.ClosestPoint(attackOrigin);
                 return HitKind.Glass;
-            }
-
-            // Walk up from the hit collider to find a MutantEnemy or SuspectCharacter - no tag dependency.
-            MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
-            SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
-
-            if (enemy == null && suspect == null)
-                continue;
-
-            if (enemy != null)
-            {
-                target   = enemy;
-                hitPoint = col.ClosestPoint(attackOrigin);
-                return HitKind.Mutant;
-            }
-
-            if (!suspect.IsDead)
-            {
-                target   = suspect;
-                hitPoint = col.ClosestPoint(attackOrigin);
-                return HitKind.Suspect;
             }
         }
 

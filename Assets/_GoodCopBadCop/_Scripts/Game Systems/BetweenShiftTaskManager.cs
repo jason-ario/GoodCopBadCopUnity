@@ -25,6 +25,15 @@ public class BetweenShiftTaskManager : MonoBehaviour
     /// <summary>Read-only view of all registered threats.</summary>
     public ISystemicThreat[] Threats => _threats;
 
+    /// <summary>
+    /// Whether this local instance believes the night phase is currently active. Each client
+    /// tracks this independently (set by <see cref="BeginNightPhase"/>/<see cref="EndNightPhase"/>),
+    /// so on the server this reflects the session's real state — used by
+    /// <see cref="GameManager.InitializeLateJoinClient"/> to decide whether a late-joining/
+    /// rejoining client needs to be caught up on already-active threats.
+    /// </summary>
+    public bool IsNightPhaseActive => _nightPhaseActive;
+
     // ── Inspector ────────────────────────────────────────────────────────────
 
     /// <summary>

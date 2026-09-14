@@ -252,7 +252,18 @@ public class GameManager : NetworkBehaviour
             Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
         };
 
-        InitializeLateJoinClientRpc(rpcParams);
+        // The night phase's threats (e.g. MutantThreat, FenceThreat) only ever get registered
+        // into a client's local TaskRegistry via BetweenShiftTaskManager.ActivateTasks(), which
+        // is normally broadcast once via ShiftManager.AddShiftTasksClientRpc — a client that
+        // wasn't connected yet when that RPC fired (a late joiner, or a player rejoining after
+        // dropping mid-night-phase) never receives it and never runs ActivateTasks() locally,
+        // so its TaskRegistry stays empty and the HUD never shows those already-active tasks.
+        // Read the server's own night-phase flag (authoritative — the host runs ActivateTasks()
+        // directly rather than through this RPC) so the client can be told to catch up.
+        bool nightPhaseActive = BetweenShiftTaskManager.Instance != null
+            && BetweenShiftTaskManager.Instance.IsNightPhaseActive;
+
+        InitializeLateJoinClientRpc(nightPhaseActive, rpcParams);
     }
 
     /// <summary>
@@ -332,7 +343,7 @@ public class GameManager : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void InitializeLateJoinClientRpc(ClientRpcParams clientRpcParams = default)
+    private void InitializeLateJoinClientRpc(bool nightPhaseActive, ClientRpcParams clientRpcParams = default)
     {
         ShiftManager.Instance.StopIntroCutscene();
         UIController.Instance.ShowPlayerUI();
@@ -342,6 +353,15 @@ public class GameManager : NetworkBehaviour
         // Bootstrap the current day on this client — it joined after StartGameClientRpc was
         // already sent, so DayActivated() was never called and no tutorial state was set up.
         CampaignManager.Instance.StartCampaign();
+
+        // Catch this client up on any night-phase threats/tasks that were already active on
+        // the host before it (re)connected — see the comment in InitializeLateJoinClient.
+        // ActivateTasks() re-populates this client's local TaskRegistry from the current
+        // (already-replicated) threat state without redoing any server-only work.
+        if (nightPhaseActive && BetweenShiftTaskManager.Instance != null)
+            BetweenShiftTaskManager.Instance.ActivateTasks();
+
+        FindObjectOfType<HUDTaskList>(true)?.ForceRebuild();
     }
 
     [ClientRpc]

@@ -1,8 +1,10 @@
 using System.Collections;
+using System.Collections.Generic;
 using FIMSpace.FLook;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
 /// Adds a simple, direct-interaction conversation to a <see cref="SuspectCharacter"/> that is
@@ -87,6 +89,7 @@ public class SuspectWorldDialogue : MonoBehaviour
     private ConversationState _state = ConversationState.Idle;
     private Transform _previousObjectToFollow;
     private bool _restoreObjectToFollow;
+    private bool _awaitingEngagementResponse;
 
     public bool InConversation => _inConversation;
 
@@ -173,12 +176,34 @@ public class SuspectWorldDialogue : MonoBehaviour
     /// </summary>
     public void BeginConversation()
     {
-        if (_inConversation) return;
+        if (_inConversation || _awaitingEngagementResponse) return;
         if (DialogueManager.Instance != null && DialogueManager.Instance.IsSpeaking) return;
+        if (speaking == null) return;
 
         ResolveOptionsForConversation();
         if (_options == null || _options.Length == 0) return;
 
+        // Ask the server for exclusive engagement with this NPC first — another player may
+        // already be mid-conversation with them — before locking our own movement/camera.
+        _awaitingEngagementResponse = true;
+        speaking.RequestBeginEngagement(OnEngagementResponse);
+    }
+
+    private void OnEngagementResponse(bool granted)
+    {
+        _awaitingEngagementResponse = false;
+
+        if (!granted)
+        {
+            UIController.Instance?.ShowShopNotification("Someone else is already talking to them.");
+            return;
+        }
+
+        StartConversation();
+    }
+
+    private void StartConversation()
+    {
         _inConversation = true;
 
         UIController.Instance.ClosePlayerUI();
@@ -253,9 +278,8 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (_state != ConversationState.ShowingGreeting && _state != ConversationState.ShowingResponse) return;
         if (DialogueManager.Instance == null) return;
 
-        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
         bool pressedAdvance = Input.GetKeyDown(KeyCode.E)
-                               || (Input.GetMouseButtonDown(0) && !overUI)
+                               || (Input.GetMouseButtonDown(0) && !IsPointerOverInteractableUI())
                                || AnyGamepadAdvanceButtonThisFrame();
         if (!pressedAdvance) return;
 
@@ -269,12 +293,45 @@ public class SuspectWorldDialogue : MonoBehaviour
         // Second input (or first when the typewriter already finished): advance past the line.
         ConversationState finishedState = _state;
         _state = ConversationState.Idle;
+
+        // Clear the subtitle locally right away instead of waiting on the AdvanceDialogueServerRpc
+        // round-trip: on the host that round-trip is effectively same-frame (host is also the
+        // server), but on a remote client it's a real network hop, which left the old subtitle
+        // visible for a beat after the choice buttons (shown locally, below) already appeared.
+        DialogueManager.Instance.ClearHistory();
         DialogueManager.Instance.AdvanceDialogueServerRpc();
 
         if (!_inConversation) return;
 
         if (finishedState == ConversationState.ShowingGreeting || finishedState == ConversationState.ShowingResponse)
             ShowOptions();
+    }
+
+    private static readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>();
+
+    /// <summary>
+    /// Unlike <see cref="EventSystem.IsPointerOverGameObject()"/>, this only reports true when the
+    /// pointer is over an actual interactive control (e.g. the Back button or a choice button),
+    /// not any raycast-target graphic. This keeps "click anywhere to skip" working over the
+    /// subtitle/backdrop while still letting the Back button (visible the whole conversation)
+    /// receive its own click uncontested instead of also being read as an advance/skip input.
+    /// </summary>
+    private static bool IsPointerOverInteractableUI()
+    {
+        if (EventSystem.current == null) return false;
+
+        PointerEventData pointerData = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
+        _uiRaycastResults.Clear();
+        EventSystem.current.RaycastAll(pointerData, _uiRaycastResults);
+
+        foreach (RaycastResult result in _uiRaycastResults)
+        {
+            if (result.gameObject == null) continue;
+            Selectable selectable = result.gameObject.GetComponentInParent<Selectable>();
+            if (selectable != null && selectable.interactable) return true;
+        }
+
+        return false;
     }
 
     private IEnumerator RestoreGameplayCursorAfterExit()
@@ -324,6 +381,8 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (!_inConversation) return;
         _inConversation = false;
         _state = ConversationState.Idle;
+
+        speaking?.EndEngagement();
 
         UIController.Instance.HideBackButton();
         DialogueChoiceSystem.Instance.HideChoicePanel();

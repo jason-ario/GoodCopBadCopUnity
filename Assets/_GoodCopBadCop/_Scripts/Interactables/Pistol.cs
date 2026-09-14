@@ -207,31 +207,62 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     /// </summary>
     private FireHit ResolveShot(Vector3 rayOrigin, Vector3 rayDirection)
     {
-        if (!Physics.Raycast(rayOrigin, rayDirection, out RaycastHit hit, _bulletRange))
+        // Uses RaycastAll (sorted by distance) instead of a plain Raycast so trigger colliders can
+        // be inspected without letting them silently block the shot. A resurrected corpse (see
+        // CorpseResurrectionController) exposes its ragdoll limb colliders as trigger hitboxes so
+        // individual limbs/body parts can be hit — but this project also uses trigger colliders
+        // everywhere for non-physical logic volumes (interaction zones, click detectors, task
+        // areas, etc.), and those must stay completely transparent to bullets, exactly like before.
+        RaycastHit[] hits = Physics.RaycastAll(rayOrigin, rayDirection, _bulletRange, Physics.AllLayers, QueryTriggerInteraction.Collide);
+        if (hits.Length == 0)
             return new FireHit(ShotKind.None, default, rayOrigin);
 
-        MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-        if (enemy != null && enemy.NetworkObject != null)
-            return new FireHit(ShotKind.Mutant, new NetworkObjectReference(enemy.NetworkObject), hit.point);
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
         ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
-        if (hit.collider.transform.root.CompareTag("Player"))
+
+        foreach (RaycastHit hit in hits)
         {
-            NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
-            PlayerHealth playerHealth  = hit.collider.GetComponentInParent<PlayerHealth>();
+            // IsActive matters here: every Player prefab carries a dormant MutantEnemy (see
+            // CorpseResurrectionController) so it can later resurrect into a chasing mutant while
+            // still alive/uninfected. Without the IsActive check, a shot at a perfectly living
+            // player would always be misclassified as a mutant hit and silently swallowed by
+            // MutantEnemy's own dormancy guard, never reaching PlayerHealth at all.
+            MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
+            if (enemy != null && enemy.IsActive)
+            {
+                if (enemy.NetworkObject != null)
+                    return new FireHit(ShotKind.Mutant, new NetworkObjectReference(enemy.NetworkObject), hit.point);
+                continue;
+            }
 
-            // Skip the shooter's own body so hitting yourself never registers damage.
-            if (playerNetObj != null && playerHealth != null && playerNetObj.OwnerClientId != localClientId)
-                return new FireHit(ShotKind.Player, new NetworkObjectReference(playerNetObj), hit.point);
+            // An irrelevant trigger (interaction zone, click detector, task area, etc.) — bullets
+            // must pass straight through it, exactly as if QueryTriggerInteraction.Collide had
+            // never been requested.
+            if (hit.collider.isTrigger)
+                continue;
 
+            if (hit.collider.transform.root.CompareTag("Player"))
+            {
+                NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
+                PlayerHealth playerHealth  = hit.collider.GetComponentInParent<PlayerHealth>();
+
+                // Skip the shooter's own body so hitting yourself never registers damage.
+                if (playerNetObj != null && playerHealth != null && playerNetObj.OwnerClientId != localClientId)
+                    return new FireHit(ShotKind.Player, new NetworkObjectReference(playerNetObj), hit.point);
+
+                return new FireHit(ShotKind.None, default, hit.point);
+            }
+
+            BreakableGlassController glass = hit.collider.GetComponentInParent<BreakableGlassController>();
+            if (glass != null && !glass.IsSmashed)
+                return new FireHit(ShotKind.Glass, default, hit.point);
+
+            // Solid geometry that isn't anything special — this blocks the shot.
             return new FireHit(ShotKind.None, default, hit.point);
         }
 
-        BreakableGlassController glass = hit.collider.GetComponentInParent<BreakableGlassController>();
-        if (glass != null && !glass.IsSmashed)
-            return new FireHit(ShotKind.Glass, default, hit.point);
-
-        return new FireHit(ShotKind.None, default, hit.point);
+        return new FireHit(ShotKind.None, default, rayOrigin);
     }
 
     /// <summary>

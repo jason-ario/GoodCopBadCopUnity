@@ -685,7 +685,8 @@ public class Day_02 : DayBase, IDailyTask
             ScriptedDialogueRunner.Instance.PlayDialogue(
                 _spawnedVlad,
                 _vladIntroDialogue,
-                () => introDone = true);
+                () => introDone = true,
+                lockOutsidePlayers: true);
             yield return new WaitUntil(() => introDone);
             _spawnedVlad.SetCanInteractNetworked(true);
         }
@@ -759,7 +760,8 @@ public class Day_02 : DayBase, IDailyTask
             ScriptedDialogueRunner.Instance.PlayDialogue(
                 _spawnedVlad,
                 _vladToolLockerDialogue,
-                () => lockerDone = true);
+                () => lockerDone = true,
+                lockOutsidePlayers: true);
             yield return new WaitUntil(() => lockerDone);
             _spawnedVlad.SetCanInteractNetworked(true);
         }

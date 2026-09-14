@@ -39,7 +39,7 @@ public class TutorialOverlay : MonoBehaviour
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
-    [SerializeField] private float holdDuration = 2f;
+    [SerializeField] private float holdDuration = 1f;
     [Tooltip("Multiplier for how fast the fill drains when R is released.")]
     [SerializeField] private float fillDrainMultiplier = 2f;
     [Tooltip("Seconds to wait after triggering the close animation before deactivating the root.")]

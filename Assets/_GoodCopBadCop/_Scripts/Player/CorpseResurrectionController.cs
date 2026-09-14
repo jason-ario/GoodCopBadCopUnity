@@ -86,6 +86,17 @@ public class CorpseResurrectionController : NetworkBehaviour
     [Tooltip("Euler angle offsets applied to the UpperChest bone every LateUpdate on top of the Animator's pose.")]
     [SerializeField] private Vector3 upperChestEulerOffset = new Vector3(4f,  14f,   0f);
 
+    [Header("Resurrected Hitbox")]
+    [Tooltip("CharacterController height applied on resurrection to match the taller, stretched " +
+             "silhouette (see the Segment Stretch settings above) — without this the capsule stays " +
+             "sized for the original human body and shots/swings aimed at the now-taller head or " +
+             "shoulders sail past it and never register. The capsule grows upward from its original " +
+             "base (feet stay planted) — see ApplyResurrectedHitboxSize.")]
+    [SerializeField] private float resurrectedControllerHeight = 3.0f;
+    [Tooltip("CharacterController radius applied on resurrection — the stretched torso/arms are " +
+             "also wider than the original human body.")]
+    [SerializeField] private float resurrectedControllerRadius = 0.68f;
+
     [Header("Face Swap")]
     [Tooltip("One entry per face mesh that needs a material swap on resurrection.")]
     [SerializeField] private FaceMaterialSwap[] faceMaterialSwaps = System.Array.Empty<FaceMaterialSwap>();
@@ -104,6 +115,13 @@ public class CorpseResurrectionController : NetworkBehaviour
     private Animator _animator;
     private NavMeshAgent _navMeshAgent;
     private Unity.Netcode.Components.NetworkTransform _networkTransform;
+    private CharacterController _characterController;
+
+    // Original CharacterController dimensions, cached at Awake, used as the growth baseline so
+    // ApplyResurrectedHitboxSize() can grow the capsule upward from its original base instead of
+    // from the world origin.
+    private float _originalControllerHeight;
+    private Vector3 _originalControllerCenter;
 
     // ── Bone transform cache ───────────────────────────────────────────────────
 
@@ -161,6 +179,13 @@ public class CorpseResurrectionController : NetworkBehaviour
         _animator         = GetComponent<Animator>();
         _navMeshAgent     = GetComponent<NavMeshAgent>();
         _networkTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
+        _characterController = GetComponent<CharacterController>();
+
+        if (_characterController != null)
+        {
+            _originalControllerHeight = _characterController.height;
+            _originalControllerCenter = _characterController.center;
+        }
 
         if (mutantEnemy == null)
             mutantEnemy = GetComponent<MutantEnemy>();
@@ -288,6 +313,27 @@ public class CorpseResurrectionController : NetworkBehaviour
         Debug.Log($"[CorpseResurrection] Corpse of {gameObject.name} burned — resurrection cancelled.");
     }
 
+    // ── Resurrected hitbox sizing ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Grows the root CharacterController to <see cref="resurrectedControllerHeight"/>/
+    /// <see cref="resurrectedControllerRadius"/> so it actually covers the taller, stretched
+    /// mutant silhouette. Grows upward from the original base (adds the full height delta to the
+    /// center's Y) so the capsule's bottom — and therefore ground contact / feet — doesn't move;
+    /// only the top of the capsule extends to cover the now-taller head/shoulders. Must run on
+    /// every machine that performs physics queries against this collider, i.e. both the server
+    /// (Resurrect()) and every client (ResurrectClientRpc()) — see the calls below.
+    /// </summary>
+    private void ApplyResurrectedHitboxSize()
+    {
+        if (_characterController == null) return;
+
+        float heightDelta = resurrectedControllerHeight - _originalControllerHeight;
+        _characterController.height = resurrectedControllerHeight;
+        _characterController.radius = resurrectedControllerRadius;
+        _characterController.center = _originalControllerCenter + new Vector3(0f, heightDelta * 0.5f, 0f);
+    }
+
     // ── Countdown ─────────────────────────────────────────────────────────────
 
     private IEnumerator ResurrectionCountdown()
@@ -321,6 +367,14 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (_networkTransform != null)
             _networkTransform.enabled = true;
 
+        // Grow the hittable capsule to match the taller silhouette, and turn the ragdoll's limb
+        // colliders into trigger hitboxes so weapon hit-scans can register per-limb hits — not
+        // just the single root capsule. Applied locally on the server too (mirrors the
+        // NavMeshAgent/NetworkTransform re-enables above) in case anything server-side ever
+        // queries this collider directly (e.g. a host also acting as a client).
+        ApplyResurrectedHitboxSize();
+        _ragdollController?.SetLimbHitboxesActive(true);
+
         // Hand off to MutantEnemy — it owns chasing, retargeting, door bashing, attacking,
         // animation speed/grounded syncing, and death/fire handling from this point on.
         if (mutantEnemy != null)
@@ -347,6 +401,14 @@ public class CorpseResurrectionController : NetworkBehaviour
         // stays disabled), so weapon hit-scans can find this GameObject via
         // GetComponentInParent<MutantEnemy>() on every client, not just the server.
         _ragdollController?.SetRagdollActive(false);
+
+        // Grow the root capsule to match the taller, stretched silhouette (see
+        // ApplyResurrectedHitboxSize) and turn the ragdoll's limb colliders into trigger hitboxes
+        // so hit-scans can register on individual limbs/body parts too, not just the root capsule.
+        // Must run on every client — each one resolves its own shooter/swinger's weapon hits
+        // locally against its own copy of these colliders (see Pistol/Shotgun/MeleeWeaponHitbox).
+        ApplyResurrectedHitboxSize();
+        _ragdollController?.SetLimbHitboxesActive(true);
 
         // Re-enable NetworkTransform locally on every client too — not just the server (see
         // Resurrect()) — so each client actually applies the server's authoritative position/
@@ -396,6 +458,12 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (current && !previous)
         {
             _ragdollController?.SetRagdollActive(false);
+
+            // Same reasoning as ResurrectClientRpc(): a late joiner never received that RPC, so
+            // its own copy of the collider would otherwise stay sized/shaped for the original
+            // human body and its ragdoll limb colliders would stay disabled.
+            ApplyResurrectedHitboxSize();
+            _ragdollController?.SetLimbHitboxesActive(true);
 
             if (_networkTransform != null)
                 _networkTransform.enabled = true;

@@ -1,3 +1,4 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -73,7 +74,7 @@ public class SpeakingInteraction : NetworkBehaviour
     {
         if (audioSource == null || laughClips == null || laughClips.Length == 0) return;
 
-        AudioClip clip = laughClips[Random.Range(0, laughClips.Length)];
+        AudioClip clip = laughClips[UnityEngine.Random.Range(0, laughClips.Length)];
         if (clip != null)
             audioSource.PlayOneShot(clip);
     }
@@ -87,6 +88,96 @@ public class SpeakingInteraction : NetworkBehaviour
     [Header("Look Target")]
     [SerializeField] private Transform lookTarget;
     public Transform LookTarget => lookTarget;
+
+    // Server-authoritative lock so only one player at a time can hold a world-dialogue
+    // conversation with this speaker. Read by everyone, written only by the server.
+    private readonly NetworkVariable<bool> _isEngaged =
+        new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<ulong> _engagedClientId =
+        new NetworkVariable<ulong>(ulong.MaxValue, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private Action<bool> _pendingEngagementCallback;
+
+    /// <summary>True while any player currently holds a world-dialogue conversation with this speaker.</summary>
+    public bool IsEngaged => _isEngaged.Value;
+
+    public override void OnNetworkSpawn()
+    {
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+    }
+
+    // Releases the engagement lock if the player who was holding it disconnects mid-conversation,
+    // so this speaker doesn't stay permanently unavailable to everyone else.
+    private void OnClientDisconnected(ulong clientId)
+    {
+        if (_isEngaged.Value && _engagedClientId.Value == clientId)
+        {
+            _isEngaged.Value = false;
+            _engagedClientId.Value = ulong.MaxValue;
+        }
+    }
+
+    /// <summary>
+    /// Requests exclusive engagement with this speaker for a world-dialogue conversation.
+    /// Invokes <paramref name="onResponse"/> with true if granted, or false if another player
+    /// already has this speaker engaged. Safe to call from any client.
+    /// </summary>
+    public void RequestBeginEngagement(Action<bool> onResponse)
+    {
+        _pendingEngagementCallback = onResponse;
+        RequestBeginEngagementServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestBeginEngagementServerRpc(ServerRpcParams rpcParams = default)
+    {
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        bool granted = !_isEngaged.Value;
+
+        if (granted)
+        {
+            _isEngaged.Value = true;
+            _engagedClientId.Value = senderId;
+        }
+
+        ClientRpcParams targetParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { senderId } }
+        };
+        EngagementResponseClientRpc(granted, targetParams);
+    }
+
+    [ClientRpc]
+    private void EngagementResponseClientRpc(bool granted, ClientRpcParams rpcParams = default)
+    {
+        Action<bool> callback = _pendingEngagementCallback;
+        _pendingEngagementCallback = null;
+        callback?.Invoke(granted);
+    }
+
+    /// <summary>Releases this speaker's engagement lock. Safe to call even if not currently engaged.</summary>
+    public void EndEngagement()
+    {
+        EndEngagementServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void EndEngagementServerRpc(ServerRpcParams rpcParams = default)
+    {
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        if (_isEngaged.Value && _engagedClientId.Value == senderId)
+        {
+            _isEngaged.Value = false;
+            _engagedClientId.Value = ulong.MaxValue;
+        }
+    }
 
     /// <summary>
     /// Broadcasts a line of dialogue to all clients via the dialogue manager.
@@ -124,8 +215,11 @@ public class SpeakingInteraction : NetworkBehaviour
 
     /// <summary>
     /// Plays a direct world-dialogue line. The player who initiated the conversation receives the
-    /// regular dialogue subtitle; every other client receives the same line as a floating bubble
-    /// over this speaker instead, so their HUD is not interrupted by another player's conversation.
+    /// regular dialogue subtitle. Every other (non-engaged) client "overhears" the same line only
+    /// while within <see cref="GameSettings.OverhearSubtitleProximity"/> of the speaker, according
+    /// to <see cref="GameSettings.WorldDialogueOverhearMode"/>: either as a floating bubble over
+    /// this speaker (InWorldSubtitles), or as the regular bottom-of-screen subtitle
+    /// (NormalSubtitles). Outside that proximity, non-engaged clients see nothing.
     /// </summary>
     public void SayWorldDialogue(string dialogue, bool clearHistory = false, bool waitForInput = false)
     {
@@ -163,7 +257,20 @@ public class SpeakingInteraction : NetworkBehaviour
             if (clearHistory)
                 DialogueManager.Instance?.ClearHistory();
 
-            GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.ShowLine(dialogue, speakerName, Color.white);
+            if (IsLocalPlayerWithinOverhearProximity())
+            {
+                if (GameSettings.Instance.WorldDialogueOverhearMode == GameSettings.OverhearSubtitleMode.NormalSubtitles)
+                {
+                    // waitForInput is intentionally ignored here: the overhearing client has no way to
+                    // advance this line themselves, so let it auto-dismiss on its own timer instead.
+                    DialogueManager.Instance?.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory,
+                        waitForInput: false);
+                }
+                else
+                {
+                    GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.ShowLine(dialogue, speakerName, Color.white);
+                }
+            }
         }
 
         AudioClip[] clips = VoiceAudioClips;
@@ -171,6 +278,21 @@ public class SpeakingInteraction : NetworkBehaviour
         {
             DialogueManager.Instance?.PlayDialogueAudio(dialogue, clips, audioSource, isMutant: _isMutantVoiceActive);
         }
+    }
+
+    /// <summary>
+    /// True when the local player is within <see cref="GameSettings.OverhearSubtitleProximity"/> of
+    /// this speaker. Used to decide whether an overheard world-dialogue line is shown at all, and if
+    /// so, whether it uses the bottom-of-screen subtitle (NormalSubtitles mode) or the in-world
+    /// bubble (InWorldSubtitles mode).
+    /// </summary>
+    private bool IsLocalPlayerWithinOverhearProximity()
+    {
+        Transform localPlayer = PlayerInstance.Instance != null ? PlayerInstance.Instance.transform : null;
+        if (localPlayer == null) return false;
+
+        float maxDistance = GameSettings.Instance.OverhearSubtitleProximity;
+        return (localPlayer.position - transform.position).sqrMagnitude <= maxDistance * maxDistance;
     }
 
     /// <summary>Hides this speaker's floating world-dialogue subtitle on every connected client.</summary>
