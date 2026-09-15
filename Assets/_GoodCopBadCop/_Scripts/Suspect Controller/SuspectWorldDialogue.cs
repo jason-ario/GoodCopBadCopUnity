@@ -69,6 +69,16 @@ public class SuspectWorldDialogue : MonoBehaviour
              "player's camera for the duration of the conversation.")]
     [SerializeField] private FLookAnimator lookAnimator;
 
+    [Tooltip("Fine-tunes the dialogue camera dolly-in framing height (meters, +up/-down) for this " +
+             "specific character. Taller characters typically want a small negative value to pull " +
+             "the shot back down toward their upper body; shorter ones may want a small positive value.")]
+    [SerializeField] private float dialogueCameraVerticalOffset = 0f;
+
+    /// <summary>Exposes <see cref="dialogueCameraVerticalOffset"/> for callers that resolve this NPC's
+    /// look target generically (e.g. <see cref="ScriptedDialogueRunner"/>) and need to pass the same
+    /// per-character framing tune-up through to <see cref="DialogueChoiceSystem.EnterScriptedDialogueModeOutside"/>.</summary>
+    public float DialogueCameraVerticalOffset => dialogueCameraVerticalOffset;
+
     [Header("Idle State")]
     [Tooltip("When true, sets the Animator's 'Sitting' bool parameter to true on Awake, so this " +
              "NPC starts (and remains, outside of conversation lines) in its sitting idle pose. " +
@@ -211,7 +221,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         Transform headBone = lookAnimator != null && lookAnimator.LeadBone != null ? lookAnimator.LeadBone : null;
         Transform lookTarget = headBone != null ? headBone
             : (speaking != null && speaking.LookTarget != null ? speaking.LookTarget : transform);
-        DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(lookTarget);
+        DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(lookTarget, dialogueCameraVerticalOffset);
 
         if (lookAnimator != null)
         {

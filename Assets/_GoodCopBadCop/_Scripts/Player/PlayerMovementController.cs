@@ -45,6 +45,17 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [Tooltip("Camera offset magnitude (local units) at which body lean reaches its maximum. Tune to match your cameraLookDownPos distance.")]
     [SerializeField] private float maxCameraOffsetForLean = 0.3f;
 
+    [Header("Dialogue Zoom Settings")]
+    [Tooltip("How far (meters) the camera dollies toward the conversation target for outside-world scripted dialogues (e.g. EnterScriptedDialogueModeOutside). Framing goal: the target's upper body/face.")]
+    [SerializeField] private float dialogueZoomDistance = 0.7f;
+    [Tooltip("Duration of the dolly-in/dolly-out tween.")]
+    [SerializeField] private float dialogueZoomDuration = 0.6f;
+    [Tooltip("Minimum clearance kept between the camera and any obstruction (wall, prop) discovered along the dolly path.")]
+    [SerializeField] private float dialogueZoomClearance = 0.15f;
+
+    private Vector3 _preDialogueZoomLocalPos;
+    private bool _isDialogueZoomed;
+
     private Vector3 _recoilRotation; // Procedural offset for recoil
     private float _cameraPitch = 0f;
     private Vector3 _currentVelocity;
@@ -695,6 +706,67 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             // Update _cameraPitch to match the new rotation to prevent snapping when mouse moves
             cameraTransform.DOLookAt(target.position, 0.5f).OnUpdate(SyncPitch);
         }
+    }
+
+    /// <summary>
+    /// Dollies the first-person camera closer to <paramref name="target"/> on top of the existing
+    /// look rotation, so an outside-world scripted conversation (see
+    /// <see cref="DialogueChoiceSystem.EnterScriptedDialogueModeOutside"/>) frames the target's
+    /// upper body/face instead of just rotating to face them. Movement/look are already locked
+    /// (CanControl false) for the whole conversation, so <see cref="Rotate"/> and its per-frame
+    /// camera-position logic never run and won't fight this tween. Safe to call multiple times;
+    /// only the first call caches the pre-zoom local position. <paramref name="verticalOffset"/>
+    /// raises (positive) or lowers (negative) the camera to re-tune framing per character height
+    /// — e.g. a taller suspect's head bone sits higher, so a small negative offset pulls the shot
+    /// back down toward their upper body. Call <see cref="ResetCameraZoomForDialogue"/> on exit to
+    /// restore the original position.
+    /// </summary>
+    public void ZoomCameraForDialogue(Transform target, float overrideDistance = -1f, float verticalOffset = 0f)
+    {
+        if (cameraTransform == null || target == null) return;
+
+        if (!_isDialogueZoomed)
+        {
+            _preDialogueZoomLocalPos = cameraTransform.localPosition;
+            _isDialogueZoomed = true;
+        }
+
+        float distance = overrideDistance > 0f ? overrideDistance : dialogueZoomDistance;
+
+        Vector3 direction = target.position - cameraTransform.position;
+        direction.y = 0f; // Dolly horizontally only — pitch already aims the camera up/down at the target.
+        if (direction.sqrMagnitude < 0.0001f)
+            direction = cameraTransform.forward;
+        direction.Normalize();
+
+        // Clamp against obstructions (walls, props) so the camera never dollies through geometry.
+        if (Physics.Raycast(cameraTransform.position, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
+            distance = Mathf.Max(0f, hit.distance - dialogueZoomClearance);
+
+        // Vertical offset lets callers re-frame the shot per character (e.g. push the camera up
+        // for a tall suspect so the shot doesn't skew too low, or down for a short one) on top
+        // of the horizontal dolly-in, without affecting the look-rotation set by LookAtTarget.
+        Vector3 worldTargetPos = cameraTransform.position + direction * distance + Vector3.up * verticalOffset;
+        Vector3 localTargetPos = cameraTransform.parent != null
+            ? cameraTransform.parent.InverseTransformPoint(worldTargetPos)
+            : worldTargetPos;
+
+        cameraTransform.DOKill();
+        cameraTransform.DOLocalMove(localTargetPos, dialogueZoomDuration).SetEase(Ease.InOutSine);
+    }
+
+    /// <summary>
+    /// Restores the camera's local position cached by <see cref="ZoomCameraForDialogue"/>. No-op if
+    /// the camera was never zoomed. Call on exiting the outside-world scripted conversation.
+    /// </summary>
+    public void ResetCameraZoomForDialogue()
+    {
+        if (cameraTransform == null || !_isDialogueZoomed) return;
+
+        _isDialogueZoomed = false;
+
+        cameraTransform.DOKill();
+        cameraTransform.DOLocalMove(_preDialogueZoomLocalPos, dialogueZoomDuration).SetEase(Ease.InOutSine);
     }
 
     /// <summary>

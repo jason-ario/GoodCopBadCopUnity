@@ -152,6 +152,7 @@ MonoBehaviour:
   - {fileID: 7300517804645528778}
   - {fileID: -6048748491816672947}
   - {fileID: -135517569053171247}
+  - {fileID: 1024964196531452821}
   m_RendererFeatureMap: ad6b866f10d7b46cbc5fa2e549ddf4c7eca222f5008a32e374f5d940af3fb8547809522231498f197a6c467a529e4afe2eba135d14a7e11d1548d42a45a7139b1db20cc840ab155ccab44f7643a650654d6196594b870eacd1e1c22b7d8b1efe
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -181,6 +182,26 @@ MonoBehaviour:
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
   m_TileOnlyMode: 0
+--- !u!114 &1024964196531452821
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b00045f12942b46c698459096c89274e, type: 3}
+  m_Name: UI Backdrop Blur
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.FullScreenPassRendererFeature
+  m_Active: 0
+  injectionPoint: 550
+  fetchColorBuffer: 1
+  requirements: 4
+  passMaterial: {fileID: 2100000, guid: 6e1478b04970b3647ba2acd8ed574753, type: 2}
+  passIndex: 0
+  bindDepthStencilAttachment: 0
+  m_Version: 1
 --- !u!114 &1841771247995849080
 MonoBehaviour:
   m_ObjectHideFlags: 1

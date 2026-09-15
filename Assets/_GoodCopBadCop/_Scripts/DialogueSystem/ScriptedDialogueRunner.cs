@@ -934,7 +934,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // interaction controller, leaving the cam and interaction lock permanently stuck because
         // ExitScriptedModeClientRpc only calls ExitScriptedDialogueMode for inside players.
         if (PlayerInstance.Instance.IsOutsideLocal)
-            DialogueChoiceSystem.Instance?.EnterScriptedDialogueModeOutside(lookTarget);
+            DialogueChoiceSystem.Instance?.EnterScriptedDialogueModeOutside(
+                lookTarget, lookTarget != null ? lookTarget.GetComponent<SuspectWorldDialogue>()?.DialogueCameraVerticalOffset ?? 0f : 0f);
         else
             DialogueChoiceSystem.Instance?.EnterScriptedDialogueMode(lookTarget);
 
@@ -1176,7 +1177,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Outside players get movement-locked when explicitly requested, but never get the
             // booth suspect-cam activated — camera cuts are handled by SetActiveOverrideCamClientRpc.
             if (lockOutsidePlayers)
-                DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(lookTarget);
+                DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(
+                    lookTarget, lookTarget != null ? lookTarget.GetComponent<SuspectWorldDialogue>()?.DialogueCameraVerticalOffset ?? 0f : 0f);
             return;
         }
 

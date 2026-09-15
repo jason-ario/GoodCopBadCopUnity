@@ -19,12 +19,14 @@ using UnityEngine.InputSystem;
 ///     <see cref="EmoteDefinition.Duration"/> seconds, then cleared.
 ///  3. Layer 3 is restored to 0 (or left at 1 if it was already there).
 ///
-/// Movement and look rotation are never locked.
+/// While the wheel is open, movement, look rotation, and interaction are locked
+/// (mirrors the pause menu / guidebook pattern), and restored when it closes.
 /// </summary>
 public class EmoteInputController : MonoBehaviour
 {
     private PlayerAnimationController   _animController;
     private PlayerInstance              _playerInstance;
+    private PlayerMovementController    _movementController;
 
     private bool      _wheelOpen       = false;
     private bool      _isEmoting       = false;
@@ -34,8 +36,9 @@ public class EmoteInputController : MonoBehaviour
 
     private void Awake()
     {
-        _animController  = GetComponent<PlayerAnimationController>();
-        _playerInstance  = GetComponent<PlayerInstance>();
+        _animController     = GetComponent<PlayerAnimationController>();
+        _playerInstance     = GetComponent<PlayerInstance>();
+        _movementController = GetComponent<PlayerMovementController>();
     }
 
     private void Start()
@@ -87,6 +90,19 @@ public class EmoteInputController : MonoBehaviour
         _wheelOpen = true;
 
         UIController.Instance?.ShowCursor();
+
+        // Lock movement, look, and interaction while the wheel is open — mirrors the
+        // pause menu / guidebook pattern. SetCanControl(false) alone stops
+        // PlayerMovementController's Update (movement + look), but SetCanMove/SetCanLook
+        // are also set so dependent systems (reticle, footsteps, camera shake) see
+        // consistent state while the wheel is up.
+        if (_movementController != null)
+        {
+            _movementController.SetCanMove(false);
+            _movementController.SetCanControl(false);
+            _movementController.SetCanLook(false);
+        }
+
         EmoteWheelUI.Instance?.Show();
     }
 
@@ -96,6 +112,15 @@ public class EmoteInputController : MonoBehaviour
         _wheelOpen = false;
 
         EmoteWheelUI.Instance?.Hide();
+
+        // Restore look first so SetCanControl finds CanLook == true and re-enables the reticle.
+        if (_movementController != null)
+        {
+            _movementController.SetCanLook(true);
+            _movementController.SetCanControl(true);
+            _movementController.SetCanMove(true);
+        }
+
         UIController.Instance?.HideCursor();
     }
 

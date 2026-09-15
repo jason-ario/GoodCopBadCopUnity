@@ -279,8 +279,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
     /// Enters scripted dialogue mode for outside-world cutscenes. Locks player movement and
     /// shows the cursor but does NOT activate the booth suspect camera. Use for NPC dialogues
     /// that occur outside the interrogation booth (e.g. Vlad out-back sequence).
+    /// <paramref name="cameraVerticalOffset"/> tunes the dolly-in framing height per character —
+    /// see <see cref="PlayerMovementController.ZoomCameraForDialogue"/>.
     /// </summary>
-    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null)
+    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null, float cameraVerticalOffset = 0f)
     {
         if (IsInDialogueMode)
         {
@@ -311,7 +313,12 @@ public class DialogueChoiceSystem : NetworkBehaviour
         UIController.Instance.ShowCursor();
 
         if (lookTarget != null)
-            player.GetComponent<PlayerMovementController>()?.LookAtTarget(lookTarget);
+        {
+            PlayerMovementController movementController = player.GetComponent<PlayerMovementController>();
+            movementController?.LookAtTarget(lookTarget);
+            // Dolly the camera closer, framing the target's upper body/face rather than just rotating to face them.
+            movementController?.ZoomCameraForDialogue(lookTarget, verticalOffset: cameraVerticalOffset);
+        }
 
         HidePlayerBody();
 
@@ -336,6 +343,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         if (player == null) return;
 
         // Restore look before restoring control so the CanControl setter can re-lock the cursor.
+        player.GetComponent<PlayerMovementController>()?.ResetCameraZoomForDialogue();
         player.GetComponent<PlayerMovementController>()?.SetCanLook(true);
         player.GetComponent<PlayerMovementController>()?.SetCanControl(true);
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
