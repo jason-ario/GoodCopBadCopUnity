@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4023670914130281889
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2352336655919156630}
+  m_Layer: 0
+  m_Name: Hit Effect Point
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2352336655919156630
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4023670914130281889}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.4, z: -18.9}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7561276088792229634}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8870200935166261913
 GameObject:
   m_ObjectHideFlags: 0
@@ -26,10 +57,11 @@ Transform:
   m_GameObject: {fileID: 8870200935166261913}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 7, z: 22.8}
+  m_LocalPosition: {x: 0, y: -10.9, z: 22.8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 2352336655919156630}
   m_Father: {fileID: 8950023152507783208}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2950890886079734997
@@ -45,9 +77,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MeleeWeaponHitbox
   ShowTopMostFoldoutHeaderGroup: 1
-  hitRadius: 1.2
-  _hitEffectPrefab: {fileID: 0}
-  _environmentHitEffectPrefab: {fileID: 0}
+  hitRadius: 0.88
+  _hitEffectPrefab: {fileID: 2995841491401614156, guid: 6ab320a6234520243ab1407c39004056, type: 3}
+  _environmentHitEffectPrefab: {fileID: 2995841491401614156, guid: 6ab320a6234520243ab1407c39004056, type: 3}
+  _hitEffectSpawnPoint: {fileID: 2352336655919156630}
 --- !u!1001 &8916678516192505795
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -36,6 +36,9 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     [Tooltip("Particle prefab instantiated at the hit position when geometry (non-enemy) is struck.")]
     [SerializeField] private ParticleSystem _environmentHitEffectPrefab;
 
+    [Tooltip("Where hit effects are spawned, e.g. the weapon's head/tip. Falls back to this transform if unassigned.")]
+    [SerializeField] private Transform _hitEffectSpawnPoint;
+
     private const string PlayerTag = "Player";
 
     /// <summary>
@@ -107,15 +110,19 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         HitKind kind = ResolveLocalHit(attackOrigin, out NetworkBehaviour target, out Vector3 hitPoint);
 
         // Immediate local feedback — no round trip, so the swing reads as connecting the instant it
-        // does on this player's screen.
+        // does on this player's screen. Spawned at the authored effect point (typically the
+        // weapon's head/tip) rather than the struck surface's closest point, so the effect always
+        // reads as coming from the weapon making contact, not from the target's geometry.
+        Vector3 effectOrigin = _hitEffectSpawnPoint != null ? _hitEffectSpawnPoint.position : attackOrigin;
+
         if (kind == HitKind.Environment)
         {
-            SpawnHitEffect(_environmentHitEffectPrefab, hitPoint);
+            SpawnHitEffect(_environmentHitEffectPrefab, effectOrigin);
             OnEnvironmentHit?.Invoke();
         }
         else if (kind != HitKind.None)
         {
-            SpawnHitEffect(_hitEffectPrefab, hitPoint);
+            SpawnHitEffect(_hitEffectPrefab, effectOrigin);
             OnHit?.Invoke();
         }
 
