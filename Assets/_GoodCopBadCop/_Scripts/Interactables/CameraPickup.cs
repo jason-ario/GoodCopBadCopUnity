@@ -67,6 +67,14 @@ public class CameraPickup : PickableObject
     [Tooltip("Played locally when the photo ejects.")]
     [SerializeField] private AudioClip _ejectSound;
 
+    [Header("Flash")]
+    [Tooltip("Light flashed briefly when the shutter fires. Starts disabled.")]
+    [SerializeField] private Light _flashLight;
+    [Tooltip("Peak intensity the flash light is set to when it fires.")]
+    [SerializeField] private float _flashIntensity = 25f;
+    [Tooltip("Total duration in seconds the flash stays lit (fades out over this time).")]
+    [SerializeField] private float _flashDuration = 0.15f;
+
     // ── Constants ─────────────────────────────────────────────────────────────
 
     private const string UsingToolBool = "UsingTool";
@@ -87,6 +95,7 @@ public class CameraPickup : PickableObject
     private bool _inCameraMode;
     private float _cameraModeEnterTime;
     private bool _isAnimatingPhoto;
+    private Coroutine _flashCoroutine;
     private PlayerInteractionController _interactionController;
     private PlayerInstance _cutscenePlayer;
 
@@ -113,6 +122,9 @@ public class CameraPickup : PickableObject
 
         if (_renderCamera != null)
             _renderCamera.gameObject.SetActive(false);
+
+        if (_flashLight != null)
+            _flashLight.enabled = false;
 
         interactText = InteractTextDefault;
     }
@@ -304,9 +316,6 @@ public class CameraPickup : PickableObject
 
         ExitCameraMode();
 
-        if (_shutterSound != null)
-            SFXController.Instance.PlayAtPosition(_shutterSound, transform.position);
-
         // Send spawn/final positions in the follow point's parent local space (i.e. camera local space).
         Vector3    localSpawnPos = _photoSpawnPoint.localPosition;
         Quaternion localSpawnRot = _photoSpawnPoint.localRotation;
@@ -314,6 +323,27 @@ public class CameraPickup : PickableObject
         Quaternion localFinalRot = _photoFinalPoint.localRotation;
 
         SpawnPhotoServerRpc(localSpawnPos, localSpawnRot, localFinalPos, localFinalRot, photoData);
+    }
+
+    /// <summary>
+    /// Briefly lights up <see cref="_flashLight"/> to simulate a camera flash: snaps to
+    /// <see cref="_flashIntensity"/> then fades out linearly over <see cref="_flashDuration"/>.
+    /// </summary>
+    private IEnumerator FlashCoroutine()
+    {
+        _flashLight.enabled = true;
+        _flashLight.intensity = _flashIntensity;
+
+        float elapsed = 0f;
+        while (elapsed < _flashDuration)
+        {
+            elapsed += Time.deltaTime;
+            _flashLight.intensity = Mathf.Lerp(_flashIntensity, 0f, elapsed / _flashDuration);
+            yield return null;
+        }
+
+        _flashLight.enabled = false;
+        _flashCoroutine = null;
     }
 
     /// <summary>
@@ -358,6 +388,10 @@ public class CameraPickup : PickableObject
     {
         if (_polaroidPrefab == null) return;
 
+        // Broadcast the shutter click + flash to every client (including the photographer) so
+        // the effect is synchronized for everyone, not just played locally.
+        PlayShutterEffectsClientRpc();
+
         // Spawn the polaroid at the spawn point's current world position.
         GameObject spawned = Instantiate(_polaroidPrefab, _photoSpawnPoint.position, _photoSpawnPoint.rotation);
         NetworkObject no = spawned.GetComponent<NetworkObject>();
@@ -379,6 +413,24 @@ public class CameraPickup : PickableObject
             localFinalPos, localFinalRot,
             photographerId,
             photoData);
+    }
+
+    /// <summary>
+    /// Received on all clients. Plays the shutter sound and fires the flash light in sync
+    /// for every player, regardless of who took the photo.
+    /// </summary>
+    [ClientRpc]
+    private void PlayShutterEffectsClientRpc()
+    {
+        if (_shutterSound != null)
+            SFXController.Instance.PlayAtPosition(_shutterSound, transform.position);
+
+        if (_flashLight != null)
+        {
+            if (_flashCoroutine != null)
+                StopCoroutine(_flashCoroutine);
+            _flashCoroutine = StartCoroutine(FlashCoroutine());
+        }
     }
 
     /// <summary>

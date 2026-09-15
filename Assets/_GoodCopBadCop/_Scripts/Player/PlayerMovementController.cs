@@ -340,6 +340,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         if(IsLocalPlayer == false) return;
         if (canControl == false)
         {
+            // Pausing (or any other canControl=false state) only disables player input —
+            // gravity and falling must keep running so the player doesn't freeze mid-air.
+            ApplyGravityOnly();
             return;
         }
         
@@ -360,6 +363,42 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
                 StandUp();
             }
         }
+    }
+
+    /// <summary>
+    /// Vertical-only counterpart to <see cref="Move"/>, run instead of it while
+    /// canControl is false (e.g. pause menu open). Keeps gravity/falling and ground
+    /// contact working correctly without processing any player input, so the player
+    /// doesn't freeze mid-air just because controls are disabled.
+    /// </summary>
+    private void ApplyGravityOnly()
+    {
+        bool isGrounded = CheckGrounded();
+        RawGrounded = isGrounded;
+
+        if (isGrounded)
+        {
+            _verticalVelocity = -2f; // Small constant to keep grounded
+        }
+        else
+        {
+            float effectiveGravity = _isUnderwater ? gravity * underwaterGravityMultiplier : gravity;
+            _verticalVelocity += effectiveGravity * Time.deltaTime;
+
+            if (_isUnderwater && _verticalVelocity < underwaterTerminalVelocity)
+                _verticalVelocity = underwaterTerminalVelocity;
+        }
+
+        _wasGrounded = isGrounded;
+
+        bool jumpAnimActive = _playerAnimationController != null && _playerAnimationController.IsJumpAnimPlaying;
+        IsGrounded = isGrounded && !jumpAnimActive && !_isUnderwater;
+
+        Vector3 moveVector = Vector3.up * _verticalVelocity;
+        CollisionFlags collisionFlags = _characterController.Move(moveVector * Time.deltaTime);
+
+        if (_verticalVelocity > 0f && (collisionFlags & CollisionFlags.Above) != 0)
+            _verticalVelocity = 0f;
     }
 
     void Move() 
@@ -387,8 +426,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         bool isRunning = !_isCrouching && IsSprintInputActive();
         IsRunning = isRunning;
+        // Running camera FOV/speed-line polish should only kick in while the player is
+        // actually moving forward, not just holding sprint while stationary or strafing/backpedaling.
+        bool isMovingForward = MoveZ > 0.1f;
         if (_playerCameraController != null)
-            _playerCameraController.UpdateMovementShake(isRunning);
+            _playerCameraController.UpdateMovementShake(isRunning, isMovingForward);
 
         // Pick speed
         float currentSpeed = _isCrouching ? crouchSpeed : (isRunning ? runSpeed : characterSpeed);
@@ -613,6 +655,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         {
             _sprintToggleActive = false;
         }
+
+        if (_playerCameraController != null)
+            _playerCameraController.SetRunningEffectsEnabled(settings.RunningEffectsEnabled);
     }
 
     public void SetCanControl(bool value)
@@ -632,7 +677,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             IsRunning = false;
             _sprintToggleActive = false;
             if (_playerCameraController != null)
-                _playerCameraController.UpdateMovementShake(false);
+                _playerCameraController.UpdateMovementShake(false, false);
         }
     }
 
@@ -647,7 +692,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             IsRunning = false;
             _sprintToggleActive = false;
             if (_playerCameraController != null)
-                _playerCameraController.UpdateMovementShake(false);
+                _playerCameraController.UpdateMovementShake(false, false);
         }
     }
 

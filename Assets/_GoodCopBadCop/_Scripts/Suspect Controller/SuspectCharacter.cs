@@ -1695,21 +1695,28 @@ public class SuspectCharacter : Interactable
     // Combat
 
     /// <summary>
-    /// Applies damage to this suspect. Server-only. Triggers a hit reaction and,
-    /// when health reaches zero, plays the death animation on all clients.
-    /// No-op entirely while this suspect has not yet transitioned into a full mutant
-    /// (<see cref="_isMutant"/> false) — hitting a non-mutant suspect has zero gameplay effect:
-    /// no damage, no hit reaction, no flee. The previous "wounded flee" hit registry for
-    /// pre-mutation suspects has been removed.
+    /// Applies a melee hit to this suspect. Server-only. Always plays the cosmetic hit
+    /// reaction (hit particle + <see cref="hitAnimTrigger"/> on the animator) on all clients so
+    /// a swing that visibly connects always feels like it connected. Gameplay consequences —
+    /// actual health loss, <see cref="OnHit"/> (used e.g. to make Ocho flee), and death — only
+    /// apply once this suspect has transitioned into a full mutant (<see cref="_isMutant"/>
+    /// true). Hitting a regular, non-mutant suspect is purely cosmetic: no damage, no flee, no
+    /// death. The previous "wounded flee" hit registry for pre-mutation suspects has been
+    /// removed.
     /// </summary>
     /// <param name="amount">Damage points to subtract.</param>
     /// <param name="hitPoint">World-space impact point used to position the blood particle.</param>
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
-        if (!IsServer || isImmuneToDamage || _isDead || _hasFled || !_isAtBooth || !_isMutant)
+        if (!IsServer || isImmuneToDamage || _isDead || _hasFled || !_isAtBooth)
             return;
 
+        // Cosmetic hit reaction plays for every strike, mutant or not.
         SpawnHitParticleClientRpc(hitPoint);
+
+        if (!_isMutant)
+            return;
+
         OnHit?.Invoke();
 
         _health -= amount;

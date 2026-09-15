@@ -42,6 +42,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             view.InvertYAxisChanged.Subscribe(OnInvertYAxisChanged).AddTo(ref disposables);
             view.CrouchModeChanged.Subscribe(OnCrouchModeChanged).AddTo(ref disposables);
             view.SprintModeChanged.Subscribe(OnSprintModeChanged).AddTo(ref disposables);
+            view.RunningEffectsEnabledChanged.Subscribe(OnRunningEffectsEnabledChanged).AddTo(ref disposables);
             view.MasterVolumeChanged.Subscribe(OnMasterVolumeChanged).AddTo(ref disposables);
             view.MusicVolumeChanged.Subscribe(OnMusicVolumeChanged).AddTo(ref disposables);
             view.SfxVolumeChanged.Subscribe(OnSfxVolumeChanged).AddTo(ref disposables);
@@ -86,6 +87,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             settingsModel.SprintMode
                 .Subscribe(sprintMode => view.SetSprintModeValue((int)sprintMode))
+                .AddTo(ref disposables);
+
+            settingsModel.RunningEffectsEnabled
+                .Subscribe(view.SetRunningEffectsEnabledValue)
                 .AddTo(ref disposables);
 
             settingsModel.MasterVolume
@@ -194,6 +199,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
 
             settingsService.SetSprintMode((EInputActivationMode)value);
+        }
+
+        private void OnRunningEffectsEnabledChanged(bool isEnabled)
+        {
+            settingsService.SetRunningEffectsEnabled(isEnabled);
         }
 
         private void OnMasterVolumeChanged(float value)

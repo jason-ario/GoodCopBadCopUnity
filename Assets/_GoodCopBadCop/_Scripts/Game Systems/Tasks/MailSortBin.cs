@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -56,30 +55,6 @@ public class MailSortBin : Interactable
              "Leave empty to skip the throw animation.")]
     [SerializeField] private string _throwAnimTrigger = "";
 
-    [Header("Confiscate Settlement")]
-    [Tooltip("Minimum clearance between the package bounds and the trigger volume edge before a contraband package can settle. Prevents a package caught on the bin lip from locking there.")]
-    [SerializeField, Min(0f)] private float _interiorClearance = 0.08f;
-
-    [Tooltip("Maximum linear speed (m/s) a fully-inside contraband package may have while it is considered settled.")]
-    [SerializeField, Min(0f)] private float _settleLinearSpeed = 0.12f;
-
-    [Tooltip("Maximum angular speed (rad/s) a fully-inside contraband package may have while it is considered settled.")]
-    [SerializeField, Min(0f)] private float _settleAngularSpeed = 0.35f;
-
-    [Tooltip("How long a contraband package must remain fully inside and below the motion thresholds before it locks in place.")]
-    [SerializeField, Min(0f)] private float _settleDuration = 0.35f;
-
-    /// <summary>
-    /// Packages currently physically overlapping <see cref="_triggerZone"/> that are being
-    /// tracked for Confiscate settlement. Membership is driven purely by trigger enter/exit — see
-    /// <see cref="HandlePackageTriggerEnter"/>/<see cref="HandlePackageTriggerExit"/> — NOT by
-    /// whether the package currently satisfies the tighter <see cref="IsPackageComfortablyInside"/>
-    /// clearance/motion criteria. A package that has merely crossed the bin's outer trigger
-    /// bounds (e.g. still resting on the lip) stays tracked and is simply not yet accumulating
-    /// settle time; only actually leaving the trigger volume removes it.
-    /// </summary>
-    private readonly HashSet<MailPackageItem> _settlingPackages = new();
-
     public MailSortBinType BinType => _binType;
 
     protected override void Awake()
@@ -104,16 +79,20 @@ public class MailSortBin : Interactable
         HandlePackageTriggerEnter(other);
     }
 
-    private void OnTriggerExit(Collider other)
-    {
-        HandlePackageTriggerExit(other);
-    }
-
     /// <summary>
     /// Evaluates whether the given Collider belongs to a droppable <see cref="MailPackageItem"/>
     /// and, if so, forwards the sort attempt to the server. Called directly by
     /// <see cref="OnTriggerEnter"/> when <see cref="_triggerZone"/> is on this GameObject, or by
     /// <see cref="MailSortBinTriggerRelay"/> when the trigger collider lives on a child instead.
+    ///
+    /// Resolved instantly — no "settle in place" delay. The moment a package that belongs in this
+    /// bin physically touches the trigger volume it is optimistically locked out of being picked
+    /// back up (see <see cref="PickableObject.LockInteractable"/>, mirroring
+    /// <see cref="MailCubbySlot.HandleItemPlaced"/>'s pattern) and the sort is requested from the
+    /// server, which authoritatively confirms it via <see cref="SortMailTask.EvaluateSort"/> ->
+    /// <see cref="MailPackageItem.MarkConfiscated"/>. A package that does NOT belong in this bin is
+    /// left interactable and simply bounces back out (see <see cref="SortMailTask.EvaluateSort"/>'s
+    /// reject branch).
     /// </summary>
     public void HandlePackageTriggerEnter(Collider other)
     {
@@ -125,137 +104,10 @@ public class MailSortBin : Interactable
         // it's a server-authoritative NetworkVariable that hasn't round-tripped back yet.
         if (package.IsResolved) return;
 
-        if (_binType == MailSortBinType.Confiscate)
-        {
-            NetworkObject binNetworkObject = GetComponent<NetworkObject>();
-            if (binNetworkObject != null)
-                package.RequestConfiscateSettleServerRpc(new NetworkObjectReference(binNetworkObject));
-            return;
-        }
+        if (package.CorrectBin == _binType)
+            package.LockInteractable();
 
         package.RequestSortServerRpc((int)_binType, -1);
-    }
-
-    /// <summary>
-    /// Evaluates whether the given Collider belongs to a <see cref="MailPackageItem"/> that just
-    /// physically left this bin's trigger volume and, if so, forwards that to the server so a
-    /// Confiscate package that never settled (e.g. bounced back out or was pulled back out by the
-    /// player) stops being tracked — see <see cref="_settlingPackages"/>. Called directly by
-    /// <see cref="OnTriggerExit"/>, or by <see cref="MailSortBinTriggerRelay"/> when the trigger
-    /// collider lives on a child instead.
-    /// </summary>
-    public void HandlePackageTriggerExit(Collider other)
-    {
-        if (_binType != MailSortBinType.Confiscate) return;
-
-        MailPackageItem package = other.GetComponentInParent<MailPackageItem>();
-        if (package == null) return;
-
-        NetworkObject binNetworkObject = GetComponent<NetworkObject>();
-        if (binNetworkObject != null)
-            package.RequestConfiscateCancelSettleServerRpc(new NetworkObjectReference(binNetworkObject));
-    }
-
-    /// <summary>
-    /// Server-only. Correct contraband remains a dynamic physics object, tracked for as long as it
-    /// physically overlaps <see cref="_triggerZone"/> (see <see cref="_settlingPackages"/>), until
-    /// it has additionally spent <see cref="_settleDuration"/> seconds fully inside the tighter
-    /// clearance inset (<see cref="IsPackageComfortablyInside"/>) below the motion thresholds.
-    /// Merely touching the lip does not cancel tracking — only actually leaving the trigger volume
-    /// (<see cref="CancelPackageSettlement"/>) does.
-    /// </summary>
-    public void BeginPackageSettlement(MailPackageItem package)
-    {
-        if (!IsServer || package == null || package.IsResolved) return;
-
-        if (package.CorrectBin != MailSortBinType.Confiscate)
-        {
-            SortMailTask.Instance?.EvaluateSort(package, _binType);
-            return;
-        }
-
-        if (_settlingPackages.Add(package))
-            StartCoroutine(WaitForPackageSettlement(package));
-    }
-
-    /// <summary>
-    /// Server-only. Called when a tracked package physically leaves this bin's trigger volume —
-    /// stops the pending settlement coroutine for it (see <see cref="WaitForPackageSettlement"/>'s
-    /// loop condition). A later re-entry starts a fresh observation window via
-    /// <see cref="BeginPackageSettlement"/>.
-    /// </summary>
-    public void CancelPackageSettlement(MailPackageItem package)
-    {
-        if (!IsServer || package == null) return;
-        _settlingPackages.Remove(package);
-    }
-
-    private IEnumerator WaitForPackageSettlement(MailPackageItem package)
-    {
-        float settledTime = 0f;
-        Rigidbody packageRigidbody = package != null ? package.GetComponent<Rigidbody>() : null;
-
-        while (_settlingPackages.Contains(package) && package != null && package.IsSpawned && !package.IsResolved)
-        {
-            if (IsPackageComfortablyInside(package))
-            {
-                bool isStill = packageRigidbody == null ||
-                               (packageRigidbody.linearVelocity.sqrMagnitude <= _settleLinearSpeed * _settleLinearSpeed &&
-                                packageRigidbody.angularVelocity.sqrMagnitude <= _settleAngularSpeed * _settleAngularSpeed);
-                settledTime = isStill ? settledTime + Time.fixedDeltaTime : 0f;
-
-                if (settledTime >= _settleDuration)
-                {
-                    SortMailTask.Instance?.EvaluateSort(package, _binType);
-                    break;
-                }
-            }
-            else
-            {
-                // Still overlapping the outer trigger (e.g. resting on the lip or mid-fall) but
-                // not yet within the tighter clearance inset — keep waiting instead of cancelling;
-                // only an actual OnTriggerExit (CancelPackageSettlement) stops this loop.
-                settledTime = 0f;
-            }
-
-            yield return new WaitForFixedUpdate();
-        }
-
-        if (package != null)
-            _settlingPackages.Remove(package);
-    }
-
-    private bool IsPackageComfortablyInside(MailPackageItem package)
-    {
-        if (_triggerZone == null) return false;
-
-        Collider packageCollider = package.GetComponent<Collider>();
-        if (packageCollider == null) return false;
-
-        Bounds packageBounds = packageCollider.bounds;
-        if (_triggerZone is BoxCollider box)
-        {
-            Vector3 halfSize = box.size * 0.5f - Vector3.one * _interiorClearance;
-            if (halfSize.x <= 0f || halfSize.y <= 0f || halfSize.z <= 0f) return false;
-
-            for (int x = -1; x <= 1; x += 2)
-            for (int y = -1; y <= 1; y += 2)
-            for (int z = -1; z <= 1; z += 2)
-            {
-                Vector3 worldCorner = packageBounds.center + Vector3.Scale(packageBounds.extents, new Vector3(x, y, z));
-                Vector3 localCorner = box.transform.InverseTransformPoint(worldCorner) - box.center;
-                if (Mathf.Abs(localCorner.x) > halfSize.x ||
-                    Mathf.Abs(localCorner.y) > halfSize.y ||
-                    Mathf.Abs(localCorner.z) > halfSize.z)
-                    return false;
-            }
-
-            return true;
-        }
-
-        Bounds innerBounds = _triggerZone.bounds;
-        innerBounds.Expand(-_interiorClearance * 2f);
-        return innerBounds.Contains(packageBounds.min) && innerBounds.Contains(packageBounds.max);
     }
 
     // ── Interact-based deposit (holding a MailPackageItem) ────────────────────
@@ -362,8 +214,8 @@ public class MailSortBin : Interactable
     /// Server-only: waits for the arc duration to elapse, then restores normal server-authoritative
     /// physics on the package (see <see cref="MailPackageItem.ResumePhysicsAfterScriptedThrow"/>,
     /// needed so a package rejected from the wrong bin can bounce out with a real physics impulse)
-    /// before finally evaluating the sort — the same way a directly-thrown package is evaluated by
-    /// <see cref="HandlePackageTriggerEnter"/>.
+    /// before instantly evaluating the sort — the same way a directly-thrown package is evaluated
+    /// by <see cref="HandlePackageTriggerEnter"/>, with no settle delay.
     /// </summary>
     private IEnumerator FinishArcDeposit(MailPackageItem package, Vector3 landPosition)
     {
@@ -372,11 +224,7 @@ public class MailSortBin : Interactable
         if (package == null || !package.IsSpawned || package.IsResolved) yield break;
 
         package.ResumePhysicsAfterScriptedThrow(landPosition);
-
-        if (_binType == MailSortBinType.Confiscate)
-            BeginPackageSettlement(package);
-        else
-            SortMailTask.Instance?.EvaluateSort(package, _binType);
+        SortMailTask.Instance?.EvaluateSort(package, _binType);
     }
 }
 
@@ -385,8 +233,7 @@ public class MailSortBin : Interactable
 /// its owning <see cref="MailSortBin"/>. Unity never bubbles physics trigger callbacks up to
 /// parent GameObjects, so without this relay, a <see cref="MailSortBin"/> whose
 /// <c>_triggerZone</c> is assigned to a child Collider (e.g. a dedicated "Trigger Zone" object)
-/// would never actually detect packages being dropped in — or leaving before they settle
-/// (<see cref="MailSortBin.HandlePackageTriggerExit"/>).
+/// would never actually detect packages being dropped in.
 ///
 /// Setup: add this component to the same GameObject as the trigger Collider (the child assigned
 /// to <see cref="MailSortBin"/>'s <c>_triggerZone</c> field).
@@ -405,11 +252,6 @@ public class MailSortBinTriggerRelay : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         _bin?.HandlePackageTriggerEnter(other);
-    }
-
-    private void OnTriggerExit(Collider other)
-    {
-        _bin?.HandlePackageTriggerExit(other);
     }
 }
 

@@ -44,6 +44,7 @@ namespace GoodCopBadCop.Settings
         ReadOnlyReactiveProperty<bool> InvertYAxis { get; }
         ReadOnlyReactiveProperty<EInputActivationMode> CrouchMode { get; }
         ReadOnlyReactiveProperty<EInputActivationMode> SprintMode { get; }
+        ReadOnlyReactiveProperty<bool> RunningEffectsEnabled { get; }
         ReadOnlyReactiveProperty<float> MasterVolume { get; }
         ReadOnlyReactiveProperty<float> MusicVolume { get; }
         ReadOnlyReactiveProperty<float> SfxVolume { get; }
@@ -81,6 +82,9 @@ namespace GoodCopBadCop.Settings
 
         public readonly PersistentReactiveProperty<EInputActivationMode> SprintModeMutable =
             new("settings.controls.sprintMode", EInputActivationMode.Hold);
+
+        public readonly PersistentReactiveProperty<bool> RunningEffectsEnabledMutable =
+            new("settings.gameplay.runningEffectsEnabled", true);
 
         public readonly PersistentReactiveProperty<float> MasterVolumeMutable =
             new("settings.audio.masterVolume", 80f);
@@ -120,6 +124,7 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<bool> InvertYAxis => InvertYAxisMutable;
         public ReadOnlyReactiveProperty<EInputActivationMode> CrouchMode => CrouchModeMutable;
         public ReadOnlyReactiveProperty<EInputActivationMode> SprintMode => SprintModeMutable;
+        public ReadOnlyReactiveProperty<bool> RunningEffectsEnabled => RunningEffectsEnabledMutable;
         public ReadOnlyReactiveProperty<float> MasterVolume => MasterVolumeMutable;
         public ReadOnlyReactiveProperty<float> MusicVolume => MusicVolumeMutable;
         public ReadOnlyReactiveProperty<float> SfxVolume => SfxVolumeMutable;
@@ -141,6 +146,7 @@ namespace GoodCopBadCop.Settings
             InvertYAxisMutable.Flush();
             CrouchModeMutable.Flush();
             SprintModeMutable.Flush();
+            RunningEffectsEnabledMutable.Flush();
             MasterVolumeMutable.Flush();
             MusicVolumeMutable.Flush();
             SfxVolumeMutable.Flush();
@@ -163,6 +169,7 @@ namespace GoodCopBadCop.Settings
             InvertYAxisMutable.Dispose();
             CrouchModeMutable.Dispose();
             SprintModeMutable.Dispose();
+            RunningEffectsEnabledMutable.Dispose();
             MasterVolumeMutable.Dispose();
             MusicVolumeMutable.Dispose();
             SfxVolumeMutable.Dispose();

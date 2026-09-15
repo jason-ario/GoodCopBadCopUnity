@@ -5,13 +5,18 @@ using UnityEngine;
 /// <summary>
 /// Two-slot hotbar inventory for the local player.
 /// Press 1/2 to equip the item in that slot, or scroll the mouse wheel to cycle through
-/// held/carried items (including an empty "stowed" state). Picking up an item fills the
-/// first free slot automatically; placing/dropping removes it.
+/// held/carried items. Picking up an item brings it straight to hand; placing/dropping empties
+/// the hand.
 ///
-/// When both slots are occupied, pressing the other slot's key (or scrolling to it) stows
-/// the held item to <see cref="stowPoint"/> (hidden on body) and brings the stored item to
-/// hand. Scrolling past the last/first item cycles to the empty-hands state, which stows
-/// whatever is currently held.
+/// A hotbar slot represents a STOWED item only — hands are never a "slot". While only one slot
+/// is occupied, its key freely toggles that item between hand and stowed (hidden on body) via
+/// <see cref="stowPoint"/>. Once BOTH slots are occupied, you can never be empty-handed: pressing
+/// the currently-held item's own key is then a no-op, and pressing the other slot's key swaps —
+/// stowing the held item and bringing the other one to hand in the same motion — so there is
+/// always exactly one item in hand whenever two are carried.
+/// Because a slot only ever holds a stowed item, an empty hand can always pick something up even
+/// if both slots are already stowed — the new item is simply carried unslotted until a slot
+/// frees up to stow it (see <see cref="IsHandLocked"/>).
 /// Requires <see cref="PlayerPickupController"/> on the same GameObject.
 /// </summary>
 [RequireComponent(typeof(PlayerPickupController))]
@@ -41,23 +46,26 @@ public class PlayerInventory : NetworkBehaviour
     private int _activeSlot = -1;   // -1 = hand empty
 
     /// <summary>
-    /// The currently held item when that item is flagged <c>canBeStowed == false</c> (e.g. the
-    /// supply box). Such items are deliberately NOT tracked in <see cref="_slots"/> — they occupy
-    /// no hotbar slot and never appear in the HUD — but while one is carried the whole hotbar is
-    /// locked (see <see cref="IsCarryingUnstowable"/>): the player must place or drop it to free
-    /// their hands.
+    /// The currently held item when it isn't tracked by either hotbar slot. This covers two
+    /// cases: the item is flagged <c>canBeStowed == false</c> (e.g. the supply box), or it IS
+    /// stowable but both hotbar slots were already occupied by stowed items when it was picked
+    /// up (see <see cref="HandleHeldObjectChanged"/>). Either way it occupies no hotbar slot and
+    /// never appears in the HUD, and while it's carried the whole hotbar is locked (see
+    /// <see cref="IsHandLocked"/>): the player must place or drop it to free their hands — a
+    /// hotbar slot may then be free to stow it, or they can carry on holding a fresh pickup.
     /// </summary>
-    private PickableObject _unstowableHeld;
+    private PickableObject _unslottedHeld;
 
     // ── Public surface ────────────────────────────────────────────────────────
 
     public int ActiveSlot => _activeSlot;
 
     /// <summary>
-    /// True while a non-stowable item is in hand. Hotbar keys, scroll cycling and slot swapping
-    /// are all disabled in this state, because honouring them would require stowing the item.
+    /// True while an item that isn't tracked by any hotbar slot is in hand (see
+    /// <see cref="_unslottedHeld"/>). Hotbar keys, scroll cycling and slot swapping are all
+    /// disabled in this state, because honouring them would require stowing the item.
     /// </summary>
-    public bool IsCarryingUnstowable => _unstowableHeld != null;
+    public bool IsHandLocked => _unslottedHeld != null;
 
     /// <summary>Non-stowable items are carried outside the hotbar entirely.</summary>
     private static bool IsStowable(PickableObject obj) =>
@@ -74,17 +82,6 @@ public class PlayerInventory : NetworkBehaviour
         (index >= 0 && index < _slots.Length) ? _slots[index] : null;
 
     /// <summary>
-    /// True if both hotbar slots are occupied and <paramref name="obj"/> isn't already tracked
-    /// in one of them (i.e. picking it up would need a free slot that doesn't exist). Used by
-    /// <see cref="PlayerPickupController.PickUpObject"/> to block new pickups when full, while
-    /// still allowing re-equipping an already-owned stowed item (e.g. via
-    /// <see cref="PlayerPickupController.UnstowItemToHand"/>).
-    /// Non-stowable items never consume a slot, so a full inventory never blocks them.
-    /// </summary>
-    public bool IsFullFor(PickableObject obj) =>
-        IsStowable(obj) && SlotOf(obj) < 0 && FreeSlot() < 0;
-
-    /// <summary>
     /// Adds every item currently owned by this inventory to a host-side workday snapshot. The
     /// local arrays cover the host player's immediate state, while the replicated references
     /// cover remote players whose local hotbar arrays are intentionally private to their owner.
@@ -95,7 +92,7 @@ public class PlayerInventory : NetworkBehaviour
 
         AddSaveId(_slots[0], itemIds);
         AddSaveId(_slots[1], itemIds);
-        AddSaveId(_unstowableHeld, itemIds);
+        AddSaveId(_unslottedHeld, itemIds);
         AddSaveId(_firstSlotRef.Value, itemIds);
         AddSaveId(_secondSlotRef.Value, itemIds);
         if (_pickup != null)
@@ -160,10 +157,9 @@ public class PlayerInventory : NetworkBehaviour
     {
         if (!IsOwner) return;
 
-        // The HUD is hidden and interaction is suspended during scripted dialogue, but this
-        // component still receives legacy hotkey and wheel input. Ignore it so an unseen 1/2 or
-        // wheel press cannot stow/swap an item and leave the hotbar in an unexpected state when
-        // normal gameplay resumes.
+        // A locked hotbar (unslotted item in hand) still receives legacy hotkey and wheel input.
+        // Ignore it so an unseen 1/2 or wheel press cannot stow/swap an item and leave the hotbar
+        // in an unexpected state when normal gameplay resumes.
         if (PlayerInstance.Instance != null &&
             (PlayerInstance.Instance.IsInCutscene ||
              ScriptedDialogueRunner.IsScriptedModeActive ||
@@ -180,22 +176,25 @@ public class PlayerInventory : NetworkBehaviour
     }
 
     /// <summary>
-    /// Scroll-wheel item cycling. Builds the set of reachable states — empty hands plus any
-    /// occupied slot — and steps one entry forward/backward from whichever is currently active,
-    /// wrapping around. Moving onto the empty-hands state stows the held item; moving onto a
-    /// slot equips/swaps to it via <see cref="EquipSlot"/> (which already knows how to swap when
-    /// both slots are full).
+    /// Scroll-wheel item cycling. Builds the set of reachable states — any occupied slot, plus
+    /// the empty-hands state UNLESS both slots are already full (with both full, empty-hands is
+    /// never reachable — see <see cref="EquipSlot"/>) — and steps one entry forward/backward from
+    /// whichever is currently active, wrapping around. Moving onto the empty-hands state stows
+    /// the held item; moving onto a slot equips it via <see cref="EquipSlot"/>, toggling/swapping
+    /// with whatever is currently held if needed.
     /// </summary>
     /// <param name="direction">+1 to scroll to the next item, -1 for the previous.</param>
     private void CycleActiveItem(int direction)
     {
         if (!IsOwner) return;
 
-        // A non-stowable item in hand locks the hotbar — the player has to put it down.
-        if (IsCarryingUnstowable) return;
+        // An unslotted item in hand locks the hotbar — the player has to put it down.
+        if (IsHandLocked) return;
 
-        // -1 represents the empty-hands state and is always a valid destination.
-        var states = new System.Collections.Generic.List<int> { -1 };
+        bool bothFull = _slots[0] != null && _slots[1] != null;
+
+        var states = new System.Collections.Generic.List<int>();
+        if (!bothFull) states.Add(-1); // empty-hands is unreachable once both slots are full
         for (int i = 0; i < _slots.Length; i++)
             if (_slots[i] != null) states.Add(i);
 
@@ -261,7 +260,7 @@ public class PlayerInventory : NetworkBehaviour
             // shown, and _activeSlot stays -1 so nothing can be cycled/swapped while it is held.
             if (!IsStowable(obj))
             {
-                _unstowableHeld = obj;
+                _unslottedHeld = obj;
                 SetActiveSlot(-1);
                 return;
             }
@@ -279,10 +278,13 @@ public class PlayerInventory : NetworkBehaviour
             int free = FreeSlot();
             if (free < 0)
             {
-                // Both slots occupied: evict the inactive stowed slot to make room.
-                int inactive = _activeSlot == 0 ? 1 : 0;
-                EvictStowedItem(inactive);
-                free = inactive;
+                // Both hotbar slots are already stowed. A slot only ever represents a STOWED
+                // item, so a hand that's otherwise empty is always free to pick something up —
+                // this item is simply carried unslotted (like a non-stowable item) until it's
+                // placed/dropped or a slot frees up to stow it.
+                _unslottedHeld = obj;
+                SetActiveSlot(-1);
+                return;
             }
 
             _slots[free]  = obj;
@@ -293,11 +295,11 @@ public class PlayerInventory : NetworkBehaviour
         }
         else
         {
-            // A non-stowable item left the hand (placed or dropped) — it owns no slot, so there is
+            // An unslotted item left the hand (placed or dropped) — it owns no slot, so there is
             // nothing to clear beyond releasing the hotbar lock.
-            if (_unstowableHeld != null)
+            if (_unslottedHeld != null)
             {
-                _unstowableHeld = null;
+                _unslottedHeld = null;
                 return;
             }
 
@@ -313,24 +315,35 @@ public class PlayerInventory : NetworkBehaviour
     // ── Slot equipping ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Pressing the hotkey for the active slot stows it away.
-    /// Pressing the hotkey for an inactive slot brings it to hand (swapping if needed).
+    /// Pressing a slot's hotkey toggles the hotbar. If that slot's item is stowed, it's brought
+    /// to hand — swapping with whatever the other slot is currently holding, if anything, so a
+    /// hand is never left empty while both slots are full. If that slot's item is already held,
+    /// pressing its own key stows it to an empty hand, but only when the other slot is empty:
+    /// with both slots full you can never be empty-handed, so pressing the held item's own key
+    /// in that case is a no-op — press the OTHER slot's key to toggle to it instead.
     /// </summary>
     public void EquipSlot(int slotIndex)
     {
         if (!IsOwner) return;
         if (slotIndex < 0 || slotIndex >= 2) return;
 
-        // A non-stowable item in hand locks the hotbar — equipping anything else would require
+        // An unslotted item in hand locks the hotbar — equipping anything else would require
         // stowing it, which it does not support. The player must place or drop it first.
-        if (IsCarryingUnstowable) return;
+        if (IsHandLocked) return;
 
         PickableObject target = _slots[slotIndex];
         if (target == null) return;   // empty slot — nothing to do
 
-        // ── Pressing the hotkey for the already-held item → stow it ──────────
+        int otherIndex = slotIndex == 0 ? 1 : 0;
+        bool otherOccupied = _slots[otherIndex] != null;
+
+        // ── Pressing the hotkey for the already-held item ─────────────────────
         if (_activeSlot == slotIndex && !_stowed[slotIndex])
         {
+            // Both slots full: stowing this would leave both hands empty. No-op — the other
+            // slot's key is how you toggle away from this item.
+            if (otherOccupied) return;
+
             if (stowPoint == null)
             {
                 Debug.LogWarning("[PlayerInventory] stowPoint is not assigned — cannot stow.");
@@ -346,31 +359,32 @@ public class PlayerInventory : NetworkBehaviour
             return;
         }
 
-        // ── Pressing the hotkey for a stowed / inactive slot → equip it ──────
-        if (_pickup.HeldObject == null)
+        // ── Pressing the hotkey for a stowed slot → bring it to hand ──────────
+        if (_stowed[slotIndex])
         {
-            if (_stowed[slotIndex])
+            if (_pickup.HeldObject == null)
             {
                 _pickup.UnstowItemToHand(target);
                 // _stowed and _activeSlot updated in HandleHeldObjectChanged.
+                return;
             }
-            return;
+
+            // Hand busy with the other slot's item — toggle: stow it, then bring this one up,
+            // so a hand is never left empty in between.
+            if (stowPoint == null)
+            {
+                Debug.LogWarning("[PlayerInventory] stowPoint is not assigned — slot toggle disabled.");
+                return;
+            }
+
+            int currentSlot = _activeSlot;
+            PickableObject stowedItem = _pickup.StowCurrentItemToPoint(stowPoint);
+            if (stowedItem != null)
+                _stowed[currentSlot] = true;
+
+            _pickup.UnstowItemToHand(target);
+            // _stowed[slotIndex] = false and SetActiveSlot handled in HandleHeldObjectChanged.
         }
-
-        // ── Both slots occupied: swap ─────────────────────────────────────────
-        if (stowPoint == null)
-        {
-            Debug.LogWarning("[PlayerInventory] stowPoint is not assigned — slot swap disabled.");
-            return;
-        }
-
-        int currentSlot = _activeSlot;
-        PickableObject stowedItem = _pickup.StowCurrentItemToPoint(stowPoint);
-        if (stowedItem != null)
-            _stowed[currentSlot] = true;
-
-        _pickup.UnstowItemToHand(target);
-        // _stowed[slotIndex] = false and SetActiveSlot handled in HandleHeldObjectChanged.
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
@@ -391,7 +405,7 @@ public class PlayerInventory : NetworkBehaviour
 
     /// <summary>
     /// Re-activates a stowed item, drops it back to the world, and clears its slot.
-    /// Called when both slots are full and a new item is picked up.
+    /// Called when this component despawns (disconnect) to avoid losing stowed items.
     /// </summary>
     private void EvictStowedItem(int index)
     {

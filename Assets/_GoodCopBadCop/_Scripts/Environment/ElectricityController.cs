@@ -211,6 +211,20 @@ public class ElectricityController : NetworkBehaviour
         }
 
         sfxSource.PlayOneShot(powerOnSound);
+
+        // Fire "power restored" here unconditionally, rather than relying solely on
+        // OnPowerStateChanged below (driven by the _isPowerOn NetworkVariable's OnValueChanged).
+        // NetworkVariable.Value setters skip OnValueChanged entirely when the new value equals
+        // the current one — so if PowerOn() is ever called while _isPowerOn.Value is already
+        // true (a stray leftover state, a duplicate call, or any other edge case), the value
+        // never "changes" and OnPowerRestoredAllClients would otherwise silently never fire,
+        // leaving listeners (e.g. OchoBoothEncounter's power-outage sequence, Day_03's fuse-box
+        // task) stuck thinking power is still out. This ClientRpc always runs whenever PowerOn()
+        // executes, so it's the reliable place to guarantee the notification. Safe to fire
+        // alongside OnPowerStateChanged's own invoke on the normal (value actually changes)
+        // path — every OnPowerRestoredAllClients subscriber in this codebase unsubscribes itself
+        // as the first thing it does, so a double notification is a harmless no-op.
+        OnPowerRestoredAllClients?.Invoke();
     }
 
     private IEnumerator PowerOffCoroutine()

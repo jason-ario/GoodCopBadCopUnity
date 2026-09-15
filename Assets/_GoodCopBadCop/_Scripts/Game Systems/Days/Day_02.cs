@@ -141,14 +141,11 @@ public class Day_02 : DayBase, IDailyTask
              "spawned Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
     [SerializeField] private Transform _ochoReappearPoint;
 
-    [Tooltip("Scene point the tutorial arrow points at during Ocho's power outage (the Electrical Panel). " +
-             "Injected into the spawned Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
-    [SerializeField] private Transform _ochoElectricalPanelMarker;
-
-    [Tooltip("The Electrical Panel's own Interactable (ElectricPanelController) — force-highlighted while " +
-             "Ocho's power outage tutorial is showing, cleared once power is restored. Injected into the " +
-             "spawned Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
-    [SerializeField] private Interactable _ochoElectricalPanelInteractable;
+    [Tooltip("The Electrical Panel Ocho's power outage affects. Its ArrowTarget (top of the box) is " +
+             "what the tutorial arrow points at, and the panel itself is force-highlighted while the " +
+             "outage tutorial is showing, cleared once power is restored. Injected into the spawned " +
+             "Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
+    [SerializeField] private ElectricPanelController _ochoElectricalPanel;
 
     // -------------------------------------------------------------------------
     // Day 2 Opening Sequence
@@ -1130,7 +1127,7 @@ public class Day_02 : DayBase, IDailyTask
         {
             SuspectController.Instance.SpawnScriptedSuspect(_ochoBoothEncounterPrefab);
             SuspectController.Instance.CurrentSuspect?.GetComponent<OchoBoothEncounter>()?
-                .ConfigureSceneReferences(_ochoReappearPoint, _ochoElectricalPanelMarker, _ochoElectricalPanelInteractable);
+                .ConfigureSceneReferences(_ochoReappearPoint, _ochoElectricalPanel?.ArrowTarget, _ochoElectricalPanel);
         };
 
         Debug.Log("[Day_02] Ocho booth encounter armed — he will be the next suspect summoned.");

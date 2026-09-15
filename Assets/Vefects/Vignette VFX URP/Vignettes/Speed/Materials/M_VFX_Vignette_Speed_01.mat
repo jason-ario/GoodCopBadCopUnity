@@ -9,15 +9,19 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: M_VFX_Vignette_Speed_01
   m_Shader: {fileID: 4800000, guid: bfa87dc0b805835469a699347b0a3806, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _RECEIVE_SHADOWS_OFF
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - _RECEIVESHADOWS_OFF
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -52,7 +56,7 @@ Material:
     - _Lines02UVSwirl: 0
     - _LinesMultiply: 100
     - _MaskPower: 3
-    - _OpacityMultiply: 1
+    - _OpacityMultiply: 0.01
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 0
@@ -66,7 +70,8 @@ Material:
     - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
     - _Lines01UVPanSpeed: {r: 0, g: 0, b: 0, a: 0}
     - _Lines01UVScale: {r: 1, g: 1, b: 0, a: 0}
-    - _Lines02UVPanSpeed: {r: 0.1, g: -2, b: 0, a: 0}
-    - _Lines02UVScale: {r: 1, g: 1, b: 0, a: 0}
+    - _Lines02UVPanSpeed: {r: 0.005, g: -2, b: 0, a: 0}
+    - _Lines02UVScale: {r: 2, g: 1, b: 0, a: 0}
     - _Vector4: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1

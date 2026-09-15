@@ -6,6 +6,10 @@ using UnityEngine;
 public class PlayerCameraController : MonoBehaviour
 {
     [SerializeField] private CinemachineCamera camera;
+    [Tooltip("The actual render Camera whose near clip plane is temporarily tightened while smoking (e.g. Player/Camera).")]
+    [SerializeField] private Camera renderCamera;
+    [Tooltip("Near clip plane distance to use while the player is smoking a cigarette.")]
+    [SerializeField] private float smokingNearClipPlane = 0.05f;
     [SerializeField] NoiseSettings normalNoiseSettings;
     [SerializeField] NoiseSettings rumbleNoiseSettings;
     [SerializeField] private float amplitudeGainNormal;
@@ -18,6 +22,27 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private NoiseSettings runningNoiseSettings;
     [SerializeField] private float amplitudeGainRunning = 1.6f;
     [SerializeField] private float frequencyGainRunning = 2f;
+    [Tooltip("Seconds to ease the running camera shake (head bob) in/out. Part of \"Running Effects\" — only engages while actually moving forward while sprinting.")]
+    [SerializeField] private float runningShakeLerpDuration = 0.3f;
+
+    [Header("Running FOV/Speed Lines")]
+    [Tooltip("Master toggle for the running FOV widen and speed-line overlay. Driven by the Gameplay settings menu (\"Running Effects\").")]
+    [SerializeField] private bool runningEffectsEnabled = true;
+    [Tooltip("Degrees added to the camera's field of view while sprinting.")]
+    [SerializeField] private float runningFieldOfViewOffset = 5f;
+    [Tooltip("Seconds to ease the FOV offset in/out when the run state changes.")]
+    [SerializeField] private float runningFovLerpDuration = 0.3f;
+    [Tooltip("Speed-line particle system (Vefects VFX_Vignette_Speed), parented under the render camera so it stays screen-aligned. Its material's _OpacityMultiply is tweened to fade it in/out.")]
+    [SerializeField] private ParticleSystem speedLinesParticleSystem;
+    [Tooltip("Seconds of sustained sprinting required before the speed lines fade in, so brief taps of sprint don't flicker the overlay.")]
+    [SerializeField] private float speedLinesSustainedRunDelay = 0.4f;
+    [Range(0f, 1f)]
+    [Tooltip("Maximum opacity of the speed-line overlay once fully faded in.")]
+    [SerializeField] private float speedLinesMaxAlpha = 1f;
+    [Tooltip("Seconds to fade the speed-line overlay in/out.")]
+    [SerializeField] private float speedLinesFadeDuration = 0.3f;
+
+    private static readonly int OpacityMultiplyId = Shader.PropertyToID("_OpacityMultiply");
 
     private CinemachineCameraFeedbackExtension _cameraFeedbackExtension;
     private CinemachineBasicMultiChannelPerlin _perlin;
@@ -27,26 +52,169 @@ public class PlayerCameraController : MonoBehaviour
     private Vector3 _cameraKickEulerOffset;
     private float _swayFieldOfViewOffset;
     private float _cameraKickFieldOfViewOffset;
-    private bool _isRunning;
+    private float _runningFieldOfViewOffsetCurrent;
+    private Tween _runningFovTween;
+    private Tween _speedLinesTween;
+    private float _runningHeldTime;
+    private Material _speedLinesMaterialInstance;
+    private float _speedLinesOpacityCurrent;
+    private bool _runningEffectsActive;
+    private Tween _runningShakeTween;
+    private float _shakeBlend;
     private bool _rumbleActive;
+    private float _defaultNearClipPlane;
+    private bool _nearClipPlaneCached;
 
     private void OnDisable()
     {
         StopSway();
         StopCameraKick();
+        _runningFovTween?.Kill();
+        _speedLinesTween?.Kill();
+        _runningShakeTween?.Kill();
+        SetRunningFieldOfViewOffset(0f);
+        SetSpeedLinesAlpha(0f);
+        _runningHeldTime = 0f;
     }
 
-    /// <summary>Called every frame by the movement controller to keep the camera shake in sync with the run state.</summary>
-    public void UpdateMovementShake(bool isRunning)
+    private void Update()
     {
-        if (_isRunning == isRunning)
+        if (!_runningEffectsActive || !runningEffectsEnabled)
+        {
+            if (_runningHeldTime != 0f)
+                _runningHeldTime = 0f;
+
+            return;
+        }
+
+        if (_runningHeldTime < speedLinesSustainedRunDelay)
+        {
+            _runningHeldTime += Time.deltaTime;
+
+            if (_runningHeldTime >= speedLinesSustainedRunDelay)
+                FadeSpeedLines(true);
+        }
+    }
+
+    /// <summary>
+    /// Called every frame by the movement controller to keep the camera shake, FOV widen, and
+    /// speed-line overlay in sync with the run state. All three are part of "Running Effects" and
+    /// only engage while the player is both sprinting AND actually moving forward — holding sprint
+    /// while stationary or only strafing/backpedaling should not trigger them.
+    /// </summary>
+    public void UpdateMovementShake(bool isRunning, bool isMovingForward)
+    {
+        bool runningEffectsActive = isRunning && isMovingForward;
+        if (_runningEffectsActive == runningEffectsActive)
             return;
 
-        _isRunning = isRunning;
-        RefreshMovementNoise();
+        _runningEffectsActive = runningEffectsActive;
+        ApplyRunningShake(runningEffectsActive, animate: true);
+        UpdateRunningFieldOfView(runningEffectsActive);
+
+        if (!runningEffectsActive)
+        {
+            _runningHeldTime = 0f;
+            FadeSpeedLines(false);
+        }
     }
 
-    private void RefreshMovementNoise()
+    /// <summary>Enables or disables the running FOV widen, speed-line overlay, and running camera shake, e.g. from the Gameplay settings menu.</summary>
+    public void SetRunningEffectsEnabled(bool isEnabled)
+    {
+        runningEffectsEnabled = isEnabled;
+
+        if (!isEnabled)
+        {
+            _runningHeldTime = 0f;
+            ApplyRunningShake(false, animate: true);
+            UpdateRunningFieldOfView(false);
+            FadeSpeedLines(false);
+        }
+        else if (_runningEffectsActive)
+        {
+            ApplyRunningShake(true, animate: true);
+            UpdateRunningFieldOfView(true);
+        }
+    }
+
+    private void UpdateRunningFieldOfView(bool isRunning)
+    {
+        if (!EnsureCameraFeedbackExtension(true))
+            return;
+
+        float target = isRunning && runningEffectsEnabled ? runningFieldOfViewOffset : 0f;
+
+        _runningFovTween?.Kill();
+        _runningFovTween = DOTween.To(
+                () => _runningFieldOfViewOffsetCurrent,
+                SetRunningFieldOfViewOffset,
+                target,
+                Mathf.Max(0.01f, runningFovLerpDuration))
+            .SetEase(Ease.OutSine)
+            .SetUpdate(true)
+            .SetTarget(this);
+    }
+
+    private void SetRunningFieldOfViewOffset(float offset)
+    {
+        _runningFieldOfViewOffsetCurrent = offset;
+        ApplyCameraFeedbackOffsets();
+    }
+
+    private void FadeSpeedLines(bool show)
+    {
+        if (!EnsureSpeedLinesReady())
+            return;
+
+        float target = show && runningEffectsEnabled ? speedLinesMaxAlpha : 0f;
+
+        _speedLinesTween?.Kill();
+        _speedLinesTween = DOTween.To(
+                () => _speedLinesOpacityCurrent,
+                SetSpeedLinesAlpha,
+                target,
+                Mathf.Max(0.01f, speedLinesFadeDuration))
+            .SetEase(Ease.OutSine)
+            .SetUpdate(true)
+            .SetTarget(this);
+    }
+
+    private void SetSpeedLinesAlpha(float alpha)
+    {
+        _speedLinesOpacityCurrent = alpha;
+
+        if (_speedLinesMaterialInstance != null)
+            _speedLinesMaterialInstance.SetFloat(OpacityMultiplyId, alpha);
+    }
+
+    private bool EnsureSpeedLinesReady()
+    {
+        if (_speedLinesMaterialInstance != null)
+            return true;
+
+        if (speedLinesParticleSystem == null)
+            return false;
+
+        ParticleSystemRenderer renderer = speedLinesParticleSystem.GetComponent<ParticleSystemRenderer>();
+        if (renderer == null)
+            return false;
+
+        _speedLinesMaterialInstance = renderer.material;
+        _speedLinesMaterialInstance.SetFloat(OpacityMultiplyId, 0f);
+
+        if (!speedLinesParticleSystem.isPlaying)
+            speedLinesParticleSystem.Play();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Blends the Cinemachine noise between the normal and running shake settings.
+    /// When animate is true, eases the blend over runningShakeLerpDuration (used when the run
+    /// state changes); when false, snaps immediately (used e.g. after rumble ends).
+    /// </summary>
+    private void ApplyRunningShake(bool active, bool animate)
     {
         if (_rumbleActive)
             return;
@@ -55,9 +223,55 @@ public class PlayerCameraController : MonoBehaviour
         if (perlin == null)
             return;
 
-        perlin.NoiseProfile = _isRunning && runningNoiseSettings != null ? runningNoiseSettings : normalNoiseSettings;
-        perlin.AmplitudeGain = _isRunning ? amplitudeGainRunning : amplitudeGainNormal;
-        perlin.FrequencyGain = _isRunning ? frequencyGainRunning : frequencyGainNormal;
+        bool useRunningProfile = active && runningEffectsEnabled;
+        float target = useRunningProfile ? 1f : 0f;
+
+        _runningShakeTween?.Kill();
+
+        if (useRunningProfile)
+            perlin.NoiseProfile = runningNoiseSettings != null ? runningNoiseSettings : normalNoiseSettings;
+
+        if (!animate)
+        {
+            if (!useRunningProfile)
+                perlin.NoiseProfile = normalNoiseSettings;
+
+            SetShakeBlend(target);
+            return;
+        }
+
+        _runningShakeTween = DOTween.To(
+                () => _shakeBlend,
+                SetShakeBlend,
+                target,
+                Mathf.Max(0.01f, runningShakeLerpDuration))
+            .SetEase(Ease.OutSine)
+            .SetUpdate(true)
+            .SetTarget(this);
+
+        if (!useRunningProfile)
+        {
+            _runningShakeTween.OnComplete(() =>
+            {
+                if (!_rumbleActive && perlin != null)
+                    perlin.NoiseProfile = normalNoiseSettings;
+            });
+        }
+    }
+
+    private void SetShakeBlend(float blend)
+    {
+        _shakeBlend = blend;
+
+        if (_rumbleActive)
+            return;
+
+        CinemachineBasicMultiChannelPerlin perlin = GetPerlin();
+        if (perlin == null)
+            return;
+
+        perlin.AmplitudeGain = Mathf.Lerp(amplitudeGainNormal, amplitudeGainRunning, blend);
+        perlin.FrequencyGain = Mathf.Lerp(frequencyGainNormal, frequencyGainRunning, blend);
     }
 
     private CinemachineBasicMultiChannelPerlin GetPerlin()
@@ -84,6 +298,7 @@ public class PlayerCameraController : MonoBehaviour
     public void TurnOnRumble()
     {
         _rumbleActive = true;
+        _runningShakeTween?.Kill();
 
         CinemachineBasicMultiChannelPerlin perlin = GetPerlin();
         if (perlin == null)
@@ -97,7 +312,22 @@ public class PlayerCameraController : MonoBehaviour
     public void TurnOffRumble()
     {
         _rumbleActive = false;
-        RefreshMovementNoise();
+        ApplyRunningShake(_runningEffectsActive, animate: false);
+    }
+
+    /// <summary>Temporarily tightens the render camera's near clip plane while smoking, restoring the cached default when finished.</summary>
+    public void SetSmokingNearClipPlaneActive(bool isSmoking)
+    {
+        if (renderCamera == null)
+            return;
+
+        if (!_nearClipPlaneCached)
+        {
+            _defaultNearClipPlane = renderCamera.nearClipPlane;
+            _nearClipPlaneCached = true;
+        }
+
+        renderCamera.nearClipPlane = isSmoking ? smokingNearClipPlane : _defaultNearClipPlane;
     }
 
     public void PlaySway(CameraSwaySettings settings)
@@ -290,7 +520,8 @@ public class PlayerCameraController : MonoBehaviour
             return;
 
         _cameraFeedbackExtension.EulerOffset = _swayEulerOffset + _cameraKickEulerOffset;
-        _cameraFeedbackExtension.FieldOfViewOffset = _swayFieldOfViewOffset + _cameraKickFieldOfViewOffset;
+        _cameraFeedbackExtension.FieldOfViewOffset =
+            _swayFieldOfViewOffset + _cameraKickFieldOfViewOffset + _runningFieldOfViewOffsetCurrent;
     }
 
     private bool EnsureCameraFeedbackExtension(bool createIfMissing)

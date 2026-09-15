@@ -55,6 +55,12 @@ public class ElectricPanelController : Interactable
     [Tooltip("Tracks whether another player is currently using this panel's diegetic view.")]
     [SerializeField] private DiegeticOccupancy _occupancy;
 
+    [Header("Tutorial Arrow")]
+    [Tooltip("Anchor point for tutorial arrows (e.g. Ocho's power-outage tutorial). Position this at " +
+             "the TOP of the panel box — NOT this component's own root/pivot, which sits low and would " +
+             "make the arrow render too close to the ground. Falls back to this transform if unassigned.")]
+    [SerializeField] private Transform _arrowTarget;
+
     // ─── Network state ────────────────────────────────────────────────────────
 
     private NetworkVariable<bool> _isDoorOpen = new NetworkVariable<bool>(
@@ -107,6 +113,9 @@ public class ElectricPanelController : Interactable
 
     /// <summary>True when the panel's electricity controller currently has power on.</summary>
     public bool IsPowerOn => _electricityController != null && _electricityController.IsPowerOn;
+
+    /// <summary>World-space anchor tutorial arrows should point at — the top of the box.</summary>
+    public Transform ArrowTarget => _arrowTarget != null ? _arrowTarget : transform;
 
     /// <summary>
     /// Resets all circuit switches to Off and snaps the knob to its Off position.

@@ -35,6 +35,7 @@ public class Cigarette : PickableObject
       base.OnStartUse();
       playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
       PlaySmokingSound();
+      SetSmokingNearClipPlaneActive(true);
    }
 
    public override void OnEquipped(PlayerPickupController player)
@@ -50,6 +51,7 @@ public class Cigarette : PickableObject
       StopSmokingSound();
       SnapLightOff();
       SnapEmissionOff();
+      SetSmokingNearClipPlaneActive(false);
    }
 
    void Update()
@@ -80,6 +82,7 @@ public class Cigarette : PickableObject
       base.OnStopUse();
       playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
       StopSmokingSound();
+      SetSmokingNearClipPlaneActive(false);
    }
 
    /// <summary>Fades the ember light in when smoking starts and out when it stops.</summary>
@@ -140,6 +143,17 @@ public class Cigarette : PickableObject
       _skinnedMeshRenderer.GetPropertyBlock(_emissionPropertyBlock, emissiveMaterialIndex);
       _emissionPropertyBlock.SetColor(EmissionColorId, emissionColor);
       _skinnedMeshRenderer.SetPropertyBlock(_emissionPropertyBlock, emissiveMaterialIndex);
+   }
+
+   /// <summary>Tightens (or restores) the player's render camera near clip plane while smoking.</summary>
+   private void SetSmokingNearClipPlaneActive(bool isSmoking)
+   {
+      if (playerPickupController == null) return;
+
+      PlayerCameraController cameraController = playerPickupController.GetComponent<PlayerCameraController>();
+      if (cameraController == null) return;
+
+      cameraController.SetSmokingNearClipPlaneActive(isSmoking);
    }
 
    /// <summary>Starts looping the smoking sound effect.</summary>

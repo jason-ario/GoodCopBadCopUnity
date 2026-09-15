@@ -6,17 +6,20 @@ namespace GoodCopBadCop.Settings
         public readonly bool InvertYAxis;
         public readonly EInputActivationMode CrouchMode;
         public readonly EInputActivationMode SprintMode;
+        public readonly bool RunningEffectsEnabled;
 
         public PlayerControlSettings(
             float mouseSensitivity,
             bool invertYAxis,
             EInputActivationMode crouchMode,
-            EInputActivationMode sprintMode)
+            EInputActivationMode sprintMode,
+            bool runningEffectsEnabled)
         {
             MouseSensitivity = mouseSensitivity;
             InvertYAxis = invertYAxis;
             CrouchMode = crouchMode;
             SprintMode = sprintMode;
+            RunningEffectsEnabled = runningEffectsEnabled;
         }
     }
 }

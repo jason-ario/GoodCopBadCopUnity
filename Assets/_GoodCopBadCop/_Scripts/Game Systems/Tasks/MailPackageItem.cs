@@ -311,39 +311,6 @@ public class MailPackageItem : PickableObject
     }
 
     /// <summary>
-    /// Called by a <see cref="MailSortBin"/> when a Confiscate-bin trigger first overlaps this
-    /// package. Resolves the referenced bin on the server so the bin can keep this package dynamic
-    /// until it is fully inside and settled, rather than freezing it at the opening lip.
-    /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    public void RequestConfiscateSettleServerRpc(NetworkObjectReference binReference)
-    {
-        if (!binReference.TryGet(out NetworkObject binNetworkObject)) return;
-
-        MailSortBin bin = binNetworkObject.GetComponent<MailSortBin>();
-        if (bin == null || bin.BinType != MailSortBinType.Confiscate) return;
-
-        bin.BeginPackageSettlement(this);
-    }
-
-    /// <summary>
-    /// Called by a <see cref="MailSortBin"/> when this package physically leaves its Confiscate
-    /// trigger volume before settling (e.g. bounced back out, or the player pulled it back out).
-    /// Stops the bin's pending settlement tracking for this package — see
-    /// <see cref="MailSortBin.CancelPackageSettlement"/>.
-    /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    public void RequestConfiscateCancelSettleServerRpc(NetworkObjectReference binReference)
-    {
-        if (!binReference.TryGet(out NetworkObject binNetworkObject)) return;
-
-        MailSortBin bin = binNetworkObject.GetComponent<MailSortBin>();
-        if (bin == null || bin.BinType != MailSortBinType.Confiscate) return;
-
-        bin.CancelPackageSettlement(this);
-    }
-
-    /// <summary>
     /// Called by <see cref="MailSortBin"/> or <see cref="MailCubbySlot"/> (any client) when this
     /// package is dropped into a bin or cubby slot. Routes the sort attempt to the server, which
     /// owns <see cref="SortMailTask"/> and decides whether the placement was correct.

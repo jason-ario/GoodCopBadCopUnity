@@ -17,6 +17,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<bool> InvertYAxisChanged { get; }
         Observable<int> CrouchModeChanged { get; }
         Observable<int> SprintModeChanged { get; }
+        Observable<bool> RunningEffectsEnabledChanged { get; }
         Observable<float> MasterVolumeChanged { get; }
         Observable<float> MusicVolumeChanged { get; }
         Observable<float> SfxVolumeChanged { get; }
@@ -39,6 +40,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void SetInvertYAxisValue(bool value);
         void SetCrouchModeValue(int value);
         void SetSprintModeValue(int value);
+        void SetRunningEffectsEnabledValue(bool value);
         void SetMasterVolumeValue(float value);
         void SetMusicVolumeValue(float value);
         void SetSfxVolumeValue(float value);
@@ -75,6 +77,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             InvertYAxis,
             CrouchMode,
             SprintMode,
+            RunningEffectsEnabled,
             VoiceChatEnabled,
             VoiceChatMuted,
             VoiceChatDeafened,
@@ -175,7 +178,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
             SettingsMenuControlDefinition.Dropdown("Language", new[] { "English" }, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Subtitles", OffOnOptions, defaultOptionIndex: 1, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Camera Shake", OffOnOptions, defaultOptionIndex: 1, interactable: false),
-            SettingsMenuControlDefinition.Dropdown("Head Bob", OffOnOptions, defaultOptionIndex: 1, interactable: false)
+            SettingsMenuControlDefinition.Dropdown("Head Bob", OffOnOptions, defaultOptionIndex: 1, interactable: false),
+            SettingsMenuControlDefinition.Dropdown(
+                "Running Effects",
+                OffOnOptions,
+                defaultOptionIndex: 1,
+                option: ESettingsMenuControlOption.RunningEffectsEnabled)
         };
 
         private static readonly SettingsMenuControlDefinition[] GraphicsControlDefinitions =
@@ -278,6 +286,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private TMP_Dropdown invertYAxisDropdown;
         private TMP_Dropdown crouchModeDropdown;
         private TMP_Dropdown sprintModeDropdown;
+        private TMP_Dropdown runningEffectsEnabledDropdown;
         private TMP_Dropdown voiceChatEnabledDropdown;
         private TMP_Dropdown voiceChatMutedDropdown;
         private TMP_Dropdown voiceChatDeafenedDropdown;
@@ -291,6 +300,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> invertYAxisChanged = new();
         private readonly Subject<int> crouchModeChanged = new();
         private readonly Subject<int> sprintModeChanged = new();
+        private readonly Subject<bool> runningEffectsEnabledChanged = new();
         private readonly Subject<float> masterVolumeChanged = new();
         private readonly Subject<float> musicVolumeChanged = new();
         private readonly Subject<float> sfxVolumeChanged = new();
@@ -313,6 +323,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> InvertYAxisChanged => invertYAxisChanged;
         public Observable<int> CrouchModeChanged => crouchModeChanged;
         public Observable<int> SprintModeChanged => sprintModeChanged;
+        public Observable<bool> RunningEffectsEnabledChanged => runningEffectsEnabledChanged;
         public Observable<float> MasterVolumeChanged => masterVolumeChanged;
         public Observable<float> MusicVolumeChanged => musicVolumeChanged;
         public Observable<float> SfxVolumeChanged => sfxVolumeChanged;
@@ -428,6 +439,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetSprintModeValue(int value)
         {
             SetDropdownValue(sprintModeDropdown, value);
+        }
+
+        public void SetRunningEffectsEnabledValue(bool value)
+        {
+            SetDropdownValue(runningEffectsEnabledDropdown, value ? 1 : 0);
         }
 
         public void SetMasterVolumeValue(float value)
@@ -1017,6 +1033,9 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case ESettingsMenuControlOption.SprintMode:
                     sprintModeDropdown = dropdown;
                     break;
+                case ESettingsMenuControlOption.RunningEffectsEnabled:
+                    runningEffectsEnabledDropdown = dropdown;
+                    break;
                 case ESettingsMenuControlOption.VoiceChatEnabled:
                     voiceChatEnabledDropdown = dropdown;
                     break;
@@ -1056,6 +1075,9 @@ namespace GoodCopBadCop.UI.SettingsMenu
                     break;
                 case ESettingsMenuControlOption.SprintMode:
                     dropdown.onValueChanged.AddListener(value => sprintModeChanged.OnNext(value));
+                    break;
+                case ESettingsMenuControlOption.RunningEffectsEnabled:
+                    dropdown.onValueChanged.AddListener(value => runningEffectsEnabledChanged.OnNext(value != 0));
                     break;
                 case ESettingsMenuControlOption.VoiceChatEnabled:
                     dropdown.onValueChanged.AddListener(value => voiceChatEnabledChanged.OnNext(value != 0));

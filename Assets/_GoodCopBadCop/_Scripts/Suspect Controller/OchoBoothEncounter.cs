@@ -106,7 +106,9 @@ public class OchoBoothEncounter : NetworkBehaviour
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _demonicLaughClip;
 
-    [Tooltip("Transform the tutorial arrow points at while the power is out (usually the Electrical Panel).")]
+    [Tooltip("Transform the tutorial arrow points at while the power is out (usually a dedicated " +
+             "arrow-target child positioned at the top of the Electrical Panel, not the panel's own " +
+             "pivot — see ConfigureSceneReferences).")]
     [SerializeField] private Transform _electricalPanelMarker;
 
     [Tooltip("The Electrical Panel's own Interactable (e.g. ElectricPanelController), force-highlighted " +
@@ -126,6 +128,14 @@ public class OchoBoothEncounter : NetworkBehaviour
     private bool _spotted;
     private Coroutine _monitorCoroutine;
     private ApplicationLetter _spawnedApplicationLetter;
+
+    /// <summary>
+    /// "Restore Power" guidebook task, registered the instant Ocho cuts the power in
+    /// <see cref="RedStampSequence"/> and resolved once the player fixes the panel in
+    /// <see cref="OnPowerRestored"/>. Mirrors the pattern <see cref="Day_03"/> uses for its own
+    /// power-outage task.
+    /// </summary>
+    private RepairPowerThreat _powerOutageThreat;
 
     private void Awake()
     {
@@ -335,6 +345,11 @@ public class OchoBoothEncounter : NetworkBehaviour
         ElectricityController.Instance?.PowerOff();
         PlayDemonicLaughInDarkClientRpc();
 
+        // Register the "Restore Power" guidebook task so the player has an explicit objective
+        // to go with the tutorial arrow — mirrors Day_03's own power-outage task registration.
+        _powerOutageThreat = new RepairPowerThreat();
+        TaskRegistry.Instance?.AddThreat(_powerOutageThreat);
+
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients += OnPowerRestored;
 
@@ -360,6 +375,13 @@ public class OchoBoothEncounter : NetworkBehaviour
     {
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerRestored;
+
+        if (_powerOutageThreat != null)
+        {
+            _powerOutageThreat.Resolve();
+            TaskRegistry.Instance?.RemoveThreat(_powerOutageThreat);
+            _powerOutageThreat = null;
+        }
 
         if (TutorialMarkerManager.Instance != null && _electricalPanelMarker != null)
             TutorialMarkerManager.Instance.Unmark(_electricalPanelMarker);

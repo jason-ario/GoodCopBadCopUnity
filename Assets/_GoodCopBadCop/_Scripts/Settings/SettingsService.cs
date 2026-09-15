@@ -12,6 +12,7 @@ namespace GoodCopBadCop.Settings
         void SetInvertYAxis(bool isInverted);
         void SetCrouchMode(EInputActivationMode mode);
         void SetSprintMode(EInputActivationMode mode);
+        void SetRunningEffectsEnabled(bool isEnabled);
         void SetMasterVolume(float value);
         void SetMusicVolume(float value);
         void SetSfxVolume(float value);
@@ -90,6 +91,11 @@ namespace GoodCopBadCop.Settings
         public void SetSprintMode(EInputActivationMode mode)
         {
             model.SprintModeMutable.Value = mode;
+        }
+
+        public void SetRunningEffectsEnabled(bool isEnabled)
+        {
+            model.RunningEffectsEnabledMutable.Value = isEnabled;
         }
 
         public void SetMasterVolume(float value)
