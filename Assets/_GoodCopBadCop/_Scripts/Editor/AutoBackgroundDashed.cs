@@ -1,5 +1,8 @@
 using UnityEditor;
 using UnityEngine;
+using Unity.Hierarchy;
+using Unity.Hierarchy.Editor;
+using UnityEngine.UIElements;
 
 [InitializeOnLoad]
 public static class HierarchyAutoSections
@@ -11,9 +14,44 @@ public static class HierarchyAutoSections
     private static readonly Color InactiveRowColor = new Color(0.35f, 0.35f, 0.35f, 0.6f);
     static HierarchyAutoSections()
     {
+        // Legacy IMGUI hierarchy (used when "Use new Hierarchy window" is disabled in Preferences).
         EditorApplication.hierarchyWindowItemByEntityIdOnGUI -= OnHierarchyGUI;
         EditorApplication.hierarchyWindowItemByEntityIdOnGUI += OnHierarchyGUI;
         EditorApplication.RepaintHierarchyWindow();
+
+        // New UI Toolkit hierarchy (default since Unity 6.6) - the IMGUI callback above is not
+        // invoked by this window, so section rows must be styled through HierarchyWindow instead.
+        HierarchyWindow.BindViewItem -= OnBindViewItem;
+        HierarchyWindow.BindViewItem += OnBindViewItem;
+    }
+
+    private static void OnBindViewItem(HierarchyWindow window, HierarchyView view, HierarchyViewItem item)
+    {
+        if (item.Handler is not HierarchyGameObjectHandler goHandler)
+            return;
+
+        ref readonly var node = ref item.Node;
+        GameObject go = goHandler.GetGameObject(node);
+        if (go == null || !go.name.Contains("---"))
+            return;
+
+        bool isActive = go.activeInHierarchy;
+        Color bg = isActive ? RowColor : SelectedRowColor;
+        Color textColor = isActive ? TextColor : new Color(0.8f, 0.85f, 0.9f, 1f);
+
+        item.RowContainer.style.backgroundColor = new StyleColor(bg);
+        item.RowContainer.style.borderTopColor = new StyleColor(BorderColor);
+        item.RowContainer.style.borderTopWidth = 1f;
+        item.RowContainer.style.borderBottomColor = new StyleColor(BorderColor);
+        item.RowContainer.style.borderBottomWidth = 1f;
+
+        string label = CleanName(go.name);
+        if (string.IsNullOrWhiteSpace(label))
+            label = "SECTION";
+
+        item.Name.text = label.ToUpperInvariant();
+        item.Name.style.color = new StyleColor(textColor);
+        item.Name.style.unityFontStyleAndWeight = FontStyle.Bold;
     }
 
     private static void OnHierarchyGUI(EntityId entityId, Rect selectionRect)
