@@ -33,7 +33,6 @@ public class WorkdaySaveState
     public ProcessResidentsTaskSaveState ProcessResidents = new();
     public GraffitiTaskSaveState Graffiti = new();
     public TrashTaskSaveState Trash = new();
-    public BloodTaskSaveState Blood = new();
     public MailTaskSaveState Mail = new();
     public FenceTaskSaveState FenceRepair = new();
     public FollowTrailTaskSaveState FollowTrail = new();
@@ -90,15 +89,6 @@ public class TrashTaskSaveState
 }
 
 [Serializable]
-public class BloodTaskSaveState
-{
-    public bool IsActive;
-    public bool IsComplete;
-    public int ScrubbedCount;
-    public int TotalCount;
-}
-
-[Serializable]
 public class MailTaskSaveState
 {
     public bool IsActive;
@@ -137,6 +127,15 @@ public class FollowTrailTaskSaveState
 public class BoothMessTaskSaveState
 {
     public bool IsActive;
+}
+
+[Serializable]
+public class BloodTaskSaveState
+{
+    public bool IsActive;
+    public bool IsComplete;
+    public int ScrubbedCount;
+    public int TotalCount;
 }
 
 [Serializable]

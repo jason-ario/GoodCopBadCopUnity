@@ -294,7 +294,7 @@ public class ToolLockerDiegeticController : DiegeticViewController
             pickup.PurchaseAndPickUp(item.pickableItemData, item.Price, pickup.holdPoint);
         }
 
-        UIController.Instance.ShowShopNotification(PurchaseSuccessMessage);
+        UIController.Instance.ShowPurchaseNotification(PurchaseSuccessMessage);
 
         bool shouldClose = customAction == null || customAction.CloseShopOnPurchase;
         if (shouldClose)

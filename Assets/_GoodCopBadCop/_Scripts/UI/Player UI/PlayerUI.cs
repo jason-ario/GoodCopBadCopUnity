@@ -19,6 +19,9 @@ public class PlayerUI : MonoBehaviour
     [SerializeField] private CheckpointIntegrityBar _checkpointIntegrityBar;
     public CheckpointIntegrityBar CheckpointIntegrityBar => _checkpointIntegrityBar;
 
+    [SerializeField] private CheckpointMaintenanceHUD _checkpointMaintenanceHUD;
+    public CheckpointMaintenanceHUD CheckpointMaintenanceHUD => _checkpointMaintenanceHUD;
+
     [Tooltip("Helper icon shown while the local player is wearing the radiation mask.")]
     [SerializeField] private GameObject _maskHelperIcon;
 

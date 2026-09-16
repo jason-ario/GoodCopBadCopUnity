@@ -159,7 +159,11 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // read the initial value in OnNetworkSpawn) to register this task in TaskRegistry.
         _isActive.Value = true;
 
-        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        // See CleanupTaskGating — only mandatory (Day 1) graffiti blocks clock-out. Day 2+ runs
+        // still spawn, still show on the compass, and still feed Checkpoint Integrity, but no
+        // longer gate the timecard machine.
+        if (CleanupTaskGating.IsMandatoryDay)
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
         SaveDataManager.Instance?.SaveCurrentWorkdayState();
     }
 
@@ -255,7 +259,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             SpawnSavedGraffiti(placement);
 
         _isActive.Value = state.IsActive && !_isComplete;
-        if (_isActive.Value)
+        if (_isActive.Value && CleanupTaskGating.IsMandatoryDay)
             ShiftManager.Instance?.RegisterPendingDailyTask(this);
     }
 

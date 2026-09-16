@@ -206,7 +206,9 @@ public class CompassController : MonoBehaviour
             case CompassMarkerCategory.Fence:
                 return FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive;
             case CompassMarkerCategory.Blood:
-                return CleanBloodTask.Instance != null && CleanBloodTask.Instance.IsActive;
+                // Blood splatters are purely cosmetic and no longer owned by any cleanup task —
+                // always show their compass pip, same as the untracked default categories.
+                return true;
             default:
                 return true;
         }

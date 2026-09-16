@@ -234,11 +234,17 @@ public class TutorialObjectiveList : MonoBehaviour
     /// <param name="item">The objective row to complete and remove.</param>
     /// <param name="preHideDelay">Seconds to pause after marking complete before the row (and, if last, the whole panel) actually hides.</param>
     /// <param name="onComplete">Optional callback fired once the row (and panel, if applicable) has been removed.</param>
-    public void CompleteAndRemoveObjective(TutorialObjectiveItem item, float preHideDelay = 0f, Action onComplete = null)
+    /// <param name="markComplete">
+    /// Whether to apply the strikethrough completion visual before removing. Pass <c>false</c> for
+    /// rows that should simply disappear once no longer active (e.g. generic HUD task-list rows),
+    /// rather than briefly lingering crossed-out — see <see cref="HUDTaskList"/>.
+    /// </param>
+    public void CompleteAndRemoveObjective(TutorialObjectiveItem item, float preHideDelay = 0f, Action onComplete = null, bool markComplete = true)
     {
         if (item == null) return;
 
-        item.MarkComplete();
+        if (markComplete)
+            item.MarkComplete();
 
         if (!gameObject.activeInHierarchy)
         {

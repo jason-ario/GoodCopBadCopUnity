@@ -32,9 +32,8 @@ using Random = UnityEngine.Random;
 ///     is replicated, so child bodies would drift away from it independently on every client.
 ///   - Assign _bloodDecalPrefabs (flat ground-decal prefabs, also registered as Network
 ///     Prefabs) to have a blood splatter spawned under each gore item when useGorePrefabs
-///     is true. Optional — leave empty to disable. Prefabs with a GraffitiInteractable
-///     component (e.g. "Random Blood Splatter Variant.prefab") are automatically registered
-///     with CleanBloodTask so they count toward the Day 3 "Clean Blood" mop task.
+///     is true. Optional — leave empty to disable. Purely cosmetic: not tracked by any
+///     cleanup task and never blocks clock-out, mop-able only for the visual.
 ///   - Assign _spawnZones with centre Transforms and half-extents.
 ///   - Set _groundLayer to match your environment layer.
 ///   - Register this component in TaskRegistry via AlexeiController.
@@ -274,7 +273,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         {
             JunkItem.OnAnyJunkItemCollected += OnJunkItemCollected;
             DumpsterInteractable.OnTrashBagDeposited += OnTrashBagDeposited;
-            ShiftManager.Instance?.RegisterPendingDailyTask(this);
+            // See CleanupTaskGating — only a mandatory (Day 1) restore re-blocks clock-out.
+            if (CleanupTaskGating.IsMandatoryDay)
+                ShiftManager.Instance?.RegisterPendingDailyTask(this);
         }
     }
 
@@ -441,7 +442,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // and OnIsActiveChanged never fires, silently dropping the task from the HUD.
         RegisterInTaskRegistryClientRpc();
 
-        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        // See CleanupTaskGating — only mandatory (Day 1) trash blocks clock-out.
+        if (CleanupTaskGating.IsMandatoryDay)
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
         Debug.Log($"[TakeOutTrashTask] ActivateForExistingItems — activated for {count} existing JunkItem(s) (no new items spawned).");
     }
@@ -531,7 +534,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // task from the HUD even though new items (e.g. Day 3's gore) were just spawned.
         RegisterInTaskRegistryClientRpc();
 
-        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        // See CleanupTaskGating — only mandatory (Day 1) trash/gore blocks clock-out. Day 2+
+        // runs still spawn, still show on the compass, and still feed Checkpoint Integrity, but
+        // no longer gate the timecard machine.
+        if (CleanupTaskGating.IsMandatoryDay)
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
         SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log($"[TakeOutTrashTask] Task triggered ({(useGorePrefabs ? "gore" : "trash")} pool) — " +
@@ -1110,10 +1117,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// oriented so its forward axis faces down into the ground surface described by
     /// <paramref name="groundNormal"/>. No-op when no decal prefabs are assigned. Server-only.
     ///
-    /// Registers the spawned decal with <see cref="CleanBloodTask"/> so it counts toward the
-    /// Day 3 "Clean Blood" task — decal prefabs with a <see cref="GraffitiInteractable"/> (e.g.
-    /// "Random Blood Splatter Variant.prefab") become mop-cleanable and count toward the total;
-    /// decals without one are left as purely cosmetic and are ignored by that task.
+    /// Purely cosmetic — decals with a <see cref="GraffitiInteractable"/> (e.g.
+    /// "Random Blood Splatter Variant.prefab") are mop-cleanable for the visual, but not tracked
+    /// by any cleanup task and never block clock-out.
     /// </summary>
     private void SpawnBloodDecal(Vector3 position, Vector3 groundNormal)
     {
@@ -1138,6 +1144,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         }
 
         netObj.Spawn(destroyWithScene: true);
+
+        // Purely cosmetic — claim the scrub callback so mopping this decal doesn't fall back to
+        // crediting the graffiti task (see GraffitiInteractable.ProgressRoutine).
+        GraffitiInteractable scrubCosmetic = decalGo.GetComponent<GraffitiInteractable>();
+        if (scrubCosmetic != null)
+            scrubCosmetic.OnScrubCompleted = () => { };
+
         _spawnedDecals.Add(netObj);
         _decalPlacements[netObj] = new WorldObjectPlacementSaveData
         {
@@ -1146,8 +1159,6 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             RotationEuler = rotation.eulerAngles,
             LocalScale = decalGo.transform.localScale
         };
-
-        CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
 
         SpawnBloodParticleClientRpc(position, rotation);
     }
@@ -1212,10 +1223,14 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         netObj.Spawn(destroyWithScene: true);
         GraffitiInteractable scrub = go.GetComponent<GraffitiInteractable>();
         if (scrub != null)
+        {
             scrub.RestoreScrubProgress(placement.ScrubProgress);
+            // Purely cosmetic — claim the scrub callback so mopping this decal doesn't fall back
+            // to crediting the graffiti task (see GraffitiInteractable.ProgressRoutine).
+            scrub.OnScrubCompleted = () => { };
+        }
         _spawnedDecals.Add(netObj);
         _decalPlacements[netObj] = placement;
-        CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
     }
 
     private void PruneCollectedItems()
@@ -1244,11 +1259,6 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         foreach (NetworkObject netObj in _spawnedDecals)
         {
-            // Tell the mop task first: these decals were registered with CleanBloodTask and count
-            // toward its total, so destroying them silently left that task requiring blood that no
-            // longer existed — permanently stuck at e.g. 4/5 with a spotless yard.
-            CleanBloodTask.Instance?.UnregisterBloodSplatter(netObj);
-
             if (netObj != null && netObj.IsSpawned)
                 netObj.Despawn(destroy: true);
         }

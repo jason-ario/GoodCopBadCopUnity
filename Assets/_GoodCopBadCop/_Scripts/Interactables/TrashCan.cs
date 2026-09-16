@@ -5,7 +5,7 @@ public class TrashCan : Interactable
 {
     private const string DocumentationCategory = "Documentation";
     private const string DocumentationTutorialIncompleteMessage =
-        "Finish the documentation tutorial before throwing this away.";
+        "Can't throw away yet";
 
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip throwTrashSound;

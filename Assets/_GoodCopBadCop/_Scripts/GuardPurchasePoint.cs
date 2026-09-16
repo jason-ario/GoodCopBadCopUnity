@@ -130,7 +130,7 @@ public class GuardPurchasePoint : Interactable
         RefreshVisualState();
 
         if (!newValue) return;
-        UIController.Instance.ShowShopNotification("Guard hired! Will arrive tomorrow.");
+        UIController.Instance.ShowPurchaseNotification("Guard hired! Will arrive tomorrow.");
     }
 
     /// <summary>Called on all clients at the start of each day. Sets arrival state on the server.</summary>

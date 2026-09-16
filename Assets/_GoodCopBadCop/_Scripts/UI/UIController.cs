@@ -597,6 +597,12 @@ public class UIController : MonoBehaviour
         shopNotificationManager.ShowNotification(message);
     }
 
+    /// <summary>Displays a transient shop notification confirming a successful purchase, with a distinct purchase sound.</summary>
+    public void ShowPurchaseNotification(string message)
+    {
+        shopNotificationManager.ShowPurchaseNotification(message);
+    }
+
     /// <summary>
     /// Shows the "someone is waiting at the booth" notification in the bottom-centre of the screen.
     /// Call this only on the local client and only when the player is away from the booth.

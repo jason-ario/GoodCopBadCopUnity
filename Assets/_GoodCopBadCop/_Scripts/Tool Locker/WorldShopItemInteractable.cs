@@ -183,7 +183,7 @@ public class WorldShopItemInteractable : Interactable
             pickup.PurchaseAndPickUp(_shopItem.pickableItemData, _shopItem.Price, pickup.holdPoint);
         }
 
-        UIController.Instance.ShowShopNotification(PurchaseSuccessMessage);
+        UIController.Instance.ShowPurchaseNotification(PurchaseSuccessMessage);
         if (_despawnOnPurchase)
             DespawnItemServerRpc();
         ClosePurchaseView();

@@ -257,7 +257,7 @@ public class WorldPurchaseActionInteractable : Interactable, IHeldItemPassthroug
 
         // Deduct money — SubtractMoneyFromClient routes through ServerRpc if called from a client.
         GlobalHostVariables.Instance?.SubtractMoneyFromClient(_shopItem.Price);
-        UIController.Instance.ShowShopNotification(PurchaseSuccessMessage);
+        UIController.Instance.ShowPurchaseNotification(PurchaseSuccessMessage);
 
         // If the NetworkObject is spawned, broadcast the purchase to all clients via RPC.
         // Fallback to direct invocation when offline or when the NetworkObject isn't yet spawned

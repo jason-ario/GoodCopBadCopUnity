@@ -50,8 +50,8 @@ public class GraffitiInteractable : NetworkBehaviour
     [SerializeField] private Renderer _graffitiRenderer;
 
     [Header("Compass")]
-    [Tooltip("This component is shared by both wall graffiti (CleanGraffitiTask) and blood decals " +
-             "(CleanBloodTask) — set this per-prefab so each shows the right colored pip on the " +
+    [Tooltip("This component is shared by both wall graffiti (CleanGraffitiTask) and purely cosmetic " +
+             "blood decals — set this per-prefab so each shows the right colored pip on the " +
              "bottom-of-screen compass while unscrubbed.")]
     [SerializeField] private CompassMarkerCategory _compassCategory = CompassMarkerCategory.Graffiti;
 

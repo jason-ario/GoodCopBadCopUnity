@@ -360,7 +360,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
     /// joined mid-cleanup: an RPC only reaches the clients connected at the instant it is sent, so
     /// a late joiner got no "clean the booth" row at all. Reading <see cref="_isActive"/> in
     /// <see cref="OnNetworkSpawn"/> plus reacting here covers both cases from one source of truth,
-    /// matching every sibling task (TakeOutTrashTask, CleanBloodTask, FenceRepairTask, ...).
+    /// matching every sibling task (TakeOutTrashTask, FenceRepairTask, ...).
     /// </summary>
     private void OnActiveChanged(bool previous, bool current)
     {

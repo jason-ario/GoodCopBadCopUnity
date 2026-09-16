@@ -210,7 +210,7 @@ public class ToolShopController : MonoBehaviour
             pickup.PurchaseAndPickUp(_selectedShopItem.pickableItemData, _selectedShopItem.Price, spawnPoint);
         }
 
-        UIController.Instance.ShowShopNotification(PurchaseSuccessMessage);
+        UIController.Instance.ShowPurchaseNotification(PurchaseSuccessMessage);
 
         bool shouldClose = customAction == null || customAction.CloseShopOnPurchase;
         if (shouldClose)

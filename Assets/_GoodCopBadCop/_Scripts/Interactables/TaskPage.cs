@@ -5,8 +5,8 @@ using UnityEngine;
 /// Renders a dynamic task list onto the Task Page paper as a world-space Canvas.
 /// Rows are instantiated from a prefab and parented to a container inside Task Page Contents.
 /// Row layout is handled by a Vertical Layout Group on the container.
-/// Tasks removed from the registry are kept with a strikethrough to show completion.
-/// Tutorial tasks are excluded.
+/// Only currently-active tasks are shown — a task's row is removed the moment it's no longer
+/// in the registry, so nothing ever lingers crossed-out. Tutorial tasks are excluded.
 ///
 /// Scene setup:
 ///   - Assign _taskRowPrefab  → Task Item prefab (has TaskPageRow component)
@@ -26,11 +26,8 @@ public class TaskPage : MonoBehaviour
 
     private readonly List<TaskPageRow> _rows = new();
 
-    /// <summary>
-    /// Ordered list of every non-tutorial task seen in the registry.
-    /// The bool is true when the task has been completed (removed from the registry).
-    /// </summary>
-    private readonly List<(ISystemicThreat threat, bool completed)> _knownTasks = new();
+    /// <summary>Ordered list of every currently-active, non-tutorial task from the registry.</summary>
+    private readonly List<ISystemicThreat> _knownTasks = new();
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -60,9 +57,9 @@ public class TaskPage : MonoBehaviour
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Clears every task the page has ever tracked (active and completed/struck-through)
-    /// and rebuilds the (now empty) row list. Call this when a day ends so the page
-    /// doesn't keep accumulating stale entries from previous days.
+    /// Clears every task the page has ever tracked and rebuilds the (now empty) row list.
+    /// Call this when a day ends so the page doesn't keep accumulating stale entries from
+    /// previous days.
     /// </summary>
     public void ResetTasks()
     {
@@ -79,39 +76,32 @@ public class TaskPage : MonoBehaviour
 
     /// <summary>
     /// Syncs _knownTasks with the current registry then rebuilds all rows.
-    ///   - New non-tutorial threats are appended as active.
-    ///   - Previously tracked threats no longer in the registry are marked completed.
+    ///   - New non-tutorial threats are appended.
+    ///   - Threats no longer in the registry are dropped entirely (no crossed-out lingering).
     /// </summary>
     private void RefreshTaskList()
     {
         if (TaskRegistry.Instance == null)
         {
+            _knownTasks.Clear();
             RebuildRows();
             return;
         }
 
         IReadOnlyList<ISystemicThreat> current = TaskRegistry.Instance.Threats;
 
+        _knownTasks.RemoveAll(threat =>
+        {
+            foreach (ISystemicThreat t in current)
+                if (ReferenceEquals(t, threat)) return false;
+            return true;
+        });
+
         foreach (ISystemicThreat threat in current)
         {
             if (threat is TutorialTask) continue;
-            if (_knownTasks.Exists(e => ReferenceEquals(e.threat, threat))) continue;
-            _knownTasks.Add((threat, false));
-        }
-
-        for (int i = 0; i < _knownTasks.Count; i++)
-        {
-            (ISystemicThreat threat, bool completed) = _knownTasks[i];
-            if (completed) continue;
-
-            bool stillActive = false;
-            foreach (ISystemicThreat t in current)
-            {
-                if (ReferenceEquals(t, threat)) { stillActive = true; break; }
-            }
-
-            if (!stillActive)
-                _knownTasks[i] = (threat, true);
+            if (_knownTasks.Exists(t => ReferenceEquals(t, threat))) continue;
+            _knownTasks.Add(threat);
         }
 
         RebuildRows();
@@ -129,7 +119,7 @@ public class TaskPage : MonoBehaviour
 
         if (_taskRowPrefab == null || _rowContainer == null) return;
 
-        foreach ((ISystemicThreat threat, bool completed) in _knownTasks)
+        foreach (ISystemicThreat threat in _knownTasks)
         {
             GameObject instance = Instantiate(_taskRowPrefab, _rowContainer);
             TaskPageRow row = instance.GetComponent<TaskPageRow>();
@@ -140,7 +130,7 @@ public class TaskPage : MonoBehaviour
                 continue;
             }
 
-            row.Bind(threat, completed);
+            row.Bind(threat);
             _rows.Add(row);
         }
     }

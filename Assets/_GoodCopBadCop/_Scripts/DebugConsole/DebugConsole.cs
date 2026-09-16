@@ -734,7 +734,7 @@ public class DebugConsole : MonoBehaviour
     /// to all clients before PlayShiftStartFanfare fires (mirrors the SkipToStartOfDay3 /
     /// SkipToOutsideBunker pattern). Routed through <see cref="EnsureGameStartedThen"/> so
     /// calling this cold from the main menu (no host/session running yet — the scene's
-    /// persistent NetworkObjects like TakeOutTrashTask/CleanBloodTask/FenceRepairTask haven't
+    /// persistent NetworkObjects like TakeOutTrashTask/FenceRepairTask haven't
     /// finished spawning) waits for the game to fully start before jumping. Without this,
     /// JumpToDay's DayActivated call can run each task's TriggerTask() before its NetworkObject
     /// has spawned, which silently no-ops on the IsServer guard and leaves every objective

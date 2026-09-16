@@ -8,13 +8,12 @@ using UnityEngine;
 /// At day start, spawns gore and body-part junk items across the yard's
 /// <see cref="TakeOutTrashTask"/> spawn zones (instead of standard trash), triggering the
 /// Take Out Trash task so players must bag up every piece of gore. Each gore piece also drops
-/// a blood decal, which arms <see cref="CleanBloodTask"/> so players must mop up every
-/// splatter with the <see cref="Mop"/> as a separate task.
+/// a purely cosmetic blood decal — mop-able for the visual, but not tracked by any cleanup task.
 ///
 /// The day's mail delivery ("Sort the mail" task) is skipped entirely for Day 3 (see
 /// <see cref="SortMailTask.SkipDeliveryForDay"/>) — no delivery, no crate, no sorting task —
 /// since the mechanic is already established on Day 2 and Day 3 is already carrying the
-/// gore/blood/fence cleanup plus its own mutant breach. The daily prohibited-goods roll still
+/// gore/fence cleanup plus its own mutant breach. The daily prohibited-goods roll still
 /// runs as normal; only the delivery/crate/task is suppressed.
 ///
 /// Right after the last suspect for the day is processed, <see cref="MutantBreachManager"/>
@@ -248,7 +247,7 @@ public class Day_03 : DayBase, IDailyTask
     // -------------------------------------------------------------------------
     //
     // NOTE: no hand-scripted objective rows are added by this script anymore.
-    // TakeOutTrashTask, CleanBloodTask, and FenceRepairTask are all ISystemicThreats, so
+    // TakeOutTrashTask and FenceRepairTask are both ISystemicThreats, so
     // HUDTaskList already adds/updates/removes their rows in TutorialObjectiveList
     // automatically via the shared TaskRegistry the moment each is triggered below in
     // DayActivated. Hand-scripting the same rows here (previously gated behind the bunker
@@ -272,13 +271,12 @@ public class Day_03 : DayBase, IDailyTask
         bool restoringWorkday = CampaignManager.Instance != null && CampaignManager.Instance.HasPendingWorkdayRestore;
         if (!restoringWorkday)
         {
-            // Arm the Clean Blood task BEFORE spawning gore so every blood decal spawned
-            // alongside it this cycle gets registered (see CleanBloodTask.TriggerTask doc comment).
-            CleanBloodTask.Instance?.TriggerTask();
+            // Blood decals are purely cosmetic (see MutantEnemy/TakeOutTrashTask) and need no
+            // arming — only the trash/gore task and the fences require an explicit trigger.
             TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true);
 
             // Randomly breaks a batch of perimeter fence segments so the yard has repair work
-            // waiting alongside the gore/blood, mirroring the post-breach fence damage from Day 1
+            // waiting alongside the gore, mirroring the post-breach fence damage from Day 1
             // (see FenceRepairTask.TriggerTask doc comment). Self-guards to server-only.
             FenceRepairTask.Instance?.TriggerTask();
         }
@@ -425,8 +423,8 @@ public class Day_03 : DayBase, IDailyTask
     /// Plays the bunker-exit stinger only. Unsubscribes immediately so later door-opens that
     /// day (e.g. going back in and out) stay silent.
     ///
-    /// No objective rows are added here — <see cref="TakeOutTrashTask"/>,
-    /// <see cref="CleanBloodTask"/>, and <see cref="FenceRepairTask"/> are all
+    /// No objective rows are added here — <see cref="TakeOutTrashTask"/> and
+    /// <see cref="FenceRepairTask"/> are both
     /// <see cref="ISystemicThreat"/>s, so <see cref="HUDTaskList"/> already adds their rows to
     /// <see cref="TutorialObjectiveList"/> automatically via the shared <see cref="TaskRegistry"/>
     /// the moment they're triggered in <see cref="DayActivated"/> (day start). Adding them again

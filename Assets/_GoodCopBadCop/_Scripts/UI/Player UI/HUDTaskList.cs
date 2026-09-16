@@ -13,7 +13,7 @@ public class HUDTaskList : MonoBehaviour
 
     /// <summary>
     /// Public re-sync entry point. Tasks triggered before this HUD element ever became enabled
-    /// (e.g. <see cref="Day_03"/>'s trash/blood tasks, which <see cref="CampaignManager.ApplyDay"/>
+    /// (e.g. <see cref="Day_03"/>'s trash task, which <see cref="CampaignManager.ApplyDay"/>
     /// activates the moment <see cref="GameManager.TryStartGame"/> runs on a resumed save — well
     /// before <see cref="ShiftManager.ResumeSavedDay"/> shows the player UI) are already sitting
     /// in <see cref="TaskRegistry"/> by the time this fires, but <see cref="OnEnable"/>'s one-shot
@@ -56,15 +56,21 @@ public class HUDTaskList : MonoBehaviour
             // Skip it here so the two don't both add a row for the same thing.
             if (threat is ProcessResidentsTask) continue;
 
-            // TakeOutTrashTask / CleanGraffitiTask / FenceRepairTask / CleanBloodTask are skipped
-            // whenever a day script (e.g. Day 1) is showing its own hand-scripted tutorial row for
-            // them — see HasCustomTutorialRow. Without this, Day 1 duplicates each objective: one
-            // row from Day_01's tutorial choreography and a second from this generic registry
-            // bridge (e.g. "Clean Blood: 0/4" next to "Clean up the blood 0/4").
+            // TakeOutTrashTask / CleanGraffitiTask / FenceRepairTask are skipped whenever a day
+            // script (e.g. Day 1) is showing its own hand-scripted tutorial row for them — see
+            // HasCustomTutorialRow. Without this, Day 1 duplicates each objective: one row from
+            // Day_01's tutorial choreography and a second from this generic registry bridge.
             if (threat is TakeOutTrashTask trashTask && trashTask.HasCustomTutorialRow) continue;
             if (threat is CleanGraffitiTask graffitiTask && graffitiTask.HasCustomTutorialRow) continue;
             if (threat is FenceRepairTask fenceTask && fenceTask.HasCustomTutorialRow) continue;
-            if (threat is CleanBloodTask bloodTask && bloodTask.HasCustomTutorialRow) continue;
+
+            // Same three tasks are skipped entirely once they become optional (every day after
+            // Day 1 — see CleanupTaskGating). They still spawn, still show compass pips, and
+            // still feed Checkpoint Integrity via CheckpointMaintenanceHUD, but no longer occupy
+            // a slot on the mandatory task list.
+            if (!CleanupTaskGating.IsMandatoryDay &&
+                (threat is TakeOutTrashTask || threat is CleanGraffitiTask || threat is FenceRepairTask))
+                continue;
 
             TutorialObjectiveItem item = list.AddObjective(BuildLabel(threat));
             if (item != null)
@@ -93,7 +99,9 @@ public class HUDTaskList : MonoBehaviour
 
         foreach (ISystemicThreat threat in stale)
         {
-            list.CompleteAndRemoveObjective(_rows[threat], preHideDelay: 1.5f);
+            // Generic HUD task rows should just disappear once their task is no longer active —
+            // no strikethrough/checkmark linger, so the list only ever shows currently-active tasks.
+            list.CompleteAndRemoveObjective(_rows[threat], preHideDelay: 0f, markComplete: false);
             _rows.Remove(threat);
         }
     }
