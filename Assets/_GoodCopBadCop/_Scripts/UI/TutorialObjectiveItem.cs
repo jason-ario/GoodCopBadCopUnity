@@ -21,7 +21,16 @@ public class TutorialObjectiveItem : MonoBehaviour
     [Tooltip("Volume multiplier for progressSound (before global SFX volume scaling).")]
     [SerializeField] private float progressSoundVolume = 0.6f;
 
+    [Header("Checkbox (optional)")]
+    [Tooltip("Shown while this objective is incomplete. Optional — leave unassigned to skip the checkbox visual.")]
+    [SerializeField] private GameObject checkboxUnchecked;
+    [Tooltip("Shown once this objective is marked complete. Optional — leave unassigned to skip the checkbox visual.")]
+    [SerializeField] private GameObject checkboxChecked;
+
     private bool _isComplete;
+
+    /// <summary>True once <see cref="MarkComplete"/> has been called on this row.</summary>
+    public bool IsComplete => _isComplete;
 
     /// <summary>Sets the display text for this objective.</summary>
     public void SetText(string text)
@@ -38,6 +47,9 @@ public class TutorialObjectiveItem : MonoBehaviour
 
         if (label != null)
             label.text = $"<s>{label.text}</s>";
+
+        if (checkboxUnchecked != null) checkboxUnchecked.SetActive(false);
+        if (checkboxChecked != null) checkboxChecked.SetActive(true);
 
         SFXController.Instance?.Play(completeSound, completeSoundVolume);
     }
