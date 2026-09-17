@@ -18,6 +18,7 @@ Shader "Hidden/VolumetricLights/CopyDepthIntoCubemap"
             #pragma fragment frag
 
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             TEXTURE2D(_ShadowTexture);

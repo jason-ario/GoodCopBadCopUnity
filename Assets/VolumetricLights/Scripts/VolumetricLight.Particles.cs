@@ -229,7 +229,7 @@ namespace VolumetricLights {
 
         void UpdateParticleColor() {
             if (particleMaterial != null) {
-                particleMaterial.SetColor(ShaderParams.ParticleLightColor, lightComp.color * mediumAlbedo * (lightComp.intensity * dustBrightness));
+                particleMaterial.SetColor(ShaderParams.ParticleLightColor, lightComp.color * mediumAlbedo * ((brightnessMode == BrightnessMode.Relative ? lightComp.intensity : 1f) * dustBrightness));
             }
         }
 

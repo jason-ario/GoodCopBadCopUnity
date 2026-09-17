@@ -24,6 +24,11 @@ namespace VolumetricLights {
         Quadratic
     }
 
+    public enum BrightnessMode {
+        Relative,
+        Absolute
+    }
+
     public enum RaymarchPresets {
         UserDefined = 0,
         Default = 10,
@@ -139,6 +144,9 @@ namespace VolumetricLights {
 
         [Tooltip("Overall brightness multiplier.")]
         public float brightness = 1f;
+
+        [Tooltip("Relative: brightness multiplies the light intensity. Absolute: brightness is independent of the light intensity.")]
+        public BrightnessMode brightnessMode = BrightnessMode.Relative;
 
         [Tooltip("Attenuation Mode")]
         public AttenuationMode attenuationMode = AttenuationMode.Simple;
@@ -321,6 +329,7 @@ namespace VolumetricLights {
             vl.density = density;
             vl.mediumAlbedo = mediumAlbedo;
             vl.brightness = brightness;
+            vl.brightnessMode = brightnessMode;
             vl.attenuationMode = attenuationMode;
             vl.attenCoefConstant = attenCoefConstant;
             vl.attenCoefLinear = attenCoefLinear;
@@ -399,6 +408,7 @@ namespace VolumetricLights {
             density = vl.density;
             mediumAlbedo = vl.mediumAlbedo;
             brightness = vl.brightness;
+            brightnessMode = vl.brightnessMode;
             attenuationMode = vl.attenuationMode;
             attenCoefConstant = vl.attenCoefConstant;
             attenCoefLinear = vl.attenCoefLinear;

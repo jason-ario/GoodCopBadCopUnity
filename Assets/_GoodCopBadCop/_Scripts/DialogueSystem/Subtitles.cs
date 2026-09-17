@@ -104,7 +104,7 @@ public class Subtitles : MonoBehaviour
 
         var tmp = textReveal.GetComponent<TextMeshProUGUI>();
         if (tmp != null)
-            tmp.textWrappingMode = TextWrappingModes.Normal;
+            tmp.enableWordWrapping = true;
 
         // Use typewriter reveal in play mode; instant set in editor to keep OnValidate previews fast.
         if (Application.isPlaying)

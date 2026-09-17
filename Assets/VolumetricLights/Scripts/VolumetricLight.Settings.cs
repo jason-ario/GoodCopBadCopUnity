@@ -92,6 +92,9 @@ namespace VolumetricLights {
         [Tooltip("Overall brightness multiplier.")]
         public float brightness = 1f;
 
+        [Tooltip("Relative: brightness multiplies the light intensity. Absolute: brightness is independent of the light intensity.")]
+        public BrightnessMode brightnessMode = BrightnessMode.Relative;
+
         [Tooltip("Attenuation Mode")]
         public AttenuationMode attenuationMode = AttenuationMode.Simple;
 

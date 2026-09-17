@@ -23,6 +23,7 @@ Shader "Hidden/VolumetricLights/DepthOnly"
             #pragma multi_compile _ DOTS_INSTANCING_ON
             #pragma multi_compile_instancing
 
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             TEXTURE2D(_BaseMap);
@@ -58,6 +59,7 @@ Shader "Hidden/VolumetricLights/DepthOnly"
             #pragma multi_compile_local _ DEPTH_PREPASS_ALPHA_TEST
             #pragma multi_compile_instancing
 
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             TEXTURE2D(_BaseMap);

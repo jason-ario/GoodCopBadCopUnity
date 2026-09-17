@@ -67,7 +67,12 @@ struct VaryingsParticle
 
 half4 SampleAlbedo(float2 uv, float3 blendUv, half4 color, float4 particleColor, float4 projectedPosition, TEXTURE2D_PARAM(albedoMap, sampler_albedoMap))
 {
-    half4 albedo = BlendTexture(TEXTURE2D_ARGS(albedoMap, sampler_albedoMap), uv, blendUv) * color;
+    half4 albedo = half4(SAMPLE_TEXTURE2D(albedoMap, sampler_albedoMap, uv));
+#ifdef _FLIPBOOKBLENDING_ON
+    half4 albedo2 = half4(SAMPLE_TEXTURE2D(albedoMap, sampler_albedoMap, blendUv.xy));
+    albedo = lerp(albedo, albedo2, half(blendUv.z));
+#endif
+    albedo *= color;
 
     // No distortion Support
     half4 colorAddSubDiff = half4(0, 0, 0, 0);

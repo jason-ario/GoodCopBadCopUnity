@@ -214,7 +214,8 @@ namespace VolumetricLights {
                 UpdateParticlesVisibility();
             }
 
-            fogMat.SetColor(ShaderParams.LightColor, lightComp.color * mediumAlbedo * (lightComp.intensity * brightness));
+            float lightIntensity = brightnessMode == BrightnessMode.Relative ? lightComp.intensity : 1f;
+            fogMat.SetColor(ShaderParams.LightColor, lightComp.color * mediumAlbedo * (lightIntensity * brightness));
             float deltaTime = Time.deltaTime;
             windDirectionAcum.x += windDirection.x * deltaTime;
             windDirectionAcum.y += windDirection.y * deltaTime;

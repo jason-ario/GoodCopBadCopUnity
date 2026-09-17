@@ -40,6 +40,10 @@ Of course, all updates of Volumetric Lights will be eventually available on the 
 Version history
 ---------------
 
+v20.2
+- Added Brightness Mode option (Relative or Absolute): choose whether the volumetric brightness depends on the light intensity
+- Added support for Unity 6.7
+
 v20.1
 - Shadow Occlusion: added "Include Transparent" option to let transparent objects and 2D sprites occlude volumetric lights. When enabled, the occlusion capture also includes the transparent render queue and no longer auto-excludes the TransparentFX layer.
 - [Fix] Custom shaders without a forward/lit pass now correctly occlude volumetric lights (including URP Forward+ and Deferred+).

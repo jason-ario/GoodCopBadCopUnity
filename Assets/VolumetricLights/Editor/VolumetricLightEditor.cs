@@ -17,7 +17,7 @@ namespace VolumetricLights {
         SerializedProperty blendMode, raymarchPreset, raymarchQuality, raymarchMinStep, raymarchMaxSteps, dithering, jittering, useBlueNoise, animatedBlueNoise, renderQueue, sortingLayerID, sortingOrder, flipDepthTexture, alwaysOn;
         SerializedProperty castDirectLight, directLightMultiplier, directLightSmoothSamples, directLightSmoothRadius, directLightBlendMode;
         SerializedProperty autoToggle, distanceStartDimming, distanceDeactivation, autoToggleCheckInterval;
-        SerializedProperty useNoise, noiseTexture, noiseStrength, noiseScale, noiseFinalMultiplier, density, mediumAlbedo, brightness;
+        SerializedProperty useNoise, noiseTexture, noiseStrength, noiseScale, noiseFinalMultiplier, density, mediumAlbedo, brightness, brightnessMode;
         SerializedProperty attenuationMode, attenCoefConstant, attenCoefLinear, attenCoefQuadratic, rangeFallOff, diffusionIntensity, penumbra;
         SerializedProperty tipRadius, nearClipDistance, cookieTexture, cookieScale, cookieOffset, cookieSpeed, frustumAngle, windDirection;
         SerializedProperty enableDustParticles, dustBrightness, dustMinSize, dustMaxSize, dustDistanceAttenuation, dustWindSpeed, dustAutoToggle, dustDistanceDeactivation, dustPrewarm;
@@ -74,6 +74,7 @@ namespace VolumetricLights {
             density = serializedObject.FindProperty("density");
             mediumAlbedo = serializedObject.FindProperty("mediumAlbedo");
             brightness = serializedObject.FindProperty("brightness");
+            brightnessMode = serializedObject.FindProperty("brightnessMode");
             attenuationMode = serializedObject.FindProperty("attenuationMode");
             attenCoefConstant = serializedObject.FindProperty("attenCoefConstant");
             attenCoefLinear = serializedObject.FindProperty("attenCoefLinear");
@@ -330,6 +331,7 @@ namespace VolumetricLights {
             EditorGUILayout.PropertyField(density);
             EditorGUILayout.PropertyField(mediumAlbedo);
             EditorGUILayout.PropertyField(brightness);
+            EditorGUILayout.PropertyField(brightnessMode);
 
             EditorGUILayout.PropertyField(attenuationMode);
             if (attenuationMode.intValue == (int)AttenuationMode.Quadratic) {
