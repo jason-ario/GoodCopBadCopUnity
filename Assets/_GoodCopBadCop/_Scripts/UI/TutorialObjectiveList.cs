@@ -64,6 +64,21 @@ public class TutorialObjectiveList : MonoBehaviour
     private readonly List<TutorialObjectiveItem> _items = new();
     private Coroutine _clearCoroutine;
 
+    /// <summary>Number of tracked rows not yet marked complete. Used for the sidebar's collapsed badge count.</summary>
+    public int IncompleteCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (TutorialObjectiveItem item in _items)
+            {
+                if (item != null && !item.IsComplete)
+                    count++;
+            }
+            return count;
+        }
+    }
+
     /// <summary>
     /// Items whose <see cref="RemoveObjectiveRoutine"/> is currently mid-flight (marked complete,
     /// waiting out <c>preHideDelay</c> before the row is actually destroyed). Unity silently kills
@@ -166,6 +181,8 @@ public class TutorialObjectiveList : MonoBehaviour
 
         SFXController.Instance?.Play(newTaskSound, newTaskSoundVolume);
 
+        HUDSidebarController.Instance?.RefreshBadge();
+
         return item;
     }
 
@@ -176,6 +193,7 @@ public class TutorialObjectiveList : MonoBehaviour
     public void CompleteObjective(TutorialObjectiveItem item)
     {
         item?.MarkComplete();
+        HUDSidebarController.Instance?.RefreshBadge();
     }
 
     /// <summary>
@@ -256,6 +274,7 @@ public class TutorialObjectiveList : MonoBehaviour
 
         StartCoroutine(RemoveObjectiveRoutine(item, preHideDelay, onComplete));
         _pendingCompletedRemovals.Add(item);
+        HUDSidebarController.Instance?.RefreshBadge();
     }
 
     // ── Private ─────────────────────────────────────────────────────────
@@ -269,6 +288,8 @@ public class TutorialObjectiveList : MonoBehaviour
         _items.Remove(item);
         if (item != null)
             Destroy(item.gameObject);
+
+        HUDSidebarController.Instance?.RefreshBadge();
 
         // Only slide the panel out and deactivate it once every tracked row is gone —
         // other concurrently-tracked tasks may still have rows showing.
