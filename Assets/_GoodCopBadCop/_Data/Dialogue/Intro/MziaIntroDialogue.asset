@@ -14,48 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Hello, dear. Here are my papers, kept them under my Bible so they
-      wouldn't wrinkle. Mzia Kakulia. Southern block, fourth floor. Thirty-one
-      years there.
+    npcLine: Hello, dear, papers kept under my Bible. Mzia Kakulia. Southern block, fourth floor, thirty-one years there.
     animationTrigger: TalkSmile
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I work as a seamstress, from home mostly. People still bring me things
-      to mend. In times like these, mending matters more than new.
+    npcLine: I work as a seamstress, from home. People bring me things to mend. Mending matters more than new, these days.
     animationTrigger: TalkSmile
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What do people bring you?
-      npcResponse: Coats, mostly. And socks. You wouldn't believe how many people
-        forget spare socks when things go wrong.
+      npcResponse: Coats, mostly, and socks. You wouldn't believe how many forget spare socks.
       animationTrigger: TalkSmile
+      playLaughSfx: 0
     - playerChoiceText: Do you work alone?
-      npcResponse: My granddaughter Irina lives with me now. She helps when her
-        hands aren't shaking. Which they do, lately. I don't say anything.
+      npcResponse: My granddaughter Irina lives with me now. She helps when her hands aren't shaking. I don't say anything.
       animationTrigger: TalkLookDown
+      playLaughSfx: 0
   - type: 0
-    npcLine: My husband helps at the bakery on weekends, a good steady man. I'm
-      going home to finish a sweater, bright red, for my grandson. You look thin,
-      dear. Are they feeding you at this post?
+    npcLine: My husband helps at the bakery weekends. I'm going home to finish a sweater for my grandson. You look thin, dear, are they feeding you?
     animationTrigger: TalkSmile
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I have a pot of soup at home if you want it later. I always make
-      too much. Permit's here, November expiry. Everything in order.
+    npcLine: I have soup at home if you want it later, I always make too much. Permit's here, November expiry.
     animationTrigger: TalkSmile
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: That's very kind of you.
-      npcResponse: I've outlived two husbands and one very bad winter. Kindness
-        is cheaper than medicine and it lasts longer.
+      npcResponse: I've outlived two husbands and one very bad winter. Kindness is cheaper than medicine.
       animationTrigger: TalkSmile
+      playLaughSfx: 0
     - playerChoiceText: You don't need to worry about me.
-      npcResponse: Mm. I'll worry anyway. Keeps my hands busy when the knitting
-        runs out.
+      npcResponse: Mm, I'll worry anyway. Keeps my hands busy.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0

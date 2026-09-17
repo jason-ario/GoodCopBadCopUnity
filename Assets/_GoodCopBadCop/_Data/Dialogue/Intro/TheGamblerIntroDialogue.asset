@@ -14,47 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Heads or tails? Just habit, I flip something whenever I'm standing
-      still. Here are the papers. Bidzina Chkhonia. Mostly I play cards.
+    npcLine: Heads or tails? Just habit, I flip something whenever I'm standing still. Papers. Bidzina Chkhonia. Mostly cards.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I've been running the numbers on this checkpoint. The time variance
-      per pass is bigger than you'd think. Forty seconds to three minutes.
+    npcLine: I've been running numbers on this checkpoint. The variance per pass is bigger than you'd think.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: You time this checkpoint?
-      npcResponse: I time everything. Probability doesn't work without data. This
-        is actually one of the more consistent variables in my day.
+      npcResponse: I time everything. Probability doesn't work without data. It's one of my steadier variables.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: Do you play for a living?
-      npcResponse: When the living holds still long enough to let me. Right now
-        nothing holds still. The odds keep shifting.
+      npcResponse: When the living holds still long enough to let me. Right now nothing holds still.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
   - type: 0
-    npcLine: I used to play at the Metropol most nights. That's closed now. Found
-      a private game in someone's basement, lower stakes, worse lighting. You
-      have a very readable face, officer.
+    npcLine: I used to play at the Metropol most nights. That's closed now. Found a private game in someone's basement, lower stakes.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
     npcLine: I won't say which eye. But I'd bet on it. My permit, August expiry.
-      I'd bet on it being correct, but that's pushing my luck.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: I don't have tells.
-      npcResponse: Everybody has tells. I've spent twenty years reading them.
-        It's not an insult, it's data.
+      npcResponse: Everybody has tells. I've spent twenty years reading them. It's not an insult, it's data.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
     - playerChoiceText: Does that help at the card table?
-      npcResponse: More than the cards, honestly. The cards are just mathematics.
-        The people are where the game lives.
+      npcResponse: More than the cards, honestly. Cards are just mathematics. People are where the game lives.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0

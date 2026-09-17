@@ -14,48 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: The shadow your booth makes at this hour, have you noticed how it
-      falls? I've been meaning to sketch it. Nini Bitsadze. I paint, or what's
-      left to paint.
+    npcLine: Have you noticed the shadow your booth makes? I've been meaning to sketch it. Nini Bitsadze. I paint, or what's left to paint.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I've been working on a series about the light changing. Before the
-      dust, after the dust. The difference is extraordinary. Terrible, but extraordinary.
+    npcLine: I've been working on a series about the light changing before and after the dust. The difference is extraordinary.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What does the light look like now?
-      npcResponse: Like the world's lit from below instead of above. Everything
-        has an amber cast. I can't stop painting it.
+      npcResponse: Like the world's lit from below instead of above, everything has an amber cast.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: Is it hard to paint during all this?
-      npcResponse: Hard? The opposite. Everything's strange and stark and honest.
-        The hardest part is knowing it won't last much longer.
+      npcResponse: Hard? The opposite. Everything's strange and honest. The hardest part is it won't last.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
   - type: 0
-    npcLine: I have a condition, it's managed. My caretaker Tamar comes in the
-      mornings, makes sure I've eaten. The charcoal on my hands is always going
-      to be there.
+    npcLine: I have a condition, it's managed. My caretaker Tamar checks on me mornings. The charcoal on my hands is always there.
     animationTrigger: TalkLookDown
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: My documents are usually inside my sketchbook, mostly kept separate
-      from the charcoal pages. Papers, December expiry. The smudge is just pigment.
+    npcLine: My documents are inside my sketchbook, kept separate from the charcoal pages. Papers, December expiry, the smudge is just pigment.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: The charcoal is fine.
-      npcResponse: Good. The last officer asked me about it every time. I started
-        counting. Eleven mentions.
+      npcResponse: Good. The last officer asked about it every time. I started counting.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: You have a good face for charcoal.
-      npcResponse: Strong lines, yes, I noticed. I've been thinking about it since
-        you sat down.
+      npcResponse: Strong lines, yes. I've been thinking about it since you sat down.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0

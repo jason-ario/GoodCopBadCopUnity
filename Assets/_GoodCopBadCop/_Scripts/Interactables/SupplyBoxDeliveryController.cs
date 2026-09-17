@@ -159,6 +159,12 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
                 continue;
             }
 
+            PickableObject pickable = instance.GetComponent<PickableObject>();
+            // Apply this before NGO spawns the object so its contents cannot impart a physics
+            // impulse to the box during the spawn/parenting frame. The NetworkVariable carries
+            // the same state to every client as part of the spawn payload.
+            pickable?.SetSupplyBoxContainedNetworked(true);
+
             netObj.Spawn(destroyWithScene: true);
 
             // Dynamically spawned ExamNotebooks require explicit page spawning — OnNetworkSpawn
@@ -176,7 +182,7 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
                 }
             }
 
-            if (instance.TryGetComponent(out PickableObject pickable))
+            if (pickable != null)
             {
                 pickable.SetParent(contentsParent);
                 pickable.LockInteractableNetworked();

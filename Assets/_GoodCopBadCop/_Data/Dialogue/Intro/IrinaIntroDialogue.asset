@@ -14,48 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Sorry, I know I look tired. Ward energy's been heavy this week. Irina
-      Kakulia, student nurse. I cover elder care, and look after my grandmother
-      at home.
+    npcLine: "Sorry, I look tired \u2014 ward energy's been heavy. Irina Kakulia, student nurse. I cover elder care and my grandmother at home."
     animationTrigger: TalkLookDown
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I moved in with her a few months ago. She's on the fourth floor of
-      the southern block. Mzia, the seamstress. You may have seen her.
+    npcLine: "I moved in with her a few months ago \u2014 fourth floor, southern block. Mzia, the seamstress. You may have seen her."
     animationTrigger: TalkLookDown
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Is she doing well?
-      npcResponse: She keeps telling me she's fine. She says it the same way she
-        talks about her sewing, so I mostly believe her.
+      npcResponse: "She keeps telling me she's fine \u2014 the same way she talks about her sewing. So I mostly believe her."
       animationTrigger: TalkIdle
+      playLaughSfx: 0
     - playerChoiceText: That must be a lot to balance.
-      npcResponse: The universe keeps asking us to carry more than we think we
-        can. I keep being surprised by how much I hold.
+      npcResponse: The universe keeps asking us to carry more than we think. I'm still surprised how much I hold.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
   - type: 0
-    npcLine: My rotation is four mornings a week. I keep her medication schedule
-      folded into the same form. My hands shake a little in the mornings. The
-      air, I think. Or mercury retrograde.
+    npcLine: "My rotation is four mornings a week. I keep her medication schedule with mine. My hands shake a little \u2014 the air, I think. Or mercury retrograde."
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: The patients ask what's happening. I tell them to breathe through
-      it. It sounds like nothing, but it's what I have. My papers are organized.
-      It's the one thing I can keep that way.
+    npcLine: "The patients ask what's happening; I tell them to breathe through it. My papers are organized \u2014 the one thing I can keep that way."
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Is that working?
       npcResponse: For some of them. For me, I'm still deciding.
       animationTrigger: TalkLookDown
+      playLaughSfx: 0
     - playerChoiceText: How are you holding up?
-      npcResponse: I'm aligned. Mostly. The frequency in the ward is strange right
-        now. I'm adjusting.
+      npcResponse: I'm aligned, mostly. The frequency in the ward is strange right now.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0

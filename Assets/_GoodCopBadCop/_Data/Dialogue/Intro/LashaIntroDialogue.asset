@@ -14,48 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Papers are right here. You going to look, or just stand there? Lasha
-      Gagua. I drive a taxi, western district, though half the routes are blocked
-      now.
+    npcLine: "Papers are right here. Lasha Gagua. Taxi driver, western district \u2014 half the routes are blocked now."
     animationTrigger: TalkCocky
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: Nine years I've been driving these streets. Used to know every shortcut.
-      Before your people closed them all.
+    npcLine: Nine years driving these streets. Used to know every shortcut, before your people closed them.
     animationTrigger: TalkCocky
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What do you mean, our people?
-      npcResponse: Security. Government. Whoever put up these barriers. I don't
-        care which box you tick.
+      npcResponse: Security, government, whoever put up these barriers. I don't care which box you tick.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
     - playerChoiceText: Nine years is a long time.
-      npcResponse: Long enough to know when a city's dying and when it's just
-        sick. This one's still sick. Salvageable.
+      npcResponse: "Long enough to know when a city's dying versus just sick. This one's still sick \u2014 salvageable."
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
   - type: 0
-    npcLine: I've got a wife and two kids in the western block. They stay home,
-      I keep working. Someone's got to bring money in. Half my fares are people
-      trying to reach the exits now. I charge double.
+    npcLine: "Wife and two kids in the western block. They stay home, I keep working. Half my fares now are people fleeing to the exits \u2014 I charge double."
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: You're new here. Previous officer had a system. Checked once, waved
-      me through. Papers. Permit runs to September.
+    npcLine: "You're new here. Previous officer had a system \u2014 checked once, waved me through. Papers, permit runs to September."
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: I do my job the same for everyone.
-      npcResponse: Sure you do. Well, do it fast. I've got a fare waiting and time
-        is still money.
+      npcResponse: "Sure you do. Do it fast \u2014 I've got a fare waiting and time's still money."
       animationTrigger: TalkCocky
+      playLaughSfx: 0
     - playerChoiceText: What kind of system?
-      npcResponse: The efficient kind. Respect for everyone's time. You'll learn
-        it. Or you won't.
+      npcResponse: The efficient kind. Respect for everyone's time. You'll learn it. Or you won't.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0

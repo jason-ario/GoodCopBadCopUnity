@@ -246,12 +246,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2136927079
+  GlobalObjectIdHash: 1490608804
   InScenePlacedSourceGlobalObjectIdHash: 2136927079
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -276,6 +278,8 @@ MonoBehaviour:
   interactText: Coffee Mug
   highlightNameFilter: 
   itemData: {fileID: 11400000, guid: b3d45df927ec7134c9fd2332434cf95f, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
 --- !u!65 &5037545842672665373
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -314,7 +318,7 @@ MonoBehaviour:
   camerasLayerMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  effectGroup: 0
+  effectGroup: 1
   effectTarget: {fileID: 0}
   effectGroupLayer:
     serializedVersion: 2
@@ -339,7 +343,7 @@ MonoBehaviour:
   customPassName: 
   normalsOption: 0
   ignore: 0
-  _highlighted: 1
+  _highlighted: 0
   fadeInDuration: 0
   fadeOutDuration: 0
   flipY: 0
@@ -561,7 +565,7 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 2
+  rmsCount: 1
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFXTriggerMode: 0

@@ -144,6 +144,17 @@ public class PickableObject : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// True while this item is physically contained by a supply box. The server writes this
+    /// before spawning delivered contents, so every peer makes the item's colliders triggers
+    /// and its rigidbodies kinematic before it can push against the box.
+    /// </summary>
+    private NetworkVariable<bool> _isContainedInSupplyBox = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+
     /// <summary>Returns true if any player is currently holding this object.</summary>
     public bool IsHeld => _holdingClientId.Value != ulong.MaxValue;
 
@@ -157,9 +168,11 @@ public class PickableObject : Interactable
         _holdingClientId.OnValueChanged             += OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged += OnNetworkInteractableOverrideChanged;
         _isStowed.OnValueChanged                    += OnIsStowedChanged;
+        _isContainedInSupplyBox.OnValueChanged      += OnSupplyBoxContainmentChanged;
 
         // Apply tutorial override first; fall back to holder-based logic if unset.
         ApplyNetworkInteractableState();
+        ApplySupplyBoxContainmentPhysics(_isContainedInSupplyBox.Value);
 
         // Late-joining clients need to inherit the current stowed visibility too.
         gameObject.SetActive(!_isStowed.Value);
@@ -173,6 +186,7 @@ public class PickableObject : Interactable
         _holdingClientId.OnValueChanged             -= OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged -= OnNetworkInteractableOverrideChanged;
         _isStowed.OnValueChanged                    -= OnIsStowedChanged;
+        _isContainedInSupplyBox.OnValueChanged      -= OnSupplyBoxContainmentChanged;
 
         PickableObjectRegistry.Instance.Unregister(this);
     }
@@ -189,6 +203,53 @@ public class PickableObject : Interactable
 
         gameObject.SetActive(!newValue);
         OnStowedNetworked?.Invoke(newValue);
+    }
+
+    /// <summary>
+    /// Server-authoritatively marks this item as contained in a supply box. Contained items keep
+    /// every collider as a trigger and every Rigidbody kinematic, preventing their contents from
+    /// imparting forces to the delivery box. The state is replicated to the host and all clients.
+    /// </summary>
+    public void SetSupplyBoxContainedNetworked(bool contained)
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning($"[PickableObject] Only the server can set supply-box containment for {name}.", this);
+            return;
+        }
+
+        _isContainedInSupplyBox.Value = contained;
+        ApplySupplyBoxContainmentPhysics(contained);
+    }
+
+    private void OnSupplyBoxContainmentChanged(bool previousValue, bool newValue)
+        => ApplySupplyBoxContainmentPhysics(newValue);
+
+    private void ApplySupplyBoxContainmentPhysics(bool contained)
+    {
+        if (contained)
+        {
+            foreach (Collider collider in GetComponentsInChildren<Collider>(true))
+            {
+                if (collider != null)
+                    collider.isTrigger = true;
+            }
+
+            foreach (Rigidbody rigidbody in GetComponentsInChildren<Rigidbody>(true))
+            {
+                if (rigidbody != null)
+                    rigidbody.isKinematic = true;
+            }
+
+            return;
+        }
+
+        // Once released from the box, defer to the existing held/free collider behavior. The
+        // normal pickup flow controls Rigidbody simulation (only throws make it non-kinematic).
+        if (IsHeld)
+            _colliderController?.SetHeld();
+        else
+            _colliderController?.SetReleased();
     }
 
     /// <summary>
@@ -349,6 +410,12 @@ public class PickableObject : Interactable
 
     private void OnHoldingClientChanged(ulong previous, ulong current)
     {
+        // An item becomes physically independent as soon as a player claims it. The server
+        // clears the replicated containment state, allowing the usual held/drop/throw flow to
+        // resume identically on the host and all clients.
+        if (current != ulong.MaxValue && _isContainedInSupplyBox.Value && IsServer)
+            _isContainedInSupplyBox.Value = false;
+
         // Update trigger state on all clients, independent of the interactable lock — except
         // for a filed FolderItem (ID card, Application, exam page), whose root collider is
         // solely owned and driven by FolderController/FolderItem.RefreshFolderState based on

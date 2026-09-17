@@ -14,47 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Good evening. You're new here. The fifth officer at this post. Nona
-      Beridze, census recorder, district eleven. Eleven years.
+    npcLine: Good evening. You're new. Nona Beridze, census recorder, district eleven. Eleven years.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: My job is to know who lives where and who's moved. In normal times
-      that's administrative. Right now it's something else.
+    npcLine: My job is knowing who lives where and who's moved. Right now, it's something else.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What do you mean, something else?
-      npcResponse: The gaps are larger now. Names that stop appearing. I always
-        cross-reference before closing a file.
+      npcResponse: The gaps are larger now. Names that stop appearing. I always cross-reference before closing.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
     - playerChoiceText: That sounds like difficult work.
-      npcResponse: It requires attention. I'm good at attention. Most people find
-        sustained attention uncomfortable. I've never understood why.
+      npcResponse: It requires attention. I'm good at it. Most people find that uncomfortable.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
   - type: 0
-    npcLine: I live alone. I prefer it, shared spaces complicate the records.
-      I've been through this checkpoint thirty-one times. I know your processing
-      time to within four seconds.
+    npcLine: I live alone. I prefer it, shared spaces complicate the records. I've been through this checkpoint thirty-one times.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I noted your face the moment you sat down. It's not personal, it's
-      simply what I do. My documents are filed myself. Everything's accurate.
+    npcLine: I noted your face the moment you sat down. It's simply what I do. Everything's in order.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: You noted my face?
-      npcResponse: I note everything. The last officer's face too, and the ones
-        before him. I find the continuity useful.
+      npcResponse: I note everything. The last officer's face too, and the ones before him.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: That's a little unusual.
-      npcResponse: So I've been told. Usually by people whose names I already
-        had written down.
+      npcResponse: So I've been told. Usually by people whose names I already had written down.
       animationTrigger: TalkIdle
+      playLaughSfx: 0

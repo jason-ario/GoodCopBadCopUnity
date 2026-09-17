@@ -14,48 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Greetings, officer. Or, greetings, sentinel of the threshold. My
-      papers are here, I mean my documents. Tina Meskhi. Performer at the Grand
-      Theater, until recently.
+    npcLine: "Greetings, officer. My papers \u2014 I mean my documents. Tina Meskhi, performer at the Grand Theater, until recently."
     animationTrigger: TalkCocky
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: The mask is my real face. I know that sounds like something someone
-      says. I've worn it seven years. I don't find it strange anymore.
+    npcLine: The mask is my real face. I've worn it seven years. I don't find it strange anymore.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Are you required to wear it for the show?
-      npcResponse: There is no show without the mask. There's also no me without
-        it. The distinction stopped mattering a while ago.
+      npcResponse: There's no show without the mask. There's no me without it either.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
     - playerChoiceText: Do you sleep in it?
-      npcResponse: The mask protects the face beneath it. Think of it as very
-        committed skincare. Please don't ask about the face beneath it.
+      npcResponse: The mask protects the face beneath it. Think of it as very committed skincare.
       animationTrigger: TalkCocky
+      playLaughSfx: 0
   - type: 0
-    npcLine: I live near the station with my producer and two interns. We keep
-      running performances anyway. The house is empty some nights, but the show
-      must go on.
+    npcLine: I live near the station with my producer and two interns. We keep running performances anyway.
     animationTrigger: TalkCocky
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: You play the stern gatekeeper very convincingly, officer. Very committed
-      to the role. My permit, December expiry. The paint on the edge is mine,
-      from rehearsal.
+    npcLine: You play the stern gatekeeper convincingly, officer. My permit, December expiry. The paint's from rehearsal.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: I'm just checking papers.
       npcResponse: Yes, that's your line. Very consistent. I respect the commitment.
       animationTrigger: TalkCocky
+      playLaughSfx: 0
     - playerChoiceText: You see everything as a performance?
-      npcResponse: Everything is a performance. The difference is whether you're
-        aware of it. You have a very strong stage presence.
+      npcResponse: Everything is a performance. The difference is whether you're aware of it.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0

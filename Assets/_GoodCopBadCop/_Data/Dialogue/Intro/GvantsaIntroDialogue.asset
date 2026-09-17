@@ -14,45 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Your booth has a hairline crack in the left panel. Wasn't there last
-      week. Gvantsa Edisherashvili. Political science student, or I was, before
-      the campus emptied.
+    npcLine: "Your booth has a hairline crack in the left panel \u2014 wasn't there last week. Gvantsa Edisherashvili. Political science student, before the campus emptied."
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I've been documenting changes at this checkpoint since week one. You
-      process about four people every six minutes.
+    npcLine: "I've documented changes here since week one \u2014 about four people processed every six minutes."
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Why are you documenting that?
       npcResponse: Because nobody else is. If I stop recording, the data disappears.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
     - playerChoiceText: That sounds exhausting.
-      npcResponse: It keeps me from thinking about everything else. Which is the
-        point.
+      npcResponse: It keeps me from thinking about everything else. Which is the point.
       animationTrigger: TalkLookDown
+      playLaughSfx: 0
   - type: 0
-    npcLine: I live with my mother and sister. My sister wanted to leave, my mother
-      wouldn't. I stayed to keep count. Two notebooks so far. The entries keep
-      getting shorter.
+    npcLine: "I live with my mother and sister \u2014 she wanted to leave, my mother wouldn't. I stayed to keep count. Two notebooks so far."
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: Everyone here looks at their papers instead of at you. They've stopped
-      trusting faces. Mine are here. Expiry's October, verified this morning.
+    npcLine: "Everyone here looks at their papers, not you \u2014 they've stopped trusting faces. Mine are here, expiry October."
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What does that mean to you?
       npcResponse: It means faces are no longer reliable data. Worth noting.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: You're very observant.
       npcResponse: I notice everything. Not always useful. But it's all I have.
       animationTrigger: TalkIdle
+      playLaughSfx: 0

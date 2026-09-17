@@ -14,47 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Here, my documents. I had them ready. Jana Sokolova. I live in the
-      residential block, end of the second row. Four years now.
+    npcLine: Here, my documents, I had them ready. Jana Sokolova. Residential block, end of the second row. Four years now.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: The dress. I can see you noticed. It's for a ceremony, later. The
-      timing's been complicated.
+    npcLine: "The dress \u2014 I see you noticed. It's for a ceremony later. The timing's been complicated."
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What kind of ceremony?
-      npcResponse: A wedding. The date's moved several times. I don't remember
-        exactly when it started.
+      npcResponse: A wedding. The date's moved several times. I don't remember when it started.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: How long have you been wearing it?
-      npcResponse: It holds its shape well. I've had it mended in a few places.
-        The seamstress on my floor is very kind.
+      npcResponse: It holds its shape well. Mended in a few places by the seamstress on my floor, who's very kind.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
   - type: 0
-    npcLine: I work the flower stall on the residential row. Arrangements for
-      whatever occasion. Funerals mostly, lately. I come through here every day.
-      I know the process.
+    npcLine: "I work the flower stall on the residential row, funerals mostly lately. I come through here every day \u2014 I know the process."
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I have a very good memory for procedures. Other things I lose sometimes.
-      My permit's here, June expiry. Everything's in order.
+    npcLine: "I have a good memory for procedures \u2014 other things I lose sometimes. My permit's here, June expiry."
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: You seem very familiar with the routine.
-      npcResponse: I've been through it many times. The routine is easier than
-        the parts in between.
+      npcResponse: I've been through it many times. The routine's easier than the parts in between.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: Do you have someone waiting at home?
-      npcResponse: Yes. Soon. He gets home later now. But I wait. I'm very good
-        at waiting.
+      npcResponse: Yes, soon. He gets home later now, but I wait. I'm good at that.
       animationTrigger: TalkIdle
+      playLaughSfx: 0

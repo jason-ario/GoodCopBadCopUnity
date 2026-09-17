@@ -14,45 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: You look like someone who reads the last page first. Useful habit,
-      here at the end. Ia Lomidze, librarian at the archive on the hill. Twenty
-      years now.
+    npcLine: You look like someone who reads the last page first. Ia Lomidze, librarian at the archive on the hill. Twenty years now.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: People keep bringing me their questions. What will happen, what comes
-      next. As if the answer's filed somewhere in my stacks.
+    npcLine: "People bring me their questions \u2014 what will happen, what comes next. As if the answer's filed in my stacks."
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Is it?
       npcResponse: Everything is, eventually. The difficulty is finding which shelf.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: What do you tell them?
-      npcResponse: That endings are written long before anyone reads them. They
-        never find that comforting. I don't know why.
+      npcResponse: That endings are written long before anyone reads them. They never find that comforting.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
   - type: 0
-    npcLine: The library's still open, I open it every morning. Fewer people every
-      day, but I live alone. Books are better company. They don't ask me to look
-      away.
+    npcLine: "The library's still open \u2014 I open it every morning. Fewer people every day, but I live alone. Books are better company."
     animationTrigger: TalkLookDown
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I've already read past this part of the story. I don't say that to
-      unsettle you. My papers are here, December expiry. I never let them lapse.
+    npcLine: I've already read past this part of the story. I don't say that to unsettle you. My papers are here, December expiry.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What happens next?
       npcResponse: To you? I wouldn't say. Some things are better as a surprise.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: That's an unusual thing to say at a checkpoint.
       npcResponse: Everything unusual feels ordinary when the plot requires it.
       animationTrigger: TalkIdle
+      playLaughSfx: 0

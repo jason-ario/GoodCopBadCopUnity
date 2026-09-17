@@ -14,48 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Papers. Timber route. Temur Gelashvili. I work the northern forest,
-      timber and trapping. I come into the city twice a season. Gets louder every
-      time.
+    npcLine: Papers. Timber route. Temur Gelashvili. I work the northern forest. I come into the city twice a season.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: The birds left the valley this morning. Early. That means something
-      bad is coming from the north.
+    npcLine: The birds left the valley this morning, early. That means something's coming from the north.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: How do you know from the birds?
-      npcResponse: You watch something long enough, it tells you things. Birds
-        always know before we do.
+      npcResponse: You watch something long enough, it tells you things. Birds always know before we do.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
     - playerChoiceText: What kind of bad?
-      npcResponse: The kind that changes the smell of the air first. You can't
-        smell it yet. You will.
+      npcResponse: The kind that changes the smell of the air first. You can't smell it yet.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
   - type: 0
-    npcLine: I live alone, cabin past the north gate. Quieter that way. The trees
-      near the eastern fence are starting to go gray, not from cold, from below.
+    npcLine: I live alone, cabin past the north gate. The trees near the eastern fence are turning gray, not from cold.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I've been tracking them for a week. They leave marks in the soil
-      that don't match any animal I know. Permit's here, November. The ink smells
-      odd today.
+    npcLine: I've been tracking them for a week. They leave marks in the soil no animal makes. Permit's here, November.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What kind of things?
-      npcResponse: I don't have a name for them. I've tracked for thirty years.
-        These are new.
+      npcResponse: I don't have a name for them. I've tracked for thirty years. These are new.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
     - playerChoiceText: Is it safe for you out there alone?
-      npcResponse: Safe is a city word. Out there you're either watching or you're
-        not. I watch.
+      npcResponse: Safe is a city word. Out there you're either watching or you're not. I watch.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0

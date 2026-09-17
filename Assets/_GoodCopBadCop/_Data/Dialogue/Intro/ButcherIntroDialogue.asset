@@ -14,45 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: First shift here? I can always tell. You're deciding whether to mention
-      the face, or pretend it's not there. You don't have to.
+    npcLine: First shift here? I can always tell. You don't have to mention the face.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: Pavle Asatiani. The Butcher. Yes, literally my job, never a nickname.
-      Meat grinder, three years back.
+    npcLine: Pavle Asatiani. The Butcher. Literally my job, never a nickname. Meat grinder, three years back.
     animationTrigger: TalkCocky
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Did it hurt?
-      npcResponse: Not how you'd think. You don't feel it till an hour later, when
-        the adrenaline drops.
+      npcResponse: Not how you'd think. You don't feel it till an hour later.
       animationTrigger: TalkLookDown
+      playLaughSfx: 0
     - playerChoiceText: You went back to work after that?
-      npcResponse: Next morning. The cows were already dead. They weren't getting
-        any fresher.
+      npcResponse: Next morning. The cows were already dead.
       animationTrigger: TalkSmile
+      playLaughSfx: 0
   - type: 0
-    npcLine: I run the stall at the end of the market row. Beef, pork, whatever
-      comes through the gates. Business is good. People eat when they're scared.
+    npcLine: I run the stall at the end of the market row. Business is good. People eat when they're scared.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: You'll see me often. Late shifts, after close. You get used to the
-      face. Papers are here. Everything's in order.
+    npcLine: You'll see me often. Late shifts, after close. Papers are here. Everything's in order.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: I'm not bothered by it.
       npcResponse: Good. Saves us both some time.
       animationTrigger: TalkSmile
+      playLaughSfx: 0
     - playerChoiceText: What does your brother think?
-      npcResponse: He cried for a week. I keep telling him I'm fine. I'm the one
-        wearing it.
+      npcResponse: He cried for a week. I'm the one wearing it.
       animationTrigger: TalkLookDown
+      playLaughSfx: 0

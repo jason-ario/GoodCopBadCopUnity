@@ -14,49 +14,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
   nodes:
   - type: 0
-    npcLine: Hello, brother. Grim morning, but we're still here. That counts for
-      something. Father Shota Eradze. I serve at the cathedral, but mostly I work
-      the streets.
+    npcLine: Hello, brother. Grim morning, but we're still here. Father Shota Eradze. I serve at the cathedral, mostly the streets.
     animationTrigger: TalkSmile
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I've been out since dawn helping with the water lines in the east
-      district. There's always something that needs doing. I find that comforting.
+    npcLine: I've been out since dawn helping with the water lines in the east district.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Water lines? That's not typically a priest's work.
-      npcResponse: People need water before they need prayer. I've learned to
-        work in that order.
+      npcResponse: People need water before they need prayer. I've learned to work in that order.
       animationTrigger: TalkSmile
+      playLaughSfx: 0
     - playerChoiceText: Doesn't it wear you out?
-      npcResponse: The body tires. The purpose doesn't. As long as I know why
-        I'm moving, the moving is easy.
+      npcResponse: The body tires. The purpose doesn't. Knowing why I'm moving makes it easy.
       animationTrigger: TalkIdle
+      playLaughSfx: 0
   - type: 0
-    npcLine: I live with the seminary brothers, three of us now. We eat together,
-      pray together, check on the parish families in rotation. Every person through
-      this checkpoint, I pray for tonight.
+    npcLine: I live with the seminary brothers, three of us now. We eat together, pray together, check on parish families in rotation.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I keep my papers in this coat, next to a letter from a parishioner.
-      She wanted to thank me for a talk we had months ago. Permit runs to December.
+    npcLine: I keep my papers next to a letter from a parishioner, thanking me for a talk months ago. Permit runs to December.
     animationTrigger: TalkIdle
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: What did you say to her?
-      npcResponse: That grief and fear sound different from the outside. From
-        the inside they feel the same. She needed to hear she wasn't doing it
-        wrong.
+      npcResponse: Grief and fear sound different from the outside. Inside, they feel the same. She needed to hear that.
       animationTrigger: TalkLookDown
+      playLaughSfx: 0
     - playerChoiceText: You seem very peaceful for the circumstances.
-      npcResponse: Peace has to be chosen each morning. Today it was an easier
-        choice than yesterday.
+      npcResponse: Peace has to be chosen each morning. Today it was an easier choice than yesterday.
       animationTrigger: TalkSmile
+      playLaughSfx: 0
