@@ -9,6 +9,8 @@ namespace GoodCopBadCop.Effects
         public const string FriendlyGunshotDamage = "player.damage.friendly_gunshot";
         public const string FriendlyFlamethrowerDamage = "player.damage.friendly_flamethrower";
         public const string RadiationTickDamage = "player.damage.radiation_tick";
+        public const string VehicleCollisionDamage = "player.damage.vehicle_collision";
+        public const string HazardDamage = "player.damage.hazard";
         public const string ScriptedRifleDamage = "player.damage.scripted_rifle";
         public const string PlayerHeal = "player.heal.default";
         public const string CigaretteHeal = "player.heal.cigarette";

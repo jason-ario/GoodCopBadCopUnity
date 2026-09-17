@@ -98,6 +98,21 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     private bool _wasGrounded;
     private bool _landSoundPlayedForCurrentFall;
 
+    [Header("Knockback Settings")]
+    [Tooltip("How quickly (units/sec^2) a horizontal knockback shove decays back to zero.")]
+    [SerializeField] private float knockbackRecoveryRate = 20f;
+
+    /// <summary>Extra horizontal velocity from knockback impulses (e.g. HazardHitbox), decays over time.</summary>
+    private Vector3 _externalVelocity;
+
+    /// <summary>
+    /// Vertical knockback speed waiting to be applied on the next <see cref="Move"/> call.
+    /// Applied after the grounded/jump logic (rather than written directly to
+    /// <see cref="_verticalVelocity"/>) so it isn't immediately clobbered by the "snap to -2 while
+    /// grounded" reset if the knockback lands on the same frame the player is still touching ground.
+    /// </summary>
+    private float _pendingKnockbackVerticalVelocity;
+
     // Input helpers — combine legacy Input Manager with gamepad polling so both
     // keyboard/mouse and controller work simultaneously without migrating to
     // the new Input System's action map callbacks.
@@ -511,6 +526,15 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         _wasGrounded = isGrounded;
 
+        // Apply any pending knockback lift now — after the grounded/jump logic above has already
+        // had its say — so it always takes effect instead of being immediately reset to -2 by the
+        // "stay grounded" clamp if the knockback landed while the player was still on the ground.
+        if (_pendingKnockbackVerticalVelocity > 0f)
+        {
+            _verticalVelocity = Mathf.Max(_verticalVelocity, _pendingKnockbackVerticalVelocity);
+            _pendingKnockbackVerticalVelocity = 0f;
+        }
+
         // Keep IsGrounded false for the entire jump animation window so systems
         // that read this property (e.g. the animation controller) don't see a
         // grounded flicker the instant the player's feet leave the ground.
@@ -518,10 +542,14 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         bool jumpAnimActive = _playerAnimationController != null && _playerAnimationController.IsJumpAnimPlaying;
         IsGrounded = isGrounded && !jumpAnimActive && !_isUnderwater;
 
-        Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity;
+        Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity + _externalVelocity;
 
         // Apply movement
         CollisionFlags collisionFlags = _characterController.Move(moveVector * Time.deltaTime);
+
+        // Decay the horizontal knockback shove back toward zero over time.
+        _externalVelocity = Vector3.MoveTowards(_externalVelocity, Vector3.zero, knockbackRecoveryRate * Time.deltaTime);
+
 
         // A CharacterController stops at a ceiling but leaves the upward velocity intact.
         // Clear it immediately so the next frame applies gravity and the player falls instead
@@ -1004,6 +1032,29 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         // Skip the owner — they already played it above.
         if (IsOwner) return;
         _footstepsAudio.PlayFootstep();
+    }
+
+    /// <summary>
+    /// Server-only. Shoves this player with <paramref name="horizontalVelocity"/> (world-space,
+    /// decays over time — see <see cref="knockbackRecoveryRate"/>) and lifts them with
+    /// <paramref name="verticalVelocity"/> (an instantaneous speed, same units as jumpForce).
+    /// Routed via a ClientRpc since movement is client-authoritative — only the owning client's
+    /// <see cref="Move"/> actually consumes the knockback. Used by e.g. HazardHitbox to push a hit
+    /// player back and up, clear of whatever hit them.
+    /// </summary>
+    public void ApplyKnockbackServer(Vector3 horizontalVelocity, float verticalVelocity)
+    {
+        if (!IsServer) return;
+        ApplyKnockbackClientRpc(horizontalVelocity, verticalVelocity);
+    }
+
+    [ClientRpc]
+    private void ApplyKnockbackClientRpc(Vector3 horizontalVelocity, float verticalVelocity)
+    {
+        if (!IsOwner) return;
+
+        _externalVelocity += horizontalVelocity;
+        _pendingKnockbackVerticalVelocity = Mathf.Max(_pendingKnockbackVerticalVelocity, verticalVelocity);
     }
 
     private void LateUpdate()

@@ -1,5 +1,6 @@
 using System.Collections;
 using DG.Tweening;
+using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -123,6 +124,12 @@ public class DeliveryTruckController : NetworkBehaviour
     [Tooltip("Peak MachineShake.positionStrength reached while driving at full speed.")]
     [SerializeField] private float peakShakeStrength = 0.05f;
 
+    [Header("Player Hit Detection")]
+    [Tooltip("HazardHitbox mounted on the truck's front bumper — active while the truck drives forward (pointA to pointB, and pointB to pointC).")]
+    [SerializeField] private HazardHitbox frontHazard;
+    [Tooltip("HazardHitbox mounted on the truck's rear bumper — active while the truck reverses back from pointC to pointA.")]
+    [SerializeField] private HazardHitbox backHazard;
+
     private const int MailDeliveryTriggerAttempts = 5;
     private const float MailDeliveryTriggerRetryDelay = 0.5f;
 
@@ -130,6 +137,14 @@ public class DeliveryTruckController : NetworkBehaviour
     private Vector3 _crateRestPosition;
     private Quaternion _crateRestRotation;
     private Sequence _driveSequence;
+
+    /// <summary>
+    /// True only while the truck is actively moving between waypoints (i.e. after the drive
+    /// rev-delay elapses and until it arrives), as opposed to parked/idling at a waypoint.
+    /// Mirrors whichever of <see cref="frontHazard"/>/<see cref="backHazard"/> is active for the
+    /// current <see cref="DriveLeg"/>.
+    /// </summary>
+    private bool _isDriving;
 
     /// <summary>
     /// True while the delivery crate is sitting at its resting spot on the ground, i.e. from the
@@ -423,6 +438,8 @@ public class DeliveryTruckController : NetworkBehaviour
     private void DeactivateClientRpc()
     {
         _driveSequence?.Kill();
+        _isDriving = false;
+        DeactivateHazards();
         if (truckAudioSource != null)
             truckAudioSource.Stop();
         SetVisualActive(false);
@@ -461,6 +478,11 @@ public class DeliveryTruckController : NetworkBehaviour
         _driveSequence?.Kill();
         _driveSequence = DOTween.Sequence();
         _driveSequence.AppendInterval(driveRevDelay);
+        _driveSequence.AppendCallback(() =>
+        {
+            _isDriving = true;
+            SetHazardsActiveForLeg(leg);
+        });
         _driveSequence.Append(transform.DOMove(to.position, duration).SetEase(speedCurve));
         _driveSequence.Join(transform.DORotateQuaternion(to.rotation, duration).SetEase(speedCurve));
 
@@ -473,12 +495,41 @@ public class DeliveryTruckController : NetworkBehaviour
 
         _driveSequence.OnComplete(() =>
         {
+            _isDriving = false;
+            DeactivateHazards();
+
             if (machineShake != null)
                 machineShake.positionStrength = baseShakeStrength;
 
             // Back to idle audio once parked at either end.
             PlayLoopingClip(idleClip);
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // Player Hit Detection
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Activates whichever of <see cref="frontHazard"/>/<see cref="backHazard"/> leads in the
+    /// given driving direction and deactivates the other — the front bumper leads for
+    /// <see cref="DriveLeg.ToPointB"/>/<see cref="DriveLeg.ToPointC"/>, the rear bumper leads for
+    /// <see cref="DriveLeg.Back"/> (the truck reverses rather than turning around). Runs
+    /// identically on every client (called from <see cref="PlayDriveSequence"/>), but each
+    /// HazardHitbox only actually ticks/damages on the server.
+    /// </summary>
+    private void SetHazardsActiveForLeg(DriveLeg leg)
+    {
+        bool frontLeads = leg == DriveLeg.ToPointB || leg == DriveLeg.ToPointC;
+        frontHazard?.SetHazardActive(frontLeads);
+        backHazard?.SetHazardActive(!frontLeads);
+    }
+
+    /// <summary>Deactivates both hazards — called whenever the truck stops driving or is fully deactivated.</summary>
+    private void DeactivateHazards()
+    {
+        frontHazard?.SetHazardActive(false);
+        backHazard?.SetHazardActive(false);
     }
 
     /// <summary>

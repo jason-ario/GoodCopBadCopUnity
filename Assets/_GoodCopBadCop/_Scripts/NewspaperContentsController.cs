@@ -38,13 +38,29 @@ public class NewspaperContentsController : MonoBehaviour
         PopulateFromDay(ShiftManager.Instance.CurrentDay);
     }
 
+    /// <summary>Number of days with authored newspaper content, for editor tooling bounds-checking.</summary>
+    public int DayCount => _newspaperContentScriptables?.Length ?? 0;
+
     /// <summary>
-    /// Populates all newspaper text fields for the given day number.
+    /// Populates all newspaper text fields for the given day number, then triggers the runtime
+    /// camera-snapshot coroutine.
     /// </summary>
     private void PopulateFromDay(int day)
     {
-        // Reactivate the hidden content (it deactivates itself again at the end of the snapshot
-        // routine below) so its TMP text is actually renderable while the camera captures it.
+        SetContentsForDay(day);
+        StartCoroutine(CameraSnapshot());
+    }
+
+    /// <summary>
+    /// Sets all newspaper text fields for the given day number, without starting the runtime
+    /// camera-snapshot coroutine (coroutines require Play Mode). Used by <see cref="PopulateFromDay"/>
+    /// for the normal runtime flow, and by NewspaperContentsControllerEditor's Edit Mode
+    /// "Bake to PNG" tool, which performs its own synchronous capture instead.
+    /// </summary>
+    public void SetContentsForDay(int day)
+    {
+        // Reactivate the hidden content (the runtime snapshot routine deactivates it again at the
+        // end) so its TMP text is actually renderable while the camera captures it.
         gameObject.SetActive(true);
 
         Debug.Log("Populating Newspaper Contents");
@@ -58,8 +74,6 @@ public class NewspaperContentsController : MonoBehaviour
         subheaderText.text = newspaperContentScriptable.subheaderText;
         descriptionText.text = newspaperContentScriptable.descriptionText;
         footerText.text = newspaperContentScriptable.footerText;
-
-        StartCoroutine(CameraSnapshot());
     }
 
     /// <summary>
