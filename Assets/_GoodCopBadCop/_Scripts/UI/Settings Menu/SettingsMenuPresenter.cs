@@ -43,6 +43,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             view.CrouchModeChanged.Subscribe(OnCrouchModeChanged).AddTo(ref disposables);
             view.SprintModeChanged.Subscribe(OnSprintModeChanged).AddTo(ref disposables);
             view.RunningEffectsEnabledChanged.Subscribe(OnRunningEffectsEnabledChanged).AddTo(ref disposables);
+            view.HeadBobEnabledChanged.Subscribe(OnHeadBobEnabledChanged).AddTo(ref disposables);
+            view.CameraShakeEnabledChanged.Subscribe(OnCameraShakeEnabledChanged).AddTo(ref disposables);
             view.MasterVolumeChanged.Subscribe(OnMasterVolumeChanged).AddTo(ref disposables);
             view.MusicVolumeChanged.Subscribe(OnMusicVolumeChanged).AddTo(ref disposables);
             view.SfxVolumeChanged.Subscribe(OnSfxVolumeChanged).AddTo(ref disposables);
@@ -91,6 +93,14 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             settingsModel.RunningEffectsEnabled
                 .Subscribe(view.SetRunningEffectsEnabledValue)
+                .AddTo(ref disposables);
+
+            settingsModel.HeadBobEnabled
+                .Subscribe(view.SetHeadBobEnabledValue)
+                .AddTo(ref disposables);
+
+            settingsModel.CameraShakeEnabled
+                .Subscribe(view.SetCameraShakeEnabledValue)
                 .AddTo(ref disposables);
 
             settingsModel.MasterVolume
@@ -204,6 +214,16 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private void OnRunningEffectsEnabledChanged(bool isEnabled)
         {
             settingsService.SetRunningEffectsEnabled(isEnabled);
+        }
+
+        private void OnHeadBobEnabledChanged(bool isEnabled)
+        {
+            settingsService.SetHeadBobEnabled(isEnabled);
+        }
+
+        private void OnCameraShakeEnabledChanged(bool isEnabled)
+        {
+            settingsService.SetCameraShakeEnabled(isEnabled);
         }
 
         private void OnMasterVolumeChanged(float value)

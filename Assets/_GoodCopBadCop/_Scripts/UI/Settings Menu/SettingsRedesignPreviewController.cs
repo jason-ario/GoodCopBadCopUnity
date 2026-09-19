@@ -170,6 +170,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<int> crouchModeChanged = new Subject<int>();
         private readonly Subject<int> sprintModeChanged = new Subject<int>();
         private readonly Subject<bool> runningEffectsEnabledChanged = new Subject<bool>();
+        private readonly Subject<bool> headBobEnabledChanged = new Subject<bool>();
+        private readonly Subject<bool> cameraShakeEnabledChanged = new Subject<bool>();
         private readonly Subject<float> masterVolumeChanged = new Subject<float>();
         private readonly Subject<float> musicVolumeChanged = new Subject<float>();
         private readonly Subject<float> sfxVolumeChanged = new Subject<float>();
@@ -193,6 +195,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<int> CrouchModeChanged { get { return crouchModeChanged; } }
         public Observable<int> SprintModeChanged { get { return sprintModeChanged; } }
         public Observable<bool> RunningEffectsEnabledChanged { get { return runningEffectsEnabledChanged; } }
+        public Observable<bool> HeadBobEnabledChanged { get { return headBobEnabledChanged; } }
+        public Observable<bool> CameraShakeEnabledChanged { get { return cameraShakeEnabledChanged; } }
         public Observable<float> MasterVolumeChanged { get { return masterVolumeChanged; } }
         public Observable<float> MusicVolumeChanged { get { return musicVolumeChanged; } }
         public Observable<float> SfxVolumeChanged { get { return sfxVolumeChanged; } }
@@ -521,6 +525,24 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 RefreshActiveSetting("running_effects");
             }
         }
+        public void SetHeadBobEnabledValue(bool value)
+        {
+            int index = Array.IndexOf(Gameplay, Array.Find(Gameplay, s => s.Key == "head_bob"));
+            if (index >= 0)
+            {
+                Gameplay[index].Index = value ? 1 : 0;
+                RefreshActiveSetting("head_bob");
+            }
+        }
+        public void SetCameraShakeEnabledValue(bool value)
+        {
+            int index = Array.IndexOf(Gameplay, Array.Find(Gameplay, s => s.Key == "camera_shake"));
+            if (index >= 0)
+            {
+                Gameplay[index].Index = value ? 1 : 0;
+                RefreshActiveSetting("camera_shake");
+            }
+        }
         public void SetMasterVolumeValue(float value) { Audio[0].Value = value; RefreshActiveSetting("master_volume"); }
         public void SetMusicVolumeValue(float value) { Audio[1].Value = value; RefreshActiveSetting("music_volume"); }
         public void SetSfxVolumeValue(float value) { Audio[2].Value = value; RefreshActiveSetting("sfx_volume"); }
@@ -712,6 +734,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "crouch_mode":
                 case "sprint_mode":
                 case "running_effects":
+                case "head_bob":
+                case "camera_shake":
                     return true;
                 default:
                     return false;
@@ -1030,6 +1054,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "crouch_mode": crouchModeChanged.OnNext(setting.Index); break;
                 case "sprint_mode": sprintModeChanged.OnNext(setting.Index); break;
                 case "running_effects": runningEffectsEnabledChanged.OnNext(setting.Index == 1); break;
+                case "head_bob": headBobEnabledChanged.OnNext(setting.Index == 1); break;
+                case "camera_shake": cameraShakeEnabledChanged.OnNext(setting.Index == 1); break;
             }
         }
         private void Save()

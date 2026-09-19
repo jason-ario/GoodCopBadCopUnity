@@ -70,6 +70,7 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
     {
         base.Interact(player);
 
+        if (player == null) return; // Defensive: nothing to open a view for.
         if (_interactingPlayer != null) return; // Already open.
 
         _interactingPlayer = player;
@@ -81,7 +82,10 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
     private void OpenView(PlayerInteractionController player)
     {
         // Disable movement and the standard interaction/reticle system.
-        player.playerMovementController.SetCanControl(false);
+        // playerMovementController is auto-resolved via GetComponent in Awake and can be
+        // null for a player prefab variant that doesn't include it — guard rather than crash.
+        if (player.playerMovementController != null)
+            player.playerMovementController.SetCanControl(false);
         player.SetSuspectCamMode(true);
 
         // Smoothly rotate the player body to the facing target's Y angle.
@@ -99,15 +103,25 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
         }
 
         // Snap look angle to straight ahead so the face camera starts centred.
-        player.playerMovementController.ResetCameraRotation();
+        player.playerMovementController?.ResetCameraRotation();
 
         // Enter third-person view: head bone, body arms, FaceCamera, FP arms, FP light.
         _thirdPersonView = player.GetComponent<PlayerThirdPersonView>();
         _thirdPersonView?.Enter();
 
-        UIController.Instance.ShowCursor();
-        UIController.Instance.ShowBackButton(CloseView);
-        UIController.Instance.ClosePlayerUI();
+        // UIController may not be ready yet (e.g. a scene/UI transition in progress) —
+        // guard rather than let a null Instance take down the interaction.
+        if (UIController.Instance != null)
+        {
+            UIController.Instance.ShowCursor();
+            UIController.Instance.ShowBackButton(CloseView);
+            UIController.Instance.ClosePlayerUI();
+        }
+        else
+        {
+            Debug.LogWarning("[CosmeticsLockerInteractable] UIController.Instance is null; " +
+                              "cursor/back button/player UI will not update for the cosmetics view.", this);
+        }
 
         PlaySFX(_openSFX);
 
@@ -140,15 +154,15 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
         _thirdPersonView?.Exit();
         _thirdPersonView = null;
 
-        UIController.Instance.HideCursor();
-        UIController.Instance.HideBackButton();
-        UIController.Instance.ShowPlayerUI();
+        UIController.Instance?.HideCursor();
+        UIController.Instance?.HideBackButton();
+        UIController.Instance?.ShowPlayerUI();
 
         // Re-enable player movement and interaction.
         if (_interactingPlayer != null)
         {
             _interactingPlayer.SetSuspectCamMode(false);
-            _interactingPlayer.playerMovementController.SetCanControl(true);
+            _interactingPlayer.playerMovementController?.SetCanControl(true);
 
             // Restore the player's point light now that the cosmetics view is closed.
             _interactingPlayer.GetComponent<PlayerInstance>()?.SetPlayerLightActive(true);
@@ -178,6 +192,12 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
     /// </summary>
     private IEnumerator RotatePlayerY(Transform playerTransform, float targetY, float duration)
     {
+        if (playerTransform == null)
+        {
+            _rotationCoroutine = null;
+            yield break;
+        }
+
         NetworkTransform networkTransform = playerTransform.GetComponent<NetworkTransform>();
         if (networkTransform != null)
             networkTransform.enabled = false;
@@ -188,13 +208,22 @@ public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
 
         while (elapsed < duration)
         {
+            // The player can be destroyed mid-tween (disconnect, death/respawn, scene change).
+            // Bail out instead of touching a destroyed Transform/Component.
+            if (playerTransform == null)
+            {
+                _rotationCoroutine = null;
+                yield break;
+            }
+
             elapsed += Time.deltaTime;
             float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
             playerTransform.eulerAngles = new Vector3(0f, startY + delta * t, 0f);
             yield return null;
         }
 
-        playerTransform.eulerAngles = new Vector3(0f, targetY, 0f);
+        if (playerTransform != null)
+            playerTransform.eulerAngles = new Vector3(0f, targetY, 0f);
 
         if (networkTransform != null)
             networkTransform.enabled = true;

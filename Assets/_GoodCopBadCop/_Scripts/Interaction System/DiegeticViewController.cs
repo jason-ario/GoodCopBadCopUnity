@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Unity.Cinemachine;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -64,6 +66,13 @@ public abstract class DiegeticViewController : MonoBehaviour
     private GameObject _playerBody;
     private PlayerInstance _playerInstance;
 
+    /// <summary>
+    /// Other connected players' body meshes hidden locally (on this client only) for the
+    /// duration of the view, so they can't visually stand between the camera and the
+    /// diegetic view's contents (e.g. the tool locker's shelves). Restored on <see cref="Close"/>.
+    /// </summary>
+    private readonly List<GameObject> _hiddenOtherPlayerBodies = new();
+
     /// <summary>Cached outdoor/indoor state at the moment this view opened, restored on close.</summary>
     private bool _preOpenLightActive;
 
@@ -118,6 +127,11 @@ public abstract class DiegeticViewController : MonoBehaviour
         _playerBody = player.transform.Find("Art")?.gameObject;
         if (_playerBody != null)
             _playerBody.SetActive(false);
+
+        // Hide every other connected player's body too — this is a local, client-side-only
+        // toggle (like the one above), so it doesn't affect what anyone else sees. Without it,
+        // the other player standing near this locker/panel would visually block the view's contents.
+        HideOtherPlayers();
 
         // Diegetic views must never leave the player's point light off — force it on
         // regardless of any indoor/outdoor state or other system that may have hidden it,
@@ -197,6 +211,8 @@ public abstract class DiegeticViewController : MonoBehaviour
             _playerBody.SetActive(true);
             _playerBody = null;
         }
+
+        ShowOtherPlayers();
     }
 
     /// <summary>
@@ -215,6 +231,42 @@ public abstract class DiegeticViewController : MonoBehaviour
         if (itemData == null || string.IsNullOrEmpty(itemData.pickupAnimBool)) return;
         PlayerAnimationController pac = player.GetComponent<PlayerAnimationController>();
         pac?.SetAnimBoolLocal(itemData.pickupAnimBool, true);
+    }
+
+    /// <summary>
+    /// Hides the body mesh ("Art" child) of every connected player other than the one opening
+    /// this view. Purely a local visibility toggle on this client — it never touches network
+    /// state — so it's safe even though only the opening client runs this view at all.
+    /// Tracks what it hid so <see cref="ShowOtherPlayers"/> can restore exactly that set.
+    /// </summary>
+    private void HideOtherPlayers()
+    {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null) return;
+
+        NetworkObject localPlayerObject = Player?.GetComponent<NetworkObject>();
+
+        foreach (var client in networkManager.ConnectedClientsList)
+        {
+            NetworkObject playerObject = client.PlayerObject;
+            if (playerObject == null || playerObject == localPlayerObject) continue;
+
+            GameObject otherBody = playerObject.transform.Find("Art")?.gameObject;
+            if (otherBody == null || !otherBody.activeSelf) continue;
+
+            otherBody.SetActive(false);
+            _hiddenOtherPlayerBodies.Add(otherBody);
+        }
+    }
+
+    /// <summary>Restores visibility of every player body hidden by <see cref="HideOtherPlayers"/>.</summary>
+    private void ShowOtherPlayers()
+    {
+        foreach (GameObject body in _hiddenOtherPlayerBodies)
+            if (body != null)
+                body.SetActive(true);
+
+        _hiddenOtherPlayerBodies.Clear();
     }
 
     // ─── Subclass hooks ──────────────────────────────────────────────────────

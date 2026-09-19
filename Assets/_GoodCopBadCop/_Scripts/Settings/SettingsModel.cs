@@ -45,6 +45,8 @@ namespace GoodCopBadCop.Settings
         ReadOnlyReactiveProperty<EInputActivationMode> CrouchMode { get; }
         ReadOnlyReactiveProperty<EInputActivationMode> SprintMode { get; }
         ReadOnlyReactiveProperty<bool> RunningEffectsEnabled { get; }
+        ReadOnlyReactiveProperty<bool> HeadBobEnabled { get; }
+        ReadOnlyReactiveProperty<bool> CameraShakeEnabled { get; }
         ReadOnlyReactiveProperty<float> MasterVolume { get; }
         ReadOnlyReactiveProperty<float> MusicVolume { get; }
         ReadOnlyReactiveProperty<float> SfxVolume { get; }
@@ -86,6 +88,12 @@ namespace GoodCopBadCop.Settings
         public readonly PersistentReactiveProperty<bool> RunningEffectsEnabledMutable =
             new("settings.gameplay.runningEffectsEnabled", true);
 
+        public readonly PersistentReactiveProperty<bool> HeadBobEnabledMutable =
+            new("settings.gameplay.headBobEnabled", true);
+
+        public readonly PersistentReactiveProperty<bool> CameraShakeEnabledMutable =
+            new("settings.gameplay.cameraShakeEnabled", true);
+
         public readonly PersistentReactiveProperty<float> MasterVolumeMutable =
             new("settings.audio.masterVolume", 80f);
 
@@ -125,6 +133,8 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<EInputActivationMode> CrouchMode => CrouchModeMutable;
         public ReadOnlyReactiveProperty<EInputActivationMode> SprintMode => SprintModeMutable;
         public ReadOnlyReactiveProperty<bool> RunningEffectsEnabled => RunningEffectsEnabledMutable;
+        public ReadOnlyReactiveProperty<bool> HeadBobEnabled => HeadBobEnabledMutable;
+        public ReadOnlyReactiveProperty<bool> CameraShakeEnabled => CameraShakeEnabledMutable;
         public ReadOnlyReactiveProperty<float> MasterVolume => MasterVolumeMutable;
         public ReadOnlyReactiveProperty<float> MusicVolume => MusicVolumeMutable;
         public ReadOnlyReactiveProperty<float> SfxVolume => SfxVolumeMutable;
@@ -147,6 +157,8 @@ namespace GoodCopBadCop.Settings
             CrouchModeMutable.Flush();
             SprintModeMutable.Flush();
             RunningEffectsEnabledMutable.Flush();
+            HeadBobEnabledMutable.Flush();
+            CameraShakeEnabledMutable.Flush();
             MasterVolumeMutable.Flush();
             MusicVolumeMutable.Flush();
             SfxVolumeMutable.Flush();
@@ -170,6 +182,8 @@ namespace GoodCopBadCop.Settings
             CrouchModeMutable.Dispose();
             SprintModeMutable.Dispose();
             RunningEffectsEnabledMutable.Dispose();
+            HeadBobEnabledMutable.Dispose();
+            CameraShakeEnabledMutable.Dispose();
             MasterVolumeMutable.Dispose();
             MusicVolumeMutable.Dispose();
             SfxVolumeMutable.Dispose();

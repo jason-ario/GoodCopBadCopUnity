@@ -215,6 +215,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8661983623754063858}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8965344395074811763}
   m_SourcePrefab: {fileID: 100100000, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}
 --- !u!1 &5819269505631014830 stripped
 GameObject:
@@ -235,10 +238,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 1180930456
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 1
   SpawnWithObservers: 1
@@ -263,6 +268,8 @@ MonoBehaviour:
   interactText: 
   highlightNameFilter: 
   itemData: {fileID: 11400000, guid: 5fe8564a7140fb34eb4f9164b78b0c42, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
   readingText: {fileID: 0}
   maxDistance: 3
   handle: {fileID: 0}
@@ -589,7 +596,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InternalBattery
   ShowTopMostFoldoutHeaderGroup: 1
   maxBatteryCapacity: 1
-  batteryDrainRate: 0.01
+  batteryDrainRate: 0.005
 --- !u!1773428102 &5649306799028136248
 ParentConstraint:
   m_ObjectHideFlags: 0
@@ -703,6 +710,18 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 1
   AutoSetKinematicOnDespawn: 1
+--- !u!114 &8965344395074811763
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5819269505631014830}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
 --- !u!4 &6596052048617542932 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 81d6377a3c9c41a4f9cb94a36771d5c0, type: 3}

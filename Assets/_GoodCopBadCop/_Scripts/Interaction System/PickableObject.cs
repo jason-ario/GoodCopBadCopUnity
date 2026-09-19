@@ -182,6 +182,16 @@ public class PickableObject : Interactable
 
     public override void OnNetworkDespawn()
     {
+        // Run the "about to despawn" cleanup hook here — rather than only at the single
+        // DespawnServerRpc call site — so it fires for EVERY despawn path (checkpoint/save
+        // restore forcing a non-existent item away via ApplySaveData, DailyPickupSpawnManager
+        // clearing leftovers, etc.), not just an explicit player-initiated despawn. Subclasses
+        // like ExamNotebook rely on this to despawn objects that are logically part of them
+        // but aren't NetworkObject children (e.g. dynamically-spawned pages) — otherwise those
+        // are orphaned in the scene whenever this object is despawned through any other path.
+        if (IsServer)
+            OnBeforeDespawnServer();
+
         base.OnNetworkDespawn();
         _holdingClientId.OnValueChanged             -= OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged -= OnNetworkInteractableOverrideChanged;
@@ -721,13 +731,15 @@ public class PickableObject : Interactable
     [ServerRpc(RequireOwnership = false)]
     public void DespawnServerRpc()
     {
-        OnBeforeDespawnServer();
         NetworkHelper.Despawn(NetworkObject);
     }
 
     /// <summary>
-    /// Server-only extension point invoked right before this object is despawned via
-    /// <see cref="DespawnServerRpc"/>. Override to despawn any additional NetworkObjects that
+    /// Server-only extension point invoked right before this object is despawned, from
+    /// <see cref="OnNetworkDespawn"/> — which fires for every despawn path (explicit
+    /// <see cref="DespawnServerRpc"/> calls, checkpoint/save restore forcing a non-existent
+    /// item away via <see cref="ApplySaveData"/>, systems like DailyPickupSpawnManager
+    /// clearing leftovers, etc.). Override to despawn any additional NetworkObjects that
     /// are logically part of this item but aren't its children (e.g. <see cref="ExamNotebook"/>'s
     /// dynamically-spawned pages) — otherwise they'd be orphaned in the scene after this object
     /// is destroyed. Only ever invoked on the server.

@@ -13,6 +13,8 @@ namespace GoodCopBadCop.Settings
         void SetCrouchMode(EInputActivationMode mode);
         void SetSprintMode(EInputActivationMode mode);
         void SetRunningEffectsEnabled(bool isEnabled);
+        void SetHeadBobEnabled(bool isEnabled);
+        void SetCameraShakeEnabled(bool isEnabled);
         void SetMasterVolume(float value);
         void SetMusicVolume(float value);
         void SetSfxVolume(float value);
@@ -96,6 +98,16 @@ namespace GoodCopBadCop.Settings
         public void SetRunningEffectsEnabled(bool isEnabled)
         {
             model.RunningEffectsEnabledMutable.Value = isEnabled;
+        }
+
+        public void SetHeadBobEnabled(bool isEnabled)
+        {
+            model.HeadBobEnabledMutable.Value = isEnabled;
+        }
+
+        public void SetCameraShakeEnabled(bool isEnabled)
+        {
+            model.CameraShakeEnabledMutable.Value = isEnabled;
         }
 
         public void SetMasterVolume(float value)

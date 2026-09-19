@@ -15,6 +15,13 @@ public class PlayerInteractionController : NetworkBehaviour
 
     public LayerMask interactLayer;
 
+    [Header("Combat Targeting")]
+    [Tooltip("Max distance at which a held melee weapon can hurt an enemy under the reticle. Drives the reticle's enemy-in-range red color.")]
+    public float weaponRange = 2.5f;
+
+    [Tooltip("Max distance to detect a living enemy under the reticle at all (for the out-of-range translucent red hint). Independent of weaponRange.")]
+    public float enemyDetectionDistance = 30f;
+
     [Tooltip("Layers that count as valid free-placement surfaces (floors, desks, world geometry, etc.)")]
     public LayerMask placementLayer;
 
@@ -229,6 +236,32 @@ public class PlayerInteractionController : NetworkBehaviour
         }
         
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+
+        // Weapon-targeting: only takes over the reticle when a living enemy is under the
+        // crosshair AND the player is holding a melee weapon capable of hurting it. Aiming at
+        // an enemy while empty-handed (or holding a non-weapon item) falls through to the
+        // normal interactable logic below, which will show the plain "nothing interactable" state.
+        bool holdingWeapon = _playerPickupController.HeldObject != null
+            && _playerPickupController.HeldObject.GetComponent<MeleeWeaponDurability>() != null;
+
+        if (holdingWeapon
+            && Physics.Raycast(ray, out RaycastHit enemyHit, enemyDetectionDistance, ~0, QueryTriggerInteraction.Ignore))
+        {
+            MutantEnemy enemy = enemyHit.collider.GetComponentInParent<MutantEnemy>();
+            if (enemy != null && !enemy.IsDead)
+            {
+                if (lastInteractable != null)
+                {
+                    lastInteractable.Highlight(false);
+                    lastInteractable = null;
+                }
+
+                reticle.SetEnemyState(true, enemyHit.distance <= weaponRange);
+                return;
+            }
+        }
+
+        reticle.SetEnemyState(false);
 
         if (lastInteractable != null)
         {

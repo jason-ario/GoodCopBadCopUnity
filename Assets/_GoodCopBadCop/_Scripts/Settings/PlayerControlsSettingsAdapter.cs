@@ -26,6 +26,8 @@ namespace GoodCopBadCop.Settings
             settingsModel.CrouchMode.Subscribe(_ => ApplyToLocalPlayer()).AddTo(ref disposables);
             settingsModel.SprintMode.Subscribe(_ => ApplyToLocalPlayer()).AddTo(ref disposables);
             settingsModel.RunningEffectsEnabled.Subscribe(_ => ApplyToLocalPlayer()).AddTo(ref disposables);
+            settingsModel.HeadBobEnabled.Subscribe(_ => ApplyToLocalPlayer()).AddTo(ref disposables);
+            settingsModel.CameraShakeEnabled.Subscribe(_ => ApplyToLocalPlayer()).AddTo(ref disposables);
             playerRuntimeModel.LocalPlayer.Subscribe(_ => ApplyToLocalPlayer()).AddTo(ref disposables);
 
             ApplyToLocalPlayer();
@@ -48,7 +50,9 @@ namespace GoodCopBadCop.Settings
                 settingsModel.InvertYAxis.CurrentValue,
                 settingsModel.CrouchMode.CurrentValue,
                 settingsModel.SprintMode.CurrentValue,
-                settingsModel.RunningEffectsEnabled.CurrentValue));
+                settingsModel.RunningEffectsEnabled.CurrentValue,
+                settingsModel.HeadBobEnabled.CurrentValue,
+                settingsModel.CameraShakeEnabled.CurrentValue));
         }
     }
 }

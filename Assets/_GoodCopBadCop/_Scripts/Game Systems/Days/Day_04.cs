@@ -72,6 +72,12 @@ public class Day_04 : DayBase
         // voice instead of a tutorial beat.
         TimecardMachine.OnClockInServer += OnPlayerClockedInServer;
 
+        // Defer the automatic Day 4 mail delivery — mirrors Day 2's SortMailTask.DeferAutoTriggerForDay
+        // usage (see Day_02.DayActivated) — so it never appears before the player has actually
+        // clocked in. Released in OnPlayerClockedInServer below. Must be set here rather than later,
+        // since CampaignManager calls DayActivated before OnDayChanged.
+        SortMailTask.DeferAutoTriggerForDay = 4;
+
         // Fires on ALL clients the instant Day 4's breach alarm starts (see
         // MutantBreachManager.OnBreachStartedAllClients) — only Day 4 reacts to it, since only
         // Day_04 is subscribed while Day 4 is active.
@@ -95,8 +101,10 @@ public class Day_04 : DayBase
 
     /// <summary>
     /// Fired on the server by <see cref="TimecardMachine.OnClockInServer"/> the instant the
-    /// player punches in for Day 4. Self-unsubscribes, then plays the new voice's megaphone
-    /// announcement using an alternate voice so it's audibly distinct from Vlad's usual bark.
+    /// player punches in for Day 4. Self-unsubscribes, releases the mail delivery deferred in
+    /// <see cref="DayActivated"/> (see <see cref="SortMailTask.DeferAutoTriggerForDay"/>), then
+    /// plays the new voice's megaphone announcement using an alternate voice so it's audibly
+    /// distinct from Vlad's usual bark.
     /// </summary>
     private void OnPlayerClockedInServer()
     {
@@ -104,6 +112,15 @@ public class Day_04 : DayBase
 
         if (this == null) return;
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        // Release Day 4's mail delivery now that the player has actually clocked in. Mirrors
+        // Day_02.DebugSkipOpening's handling: if OnDayChanged hasn't consumed the deferral yet,
+        // clear the flag so the normal automatic trigger fires it; otherwise it's already been
+        // deferred and is waiting on this manual call.
+        if (SortMailTask.DeferAutoTriggerForDay == 4)
+            SortMailTask.DeferAutoTriggerForDay = -1;
+        else
+            SortMailTask.Instance?.TriggerDeferredDelivery();
 
         if (_newVoiceAnnouncementDialogue == null)
         {

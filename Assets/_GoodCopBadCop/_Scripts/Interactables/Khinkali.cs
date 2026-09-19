@@ -14,6 +14,12 @@ public class Khinkali : PickableObject
     // Spoilage - server only
 
     /// <summary>
+    /// When false (default), the Khinkali never spoils - the fridge/shift-end
+    /// rotting sequence is fully disabled. Enable to restore the old behaviour.
+    /// </summary>
+    [SerializeField] private bool enableSpoilage = false;
+
+    /// <summary>
     /// How close (in world units) the Khinkali must be to a MiniFridge centre for it
     /// to count as being stored inside it when the shift ends.
     /// </summary>
@@ -52,7 +58,7 @@ public class Khinkali : PickableObject
         // Snap late-joining clients to the correct visual state.
         ApplySpoiledVisuals(_isSpoiled.Value);
 
-        if (IsServer && ShiftManager.Instance != null)
+        if (enableSpoilage && IsServer && ShiftManager.Instance != null)
             ShiftManager.Instance.OnShiftEnd += OnShiftEnded;
     }
 
@@ -62,7 +68,7 @@ public class Khinkali : PickableObject
 
         _isSpoiled.OnValueChanged -= OnSpoiledChanged;
 
-        if (IsServer && ShiftManager.Instance != null)
+        if (enableSpoilage && IsServer && ShiftManager.Instance != null)
             ShiftManager.Instance.OnShiftEnd -= OnShiftEnded;
     }
 
@@ -101,6 +107,7 @@ public class Khinkali : PickableObject
     /// </summary>
     private void OnShiftEnded()
     {
+        if (!enableSpoilage) return;
         if (_isSpoiled.Value) return;
         if (IsHeld) return;
 

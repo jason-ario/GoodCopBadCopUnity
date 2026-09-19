@@ -18,6 +18,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<int> CrouchModeChanged { get; }
         Observable<int> SprintModeChanged { get; }
         Observable<bool> RunningEffectsEnabledChanged { get; }
+        Observable<bool> HeadBobEnabledChanged { get; }
+        Observable<bool> CameraShakeEnabledChanged { get; }
         Observable<float> MasterVolumeChanged { get; }
         Observable<float> MusicVolumeChanged { get; }
         Observable<float> SfxVolumeChanged { get; }
@@ -41,6 +43,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void SetCrouchModeValue(int value);
         void SetSprintModeValue(int value);
         void SetRunningEffectsEnabledValue(bool value);
+        void SetHeadBobEnabledValue(bool value);
+        void SetCameraShakeEnabledValue(bool value);
         void SetMasterVolumeValue(float value);
         void SetMusicVolumeValue(float value);
         void SetSfxVolumeValue(float value);
@@ -78,6 +82,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             CrouchMode,
             SprintMode,
             RunningEffectsEnabled,
+            HeadBobEnabled,
+            CameraShakeEnabled,
             VoiceChatEnabled,
             VoiceChatMuted,
             VoiceChatDeafened,
@@ -177,8 +183,16 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             SettingsMenuControlDefinition.Dropdown("Language", new[] { "English" }, interactable: false),
             SettingsMenuControlDefinition.Dropdown("Subtitles", OffOnOptions, defaultOptionIndex: 1, interactable: false),
-            SettingsMenuControlDefinition.Dropdown("Camera Shake", OffOnOptions, defaultOptionIndex: 1, interactable: false),
-            SettingsMenuControlDefinition.Dropdown("Head Bob", OffOnOptions, defaultOptionIndex: 1, interactable: false),
+            SettingsMenuControlDefinition.Dropdown(
+                "Camera Shake",
+                OffOnOptions,
+                defaultOptionIndex: 1,
+                option: ESettingsMenuControlOption.CameraShakeEnabled),
+            SettingsMenuControlDefinition.Dropdown(
+                "Head Bob",
+                OffOnOptions,
+                defaultOptionIndex: 1,
+                option: ESettingsMenuControlOption.HeadBobEnabled),
             SettingsMenuControlDefinition.Dropdown(
                 "Running Effects",
                 OffOnOptions,
@@ -287,6 +301,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private TMP_Dropdown crouchModeDropdown;
         private TMP_Dropdown sprintModeDropdown;
         private TMP_Dropdown runningEffectsEnabledDropdown;
+        private TMP_Dropdown headBobEnabledDropdown;
+        private TMP_Dropdown cameraShakeEnabledDropdown;
         private TMP_Dropdown voiceChatEnabledDropdown;
         private TMP_Dropdown voiceChatMutedDropdown;
         private TMP_Dropdown voiceChatDeafenedDropdown;
@@ -301,6 +317,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<int> crouchModeChanged = new();
         private readonly Subject<int> sprintModeChanged = new();
         private readonly Subject<bool> runningEffectsEnabledChanged = new();
+        private readonly Subject<bool> headBobEnabledChanged = new();
+        private readonly Subject<bool> cameraShakeEnabledChanged = new();
         private readonly Subject<float> masterVolumeChanged = new();
         private readonly Subject<float> musicVolumeChanged = new();
         private readonly Subject<float> sfxVolumeChanged = new();
@@ -324,6 +342,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<int> CrouchModeChanged => crouchModeChanged;
         public Observable<int> SprintModeChanged => sprintModeChanged;
         public Observable<bool> RunningEffectsEnabledChanged => runningEffectsEnabledChanged;
+        public Observable<bool> HeadBobEnabledChanged => headBobEnabledChanged;
+        public Observable<bool> CameraShakeEnabledChanged => cameraShakeEnabledChanged;
         public Observable<float> MasterVolumeChanged => masterVolumeChanged;
         public Observable<float> MusicVolumeChanged => musicVolumeChanged;
         public Observable<float> SfxVolumeChanged => sfxVolumeChanged;
@@ -444,6 +464,16 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetRunningEffectsEnabledValue(bool value)
         {
             SetDropdownValue(runningEffectsEnabledDropdown, value ? 1 : 0);
+        }
+
+        public void SetHeadBobEnabledValue(bool value)
+        {
+            SetDropdownValue(headBobEnabledDropdown, value ? 1 : 0);
+        }
+
+        public void SetCameraShakeEnabledValue(bool value)
+        {
+            SetDropdownValue(cameraShakeEnabledDropdown, value ? 1 : 0);
         }
 
         public void SetMasterVolumeValue(float value)
@@ -1036,6 +1066,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case ESettingsMenuControlOption.RunningEffectsEnabled:
                     runningEffectsEnabledDropdown = dropdown;
                     break;
+                case ESettingsMenuControlOption.HeadBobEnabled:
+                    headBobEnabledDropdown = dropdown;
+                    break;
+                case ESettingsMenuControlOption.CameraShakeEnabled:
+                    cameraShakeEnabledDropdown = dropdown;
+                    break;
                 case ESettingsMenuControlOption.VoiceChatEnabled:
                     voiceChatEnabledDropdown = dropdown;
                     break;
@@ -1078,6 +1114,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
                     break;
                 case ESettingsMenuControlOption.RunningEffectsEnabled:
                     dropdown.onValueChanged.AddListener(value => runningEffectsEnabledChanged.OnNext(value != 0));
+                    break;
+                case ESettingsMenuControlOption.HeadBobEnabled:
+                    dropdown.onValueChanged.AddListener(value => headBobEnabledChanged.OnNext(value != 0));
+                    break;
+                case ESettingsMenuControlOption.CameraShakeEnabled:
+                    dropdown.onValueChanged.AddListener(value => cameraShakeEnabledChanged.OnNext(value != 0));
                     break;
                 case ESettingsMenuControlOption.VoiceChatEnabled:
                     dropdown.onValueChanged.AddListener(value => voiceChatEnabledChanged.OnNext(value != 0));

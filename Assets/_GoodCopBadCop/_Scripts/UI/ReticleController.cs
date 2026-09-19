@@ -6,9 +6,22 @@ using UnityEngine.UI;
 public class ReticleController : MonoBehaviour
 {
     public Image reticle;
-    public Color normalColor = Color.white;
-    public Color interactColor = Color.green;
-    public Color tooFarColor = Color.red;
+
+    [Header("Colors")]
+    [Tooltip("Nothing interactable and no weapon target under the reticle.")]
+    public Color normalColor = new Color(0.6f, 0.6f, 0.6f, 0.4f);
+
+    [Tooltip("Aiming at an interactable that is within interaction range.")]
+    public Color interactColor = new Color(1f, 1f, 1f, 1f);
+
+    [Tooltip("Aiming at an interactable that is out of interaction range.")]
+    public Color interactOutOfRangeColor = new Color(1f, 1f, 1f, 0.4f);
+
+    [Tooltip("Holding a weapon and aiming at a living enemy that is within the weapon's attack range.")]
+    public Color enemyColor = new Color(1f, 0f, 0f, 1f);
+
+    [Tooltip("Holding a weapon and aiming at a living enemy that is out of the weapon's attack range.")]
+    public Color enemyOutOfRangeColor = new Color(1f, 0f, 0f, 0.4f);
 
     public float normalScale = 1f;
     public float interactScale = 1.3f;
@@ -32,6 +45,8 @@ public class ReticleController : MonoBehaviour
 
     private bool canInteract = false;
     private bool isTooFar = false;
+    private bool isEnemyTarget = false;
+    private bool isEnemyInRange = false;
 
     private void OnEnable()
     {
@@ -52,14 +67,19 @@ public class ReticleController : MonoBehaviour
         Color targetColor = normalColor;
         float targetScale = normalScale;
 
-        if (canInteract)
+        if (isEnemyTarget)
+        {
+            targetColor = isEnemyInRange ? enemyColor : enemyOutOfRangeColor;
+            targetScale = interactScale;
+        }
+        else if (canInteract)
         {
             targetColor = interactColor;
             targetScale = interactScale;
         }
         else if (isTooFar)
         {
-            targetColor = tooFarColor;
+            targetColor = interactOutOfRangeColor;
             targetScale = interactScale;
         }
 
@@ -85,8 +105,30 @@ public class ReticleController : MonoBehaviour
     public void SetInteractState(bool state, string text = "", bool useKeyPrompt = false, bool showButtonTooltip = true, bool showHint = false)
     {
         canInteract = state;
-        if (state) isTooFar = false;
+        if (state)
+        {
+            isTooFar = false;
+            isEnemyTarget = false;
+        }
         SetHintVisible(showHint, text);
+    }
+
+    /// <summary>
+    /// Marks the reticle as aiming at a living enemy while the player is holding a weapon
+    /// capable of hurting it. Takes priority over the interact/too-far states while active.
+    /// </summary>
+    /// <param name="state">Whether a valid weapon target is under the reticle.</param>
+    /// <param name="inRange">Whether the target is within the held weapon's attack range.</param>
+    public void SetEnemyState(bool state, bool inRange = false)
+    {
+        isEnemyTarget = state;
+        isEnemyInRange = inRange;
+        if (state)
+        {
+            canInteract = false;
+            isTooFar = false;
+            SetHintVisible(false);
+        }
     }
 
     /// <summary>Hides the reticle entirely.</summary>
@@ -111,6 +153,7 @@ public class ReticleController : MonoBehaviour
         if (state)
         {
             canInteract = false;
+            isEnemyTarget = false;
             SetHintVisible(false);
         }
     }

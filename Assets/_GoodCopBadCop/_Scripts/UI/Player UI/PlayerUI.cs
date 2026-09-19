@@ -25,9 +25,46 @@ public class PlayerUI : MonoBehaviour
     [Tooltip("Helper icon shown while the local player is wearing the radiation mask.")]
     [SerializeField] private GameObject _maskHelperIcon;
 
+    private PlayerPickupController _pickupController;
+    private InternalBattery _currentBattery;
+
     private void Awake()
     {
         Instance = this;
+    }
+
+    private void OnEnable()
+    {
+        _batteryBar?.Hide();
+        TrySubscribeToPickupController();
+    }
+
+    private void Update()
+    {
+        // Poll until PlayerInstance is available (it sets itself in OnNetworkSpawn).
+        if (_pickupController == null)
+        {
+            TrySubscribeToPickupController();
+            return;
+        }
+
+        // While an item with a battery is held, keep the fill amount live as it drains/recharges.
+        if (_currentBattery != null)
+        {
+            _batteryBar?.UpdateBar(_currentBattery);
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (_pickupController != null)
+        {
+            _pickupController.OnHeldObjectChanged -= OnHeldObjectChanged;
+            _pickupController = null;
+        }
+
+        _currentBattery = null;
+        _batteryBar?.Hide();
     }
 
     /// <summary>Shows or hides the radiation mask helper icon.</summary>
@@ -35,5 +72,33 @@ public class PlayerUI : MonoBehaviour
     {
         if (_maskHelperIcon != null)
             _maskHelperIcon.SetActive(visible);
+    }
+
+    // ── Battery bar wiring ───────────────────────────────────────────────────
+
+    private void TrySubscribeToPickupController()
+    {
+        if (PlayerInstance.Instance?.PlayerPickupController == null) return;
+
+        _pickupController = PlayerInstance.Instance.PlayerPickupController;
+        _pickupController.OnHeldObjectChanged += OnHeldObjectChanged;
+
+        // Sync immediately in case an item is already held when this UI first activates.
+        OnHeldObjectChanged(_pickupController.HeldObject);
+    }
+
+    private void OnHeldObjectChanged(PickableObject heldObject)
+    {
+        _currentBattery = heldObject != null ? heldObject.GetComponent<InternalBattery>() : null;
+
+        if (_currentBattery != null)
+        {
+            _batteryBar?.UpdateBar(_currentBattery);
+            _batteryBar?.Show();
+        }
+        else
+        {
+            _batteryBar?.Hide();
+        }
     }
 }

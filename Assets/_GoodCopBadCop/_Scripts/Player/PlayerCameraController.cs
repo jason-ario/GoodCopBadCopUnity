@@ -46,6 +46,7 @@ public class PlayerCameraController : MonoBehaviour
 
     private CinemachineCameraFeedbackExtension _cameraFeedbackExtension;
     private CinemachineBasicMultiChannelPerlin _perlin;
+    private CinemachineImpulseListener _impulseListener;
     private Sequence _swaySequence;
     private Sequence _cameraKickSequence;
     private Vector3 _swayEulerOffset;
@@ -62,6 +63,8 @@ public class PlayerCameraController : MonoBehaviour
     private Tween _runningShakeTween;
     private float _shakeBlend;
     private bool _rumbleActive;
+    private bool _headBobEnabled = true;
+    private bool _cameraShakeEnabled = true;
     private float _defaultNearClipPlane;
     private bool _nearClipPlaneCached;
 
@@ -154,6 +157,19 @@ public class PlayerCameraController : MonoBehaviour
             .SetEase(Ease.OutSine)
             .SetUpdate(true)
             .SetTarget(this);
+    }
+
+    /// <summary>
+    /// Enables or disables the idle/running camera noise ("head bob"), e.g. from the Gameplay
+    /// settings menu. Does not affect the dedicated rumble effect (see TurnOnRumble).
+    /// </summary>
+    public void SetHeadBobEnabled(bool isEnabled)
+    {
+        if (_headBobEnabled == isEnabled)
+            return;
+
+        _headBobEnabled = isEnabled;
+        SetShakeBlend(_shakeBlend);
     }
 
     private void SetRunningFieldOfViewOffset(float offset)
@@ -270,6 +286,13 @@ public class PlayerCameraController : MonoBehaviour
         if (perlin == null)
             return;
 
+        if (!_headBobEnabled)
+        {
+            perlin.AmplitudeGain = 0f;
+            perlin.FrequencyGain = 0f;
+            return;
+        }
+
         perlin.AmplitudeGain = Mathf.Lerp(amplitudeGainNormal, amplitudeGainRunning, blend);
         perlin.FrequencyGain = Mathf.Lerp(frequencyGainNormal, frequencyGainRunning, blend);
     }
@@ -280,6 +303,28 @@ public class PlayerCameraController : MonoBehaviour
             _perlin = camera.GetComponent<CinemachineBasicMultiChannelPerlin>();
 
         return _perlin;
+    }
+
+    private CinemachineImpulseListener GetImpulseListener()
+    {
+        if (_impulseListener == null && camera != null)
+            _impulseListener = camera.GetComponent<CinemachineImpulseListener>();
+
+        return _impulseListener;
+    }
+
+    /// <summary>
+    /// Enables or disables camera reaction to Cinemachine impulse signals (weapon fire, impacts,
+    /// interactable events, etc.), e.g. from the Gameplay settings menu. Does not affect weapon
+    /// aim recoil, which is a core gunplay mechanic rather than decorative shake.
+    /// </summary>
+    public void SetCameraShakeEnabled(bool isEnabled)
+    {
+        _cameraShakeEnabled = isEnabled;
+
+        CinemachineImpulseListener impulseListener = GetImpulseListener();
+        if (impulseListener != null)
+            impulseListener.Gain = isEnabled ? 1f : 0f;
     }
 
     /// <summary>Enables or disables the Cinemachine virtual camera.</summary>

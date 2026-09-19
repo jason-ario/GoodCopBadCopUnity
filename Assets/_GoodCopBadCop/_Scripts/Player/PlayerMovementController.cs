@@ -686,7 +686,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         }
 
         if (_playerCameraController != null)
+        {
             _playerCameraController.SetRunningEffectsEnabled(settings.RunningEffectsEnabled);
+            _playerCameraController.SetHeadBobEnabled(settings.HeadBobEnabled);
+            _playerCameraController.SetCameraShakeEnabled(settings.CameraShakeEnabled);
+        }
     }
 
     public void SetCanControl(bool value)

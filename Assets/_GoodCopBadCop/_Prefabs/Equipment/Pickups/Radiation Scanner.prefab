@@ -123,6 +123,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7695398724750281573, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2452897288980540962}
+    - targetCorrespondingSourceObject: {fileID: 7695398724750281573, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6861630121311051722}
     - targetCorrespondingSourceObject: {fileID: 639363113693363390, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1590931603433180636}
@@ -160,10 +163,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 3755298264
   InScenePlacedSourceGlobalObjectIdHash: 3755298264
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -189,6 +194,8 @@ MonoBehaviour:
   interactText: Geiger Counter
   highlightNameFilter: 
   itemData: {fileID: 11400000, guid: 6a1a2824fbdfaf34c85385d034e46c27, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
   maxDistance: 3
   geigerNeedle: {fileID: 1062937157706833625}
   baselineRadiation: 5
@@ -196,6 +203,12 @@ MonoBehaviour:
   falloffSpeed: 180
   rereadInterval: 0.15
   readingJitter: 4
+  chaosRadiationRateThreshold: 0.3
+  chaosMinReading: 90
+  chaosMaxReading: 170
+  chaosJitter: 25
+  chaosRampSpeed: 600
+  chaosRerollInterval: 0.06
 --- !u!114 &1308897075231661948
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -550,7 +563,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InternalBattery
   ShowTopMostFoldoutHeaderGroup: 1
   maxBatteryCapacity: 1
-  batteryDrainRate: 0.01
+  batteryDrainRate: 0.005
+--- !u!114 &6861630121311051722
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4549720314701780645}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
 --- !u!1 &6716889623341015422 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 639363113693363390, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}

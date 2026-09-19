@@ -21,12 +21,18 @@ using UnityEngine.InputSystem;
 ///
 /// While the wheel is open, movement, look rotation, and interaction are locked
 /// (mirrors the pause menu / guidebook pattern), and restored when it closes.
+///
+/// Opening is only allowed while the player can otherwise interact with the world
+/// (<see cref="PlayerInteractionController.CanInteract"/>, and not mid-dialogue via
+/// <see cref="DialogueChoiceSystem.IsInDialogueMode"/> / <see cref="ScriptedDialogueRunner.IsScriptedModeActive"/>).
+/// If any of these become true while the wheel is already open, it force-closes immediately.
 /// </summary>
 public class EmoteInputController : MonoBehaviour
 {
-    private PlayerAnimationController   _animController;
-    private PlayerInstance              _playerInstance;
-    private PlayerMovementController    _movementController;
+    private PlayerAnimationController    _animController;
+    private PlayerInstance               _playerInstance;
+    private PlayerMovementController     _movementController;
+    private PlayerInteractionController  _interactionController;
 
     private bool      _wheelOpen       = false;
     private bool      _isEmoting       = false;
@@ -36,9 +42,10 @@ public class EmoteInputController : MonoBehaviour
 
     private void Awake()
     {
-        _animController     = GetComponent<PlayerAnimationController>();
-        _playerInstance     = GetComponent<PlayerInstance>();
-        _movementController = GetComponent<PlayerMovementController>();
+        _animController        = GetComponent<PlayerAnimationController>();
+        _playerInstance        = GetComponent<PlayerInstance>();
+        _movementController    = GetComponent<PlayerMovementController>();
+        _interactionController = GetComponent<PlayerInteractionController>();
     }
 
     private void Start()
@@ -63,6 +70,14 @@ public class EmoteInputController : MonoBehaviour
         if (PlayerInstance.Instance != _playerInstance) return;
         if (UIController.Instance != null && UIController.Instance.IsPaused) return;
 
+        // The emote wheel is only allowed while the player can otherwise interact with the
+        // world. This covers dialogue (interview mode drives CanInteract false via
+        // SetSuspectCamMode), scripted cutscenes, and any other system that disables
+        // PlayerInteractionController via SetCanInteract(false).
+        bool interactAllowed = (_interactionController == null || _interactionController.CanInteract)
+                                && !DialogueChoiceSystem.IsInDialogueMode
+                                && !ScriptedDialogueRunner.IsScriptedModeActive;
+
         // Opening requires a fresh press edge, so re-clicking an emote while the open input is
         // still physically held won't immediately reopen a wheel that was just closed.
         bool openPressed = RebindableInput.GetKeyDown(GameAction.OpenEmotes) || (Gamepad.current?.dpad.up.wasPressedThisFrame ?? false);
@@ -75,10 +90,12 @@ public class EmoteInputController : MonoBehaviour
         // because a "key up"/"released" event never fired.
         bool openHeld = RebindableInput.GetKeyHeld(GameAction.OpenEmotes) || (Gamepad.current?.dpad.up.isPressed ?? false);
 
-        if (!_isEmoting && openPressed)
+        if (!_isEmoting && interactAllowed && openPressed)
             OpenWheel();
 
-        if (_wheelOpen && !openHeld)
+        // If interaction becomes disabled while the wheel is already open (e.g. a dialogue
+        // starts mid-hold), force it closed immediately rather than waiting for key release.
+        if (_wheelOpen && (!openHeld || !interactAllowed))
             CloseWheel();
     }
 

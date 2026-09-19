@@ -417,6 +417,7 @@ public class UIController : MonoBehaviour
     {
         UIController.Instance.ShowCursor();
         startShiftScreen.SetActive(true);
+        playerUI.SetActive(false);
         PlayerInstance.Instance.OpenedUIPanel();
     }
     
