@@ -2,15 +2,9 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// Consolidated top-right HUD sidebar. Merges what used to be three separate widgets — the
-/// "CURRENT ORDERS" checklist (<see cref="TutorialObjectiveList"/>), the checkpoint maintenance
-/// readout (<see cref="CheckpointMaintenanceHUD"/>), and an "OPTIONAL" side-task list
-/// (<see cref="OptionalTaskSection"/>) — into one panel that expands/collapses on TAB.
-///
-/// Expanded: the full "TASKS" panel (current orders, maintenance progress, optional tasks) is
-/// shown beneath the always-visible checkpoint integrity header.
-/// Collapsed: only the checkpoint integrity header remains, plus a small "TAB" hint and a
-/// badge showing the total number of incomplete tasks across all three sections.
+/// Legacy task-sidebar controller retained for serialized prefab compatibility.
+/// The HUD now presents active tasks exclusively through <see cref="TutorialObjectiveList"/>
+/// as a title-free list, so this sidebar is disabled at startup.
 /// </summary>
 public class HUDSidebarController : MonoBehaviour
 {
@@ -51,6 +45,7 @@ public class HUDSidebarController : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        gameObject.SetActive(false);
     }
 
     private void OnDestroy()

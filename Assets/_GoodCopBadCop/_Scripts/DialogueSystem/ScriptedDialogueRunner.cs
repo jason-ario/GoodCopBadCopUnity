@@ -90,9 +90,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     [Header("Proximity Join")]
     [Tooltip("Distance (world units) from the speaker within which a player is automatically " +
-             "included as a required participant in the advance and choice gates. Players who " +
-             "walk into range mid-dialogue are late-joined: their movement locks and suspect " +
-             "cam activates, and they are added to the gate from the next line onward.")]
+             "included as a required participant in standard scripted dialogue. Optional suspect " +
+             "intros disable proximity joining: the other player joins only by interacting with the suspect.")]
     [SerializeField] private float _joinRadius = 5f;
 
     // -------------------------------------------------------------------------
@@ -109,6 +108,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     private readonly Dictionary<ulong, int> _choiceSubmissions = new();
     private readonly Dictionary<ulong, string> _choicePlayerNames = new();
+    private string[] _activeChoiceTexts;
     private bool _choiceResolved;
     private int _resolvedChoiceIndex;
     private Coroutine _choiceTimerCoroutine;
@@ -134,6 +134,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     // Transform of the current NPC speaker — used for server-side proximity checks.
     private Transform _currentSpeakerTransform;
+
+    // Per-sequence participation policy. Optional suspect intros seed only the interacting
+    // player, do not proximity-join the co-op partner, and let either participant back out.
+    private bool _joinByInteractionOnly;
+    private bool _allowParticipantExit;
+    private bool _hideNonParticipantUI;
 
     // Throttle for the per-frame proximity scan — removed; cost is negligible for 2 players.
 
@@ -259,7 +265,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </para>
     /// </summary>
     public void PlayDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
-        Action onComplete = null, bool deferExit = false, bool lockOutsidePlayers = false)
+        Action onComplete = null, bool deferExit = false, bool lockOutsidePlayers = false,
+        ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
+        bool allowParticipantExit = false, bool hideNonParticipantUI = true)
     {
         if (!IsServer) return;
 
@@ -271,7 +279,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        StartCoroutine(RunDialogue(speaker, dialogue, onComplete, deferExit, lockOutsidePlayers));
+        StartCoroutine(RunDialogue(
+            speaker,
+            dialogue,
+            onComplete,
+            deferExit,
+            lockOutsidePlayers,
+            initialParticipantClientId,
+            joinByInteractionOnly,
+            allowParticipantExit,
+            hideNonParticipantUI));
     }
 
     /// <summary>
@@ -299,12 +316,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         ulong speakerNetId = _currentSpeakerTransform != null
             ? _currentSpeakerTransform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0UL
             : 0UL;
+        ClientRpcParams exitRecipients = _hideNonParticipantUI
+            ? default
+            : BuildParticipantRpcParams();
         _currentSpeakerTransform = null;
         _participants.Clear();
         _leftParticipants.Clear();
+        _joinByInteractionOnly = false;
+        _allowParticipantExit = false;
+        _hideNonParticipantUI = true;
         HideInWorldSubtitleClientRpc(speakerNetId);
         SetActiveDialogueSpeakerClientRpc(0);
-        ExitScriptedModeClientRpc();
+        ExitScriptedModeClientRpc(false, exitRecipients);
     }
 
     /// <summary>
@@ -471,13 +494,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     private IEnumerator RunDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
-        Action onComplete, bool deferExit = false, bool lockOutsidePlayers = false)
+        Action onComplete, bool deferExit = false, bool lockOutsidePlayers = false,
+        ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
+        bool allowParticipantExit = false, bool hideNonParticipantUI = true)
     {
         ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
 
         Debug.Log($"[ScriptedDialogueRunner] RunDialogue — IsSpawned={IsSpawned}, IsServer={IsServer}, speakerNetId={speakerNetId}, deferExit={deferExit}");
 
         _lastAnimTrigger = string.Empty;
+        _joinByInteractionOnly = joinByInteractionOnly;
+        _allowParticipantExit = allowParticipantExit;
+        _hideNonParticipantUI = hideNonParticipantUI;
 
         // Set the server-side flag immediately so CheckProximityJoins works even if the
         // host client is not a participant (targeted RPCs won't reach a non-participant host).
@@ -488,16 +516,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         SetActiveDialogueSpeakerClientRpc(speakerNetId);
 
         // Seed the participant set before broadcasting EnterScriptedMode so the advance
-        // gate is correct from the very first line.
+        // gate is correct from the very first line. Optional suspect intros seed only the
+        // player who interacted; their partner can join later by interacting with the suspect.
         _currentSpeakerTransform = speaker.transform;
-        SeedParticipants(lockOutsidePlayers);
+        SeedParticipants(lockOutsidePlayers, initialParticipantClientId);
 
-        // Target EnterScriptedMode to participants only — far-away players should NOT be
-        // pulled into scripted mode until they walk within _joinRadius (LateJoinClientRpc).
-        // Player UI is broadcast to ALL clients so the HUD never overlaps a cutscene shot,
-        // even for non-participants who won't receive EnterScriptedModeClientRpc.
-        SetPlayerUIVisibleClientRpc(false);
-        EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers, BuildParticipantRpcParams());
+        // Standard cutscenes hide the HUD for everyone. Optional suspect intros leave the
+        // non-participant's HUD and controls intact while subtitle RPCs keep them informed.
+        if (_hideNonParticipantUI)
+            SetPlayerUIVisibleClientRpc(false);
+        EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers, _allowParticipantExit, BuildParticipantRpcParams());
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)
@@ -531,14 +559,24 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // or PlayMegaphoneDialogue (which exits mode when it completes).
         if (!deferExit)
         {
+            // Optional suspect intros leave non-participants free. Capture the participant
+            // targets before clearing the server set so only actual participants have their
+            // camera, interaction state, and Back button restored on completion.
+            ClientRpcParams exitRecipients = _hideNonParticipantUI
+                ? default
+                : BuildParticipantRpcParams();
+
             // Clear the server-side flag before the client RPC so CheckProximityJoins stops.
             IsScriptedModeActive = false;
             _currentSpeakerTransform = null;
             _participants.Clear();
             _leftParticipants.Clear();
+            _joinByInteractionOnly = false;
+            _allowParticipantExit = false;
+            _hideNonParticipantUI = true;
             HideInWorldSubtitleClientRpc(speakerNetId);
             SetActiveDialogueSpeakerClientRpc(0);
-            ExitScriptedModeClientRpc(lockOutsidePlayers);
+            ExitScriptedModeClientRpc(lockOutsidePlayers, exitRecipients);
             yield return null;
         }
 
@@ -665,10 +703,17 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </list>
     /// Must be called on the server.
     /// </summary>
-    private void SeedParticipants(bool lockOutsidePlayers = false)
+    private void SeedParticipants(bool lockOutsidePlayers = false, ulong initialParticipantClientId = ulong.MaxValue)
     {
         _participants.Clear();
         _leftParticipants.Clear();
+
+        if (_joinByInteractionOnly && initialParticipantClientId != ulong.MaxValue)
+        {
+            _participants.Add(initialParticipantClientId);
+            Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — optional intro started by client {initialParticipantClientId}.");
+            return;
+        }
 
         // When all players are explicitly locked in, include everyone.
         if (lockOutsidePlayers || _currentSpeakerTransform == null)
@@ -708,7 +753,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </summary>
     private void CheckProximityJoins()
     {
-        if (_currentSpeakerTransform == null) return;
+        if (_joinByInteractionOnly || _currentSpeakerTransform == null) return;
 
         Vector3 speakerPos = _currentSpeakerTransform.position;
 
@@ -748,7 +793,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // correct camera before dialogue mode activates (avoids a one-frame camera pop).
         SetActiveOverrideCamClientRpc(_currentCameraKey, singleClientRpc);
 
-        LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, singleClientRpc);
+        LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, _allowParticipantExit, singleClientRpc);
+
+        // A player who joins while a response choice is open must receive the current panel,
+        // not wait until the next choice node to participate.
+        if (_awaitingScriptedChoice && _activeChoiceTexts != null && _activeChoiceTexts.Length >= 2)
+            ShowChoicesClientRpc(_activeChoiceTexts[0], _activeChoiceTexts[1], singleClientRpc);
 
         // If everyone had left and the in-world subtitle bubbles were showing, hide the
         // suspect's bubble now that a normal participant is back — future lines resume the
@@ -770,7 +820,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void LeaveScriptedDialogueServerRpc(ServerRpcParams rpcParams = default)
     {
-        if (!IsScriptedModeActive) return;
+        if (!IsScriptedModeActive || !_allowParticipantExit) return;
 
         ulong senderId = rpcParams.Receive.SenderClientId;
         if (!_participants.Contains(senderId)) return;
@@ -914,7 +964,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </para>
     /// </summary>
     [ClientRpc]
-    private void LateJoinClientRpc(ulong speakerNetId, bool isWaitingForInput, ClientRpcParams rpcParams = default)
+    private void LateJoinClientRpc(ulong speakerNetId, bool isWaitingForInput, bool canLeave,
+        ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = true;
         _clientIsWaitingForInput = isWaitingForInput;
@@ -927,6 +978,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         if (speakerNetId != 0 &&
             NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
             lookTarget = netObj.transform;
+
+        if (canLeave)
+            UIController.Instance?.ShowBackButton(() => LeaveScriptedDialogueServerRpc());
 
         // Mirror EnterScriptedModeClientRpc: outside players get movement-locked but must NOT
         // receive the booth suspect-cam activation. Calling EnterScriptedDialogueMode for an
@@ -1044,10 +1098,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _choiceResolved = false;
         _resolvedChoiceIndex = -1;
         _awaitingScriptedChoice = true;
-        ShowChoicesClientRpc(node.choices[0].playerChoiceText, node.choices[1].playerChoiceText, BuildParticipantRpcParams());
+        _activeChoiceTexts = new[] { node.choices[0].playerChoiceText, node.choices[1].playerChoiceText };
+        ShowChoicesClientRpc(_activeChoiceTexts[0], _activeChoiceTexts[1], BuildParticipantRpcParams());
 
         yield return new WaitUntil(() => _choiceResolved);
         _awaitingScriptedChoice = false;
+        _activeChoiceTexts = null;
 
         // Broadcast the finalized choice: hide the panel, clear highlights, and show the
         // winning player's spoken line as a subtitle on all clients.
@@ -1135,7 +1191,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
+    private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false,
+        bool canLeave = false, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = true;
 
@@ -1172,6 +1229,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
             lookTarget = netObj.transform;
 
+        if (canLeave)
+            UIController.Instance?.ShowBackButton(() => LeaveScriptedDialogueServerRpc());
+
         if (PlayerInstance.Instance.IsOutsideLocal)
         {
             // Outside players get movement-locked when explicitly requested, but never get the
@@ -1186,7 +1246,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void ExitScriptedModeClientRpc(bool lockOutsidePlayers = false)
+    private void ExitScriptedModeClientRpc(bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = false;
 

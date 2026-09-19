@@ -692,6 +692,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 : Quaternion.FromToRotation(Vector3.up, hit.normal);
 
         Vector3 targetPosition = placementSlot != null ? placementSlot.SnapPoint.position : hit.point;
+        ObjectPlacer.Instance.SetPendingTargetRotation(targetRotation);
 
         reticle.SetInteractState(false);
 

@@ -12,53 +12,61 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
   m_Name: SandroFullMutantDialogue
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 1
   nodes:
   - type: 0
-    npcLine: The light is extraordinary right now. You should see it from — from where
-      I am. It's been setting for months. The same sunset, for months.
+    npcLine: "The light is extraordinary right now. You should see it from \u2014 from where I am. It's been setting for months. The same sunset, for months."
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: I've been trying to come back. The road keeps going. I follow it. It's
-      a very good road.
+    npcLine: I've been trying to come back. The road keeps going. I follow it. It's a very good road.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: "Sorry \u2014 I was talking to someone. He says you should be careful.
-      I agree with him. He's been right about most things so far."
+    npcLine: "Sorry \u2014 I was talking to someone. He says you should be careful. I agree with him. He's been right about most things so far."
     animationTrigger: TalkIdle
     cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: I wrote you something. I don't remember writing it. Here. In case you
-      need it later.
+    npcLine: I wrote you something. I don't remember writing it. Here. In case you need it later.
     animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: Don't be sad about it. It's very beautiful where I am. Very quiet. You'll
-      understand eventually.
+    npcLine: Don't be sad about it. It's very beautiful where I am. Very quiet. You'll understand eventually.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Sandro, come back.
-      npcResponse: I would if I could find the road back. I've been looking. It doesn't
-        seem to go that direction.
+      npcResponse: I would if I could find the road back. I've been looking. It doesn't seem to go that direction.
       animationTrigger: TalkLookDown
+      playLaughSfx: 0
     - playerChoiceText: Who were you talking to?
-      npcResponse: I'm not entirely sure. He's been there the whole time. He says
-        hello. He says goodbye. He changes his mind a lot.
+      npcResponse: I'm not entirely sure. He's been there the whole time. He says hello. He says goodbye. He changes his mind a lot.
       animationTrigger: TalkLookAway
+      playLaughSfx: 0
   - type: 0
     npcLine: The light is extraordinary. I wish you could see it.
     animationTrigger: TalkLookAway
     cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []

@@ -4,10 +4,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Singleton controller for the tutorial objective list panel.
-/// Slides in from the right when the first objective of a sequence is added,
-/// shows strikethroughs as objectives are completed, then hides and destroys
-/// all items when the sequence ends via <see cref="HideAndClear"/>.
+/// Singleton controller for the active HUD objective rows.
+/// Displays the current objectives as an unobstructed list, and removes the list
+/// once its final row has been cleared.
 ///
 /// Typical usage per sequence:
 /// <code>
@@ -42,17 +41,10 @@ public class TutorialObjectiveList : MonoBehaviour
         private set => _instance = value;
     }
 
-    private static readonly int IsShowingHash = Animator.StringToHash("IsShowing");
-
     [Header("References")]
     [SerializeField] private GameObject objectiveListRoot;
-    [SerializeField] private Animator listAnimator;
     [SerializeField] private Transform taskListContainer;
     [SerializeField] private GameObject taskItemPrefab;
-
-    [Header("Settings")]
-    [Tooltip("Seconds to wait after triggering the hide animation before destroying all items.")]
-    [SerializeField] private float hideAnimDuration = 0.8f;
 
     [Header("Audio")]
     [Tooltip("Played once via SFXController whenever a new objective row is added to the list.")]
@@ -100,6 +92,7 @@ public class TutorialObjectiveList : MonoBehaviour
             return;
         }
         Instance = this;
+        ConfigurePlainList();
     }
 
     private void OnDisable()
@@ -125,8 +118,6 @@ public class TutorialObjectiveList : MonoBehaviour
 
     private void Start()
     {
-        // Clear design-time placeholder items then deactivate the card root.
-        // The root stays inactive until the first objective of a sequence is added.
         ClearAllItems();
         objectiveListRoot.SetActive(false);
     }
@@ -134,8 +125,7 @@ public class TutorialObjectiveList : MonoBehaviour
     // ── Public API ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Adds a new objective row to the list. Automatically slides the panel
-    /// in if it is not already visible.
+    /// Adds a new objective row and makes the list visible if needed.
     /// </summary>
     /// <returns>The created <see cref="TutorialObjectiveItem"/> handle, used to mark it complete later.</returns>
     public TutorialObjectiveItem AddObjective(string text)
@@ -206,7 +196,7 @@ public class TutorialObjectiveList : MonoBehaviour
     }
 
     /// <summary>
-    /// Hides the objective list with its slide-out animation, then destroys all items.
+    /// Hides the objective list and destroys all items.
     /// Safe to call when the list is not showing.
     ///
     /// WARNING: this unconditionally tears down every row in the shared list, including ones
@@ -217,7 +207,7 @@ public class TutorialObjectiveList : MonoBehaviour
     /// When a task may run alongside others, use <see cref="CompleteAndRemoveObjective"/> instead
     /// so finishing early doesn't hide a sibling task's still-active row.
     /// </summary>
-    /// <param name="preHideDelay">Seconds to pause before starting the hide animation, so completed tasks remain visible.</param>
+    /// <param name="preHideDelay">Seconds to keep completed rows visible before removing the list.</param>
     /// <param name="onComplete">Optional callback fired after items are destroyed.</param>
     public void HideAndClear(float preHideDelay = 0f, Action onComplete = null)
     {
@@ -245,13 +235,13 @@ public class TutorialObjectiveList : MonoBehaviour
     /// <summary>
     /// Marks <paramref name="item"/> complete and removes only that row, leaving every other
     /// concurrently-tracked objective (e.g. a sibling task's still-in-progress row) untouched.
-    /// The panel only plays its slide-out-and-hide animation once this was the LAST remaining
-    /// row — safe to use even while other tasks are still being tracked in the same shared list.
+    /// The list is removed once this was the LAST remaining row — safe to use even while
+    /// other tasks are still being tracked in the same shared list.
     /// Safe to call with a null <paramref name="item"/>.
     /// </summary>
     /// <param name="item">The objective row to complete and remove.</param>
-    /// <param name="preHideDelay">Seconds to pause after marking complete before the row (and, if last, the whole panel) actually hides.</param>
-    /// <param name="onComplete">Optional callback fired once the row (and panel, if applicable) has been removed.</param>
+    /// <param name="preHideDelay">Seconds to pause after marking complete before the row (and, if last, the list) is removed.</param>
+    /// <param name="onComplete">Optional callback fired once the row (and list, if applicable) has been removed.</param>
     /// <param name="markComplete">
     /// Whether to apply the strikethrough completion visual before removing. Pass <c>false</c> for
     /// rows that should simply disappear once no longer active (e.g. generic HUD task-list rows),
@@ -291,8 +281,7 @@ public class TutorialObjectiveList : MonoBehaviour
 
         HUDSidebarController.Instance?.RefreshBadge();
 
-        // Only slide the panel out and deactivate it once every tracked row is gone —
-        // other concurrently-tracked tasks may still have rows showing.
+        // Remove the list once every tracked row is gone; sibling tasks keep it visible.
         if (_items.Count == 0 && _isShowing)
         {
             _isShowing = false;
@@ -306,15 +295,33 @@ public class TutorialObjectiveList : MonoBehaviour
         }
     }
 
+    private void ConfigurePlainList()
+    {
+        if (objectiveListRoot == null) return;
+
+        if (objectiveListRoot.TryGetComponent(out UnityEngine.UI.Image background))
+            background.enabled = false;
+
+        Transform header = objectiveListRoot.transform.Find("Screens/Header");
+        if (header != null)
+            header.gameObject.SetActive(false);
+
+        if (taskListContainer is RectTransform listRect)
+        {
+            listRect.anchorMin = new Vector2(0f, 1f);
+            listRect.anchorMax = new Vector2(1f, 1f);
+            listRect.anchoredPosition = Vector2.zero;
+            listRect.sizeDelta = Vector2.zero;
+            listRect.pivot = new Vector2(0.5f, 1f);
+        }
+    }
+
     private void Show()
     {
         _isShowing = true;
         objectiveListRoot.SetActive(true);
-        listAnimator.SetBool(IsShowingHash, true);
         Debug.Log($"[TutorialObjectiveList] Show() — objectiveListRoot.activeSelf={objectiveListRoot.activeSelf}, " +
-                  $"activeInHierarchy={objectiveListRoot.activeInHierarchy}, listAnimator.enabled={listAnimator.enabled}, " +
-                  $"listAnimator.gameObject.activeInHierarchy={listAnimator.gameObject.activeInHierarchy}, " +
-                  $"runtimeAnimatorController={(listAnimator.runtimeAnimatorController != null ? listAnimator.runtimeAnimatorController.name : "NULL")}");
+                  $"activeInHierarchy={objectiveListRoot.activeInHierarchy}");
     }
 
     private IEnumerator HideAndClearRoutine(float preHideDelay, Action onComplete)
@@ -322,11 +329,6 @@ public class TutorialObjectiveList : MonoBehaviour
         // Let the player see completed tasks before hiding.
         if (preHideDelay > 0f)
             yield return new WaitForSeconds(preHideDelay);
-
-        listAnimator.SetBool(IsShowingHash, false);
-
-        // Wait for the slide-out animation to finish, then deactivate and clear.
-        yield return new WaitForSeconds(hideAnimDuration);
 
         objectiveListRoot.SetActive(false);
         ClearAllItems();

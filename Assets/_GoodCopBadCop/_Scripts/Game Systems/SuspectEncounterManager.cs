@@ -1,23 +1,20 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using Unity.Netcode;
 
 /// <summary>
-/// Tracks first encounters with named suspects and automatically triggers their
-/// <see cref="SuspectData.introDialogue"/> the first time they arrive at the booth window.
+/// Tracks first encounters with named suspects and starts their authored
+/// <see cref="SuspectData.introDialogue"/> either automatically on arrival (when
+/// <see cref="ScriptedDialogue.isForced"/> is true) or when a player deliberately interacts
+/// with the suspect at the booth (when it is false).
 ///
 /// Encounter state is persisted per campaign save slot via <see cref="SaveDataManager"/>
 /// (see <see cref="SaveSlot.EncounteredSuspectNames"/>), keyed by each suspect's Unity asset
-/// name (e.g. <c>"Ivan"</c>). This means starting a new save slot correctly replays every
-/// suspect's intro dialogue again, rather than the record leaking across separate campaigns.
-///
-/// This manager is called server-side from <see cref="SuspectController.SayEntryDialogue"/>
-/// immediately before the normal entry-bark path. When <see cref="TryInterceptForIntroDialogue"/>
-/// returns <c>true</c> the caller must skip both the generic bark and the paperwork hand-off;
-/// this manager drives the scripted intro, then — if the suspect gives paperwork — calls
-/// <see cref="SuspectCharacter.GivePaperwork"/> after the dialogue completes (so the
-/// suspect's "Give" animation plays before the documents appear, matching the normal
-/// entry-bark path) and fires <see cref="OnFirstEncounterDialogueComplete"/>.
+/// name (e.g. <c>"Ivan"</c>). Forced intros suppress the normal entry bark and paperwork
+/// hand-off, then hand off paperwork themselves once the dialogue completes — matching the
+/// original always-forced behaviour. Optional intros leave the normal entry bark and paperwork
+/// untouched; interacting starts the intro as a separate, skippable conversation.
 /// </summary>
 public class SuspectEncounterManager : MonoBehaviour
 {
@@ -36,6 +33,7 @@ public class SuspectEncounterManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
         Instance = this;
     }
 
@@ -68,14 +66,14 @@ public class SuspectEncounterManager : MonoBehaviour
             Debug.LogWarning($"[SuspectEncounterManager] No SaveDataManager instance — '{data.name}' encounter could not be persisted.");
             return;
         }
+
         SaveDataManager.Instance.MarkSuspectEncountered(data.name);
     }
 
     /// <summary>
     /// Marks a suspect as already encountered without playing their intro dialogue.
-    /// Used for scripted appearances (e.g. Day 1's too-far-gone tutorial suspect) that
-    /// borrow a suspect from the general pool but must skip straight to the normal
-    /// entry bark + paperwork flow instead of that suspect's authored intro monologue.
+    /// Used for scripted appearances that borrow a suspect from the general pool but must skip
+    /// their authored intro conversation.
     /// </summary>
     public static void MarkEncounteredWithoutIntro(SuspectData data) => MarkEncountered(data);
 
@@ -98,29 +96,31 @@ public class SuspectEncounterManager : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Intro Dialogue Intercept
+    // Forced intro intercept — called from SuspectController.SayEntryDialogue on arrival
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Called from <see cref="SuspectController.SayEntryDialogue"/> when a suspect arrives at the window.
-    /// Returns <c>true</c> if an intro dialogue was queued — the caller must then suppress
-    /// both the generic entry bark and the paperwork hand-off; this manager handles both.
-    /// Only has an effect on the server.
+    /// Called from <see cref="SuspectController.SayEntryDialogue"/> when a suspect arrives at
+    /// the window. Returns <c>true</c> — and starts the intro immediately, pulling in every
+    /// connected player — only when the suspect has an unplayed intro authored with
+    /// <see cref="ScriptedDialogue.isForced"/> set. The caller must then suppress both the
+    /// generic entry bark and the paperwork hand-off; this manager hands off paperwork itself
+    /// once the dialogue completes. Only has an effect on the server.
     /// </summary>
-    public bool TryInterceptForIntroDialogue(SuspectCharacter suspect)
+    public bool TryInterceptForcedIntroDialogue(SuspectCharacter suspect)
     {
         if (suspect == null || suspect.Data == null) return false;
-        if (suspect.Data.introDialogue == null) return false;
+        if (suspect.Data.introDialogue == null || !suspect.Data.introDialogue.isForced) return false;
         if (HasEncountered(suspect.Data)) return false;
 
         // Mark immediately so a re-entrant call cannot double-trigger.
         MarkEncountered(suspect.Data);
 
-        StartCoroutine(PlayIntroDialogue(suspect));
+        StartCoroutine(PlayForcedIntroDialogue(suspect));
         return true;
     }
 
-    private IEnumerator PlayIntroDialogue(SuspectCharacter suspect)
+    private IEnumerator PlayForcedIntroDialogue(SuspectCharacter suspect)
     {
         if (suspect == null) yield break;
 
@@ -135,7 +135,7 @@ public class SuspectEncounterManager : MonoBehaviour
 
         if (suspect == null)
         {
-            Debug.LogWarning($"[SuspectEncounterManager] PlayIntroDialogue: '{data.name}' was destroyed during the settle beat — aborting before dialogue starts.");
+            Debug.LogWarning($"[SuspectEncounterManager] PlayForcedIntroDialogue: '{data.name}' was destroyed during the settle beat — aborting before dialogue starts.");
             yield break;
         }
 
@@ -153,7 +153,7 @@ public class SuspectEncounterManager : MonoBehaviour
 
         if (suspect == null)
         {
-            Debug.LogWarning($"[SuspectEncounterManager] PlayIntroDialogue: '{data.name}' was destroyed before GivePaperwork could be called.");
+            Debug.LogWarning($"[SuspectEncounterManager] PlayForcedIntroDialogue: '{data.name}' was destroyed before GivePaperwork could be called.");
             OnFirstEncounterDialogueComplete?.Invoke(data);
             yield break;
         }
@@ -165,6 +165,54 @@ public class SuspectEncounterManager : MonoBehaviour
             suspect.GivePaperwork();
 
         OnFirstEncounterDialogueComplete?.Invoke(data);
-        Debug.Log($"[SuspectEncounterManager] First-encounter intro complete for '{data.name}'.");
+        Debug.Log($"[SuspectEncounterManager] Forced first-encounter intro complete for '{data.name}'.");
+    }
+
+    // -------------------------------------------------------------------------
+    // Optional first-encounter intro — started by SuspectCharacter.Interact
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Starts the current booth suspect's first-encounter intro for the player who interacted
+    /// with them. Only starts a dialogue authored with <see cref="ScriptedDialogue.isForced"/>
+    /// left false — forced intros are handled by <see cref="TryInterceptForcedIntroDialogue"/>
+    /// on arrival instead. Must be called on the server. The initiating player is the only
+    /// initial participant; another player can join explicitly by interacting with the same
+    /// suspect.
+    /// </summary>
+    public bool TryStartIntroDialogue(SuspectCharacter suspect, ulong initiatingClientId)
+    {
+        if (suspect == null || suspect.Data == null) return false;
+        if (suspect.Data.introDialogue == null || suspect.Data.introDialogue.isForced) return false;
+        if (HasEncountered(suspect.Data)) return false;
+        if (SuspectController.Instance == null || SuspectController.Instance.CurrentSuspect != suspect)
+            return false;
+        if (ScriptedDialogueRunner.Instance == null)
+        {
+            Debug.LogWarning("[SuspectEncounterManager] ScriptedDialogueRunner not found — cannot start intro dialogue.");
+            return false;
+        }
+        if (!NetworkManager.Singleton.ConnectedClients.ContainsKey(initiatingClientId))
+            return false;
+
+        // Mark before starting the coroutine so two near-simultaneous interaction requests
+        // cannot start the same intro twice.
+        MarkEncountered(suspect.Data);
+        SuspectData data = suspect.Data;
+
+        ScriptedDialogueRunner.Instance.PlayDialogue(
+            suspect,
+            data.introDialogue,
+            () =>
+            {
+                OnFirstEncounterDialogueComplete?.Invoke(data);
+                Debug.Log($"[SuspectEncounterManager] First-encounter intro complete for '{data.name}'.");
+            },
+            initialParticipantClientId: initiatingClientId,
+            joinByInteractionOnly: true,
+            allowParticipantExit: true,
+            hideNonParticipantUI: false);
+
+        return true;
     }
 }

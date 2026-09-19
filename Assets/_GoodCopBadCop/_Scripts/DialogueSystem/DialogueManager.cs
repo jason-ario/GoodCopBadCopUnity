@@ -125,7 +125,12 @@ public class DialogueManager : NetworkBehaviour
             return;
         }
 
-        SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, waitForInput);
+        // A non-participant still receives scripted dialogue subtitles, but cannot advance the
+        // sequence. Do not show them a misleading continue prompt; unscripted callers retain
+        // their existing wait-for-input behaviour.
+        bool showWaitForInput = waitForInput &&
+            (ScriptedDialogueRunner.ActiveDialogueSpeakerNetId == 0 || ScriptedDialogueRunner.IsScriptedModeActive);
+        SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, showWaitForInput);
 
         // Lines flagged to play a laugh instead of normal speech (e.g. ScriptedDialogueNode/
         // Choice.playLaughSfx) show their subtitle immediately but skip the voice-clip cycling

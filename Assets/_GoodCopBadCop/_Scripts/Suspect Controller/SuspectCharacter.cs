@@ -1488,6 +1488,18 @@ public class SuspectCharacter : Interactable
             }
         }
 
+        // Booth suspects with an unplayed, non-forced authored intro start that conversation
+        // only when a player deliberately interacts with them. Forced intros already started
+        // automatically on arrival (see SuspectController.SayEntryDialogue) and are not
+        // re-triggerable here. The server validates current-suspect state and encounter
+        // history before it starts anything.
+        if (SuspectController.Instance?.CurrentSuspect == this &&
+            Data?.introDialogue != null && !Data.introDialogue.isForced)
+        {
+            RequestIntroDialogue(player);
+            return;
+        }
+
         // Scene-placed suspects that are talked to directly (not through the booth) can be
         // configured with a SuspectWorldDialogue for a simple 3-choice conversation.
         if (worldDialogue != null)
@@ -1504,6 +1516,25 @@ public class SuspectCharacter : Interactable
         // dialogue (ScriptedDialogueRunner), not via a player-initiated choice-based dialogue.
         // The scripted intro/exit flow and SuspectWorldDialogue conversations above are
         // unaffected by this.
+    }
+
+    private void RequestIntroDialogue(PlayerInteractionController player)
+    {
+        if (player == null) return;
+
+        if (IsServer)
+        {
+            SuspectEncounterManager.Instance?.TryStartIntroDialogue(this, player.OwnerClientId);
+            return;
+        }
+
+        RequestIntroDialogueServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestIntroDialogueServerRpc(ServerRpcParams rpcParams = default)
+    {
+        SuspectEncounterManager.Instance?.TryStartIntroDialogue(this, rpcParams.Receive.SenderClientId);
     }
 
     public void SetCanInteract(bool canInteract)

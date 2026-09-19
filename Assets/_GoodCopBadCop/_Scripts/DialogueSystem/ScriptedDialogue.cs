@@ -98,5 +98,13 @@ public class ScriptedDialogueNode
 [CreateAssetMenu(fileName = "New Scripted Dialogue", menuName = "Dialogue/Scripted Dialogue")]
 public class ScriptedDialogue : ScriptableObject
 {
+    [Tooltip("If true, this dialogue starts automatically (all players are pulled in immediately, " +
+             "matching the original forced-intro behaviour). If false, the dialogue only begins when " +
+             "a player interacts with the suspect — other players stay free, see subtitles, and can " +
+             "join later by interacting with the same suspect. Only applies to suspect first-encounter " +
+             "intro dialogues (SuspectData.introDialogue); other PlayDialogue call sites (cutscenes, " +
+             "megaphone, etc.) are unaffected by this flag.")]
+    public bool isForced = false;
+
     public ScriptedDialogueNode[] nodes;
 }

@@ -175,7 +175,25 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     [SerializeField] private float _waypointPause = 0.05f;
     [SerializeField] private float _postJumpDelay = 0.3f;
 
-    // ── Runtime state ────────────────────────────────────────────────────────
+    private enum NetworkCutscenePhase : byte
+    {
+        Dormant,
+        Eating,
+        Looking,
+        Dropped,
+        Escaping
+    }
+
+    /// <summary>
+    /// Authoritative cutscene phase retained by the in-scene NetworkObject. The normal sequence
+    /// still uses ClientRpcs for its timed visual transitions; this value exists so a client that
+    /// connects after one of those one-shot messages can reconstruct whether Ocho should still be
+    /// visible on the roof rather than leaving him in the scene-authored hidden state.
+    /// </summary>
+    private readonly NetworkVariable<NetworkCutscenePhase> _networkPhase = new(
+        NetworkCutscenePhase.Dormant,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     private bool _triggered;
     private Coroutine _monitorRoutine;
@@ -208,6 +226,17 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         _spawnedPieceRigidbodies = new Rigidbody[pieceCount];
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // NetworkVariable values are included with an in-scene object's spawn state. A client
+        // that joins after the Day 3 activation RPC therefore still learns whether Ocho is on the
+        // roof, looking, has dropped the pieces, or already escaped.
+        if (!IsServer)
+            ApplyLateJoinOchoVisualState(_networkPhase.Value);
+    }
+
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
@@ -226,6 +255,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         if (!IsServer) return;
         if (_triggered) return;
         _triggered = true;
+        _networkPhase.Value = NetworkCutscenePhase.Eating;
 
         ActivateOchoClientRpc();
 
@@ -248,6 +278,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         }
 
         _triggered = false;
+        _networkPhase.Value = NetworkCutscenePhase.Dormant;
         LocalSetLooking(false);
         DespawnNetworkedVladPieces();
 
@@ -287,17 +318,19 @@ public class OchoEatingVladCutscene : NetworkBehaviour
 
     private IEnumerator RunCutsceneSequence()
     {
-        // Animation-driven "StopAndLook" trigger is disabled — enabling the FLookAnimator
-        // directly (below) reads better than the canned turn animation. LocalPlayStopAndLook
-        // still cuts the eating-loop audio; only its Animator.SetTrigger call is skipped now.
+        _networkPhase.Value = NetworkCutscenePhase.Looking;
         PlayStopAndLookClientRpc();
         SetLookingClientRpc(true);
         yield return new WaitForSeconds(_lookHoldDuration);
 
+        _networkPhase.Value = NetworkCutscenePhase.Dropped;
         SetLookingClientRpc(false);
         DropVladPiecesAndIdleClientRpc();
         yield return new WaitForSeconds(_postDropDelay);
 
+        // A late joiner cannot reconstruct a partially completed DOTween path, so keep Ocho
+        // hidden once he has left the roof instead of replaying the escape at its start point.
+        _networkPhase.Value = NetworkCutscenePhase.Escaping;
         PlayJumpSequenceAndVanishClientRpc();
     }
 
@@ -316,6 +349,42 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     {
         if (_ochoGameObjectToDeactivate != null)
             _ochoGameObjectToDeactivate.SetActive(true);
+    }
+
+    /// <summary>
+    /// Applies the stable portion of the current cutscene state for a client that connected
+    /// after the normal ClientRpcs were broadcast. Timed effects such as the physical piece drop
+    /// and DOTween escape are intentionally not replayed; NGO already synchronizes spawned
+    /// physics pieces, while an escape in progress is represented by Ocho remaining hidden.
+    /// </summary>
+    private void ApplyLateJoinOchoVisualState(NetworkCutscenePhase phase)
+    {
+        switch (phase)
+        {
+            case NetworkCutscenePhase.Eating:
+                LocalActivateOcho();
+                LocalPlayEatingLoop();
+                break;
+
+            case NetworkCutscenePhase.Looking:
+                LocalActivateOcho();
+                LocalPlayStopAndLook();
+                LocalSetLooking(true);
+                break;
+
+            case NetworkCutscenePhase.Dropped:
+                LocalActivateOcho();
+                LocalPlayStopAndLook();
+                if (_ochoAnimator != null && !string.IsNullOrEmpty(_idleTrigger))
+                    _ochoAnimator.SetTrigger(_idleTrigger);
+                break;
+
+            case NetworkCutscenePhase.Dormant:
+            case NetworkCutscenePhase.Escaping:
+                LocalSetLooking(false);
+                DeactivateOcho();
+                break;
+        }
     }
 
     [ClientRpc]

@@ -960,6 +960,11 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
+        // Finish the preview's rotation before resolving the placement pose. The ghost is
+        // smoothed while aiming, but releasing placement must commit the intended target
+        // rotation rather than whichever intermediate angle it had reached this frame.
+        ObjectPlacer.Instance.SnapToPendingTargetRotation();
+
         bool hasPlacementPose = ObjectPlacer.Instance.TryGetPlacementPose(
             _heldObject,
             out Vector3 placementPosition,

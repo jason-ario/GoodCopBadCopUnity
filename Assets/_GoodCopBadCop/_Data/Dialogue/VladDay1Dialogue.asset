@@ -12,119 +12,141 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
   m_Name: VladDay1Dialogue
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 1
   nodes:
   - type: 0
     npcLine: So. You are the replacement.
     animationTrigger: TalkBigCocky
     cameraTrigger: suspect face
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
     npcLine: You look exactly like the last one. Same uniform, same nervous eyes.
     animationTrigger: TalkCocky
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: Same face that says I have no idea what I agreed to. Good. That means
-      you are normal. For now.
+    npcLine: Same face that says I have no idea what I agreed to. Good. That means you are normal. For now.
     animationTrigger: TalkDismissing
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
     npcLine: My name is Vladimir Syrnikov. You will call me Vlad.
     animationTrigger: TalkBigCocky
     cameraTrigger: suspect face
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: Outside this booth, you will not say that name. This is not vanity.
-      It is simply how things are.
+    npcLine: Outside this booth, you will not say that name. This is not vanity. It is simply how things are.
     animationTrigger: TalkDismissing
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
     npcLine: Tell me. What do you know about what comes through this gate?
     animationTrigger: TalkPoint
     cameraTrigger: suspect face
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Civilians, migrants, documented travelers.
-      npcResponse: Mm. The paperwork version. Cute. You are going to have a very
-        interesting first week.
+      npcResponse: Mm. The paperwork version. Cute. You are going to have a very interesting first week.
       animationTrigger: TalkDismissing
+      playLaughSfx: 0
     - playerChoiceText: Whatever the briefing didn't cover, I assume.
-      npcResponse: Ha! I like that. Pessimism and self-awareness. You may survive
-        after all. Do not get comfortable.
+      npcResponse: Ha! I like that. Pessimism and self-awareness. You may survive after all. Do not get comfortable.
       animationTrigger: ShortLaugh
+      playLaughSfx: 0
   - type: 0
-    npcLine: Most of what you will see is boring. Papers, stamps, faces, send them
-      through.
+    npcLine: Most of what you will see is boring. Papers, stamps, faces, send them through.
     animationTrigger: TalkShrug
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: You will wish for something to happen. Do not. The boring days are the
-      gift.
+    npcLine: You will wish for something to happen. Do not. The boring days are the gift.
     animationTrigger: TalkDismissing
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: When something wrong walks through that window, and it will, what
-      is your instinct?
+    npcLine: When something wrong walks through that window, and it will, what is your instinct?
     animationTrigger: TalkLookAway
     cameraTrigger: suspect face
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices:
     - playerChoiceText: Follow the rulebook. Document everything.
-      npcResponse: The rulebook. Yes. Good friend, the rulebook. Until it has never
-        seen what you are looking at. Then it is useless paper.
+      npcResponse: The rulebook. Yes. Good friend, the rulebook. Until it has never seen what you are looking at. Then it is useless paper.
       animationTrigger: TalkSarcasticNod
+      playLaughSfx: 0
     - playerChoiceText: Trust my gut. Make a call.
-      npcResponse: Your gut. Good. Your gut will be smarter than you, most of
-        the time. The times it is not, those are the times that end careers.
-        Or worse.
+      npcResponse: Your gut. Good. Your gut will be smarter than you, most of the time. The times it is not, those are the times that end careers. Or worse.
       animationTrigger: TalkCocky
+      playLaughSfx: 0
   - type: 0
-    npcLine: There are things coming through this gate that your training did not
-      cover.
+    npcLine: There are things coming through this gate that your training did not cover.
     animationTrigger: TalkLookAway
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: When you encounter one, do not panic. Do your job. The paperwork
-      will lie. The face might lie.
+    npcLine: When you encounter one, do not panic. Do your job. The paperwork will lie. The face might lie.
     animationTrigger: TalkPoint
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
     npcLine: But something about them will feel wrong. Trust that.
     animationTrigger: Talk1
     cameraTrigger: suspect face
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
     npcLine: You have questions. I can see them. Keep them for now.
     animationTrigger: TalkShrug
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: Do your job, stay sharp, and if you last the week, maybe I answer
-      some of them.
+    npcLine: Do your job, stay sharp, and if you last the week, maybe I answer some of them.
     animationTrigger: 
     cameraTrigger: 
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
     npcLine: Try not to disappoint me, Officer. It would be genuinely inconvenient.
     animationTrigger: 
     cameraTrigger: suspect face
-    wobbleText: 0
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []

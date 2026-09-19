@@ -34,6 +34,8 @@ public class ObjectPlacer : MonoBehaviour
     /// noise, unlike free-surface placement where it helps show where the item will land.
     /// </summary>
     private bool _suppressArc;
+    private Quaternion _pendingTargetRotation;
+    private bool _hasPendingTargetRotation;
     private readonly List<Material> _ghostMaterials = new List<Material>();
     public bool IsActive;
     public bool IsInRange { get; private set; } = true;
@@ -101,6 +103,7 @@ public class ObjectPlacer : MonoBehaviour
         yield return new WaitForEndOfFrame();
         deactivatedThisFrame = false;
         _currentPlacementBoard = null;
+        _hasPendingTargetRotation = false;
     }
 
     public void SetItem(PickableItemData itemData)
@@ -267,6 +270,28 @@ public class ObjectPlacer : MonoBehaviour
             }
             rend.materials = instanceMats;
         }
+    }
+
+    /// <summary>
+    /// Records the rotation the placement preview is currently interpolating toward.
+    /// The pending value remains available through the release frame, even if the
+    /// preview is deactivated before the drop input is processed.
+    /// </summary>
+    public void SetPendingTargetRotation(Quaternion rotation)
+    {
+        _pendingTargetRotation = rotation;
+        _hasPendingTargetRotation = true;
+    }
+
+    /// <summary>
+    /// Immediately completes the active placement rotation interpolation.
+    /// Called just before a drop reads this transform to ensure the placed object
+    /// uses the exact target orientation rather than an in-between preview angle.
+    /// </summary>
+    public void SnapToPendingTargetRotation()
+    {
+        if (_hasPendingTargetRotation)
+            transform.rotation = _pendingTargetRotation;
     }
 
     /// <summary>

@@ -161,6 +161,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2126398315448153960}
+  - {fileID: 2498503505298333879}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: -180, y: 0, z: 0}
 --- !u!114 &961852255464963682
@@ -177,10 +178,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 712537964
   InScenePlacedSourceGlobalObjectIdHash: 712537964
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -476,3 +479,82 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   interactText: Toilet Seat
   highlightNameFilter: 
+  _destroyOnCollect: 1
+--- !u!1001 &3028346072973860285
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 6663731062924620298}
+    m_Modifications:
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.01
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.01
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.01
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5618159235900635052, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: m_Name
+      value: Interaction Collider
+      objectReference: {fileID: 0}
+    - target: {fileID: 8570621670973952761, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+      propertyPath: Interactable
+      value: 
+      objectReference: {fileID: 3565577844920501451}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+--- !u!4 &2498503505298333879 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 624503939453058314, guid: 78b537d3e298f5b428de7b04cd2892f4, type: 3}
+  m_PrefabInstance: {fileID: 3028346072973860285}
+  m_PrefabAsset: {fileID: 0}

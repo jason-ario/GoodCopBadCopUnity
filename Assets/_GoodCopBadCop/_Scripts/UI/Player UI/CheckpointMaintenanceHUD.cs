@@ -9,8 +9,9 @@ using UnityEngine;
 /// After Day 1 these three cleanup categories become optional (see <see cref="CleanupTaskGating"/>):
 /// they no longer occupy a slot on the mandatory "CURRENT ORDERS" task list and no longer block
 /// clock-out, but they still spawn, still show compass pips, and still drag down
-/// <see cref="CheckpointIntegrityService"/>'s payout multiplier. This section is the always-visible
-/// replacement so the player can still see exactly what's left without it being a task-list entry.
+/// <see cref="CheckpointIntegrityService"/>'s payout multiplier. The rows live inside the
+/// toggleable TASKS panel, while the separate persistent integrity card keeps the score visible
+/// even when the task details are collapsed.
 ///
 /// Purely a read-side display: never registers or blocks anything, just mirrors already-networked
 /// task state. Shows 0/0 for any task that hasn't spawned yet.

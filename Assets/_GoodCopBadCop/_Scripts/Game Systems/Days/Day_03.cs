@@ -169,6 +169,8 @@ public class Day_03 : DayBase, IDailyTask
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients += OnPowerOutageResolved;
 
+        BeginInvestigateFuseBoxStep();
+
         Telephone.Instance?.HangUpCurrentCaller();
 
         Debug.Log("[Day_03] HQ power-outage dialogue complete -- Restore Power task granted, hanging up.");
@@ -235,6 +237,15 @@ public class Day_03 : DayBase, IDailyTask
     [Tooltip("Subtitle name colour for the HQ power-outage call, matching the alternate-voice " +
              "convention used by Day 4's new voice announcement.")]
     [SerializeField] private Color _powerOutageCallSpeakerColor = new Color(0.85f, 0.05f, 0.05f);
+
+    [Tooltip("The power station's fuse box. Force-highlighted and pointed at with a pooled " +
+             "TutorialMarker arrow (see TutorialMarkerManager) the instant the 'Restore Power' " +
+             "task is granted, directing the player to investigate it. Both are cleared the " +
+             "first time the box is opened (see FuseBoxPuzzleController.OnBoxInteracted), which " +
+             "also advances the task text to 'insert the missing fuses'. The power switch lever " +
+             "highlights itself automatically once every fuse slot is filled — see " +
+             "PowerSwitch.OnFuseCountChanged — so no separate wiring is needed for that step.")]
+    [SerializeField] private FuseBoxPuzzleController _fuseBoxController;
 
     /// <summary>Runtime "Restore Power" guidebook task, created only while the outage is active.</summary>
     private RepairPowerThreat _powerOutageThreat;
@@ -358,6 +369,85 @@ public class Day_03 : DayBase, IDailyTask
 
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerOutageResolved;
+
+        ClearFuseBoxTutorialState();
+    }
+
+    // -------------------------------------------------------------------------
+    // Fuse-box tutorial highlight / arrow steps
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Step 1: force-highlights the fuse box and points a pooled TutorialMarker arrow at it,
+    /// then waits for the box to be opened for the first time (either direction — the door
+    /// toggles open/closed on every interaction, so <see cref="OnFuseBoxFirstOpened"/> is a
+    /// one-shot that unsubscribes itself immediately).
+    /// </summary>
+    private void BeginInvestigateFuseBoxStep()
+    {
+        if (_fuseBoxController == null)
+        {
+            Debug.LogWarning("[Day_03] _fuseBoxController is not assigned -- skipping the fuse-box tutorial highlight/arrow.");
+            return;
+        }
+
+        _fuseBoxController.SetForceHighlight(true);
+        TutorialMarkerManager.Instance?.Mark(_fuseBoxController.transform);
+
+        _fuseBoxController.OnBoxInteracted += OnFuseBoxFirstOpened;
+    }
+
+    /// <summary>
+    /// Step 2: fired the first time the fuse box door is toggled. Clears the fuse-box highlight
+    /// and arrow, advances the guidebook task to "insert the missing fuses", then starts
+    /// listening for every slot to be filled. The fuses themselves already self-highlight the
+    /// instant they spawn (see <see cref="FusePickup.OnNetworkSpawn"/>) and clear on pickup, so
+    /// no extra highlight wiring is needed for them here.
+    /// </summary>
+    private void OnFuseBoxFirstOpened()
+    {
+        _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
+
+        _fuseBoxController.SetForceHighlight(false);
+        TutorialMarkerManager.Instance?.Unmark(_fuseBoxController.transform);
+
+        _powerOutageThreat?.SetStep(RepairPowerThreat.Step.InsertFuses);
+
+        _fuseBoxController.OnFuseCountChanged += OnFuseCountChangedDuringOutage;
+
+        // Catch up immediately in case every slot was somehow already filled before the box
+        // was first opened (e.g. inserted by another client while this one was mid-dialogue).
+        OnFuseCountChangedDuringOutage(_fuseBoxController.FilledSlotCount, _fuseBoxController.FuseSlotCount);
+    }
+
+    /// <summary>
+    /// Step 3: fired whenever a fuse is inserted/extracted while the "insert fuses" step is
+    /// active. Once every slot is filled, advances the guidebook task to "pull the lever".
+    /// The power switch highlights itself automatically once
+    /// <see cref="FuseBoxPuzzleController.IsReady"/> — see <see cref="PowerSwitch.OnFuseCountChanged"/>
+    /// — so no separate lever highlight call is needed here.
+    /// </summary>
+    private void OnFuseCountChangedDuringOutage(int filled, int total)
+    {
+        if (_fuseBoxController == null || !_fuseBoxController.IsReady) return;
+
+        _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedDuringOutage;
+        _powerOutageThreat?.SetStep(RepairPowerThreat.Step.PullLever);
+    }
+
+    /// <summary>
+    /// Defensive cleanup covering every fuse-box tutorial subscription/highlight/arrow above.
+    /// Safe to call at any point in the sequence (or if it never started) — every unsubscribe
+    /// and highlight-clear is itself idempotent.
+    /// </summary>
+    private void ClearFuseBoxTutorialState()
+    {
+        if (_fuseBoxController == null) return;
+
+        _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
+        _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedDuringOutage;
+        _fuseBoxController.SetForceHighlight(false);
+        TutorialMarkerManager.Instance?.Unmark(_fuseBoxController.transform);
     }
 
     // -------------------------------------------------------------------------
@@ -393,6 +483,11 @@ public class Day_03 : DayBase, IDailyTask
     {
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerOutageResolved;
+
+        // Covers any leftover fuse-box tutorial subscription/highlight/arrow in case power was
+        // restored via some other path (e.g. a debug cheat) without ever progressing through
+        // the normal open-box / insert-fuses steps above.
+        ClearFuseBoxTutorialState();
 
         if (_powerOutageThreat != null)
         {

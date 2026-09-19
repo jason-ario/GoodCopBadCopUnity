@@ -849,13 +849,13 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
-        // If this is the player's first encounter with this suspect and they have an intro
-        // dialogue, hand control to SuspectEncounterManager. It will suppress the generic
-        // bark, play the scripted intro, spawn paperwork if needed, and fire
-        // OnFirstEncounterDialogueComplete when done.
+        // Suspects whose first-encounter intro is authored as "forced" pull every player into
+        // it automatically on arrival — this suppresses the generic entry bark and paperwork
+        // hand-off, mirroring the pre-interaction-based behaviour. Non-forced intros are left
+        // for the player to start by interacting with the suspect (see SuspectCharacter.Interact).
         if (!forceSkipEntry &&
             SuspectEncounterManager.Instance != null &&
-            SuspectEncounterManager.Instance.TryInterceptForIntroDialogue(suspectCharacter))
+            SuspectEncounterManager.Instance.TryInterceptForcedIntroDialogue(suspectCharacter))
         {
             ForceNextSuspectNoPaperwork = false; // consumed by the intercept
             return;
