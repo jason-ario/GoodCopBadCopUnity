@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using FIMSpace.FLook;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -12,10 +13,15 @@ using UnityEngine.UI;
 /// to the interrogation booth flow which is driven exclusively by <see cref="ScriptedDialogueRunner"/>.
 ///
 /// The player walks up, interacts (LMB / E) and is shown up to 3 dialogue options for the
-/// current day (see <see cref="DaySet"/>). Picking an option hides the choices, plays the NPC's
-/// unique response as a click-through subtitle (typewriter reveal, skip-to-complete, then
-/// advance), and returns to the choice menu — mirroring <see cref="ScriptedDialogueRunner"/>'s
-/// line-advance UX. The player can leave the conversation at any time via the Back button.
+/// current day (see <see cref="DaySet"/>). Both players may hold the same conversation with
+/// this NPC at once (see <see cref="SpeakingInteraction"/>'s participant tracking); picking an
+/// option votes for it, and conflicting picks are resolved with the exact same rule
+/// <see cref="ScriptedDialogueRunner"/> uses for interrogation-booth choice nodes — a unanimous
+/// pick wins outright, a split pick is decided by a random draw from the submitted options only,
+/// and a timeout keeps the conversation moving if a participant never answers. Picking hides the
+/// choices, plays the NPC's response as a click-through subtitle (typewriter reveal, skip-to-
+/// complete, then advance — gated the same way on every participant), and returns to the choice
+/// menu. Either participant can leave the conversation at any time via the Back button.
 /// </summary>
 public class SuspectWorldDialogue : MonoBehaviour
 {
@@ -88,9 +94,8 @@ public class SuspectWorldDialogue : MonoBehaviour
     private enum ConversationState
     {
         Idle,
-        ShowingGreeting,
-        ShowingOptions,
-        ShowingResponse
+        WaitingForAdvance,
+        WaitingForChoice
     }
 
     private DialogueOption[] _options;
@@ -101,12 +106,38 @@ public class SuspectWorldDialogue : MonoBehaviour
     private bool _restoreObjectToFollow;
     private bool _awaitingEngagementResponse;
 
+    // Server-only: guards against starting the authoritative conversation loop twice.
+    private bool _serverConversationRunning;
+
     public bool InConversation => _inConversation;
 
     private void Awake()
     {
         if (startSitting && animator != null)
             animator.SetBool("Sitting", true);
+
+        SubscribeToSpeaking();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeFromSpeaking();
+    }
+
+    private void SubscribeToSpeaking()
+    {
+        if (speaking == null) return;
+        speaking.OnWorldChoicesShown += HandleWorldChoicesShown;
+        speaking.OnWorldChoiceFinalized += HandleWorldChoiceFinalized;
+        speaking.OnWorldAdvanceGateChanged += HandleWorldAdvanceGateChanged;
+    }
+
+    private void UnsubscribeFromSpeaking()
+    {
+        if (speaking == null) return;
+        speaking.OnWorldChoicesShown -= HandleWorldChoicesShown;
+        speaking.OnWorldChoiceFinalized -= HandleWorldChoiceFinalized;
+        speaking.OnWorldAdvanceGateChanged -= HandleWorldAdvanceGateChanged;
     }
 
     /// <summary>
@@ -118,11 +149,13 @@ public class SuspectWorldDialogue : MonoBehaviour
     /// </summary>
     public void Configure(SpeakingInteraction speakingRef, Animator animatorRef, DaySet[] sets, bool startSittingNow = true, FLookAnimator lookAnimatorRef = null)
     {
+        UnsubscribeFromSpeaking();
         speaking = speakingRef;
         animator = animatorRef;
         daySets = sets;
         startSitting = startSittingNow;
         lookAnimator = lookAnimatorRef;
+        SubscribeToSpeaking();
     }
 
     /// <summary>
@@ -179,10 +212,12 @@ public class SuspectWorldDialogue : MonoBehaviour
     }
 
     /// <summary>
-    /// Opens the conversation: locks player movement/camera and either plays the day's greeting
-    /// line (click-through) before showing options, or shows options immediately if there's no
-    /// greeting. Safe to call repeatedly — ignored while already in conversation or while the
-    /// NPC is mid-line.
+    /// Opens the conversation: locks player movement/camera and joins the NPC's world-dialogue
+    /// conversation. Multiple players may join the same conversation — the first joiner starts
+    /// the authoritative sequence on the server (greeting, then options/response looping until
+    /// every participant leaves), later joiners are folded into the existing one (see
+    /// <see cref="SpeakingInteraction.RequestBeginEngagement"/>). Safe to call repeatedly —
+    /// ignored while already in conversation or while the NPC is mid-line.
     /// </summary>
     public void BeginConversation()
     {
@@ -190,11 +225,13 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (DialogueManager.Instance != null && DialogueManager.Instance.IsSpeaking) return;
         if (speaking == null) return;
 
+        // Local pre-check only, so a misconfigured NPC (no options authored) never locks the
+        // player's movement/camera waiting on a conversation that will never show anything. The
+        // server independently (and authoritatively) re-resolves the same data in
+        // ServerRunConversationLoop once the conversation actually starts.
         ResolveOptionsForConversation();
         if (_options == null || _options.Length == 0) return;
 
-        // Ask the server for exclusive engagement with this NPC first — another player may
-        // already be mid-conversation with them — before locking our own movement/camera.
         _awaitingEngagementResponse = true;
         speaking.RequestBeginEngagement(OnEngagementResponse);
     }
@@ -205,7 +242,10 @@ public class SuspectWorldDialogue : MonoBehaviour
 
         if (!granted)
         {
-            UIController.Instance?.ShowShopNotification("Someone else is already talking to them.");
+            // No longer expected — joining a world-dialogue conversation is always granted now
+            // that multiple participants are supported — but guard defensively in case a future
+            // caller reintroduces a rejection path.
+            Debug.LogWarning($"[SuspectWorldDialogue] Engagement with '{name}' was unexpectedly denied.");
             return;
         }
 
@@ -235,57 +275,126 @@ public class SuspectWorldDialogue : MonoBehaviour
 
         UIController.Instance.ShowBackButton(EndConversation);
 
-        if (!string.IsNullOrEmpty(_greetingLineForCurrentConversation) && speaking != null)
-        {
-            _state = ConversationState.ShowingGreeting;
-            speaking.SayWorldDialogue(_greetingLineForCurrentConversation, waitForInput: true);
-        }
-        else
-        {
-            ShowOptions();
-        }
+        // Presentation only — whatever the conversation is currently showing (the greeting, a
+        // response line, or the choice panel) reaches this client via the server's broadcasts
+        // (see HandleWorldChoicesShown / HandleWorldAdvanceGateChanged), which also drive any
+        // other already-joined participant identically.
     }
 
-    private void ShowOptions()
-    {
-        _state = ConversationState.ShowingOptions;
+    // -------------------------------------------------------------------------
+    // Server-only: authoritative conversation sequencing
+    // -------------------------------------------------------------------------
 
+    /// <summary>
+    /// Server-only. Begins the authoritative world-dialogue conversation loop for this NPC.
+    /// Called by <see cref="SpeakingInteraction"/> when the first participant joins. Resolves
+    /// this day's options/greeting once, then repeatedly shows the option panel to every current
+    /// participant, resolves their pick via <see cref="SpeakingInteraction.ServerBeginWorldChoiceVote"/>
+    /// (the same voting rule <see cref="ScriptedDialogueRunner"/> uses for choice nodes), and
+    /// plays the NPC's response — until every participant has left the conversation.
+    /// </summary>
+    public void ServerStartConversation()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+        if (_serverConversationRunning) return;
+
+        _serverConversationRunning = true;
+        StartCoroutine(ServerRunConversationLoop());
+    }
+
+    private IEnumerator ServerRunConversationLoop()
+    {
+        // Flush the engagement-grant RPC before broadcasting the first line, so the joining
+        // client has already entered conversation presentation (see StartConversation) by the
+        // time it arrives — mirrors ScriptedDialogueRunner's "flush RPCs before the first line".
+        yield return null;
+
+        ResolveOptionsForConversation();
+
+        if (speaking == null || _options == null || _options.Length == 0)
+        {
+            _serverConversationRunning = false;
+            yield break;
+        }
+
+        if (!string.IsNullOrEmpty(_greetingLineForCurrentConversation))
+            yield return StartCoroutine(ServerSayLineAndWaitForAdvance(_greetingLineForCurrentConversation));
+
+        while (speaking.HasWorldParticipants)
+        {
+            int chosenIndex = 0;
+            bool resolved = false;
+            speaking.ServerBeginWorldChoiceVote(BuildOptionTexts(), idx => { chosenIndex = idx; resolved = true; });
+            yield return new WaitUntil(() => resolved);
+
+            if (!speaking.HasWorldParticipants) break;
+
+            DialogueOption chosen = _options[Mathf.Clamp(chosenIndex, 0, _options.Length - 1)];
+
+            if (animator != null && !string.IsNullOrEmpty(chosen.animationTrigger))
+                animator.SetTrigger(chosen.animationTrigger);
+
+            yield return StartCoroutine(ServerSayLineAndWaitForAdvance(chosen.npcResponse));
+        }
+
+        _serverConversationRunning = false;
+    }
+
+    private IEnumerator ServerSayLineAndWaitForAdvance(string line)
+    {
+        speaking.SayWorldDialogue(line, waitForInput: true);
+
+        bool advanced = false;
+        speaking.ServerBeginWorldAdvanceGate(() => advanced = true);
+        yield return new WaitUntil(() => advanced);
+    }
+
+    private string[] BuildOptionTexts()
+    {
         string[] texts = new string[_options.Length];
         for (int i = 0; i < _options.Length; i++)
             texts[i] = _options[i].playerLine;
+        return texts;
+    }
 
+    // -------------------------------------------------------------------------
+    // Local presentation — driven by SpeakingInteraction's broadcasts
+    // -------------------------------------------------------------------------
+
+    private void HandleWorldChoicesShown(string[] texts)
+    {
+        if (!_inConversation) return;
+        _state = ConversationState.WaitingForChoice;
         DialogueChoiceSystem.Instance.ShowScriptedChoices(texts, OnOptionChosen);
     }
 
     private void OnOptionChosen(int index)
     {
         if (!_inConversation) return;
-        if (index < 0 || index >= _options.Length) return;
 
-        // The scripted-choice callback path does not hide the panel on its own — do it here so
-        // the choices disappear the moment a pick is made, before the response plays.
-        DialogueChoiceSystem.Instance.HideChoicePanel();
+        // Highlights the pick locally and submits the vote — the panel stays open until the
+        // server resolves the vote (see HandleWorldChoiceFinalized), exactly like
+        // ScriptedDialogueRunner's choice nodes.
+        speaking.SubmitWorldChoicePick(index);
+    }
 
-        DialogueOption chosen = _options[index];
+    private void HandleWorldChoiceFinalized()
+    {
+        // DialogueChoiceSystem's panel/highlights are already cleared by SpeakingInteraction's
+        // ClientRpc — nothing further needed here. The NPC's response line and the next
+        // advance-gate broadcast follow immediately from the server's conversation loop.
+    }
 
-        if (animator != null && !string.IsNullOrEmpty(chosen.animationTrigger))
-            animator.SetTrigger(chosen.animationTrigger);
-
-        if (speaking != null)
-        {
-            _state = ConversationState.ShowingResponse;
-            speaking.SayWorldDialogue(chosen.npcResponse, waitForInput: true);
-        }
-        else
-        {
-            ShowOptions();
-        }
+    private void HandleWorldAdvanceGateChanged(bool awaiting)
+    {
+        if (!_inConversation) return;
+        _state = awaiting ? ConversationState.WaitingForAdvance : ConversationState.Idle;
     }
 
     private void Update()
     {
         if (!_inConversation) return;
-        if (_state != ConversationState.ShowingGreeting && _state != ConversationState.ShowingResponse) return;
+        if (_state != ConversationState.WaitingForAdvance) return;
         if (DialogueManager.Instance == null) return;
 
         bool pressedAdvance = Input.GetKeyDown(KeyCode.E)
@@ -300,21 +409,11 @@ public class SuspectWorldDialogue : MonoBehaviour
             return;
         }
 
-        // Second input (or first when the typewriter already finished): advance past the line.
-        ConversationState finishedState = _state;
-        _state = ConversationState.Idle;
-
-        // Clear the subtitle locally right away instead of waiting on the AdvanceDialogueServerRpc
-        // round-trip: on the host that round-trip is effectively same-frame (host is also the
-        // server), but on a remote client it's a real network hop, which left the old subtitle
-        // visible for a beat after the choice buttons (shown locally, below) already appeared.
-        DialogueManager.Instance.ClearHistory();
-        DialogueManager.Instance.AdvanceDialogueServerRpc();
-
-        if (!_inConversation) return;
-
-        if (finishedState == ConversationState.ShowingGreeting || finishedState == ConversationState.ShowingResponse)
-            ShowOptions();
+        // Second input (or first when the typewriter already finished): vote to advance. The
+        // gate only opens — clearing the subtitle and moving on to the next line/options — once
+        // every current participant has voted, or the timeout fires (see
+        // SpeakingInteraction.SubmitWorldAdvanceServerRpc).
+        speaking.SubmitWorldAdvanceServerRpc();
     }
 
     private static readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>();
@@ -382,9 +481,12 @@ public class SuspectWorldDialogue : MonoBehaviour
     }
 
     /// <summary>
-    /// Leaves the conversation at any point: hides the choice panel and back button, clears any
-    /// active subtitle, and restores normal player control. Wired to the Back button shown in
-    /// <see cref="BeginConversation"/>.
+    /// Leaves the conversation at any point: leaves the NPC's world-dialogue participant set,
+    /// hides the choice panel and back button, clears any active subtitle, and restores normal
+    /// player control. The other participant (if any) is unaffected and continues the
+    /// conversation on their own — the server's advance/choice gates immediately re-evaluate
+    /// against the shrunken participant set (see <see cref="SpeakingInteraction"/>). Wired to the
+    /// Back button shown in <see cref="BeginConversation"/>.
     /// </summary>
     public void EndConversation()
     {

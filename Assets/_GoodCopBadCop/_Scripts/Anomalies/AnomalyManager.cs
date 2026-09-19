@@ -34,16 +34,23 @@ public class AnomalyManager : MonoBehaviour
     [SerializeField] private int _vitalsPoints = 1;
 
     [Header("Global Tuning")]
-    [Tooltip("Multiplies every suspect's daily infection score increase in SuspectRunRecords.AdvanceDayInfection(). " +
-             "1 = normal speed, 2 = anomalies progress twice as fast, 0.5 = half as fast. Useful for tuning how many " +
-             "days it takes suspects to reach higher anomaly counts (e.g. a 'too far gone' state).")]
-    [SerializeField] private float _infectionProgressionMultiplier = 1f;
+    [Tooltip("Range a random multiplier is drawn from once per campaign day in SuspectRunRecords.AdvanceDayInfection(). " +
+             "The same rolled value is applied to every suspect's daily infection increase that day, so some days " +
+             "are calmer (near the low end) and some days spike (near the high end). Set both X and Y to 1 to disable " +
+             "day-level randomness and always apply a flat 1x. Set both to 0 to freeze infection progression entirely.")]
+    [SerializeField] private Vector2 _infectionProgressionMultiplierRange = new Vector2(0.8f, 1.43f);
 
     /// <summary>
-    /// Multiplier applied to each suspect's daily infection score increase. Never negative —
-    /// use 0 to freeze infection progression entirely without touching per-suspect data.
+    /// Rolls a fresh random multiplier within <see cref="_infectionProgressionMultiplierRange"/>. Callers should
+    /// roll this once per day (not once per suspect) so every suspect shares the same "how bad was today" swing.
+    /// Never negative — a range of (0, 0) freezes infection progression entirely without touching per-suspect data.
     /// </summary>
-    public float InfectionProgressionMultiplier => Mathf.Max(0f, _infectionProgressionMultiplier);
+    public float RollInfectionProgressionMultiplier()
+    {
+        float min = Mathf.Max(0f, Mathf.Min(_infectionProgressionMultiplierRange.x, _infectionProgressionMultiplierRange.y));
+        float max = Mathf.Max(0f, Mathf.Max(_infectionProgressionMultiplierRange.x, _infectionProgressionMultiplierRange.y));
+        return UnityEngine.Random.Range(min, max);
+    }
 
     [Header("Never-Seen Suspect Tiered Starting Score")]
     [Tooltip("Starting mutation score granted to a suspect the very first time they're shown to the " +

@@ -992,7 +992,63 @@ public class Day_01 : DayBase
         if (!NetworkManager.Singleton.IsServer) return;
         if (_debugSkipActive) return;
 
+        // Vlad's scripted opening only belongs on a genuinely fresh Day 1 (or a save captured
+        // before he was fully processed — see CampaignManager.StartCampaign, which discards a
+        // mid-shift restore in that exact case so this still runs from the top). Once his
+        // tutorial has actually been completed (SaveDataManager.Day1VladProcessed), every later
+        // clock-in on this save — whether from resuming mid-Day-1 after a quit/reload, or from
+        // any other re-entry into this method — must NOT re-arm his forced spawn/dialogue.
+        // Without this check, Day1OpeningSequence unconditionally re-armed
+        // SuspectController.InterceptNextSuspectSpawn on every single clock-in, hijacking
+        // whichever suspect the restored SuspectIndex actually pointed at (spawning Vlad again,
+        // or leaving OnVladArrivedAtWindow's index-0 check to fire his dialogue onto whoever
+        // actually landed on lineup slot 0) instead of continuing the lineup from where the
+        // player left off.
+        if (SaveDataManager.Instance?.Day1VladProcessed ?? false)
+        {
+            StartCoroutine(Day1ResumedShiftStart());
+            return;
+        }
+
         StartCoroutine(Day1OpeningSequence());
+    }
+
+    /// <summary>
+    /// Runs instead of <see cref="Day1OpeningSequence"/> whenever the player clocks in on Day 1
+    /// after Vlad's scripted tutorial has already been fully processed on this save file (see
+    /// <see cref="SaveDataManager.Day1VladProcessed"/>) — i.e. every clock-in on a mid-Day-1
+    /// resume from here on, since Vlad only ever needs to appear once per save. Starts the
+    /// shift normally, with no Vlad intercept, no forced no-paperwork/skip-entry-dialogue, and
+    /// no bell bypass, so the suspect lineup continues from wherever
+    /// <see cref="SuspectController.SuspectIndex"/> was left (restored by
+    /// <see cref="ShiftManager.RestoreWorkdaySaveState"/>) instead of forcing Vlad back into
+    /// that slot.
+    /// </summary>
+    private IEnumerator Day1ResumedShiftStart()
+    {
+        yield return new WaitForSeconds(_shutterOpenDelay);
+
+        // Vlad's arrival-only dialogue hook must never fire again this session. A resumed
+        // suspect can legitimately land back on lineup index 0 (e.g. a retry after a failed
+        // spawn attempt) — without unsubscribing here, OnVladArrivedAtWindow's index-0 check
+        // would force his scripted dialogue onto whoever that suspect actually is.
+        SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
+
+        ShutterController.Instance.OpenShutter();
+        _lever?.AnimateOpenServerSide(1f);
+
+        // DayActivated unconditionally re-locks every tutorial-gated interactable and re-arms
+        // HandOffPoint.BlockVerdict every time Day 1 activates, including on this resumed
+        // session — but the sequence that normally unlocks/clears them (Vlad's own tutorial)
+        // will never run again this session, since he was already processed. Force them back
+        // to their unlocked/cleared state, mirroring ShiftManager.ResumeSavedDay's Day 2+ restore.
+        ForceUnlockTutorialItems();
+        HandOffPoint.BlockVerdict = false;
+        SuspectController.Instance?.ClearBlockVerdictAcrossAllClients();
+
+        ShiftManager.Instance.TryStartShift();
+
+        Debug.Log("[Day_01] Vlad's tutorial was already processed on this save — resuming the shift normally.");
     }
 
     /// <summary>

@@ -183,6 +183,20 @@ public class CampaignManager : NetworkBehaviour
             _currentDay = Mathf.Max(1, SaveDataManager.Instance.CurrentDay);
             _networkCurrentDay.Value = _currentDay;
 
+            // Day 1 safety net: Vlad's scripted tutorial is not resumable mid-sequence — his
+            // walk-in, dialogue, and paperwork tutorial only ever run once, at the top of
+            // Day1OpeningSequence, and only on a genuinely fresh clock-in (see
+            // Day_01.OnPlayerClockedIn). So if the player reloads before he was fully processed,
+            // there is no partial state worth keeping: treat it exactly like a brand-new Day 1
+            // by resetting the save's entire in-progress workday (cash, pickables, suspect
+            // progress) back to the immutable day-start baseline BEFORE the coupon total below
+            // is read, so a stale mid-day cash amount is never applied.
+            if (_currentDay == 1 && !(SaveDataManager.Instance?.Day1VladProcessed ?? false))
+            {
+                Debug.Log("[CampaignManager] Day 1 resumed before Vlad's tutorial was processed — resetting the save's Day 1 progress back to the start of the day.");
+                SaveDataManager.Instance?.ResetCurrentWorkdayToDayStart();
+            }
+
             // Restore the coupon total from the active save slot. GlobalHostVariables.money is
             // a NetworkVariable that always starts at 0 on scene load, so without this the
             // player's persisted cash silently resets to 0 whenever a save file is loaded.
@@ -201,22 +215,11 @@ public class CampaignManager : NetworkBehaviour
 
         // Keep an immutable reference before day activation. Activation may schedule a fresh task
         // and autosave it, but it must never replace the state selected for this resume.
+        // On Day 1 before Vlad is processed this is always null: the reset above just wrote a
+        // clean (or empty) WorkdayState back, and GetWorkdayState only returns a snapshot that
+        // is both valid and belongs to this exact day, so ApplyDay below always activates a
+        // completely fresh Day 1 in that case.
         _pendingWorkdayRestore = IsServer ? SaveDataManager.Instance?.GetWorkdayState(_currentDay) : null;
-
-        // Day 1 safety net: a generic mid-shift restore resumes the suspect lineup at the next
-        // unprocessed slot via the normal population path — it does NOT re-arm Vlad's scripted
-        // spawn intercept (that only happens inside Day_01.Day1OpeningSequence, which runs once
-        // on clock-in and never again on resume). If the save was made before Vlad's tutorial
-        // appearance was fully processed, resuming this way spawns a random suspect into slot 0
-        // while Day_01's Vlad-only dialogue hooks (keyed off lineup index 0) still fire on them.
-        // Discard the stale restore instead so Day 1 falls through to its normal fresh-start path
-        // and the opening sequence (Vlad first, as usual) runs from the beginning.
-        if (IsServer && _currentDay == 1 && _pendingWorkdayRestore != null &&
-            !(SaveDataManager.Instance?.Day1VladProcessed ?? false))
-        {
-            Debug.Log("[CampaignManager] Day 1 resumed before Vlad's tutorial was processed — discarding mid-shift restore so the opening sequence restarts from the beginning.");
-            _pendingWorkdayRestore = null;
-        }
 
         ApplyDay(_currentDay);
 

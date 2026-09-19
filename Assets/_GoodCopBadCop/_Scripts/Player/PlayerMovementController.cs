@@ -372,7 +372,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         if (_isSitting && _canSitOrStand)
         {
             bool standUpInput = Input.GetKeyDown(KeyCode.Escape)
-                                || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
+                                || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)
+                                || IsJumpDown;
             if (standUpInput && UIController.Instance.IsPaused == false)
             {
                 StandUp();

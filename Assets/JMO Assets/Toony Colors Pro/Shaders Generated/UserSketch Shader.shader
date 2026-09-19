@@ -326,7 +326,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				"LightMode"="UniversalForward"
 				// Injection Point: 'Main Pass/Tags'
 			}
-		Blend [_SrcBlend] [_DstBlend]
+		Blend One Zero
 		Cull [_Cull]
 		ZWrite [_ZWrite]
 			// Injection Point: 'Main Pass/Shader States'
@@ -754,7 +754,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 				// Injection Point: 'Outline Pass/Tags'
 			}
 			Cull Front
-			Blend [_SrcBlend] [_DstBlend]
+			Blend One Zero
 			ColorMask RGB
 			ZWrite On
 			// Injection Point: 'Outline Pass/Shader States'

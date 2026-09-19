@@ -559,6 +559,17 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             // Wait for the animation to reach the impact point, then register the hit.
             yield return new WaitForSeconds(0.5f);
 
+            // Player closed the shutter during the wind-up — the shutter starts moving (and
+            // ShutterController.IsOpen flips) the instant the switch is hit, well before the
+            // panel is visually all the way down. Treat that as fully closed immediately so a
+            // blow already mid-swing doesn't land on the glass behind a shutter that is on its
+            // way down. Abort this hit and retreat instead of following through.
+            if (_shutterController != null && !_shutterController.IsOpen)
+            {
+                SetAttackClientRpc(false);
+                break;
+            }
+
             if (glass != null)
             {
                 int newHits = glass.RegisterHit();

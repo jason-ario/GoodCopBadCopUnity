@@ -355,6 +355,11 @@ public class SuspectRunRecords : MonoBehaviour
     {
         int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
 
+        // Rolled once per day (not once per suspect) so every suspect shares the same
+        // "how bad was today" swing — see AnomalyManager.RollInfectionProgressionMultiplier.
+        float dayMultiplier = AnomalyManager.Instance != null ? AnomalyManager.Instance.RollInfectionProgressionMultiplier() : 1f;
+        Debug.Log($"[SuspectRunRecords] Day {currentDay} infection multiplier rolled: {dayMultiplier:F2}x.");
+
         foreach (SuspectRecord record in records)
         {
             // --- Replacement activation check ---
@@ -402,10 +407,9 @@ public class SuspectRunRecords : MonoBehaviour
             {
                 Vector2Int range = record.SuspectData.dailyInfectionProgression;
                 int baseIncrease = UnityEngine.Random.Range(range.x, range.y + 1);
-                float multiplier = AnomalyManager.Instance != null ? AnomalyManager.Instance.InfectionProgressionMultiplier : 1f;
-                int increase = Mathf.RoundToInt(baseIncrease * multiplier);
+                int increase = Mathf.RoundToInt(baseIncrease * dayMultiplier);
                 record.infectionScore = Mathf.Clamp(record.infectionScore + increase, 0, 100);
-                Debug.Log($"[SuspectRunRecords] '{record.SuspectData.name}' infection +{increase} (base {baseIncrease} × {multiplier:F2}) → {record.infectionScore}{(record.IsFullyMutated ? " [FULLY MUTATED]" : "")}.");
+                Debug.Log($"[SuspectRunRecords] '{record.SuspectData.name}' infection +{increase} (base {baseIncrease} × {dayMultiplier:F2}) → {record.infectionScore}{(record.IsFullyMutated ? " [FULLY MUTATED]" : "")}.");
             }
         }
 

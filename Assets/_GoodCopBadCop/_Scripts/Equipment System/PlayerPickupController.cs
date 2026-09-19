@@ -193,14 +193,6 @@ public class PlayerPickupController : NetworkBehaviour
 
         _bodyCurrentlyEquippedItem = targetBodyContainer.CurrentlyEquippedItem;
 
-        // Non-owner clients constrain the world object to the body arm so they see it there.
-        // (Owner already constrained it to the camera arm in PickUpObject.)
-        // Called here regardless of _heldObjectRef order — ApplyBodyConstraint guards
-        // internally against missing refs and will no-op if _heldObjectRef hasn't arrived yet;
-        // OnHeldObjectRefChanged will call it again once that variable syncs.
-        if (!IsOwner)
-            ApplyBodyConstraint();
-
         if (itemData.useRightIK)
         {
             _playerAnimationController.SetRightArmRigWeightSmooth(1, .2f);
@@ -244,6 +236,20 @@ public class PlayerPickupController : NetworkBehaviour
         {
             _playerAnimationController.EnableRightArmMask();
         }
+
+        // Non-owner clients constrain the world object to the body arm so they see it there.
+        // (Owner already constrained it to the camera arm in PickUpObject.)
+        // Called here regardless of _heldObjectRef order — ApplyBodyConstraint guards
+        // internally against missing refs and will no-op if _heldObjectRef hasn't arrived yet;
+        // OnHeldObjectRefChanged will call it again once that variable syncs.
+        // Deliberately runs LAST: if this player is currently being spectated,
+        // ApplyBodyConstraint -> EquipCamContainerForSpectate re-targets RightArmIKTarget/
+        // LeftArmIKTarget (set to the body sockets above) to the lag-free cam sockets instead.
+        // Running it before the body-target assignments above would let them clobber that
+        // retarget, leaving the hand bone tracking the laggy body socket while the item itself
+        // followed the cam socket — the visible item/hand desync seen while spectating.
+        if (!IsOwner)
+            ApplyBodyConstraint();
     }
 
     // RT (rightTrigger) = LMB, LT (leftTrigger) = RMB — mirrors PlayerInteractionController.
@@ -1192,7 +1198,23 @@ public class PlayerPickupController : NetworkBehaviour
         _camEquippedItem = camContainer.CurrentlyEquippedItem;
 
         if (_camEquippedItem != null)
+        {
             _followTarget = _camEquippedItem.transform;
+
+            // The item now tracks the lag-free cam socket instead of the NetworkAnimator-
+            // interpolated body socket. Retarget the visible arm IK to the SAME cam socket so
+            // the rendered hand bone stays glued to the item instead of trailing behind at the
+            // old (laggier) body-socket position — this is what caused the item to visibly
+            // float out of sync with the hand while spectating.
+            IkTargets camIk = _camEquippedItem.GetComponent<IkTargets>();
+            if (camIk != null)
+            {
+                if (itemData.useRightIK)
+                    _playerAnimationController.RightArmIKTarget = camIk.rightIKTarget;
+                if (itemData.useLeftIK)
+                    _playerAnimationController.LeftArmIKTarget = camIk.leftIKTarget;
+            }
+        }
     }
 
     /// <summary>
@@ -1210,6 +1232,21 @@ public class PlayerPickupController : NetworkBehaviour
 
         camContainer.UnequipItem(this);
         _camEquippedItem = null;
+
+        // Restore the body-socket IK targets so the arm rig goes back to tracking the
+        // NetworkAnimator-driven body container (which the item's follow target also reverts
+        // to in SetSpectatedView) once we stop borrowing the cam socket for spectating.
+        if (_bodyCurrentlyEquippedItem != null && itemData != null)
+        {
+            IkTargets bodyIk = _bodyCurrentlyEquippedItem.GetComponent<IkTargets>();
+            if (bodyIk != null)
+            {
+                if (itemData.useRightIK)
+                    _playerAnimationController.RightArmIKTarget = bodyIk.rightIKTarget;
+                if (itemData.useLeftIK)
+                    _playerAnimationController.LeftArmIKTarget = bodyIk.leftIKTarget;
+            }
+        }
     }
 
     /// <summary>

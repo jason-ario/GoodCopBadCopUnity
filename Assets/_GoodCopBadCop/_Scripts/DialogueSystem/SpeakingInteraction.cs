@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -89,12 +91,13 @@ public class SpeakingInteraction : NetworkBehaviour
     [SerializeField] private Transform lookTarget;
     public Transform LookTarget => lookTarget;
 
-    // Server-authoritative lock so only one player at a time can hold a world-dialogue
-    // conversation with this speaker. Read by everyone, written only by the server.
+    // Server-authoritative engagement flag, true while any player holds a world-dialogue
+    // conversation with this speaker. Read by everyone, written only by the server. Multiple
+    // players may be engaged simultaneously — see the "World Dialogue Voting" region below,
+    // which resolves conflicting dialogue-option picks across every engaged participant using
+    // the same rule ScriptedDialogueRunner uses for interrogation-booth choice nodes.
     private readonly NetworkVariable<bool> _isEngaged =
         new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    private readonly NetworkVariable<ulong> _engagedClientId =
-        new NetworkVariable<ulong>(ulong.MaxValue, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private Action<bool> _pendingEngagementCallback;
 
@@ -113,21 +116,22 @@ public class SpeakingInteraction : NetworkBehaviour
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
     }
 
-    // Releases the engagement lock if the player who was holding it disconnects mid-conversation,
-    // so this speaker doesn't stay permanently unavailable to everyone else.
+    // Releases this client's engagement participation if it disconnects mid-conversation, so a
+    // vanished player doesn't leave the choice/advance gates waiting on them forever.
     private void OnClientDisconnected(ulong clientId)
     {
-        if (_isEngaged.Value && _engagedClientId.Value == clientId)
+        if (_worldParticipants.Remove(clientId))
         {
-            _isEngaged.Value = false;
-            _engagedClientId.Value = ulong.MaxValue;
+            _isEngaged.Value = _worldParticipants.Count > 0;
+            RecheckWorldGatesAfterParticipantChange();
         }
     }
 
     /// <summary>
-    /// Requests exclusive engagement with this speaker for a world-dialogue conversation.
-    /// Invokes <paramref name="onResponse"/> with true if granted, or false if another player
-    /// already has this speaker engaged. Safe to call from any client.
+    /// Requests to join this speaker's world-dialogue conversation. Multiple players may join
+    /// the same conversation simultaneously — the join is always granted, there is no more
+    /// exclusivity lock. <paramref name="onResponse"/> is invoked once the server confirms the
+    /// join. Safe to call from any client.
     /// </summary>
     public void RequestBeginEngagement(Action<bool> onResponse)
     {
@@ -139,19 +143,32 @@ public class SpeakingInteraction : NetworkBehaviour
     private void RequestBeginEngagementServerRpc(ServerRpcParams rpcParams = default)
     {
         ulong senderId = rpcParams.Receive.SenderClientId;
-        bool granted = !_isEngaged.Value;
-
-        if (granted)
-        {
-            _isEngaged.Value = true;
-            _engagedClientId.Value = senderId;
-        }
+        bool isFirstParticipant = _worldParticipants.Count == 0;
+        _worldParticipants.Add(senderId);
+        _isEngaged.Value = true;
 
         ClientRpcParams targetParams = new ClientRpcParams
         {
             Send = new ClientRpcSendParams { TargetClientIds = new[] { senderId } }
         };
-        EngagementResponseClientRpc(granted, targetParams);
+        EngagementResponseClientRpc(true, targetParams);
+
+        if (isFirstParticipant)
+        {
+            // First participant starts the authoritative conversation loop on the server.
+            GetComponent<SuspectWorldDialogue>()?.ServerStartConversation();
+        }
+        else if (_awaitingWorldChoice && _lastShownWorldChoiceTexts != null)
+        {
+            // Catch a mid-conversation joiner up with the choice panel that's already open,
+            // so they can immediately take part in the vote.
+            SplitChoiceTexts(_lastShownWorldChoiceTexts, out string c0, out string c1, out string c2);
+            ShowWorldChoicesClientRpc(c0, c1, c2, targetParams);
+        }
+        else if (_awaitingWorldAdvance)
+        {
+            SetWorldAwaitingAdvanceClientRpc(true, targetParams);
+        }
     }
 
     [ClientRpc]
@@ -162,7 +179,7 @@ public class SpeakingInteraction : NetworkBehaviour
         callback?.Invoke(granted);
     }
 
-    /// <summary>Releases this speaker's engagement lock. Safe to call even if not currently engaged.</summary>
+    /// <summary>Leaves this speaker's world-dialogue conversation. Safe to call even if not engaged.</summary>
     public void EndEngagement()
     {
         EndEngagementServerRpc();
@@ -172,10 +189,10 @@ public class SpeakingInteraction : NetworkBehaviour
     private void EndEngagementServerRpc(ServerRpcParams rpcParams = default)
     {
         ulong senderId = rpcParams.Receive.SenderClientId;
-        if (_isEngaged.Value && _engagedClientId.Value == senderId)
+        if (_worldParticipants.Remove(senderId))
         {
-            _isEngaged.Value = false;
-            _engagedClientId.Value = ulong.MaxValue;
+            _isEngaged.Value = _worldParticipants.Count > 0;
+            RecheckWorldGatesAfterParticipantChange();
         }
     }
 
@@ -225,7 +242,7 @@ public class SpeakingInteraction : NetworkBehaviour
     {
         if (IsServer)
         {
-            SayWorldDialogueClientRpc(dialogue, NetworkManager.Singleton.LocalClientId, clearHistory, waitForInput);
+            SayWorldDialogueClientRpc(dialogue, WorldParticipantIdsSnapshot(), clearHistory, waitForInput);
         }
         else
         {
@@ -234,18 +251,25 @@ public class SpeakingInteraction : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SayWorldDialogueServerRpc(string dialogue, bool clearHistory, bool waitForInput,
-        ServerRpcParams rpcParams = default)
+    private void SayWorldDialogueServerRpc(string dialogue, bool clearHistory, bool waitForInput)
     {
-        SayWorldDialogueClientRpc(dialogue, rpcParams.Receive.SenderClientId, clearHistory, waitForInput);
+        SayWorldDialogueClientRpc(dialogue, WorldParticipantIdsSnapshot(), clearHistory, waitForInput);
+    }
+
+    /// <summary>Server-only snapshot of the clients currently engaged in this speaker's world-dialogue conversation.</summary>
+    private ulong[] WorldParticipantIdsSnapshot()
+    {
+        ulong[] ids = new ulong[_worldParticipants.Count];
+        _worldParticipants.CopyTo(ids);
+        return ids;
     }
 
     [ClientRpc]
-    private void SayWorldDialogueClientRpc(string dialogue, ulong engagedClientId, bool clearHistory,
+    private void SayWorldDialogueClientRpc(string dialogue, ulong[] participantIds, bool clearHistory,
         bool waitForInput)
     {
         bool isEngagedPlayer = NetworkManager.Singleton != null &&
-                               NetworkManager.Singleton.LocalClientId == engagedClientId;
+                               Array.IndexOf(participantIds, NetworkManager.Singleton.LocalClientId) >= 0;
 
         if (isEngagedPlayer)
         {
@@ -380,5 +404,306 @@ public class SpeakingInteraction : NetworkBehaviour
         {
             distortion.enabled = false;
         }
+    }
+
+    // ===========================================================================================
+    // World dialogue — multiplayer participants & choice voting
+    // ===========================================================================================
+    //
+    // Both players may now hold the same world-dialogue conversation (SuspectWorldDialogue) with
+    // this speaker at once. When they pick different dialogue options, the winning pick is
+    // resolved with the exact same rule ScriptedDialogueRunner uses for interrogation-booth
+    // choice nodes: a unanimous pick wins outright, a split pick is decided by a random draw
+    // from the submitted options only (never from options nobody picked), and a per-pick timeout
+    // keeps the conversation moving if a participant never answers. The same "wait for every
+    // participant, or timeout" gate is applied to advancing past the greeting/response lines, so
+    // both participants stay in lock-step exactly like a scripted dialogue sequence.
+
+    [Header("World Dialogue Voting")]
+    [Tooltip("Seconds after the first participant advances a line or submits a choice before " +
+             "the conversation continues automatically without the other participant's input. " +
+             "Mirrors ScriptedDialogueRunner's equivalent multi-player timeout.")]
+    [SerializeField] private float _worldAdvanceTimeoutSeconds = 1.5f;
+
+    // Server-only: clients currently engaged in a world-dialogue conversation with this speaker.
+    private readonly HashSet<ulong> _worldParticipants = new HashSet<ulong>();
+
+    /// <summary>Server-only: true while at least one client is engaged with this speaker.</summary>
+    public bool HasWorldParticipants => _worldParticipants.Count > 0;
+
+    // Server-only — line-advance gate (greeting / NPC response lines).
+    private readonly HashSet<ulong> _worldAdvanceSet = new HashSet<ulong>();
+    private bool _awaitingWorldAdvance;
+    private bool _worldAdvanceReady;
+    private Coroutine _worldAdvanceTimerCoroutine;
+    private Action _onWorldAdvanceOpened;
+
+    // Server-only — choice-vote gate.
+    private readonly Dictionary<ulong, int> _worldChoiceSubmissions = new Dictionary<ulong, int>();
+    private bool _awaitingWorldChoice;
+    private bool _worldChoiceResolved;
+    private int _resolvedWorldChoiceIndex;
+    private Coroutine _worldChoiceTimerCoroutine;
+    private string[] _lastShownWorldChoiceTexts;
+    private Action<int> _onWorldChoiceResolved;
+
+    // Client-only: true while the server is waiting for this client to advance the current line.
+    private bool _clientAwaitingWorldAdvance;
+
+    /// <summary>True on this client while the server is waiting for it to advance the current world-dialogue line.</summary>
+    public bool IsAwaitingWorldAdvance => _clientAwaitingWorldAdvance;
+
+    /// <summary>
+    /// Fired locally whenever the server shows the world-dialogue choice panel to this client.
+    /// <see cref="SuspectWorldDialogue"/> subscribes to route the player's pick into
+    /// <see cref="SubmitWorldChoicePick"/> via <see cref="DialogueChoiceSystem.ShowScriptedChoices"/>.
+    /// </summary>
+    public event Action<string[]> OnWorldChoicesShown;
+
+    /// <summary>Fired locally once the server has resolved (or timed out) the current choice vote.</summary>
+    public event Action OnWorldChoiceFinalized;
+
+    /// <summary>Fired locally whenever <see cref="IsAwaitingWorldAdvance"/> changes.</summary>
+    public event Action<bool> OnWorldAdvanceGateChanged;
+
+    private ClientRpcParams WorldParticipantRpcParams()
+    {
+        return new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new List<ulong>(_worldParticipants) }
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Line-advance gate
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only. Opens the line-advance gate for the current world-dialogue line (greeting or
+    /// NPC response) and calls <paramref name="onOpened"/> once every current participant has
+    /// advanced past it, or the per-participant timeout expires — mirrors
+    /// <c>ScriptedDialogueRunner.SayAndWait</c> / <c>WaitForScriptedAdvance</c>.
+    /// </summary>
+    public void ServerBeginWorldAdvanceGate(Action onOpened)
+    {
+        _worldAdvanceSet.Clear();
+        _worldAdvanceReady = false;
+        _awaitingWorldAdvance = true;
+        _onWorldAdvanceOpened = onOpened;
+        SetWorldAwaitingAdvanceClientRpc(true, WorldParticipantRpcParams());
+    }
+
+    [ClientRpc]
+    private void SetWorldAwaitingAdvanceClientRpc(bool awaiting, ClientRpcParams rpcParams = default)
+    {
+        _clientAwaitingWorldAdvance = awaiting;
+        OnWorldAdvanceGateChanged?.Invoke(awaiting);
+    }
+
+    /// <summary>
+    /// Sent by a participant pressing E/click to advance the current greeting/response line.
+    /// After the first submission a countdown begins; the gate opens once every current
+    /// participant has submitted or the countdown expires — mirrors
+    /// <c>ScriptedDialogueRunner.AdvanceScriptedLineServerRpc</c>.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void SubmitWorldAdvanceServerRpc(ServerRpcParams rpcParams = default)
+    {
+        if (!_awaitingWorldAdvance || _worldAdvanceReady) return;
+
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        _worldParticipants.Add(senderId);
+        _worldAdvanceSet.Add(senderId);
+
+        int required = Mathf.Max(1, _worldParticipants.Count);
+
+        if (_worldAdvanceSet.Count == 1 && _worldAdvanceTimerCoroutine == null && required > 1)
+            _worldAdvanceTimerCoroutine = StartCoroutine(WorldAdvanceTimeoutCoroutine());
+
+        if (_worldAdvanceSet.Count >= required)
+            OpenWorldAdvanceGate();
+    }
+
+    private IEnumerator WorldAdvanceTimeoutCoroutine()
+    {
+        yield return new WaitForSeconds(_worldAdvanceTimeoutSeconds);
+        OpenWorldAdvanceGate();
+    }
+
+    private void OpenWorldAdvanceGate()
+    {
+        if (_worldAdvanceReady) return;
+        _worldAdvanceReady = true;
+        _awaitingWorldAdvance = false;
+
+        if (_worldAdvanceTimerCoroutine != null)
+        {
+            StopCoroutine(_worldAdvanceTimerCoroutine);
+            _worldAdvanceTimerCoroutine = null;
+        }
+
+        SetWorldAwaitingAdvanceClientRpc(false, WorldParticipantRpcParams());
+
+        // Reuse the shared subtitle-advance broadcast so the waiting line is cleared for every
+        // participant exactly the same way a normal (non-voted) advance would clear it.
+        DialogueManager.Instance.AdvanceDialogueServerRpc();
+
+        Action callback = _onWorldAdvanceOpened;
+        _onWorldAdvanceOpened = null;
+        callback?.Invoke();
+    }
+
+    // -------------------------------------------------------------------------
+    // Choice-vote gate
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only. Shows the world-dialogue choice panel to every current participant and
+    /// collects their picks. A unanimous pick wins outright; conflicting picks are resolved by a
+    /// random draw from the submitted options only — mirrors <c>ScriptedDialogueRunner.ResolveChoices</c>.
+    /// Calls <paramref name="onResolved"/> with the winning index once resolved. Supports up to 3
+    /// options (matching <see cref="SuspectWorldDialogue"/>'s authored option limit) — like
+    /// <c>ScriptedDialogueRunner.ShowChoicesClientRpc</c>, texts are sent as individual string
+    /// parameters rather than a string[] array, since NGO arrays of managed types are not used
+    /// elsewhere in this project.
+    /// </summary>
+    public void ServerBeginWorldChoiceVote(string[] choiceTexts, Action<int> onResolved)
+    {
+        _worldChoiceSubmissions.Clear();
+        _worldChoiceResolved = false;
+        _resolvedWorldChoiceIndex = -1;
+        _awaitingWorldChoice = true;
+        _lastShownWorldChoiceTexts = choiceTexts;
+        _onWorldChoiceResolved = onResolved;
+        SplitChoiceTexts(choiceTexts, out string c0, out string c1, out string c2);
+        ShowWorldChoicesClientRpc(c0, c1, c2, WorldParticipantRpcParams());
+    }
+
+    private static void SplitChoiceTexts(string[] texts, out string choice0, out string choice1, out string choice2)
+    {
+        choice0 = texts.Length > 0 ? texts[0] : string.Empty;
+        choice1 = texts.Length > 1 ? texts[1] : string.Empty;
+        choice2 = texts.Length > 2 ? texts[2] : string.Empty;
+    }
+
+    [ClientRpc]
+    private void ShowWorldChoicesClientRpc(string choice0, string choice1, string choice2, ClientRpcParams rpcParams = default)
+    {
+        var texts = new List<string> { choice0, choice1 };
+        if (!string.IsNullOrEmpty(choice2)) texts.Add(choice2);
+        OnWorldChoicesShown?.Invoke(texts.ToArray());
+    }
+
+    /// <summary>
+    /// Called locally by <see cref="SuspectWorldDialogue"/> once the player clicks a choice
+    /// button: highlights the pick immediately (mirrors <c>ScriptedDialogueRunner.OnLocalPlayerPickedChoice</c>)
+    /// and submits the vote to the server. The panel stays open until every participant has
+    /// picked (or the timeout fires).
+    /// </summary>
+    public void SubmitWorldChoicePick(int choiceIndex)
+    {
+        DialogueChoiceSystem.Instance.HighlightChoice(choiceIndex);
+        SubmitWorldChoiceServerRpc(choiceIndex);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SubmitWorldChoiceServerRpc(int choiceIndex, ServerRpcParams rpcParams = default)
+    {
+        if (_worldChoiceResolved) return;
+
+        ulong senderId = rpcParams.Receive.SenderClientId;
+        if (_worldChoiceSubmissions.ContainsKey(senderId)) return; // ignore re-submissions
+
+        _worldParticipants.Add(senderId);
+        _worldChoiceSubmissions[senderId] = choiceIndex;
+
+        HighlightWorldChoiceForOthersClientRpc(choiceIndex, senderId);
+
+        int required = Mathf.Max(1, _worldParticipants.Count);
+
+        if (_worldChoiceSubmissions.Count == 1 && required > 1)
+            _worldChoiceTimerCoroutine = StartCoroutine(WorldChoiceTimeoutCoroutine());
+
+        if (_worldChoiceSubmissions.Count >= required)
+            ResolveWorldChoiceVote();
+    }
+
+    /// <summary>Highlights the submitted choice on every client except the sender, who already highlighted locally.</summary>
+    [ClientRpc]
+    private void HighlightWorldChoiceForOthersClientRpc(int choiceIndex, ulong senderClientId)
+    {
+        if (NetworkManager.Singleton.LocalClientId == senderClientId) return;
+        DialogueChoiceSystem.Instance?.HighlightChoice(choiceIndex);
+    }
+
+    private IEnumerator WorldChoiceTimeoutCoroutine()
+    {
+        yield return new WaitForSeconds(_worldAdvanceTimeoutSeconds);
+        ResolveWorldChoiceVote();
+    }
+
+    private void ResolveWorldChoiceVote()
+    {
+        if (_worldChoiceResolved) return;
+        _worldChoiceResolved = true;
+        _awaitingWorldChoice = false;
+
+        if (_worldChoiceTimerCoroutine != null)
+        {
+            StopCoroutine(_worldChoiceTimerCoroutine);
+            _worldChoiceTimerCoroutine = null;
+        }
+
+        var submitted = new List<int>(_worldChoiceSubmissions.Values);
+
+        if (submitted.Count == 0)
+        {
+            _resolvedWorldChoiceIndex = 0;
+            Debug.LogWarning($"[SpeakingInteraction] ResolveWorldChoiceVote on '{speakerName}' called with no submissions. Defaulting to choice 0.");
+        }
+        else
+        {
+            bool unanimous = submitted.TrueForAll(v => v == submitted[0]);
+            _resolvedWorldChoiceIndex = unanimous
+                ? submitted[0]
+                : submitted[UnityEngine.Random.Range(0, submitted.Count)];
+        }
+
+        FinalizeWorldChoiceClientRpc(WorldParticipantRpcParams());
+
+        Action<int> callback = _onWorldChoiceResolved;
+        _onWorldChoiceResolved = null;
+        callback?.Invoke(_resolvedWorldChoiceIndex);
+    }
+
+    [ClientRpc]
+    private void FinalizeWorldChoiceClientRpc(ClientRpcParams rpcParams = default)
+    {
+        DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
+        DialogueChoiceSystem.Instance?.HideChoicePanel();
+        OnWorldChoiceFinalized?.Invoke();
+    }
+
+    /// <summary>
+    /// Re-evaluates the advance/choice gates after <see cref="_worldParticipants"/> shrinks (a
+    /// participant left or disconnected). Opens/resolves immediately if the remaining
+    /// participants have already all submitted, or if nobody is left to answer at all — mirrors
+    /// <c>ScriptedDialogueRunner.RecheckGatesAfterParticipantChange</c>.
+    /// </summary>
+    private void RecheckWorldGatesAfterParticipantChange()
+    {
+        if (_worldParticipants.Count == 0)
+        {
+            if (_awaitingWorldAdvance && !_worldAdvanceReady) OpenWorldAdvanceGate();
+            if (_awaitingWorldChoice && !_worldChoiceResolved) ResolveWorldChoiceVote();
+            return;
+        }
+
+        int required = _worldParticipants.Count;
+
+        if (_awaitingWorldAdvance && !_worldAdvanceReady && _worldAdvanceSet.Count >= required)
+            OpenWorldAdvanceGate();
+        else if (_awaitingWorldChoice && !_worldChoiceResolved && _worldChoiceSubmissions.Count >= required)
+            ResolveWorldChoiceVote();
     }
 }
