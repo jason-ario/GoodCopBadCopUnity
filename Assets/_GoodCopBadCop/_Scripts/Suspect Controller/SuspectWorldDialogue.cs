@@ -331,6 +331,12 @@ public class SuspectWorldDialogue : MonoBehaviour
 
             DialogueOption chosen = _options[Mathf.Clamp(chosenIndex, 0, _options.Length - 1)];
 
+            // Flush the FinalizeWorldChoiceClientRpc (which shows the choice echo) before firing
+            // the NPC response's own SayWorldDialogueClientRpc — mirrors
+            // ScriptedDialogueRunner.PlayChoiceNode's identical "flush the RPC" yield, since two
+            // ClientRpcs fired in the same server frame can otherwise be delivered out of order.
+            yield return null;
+
             if (animator != null && !string.IsNullOrEmpty(chosen.animationTrigger))
                 animator.SetTrigger(chosen.animationTrigger);
 

@@ -49,11 +49,23 @@ public class DialogueManager : NetworkBehaviour
 
     /// <summary>
     /// The persistent "player choice echo" line spawned by <see cref="ShowChoiceEcho"/>.
-    /// Unlike normal subtitles, this instance survives <see cref="DestroyPreviousSubtitles"/>
-    /// so it can remain visible above the NPC's response subtitle until explicitly hidden
-    /// via <see cref="HideChoiceEcho"/>.
+    /// Unlike a normal subtitle, this instance is never cleared by an advance/skip
+    /// (<see cref="ClearHistory"/>) — it disappears only via its own auto-hide timer (see
+    /// <see cref="AutoHideChoiceEcho"/>), by being replaced by a newer echo, or by coexisting
+    /// with exactly one subsequent subtitle (the NPC's response) before yielding to whatever
+    /// comes after that — see <see cref="_choiceEchoProtected"/>.
     /// </summary>
     private GameObject _activeChoiceEcho;
+
+    /// <summary>
+    /// True for the single subtitle spawn immediately following <see cref="ShowChoiceEcho"/> —
+    /// lets the NPC's response subtitle spawn without evicting the echo above it. Consumed (set
+    /// false) the first time <see cref="DestroyPreviousSubtitles"/> runs afterward, so any
+    /// further/later subtitle spawn evicts the echo normally.
+    /// </summary>
+    private bool _choiceEchoProtected;
+
+    private Coroutine _choiceEchoDestroyCoroutine;
 
     private void Awake()
     {
@@ -314,10 +326,12 @@ public class DialogueManager : NetworkBehaviour
 
     /// <summary>
     /// Spawns a persistent caption showing the resolved player dialogue choice. Unlike a
-    /// normal subtitle, this line is not cleared by <see cref="DestroyPreviousSubtitles"/>,
-    /// so it stays on screen — stacked above via the subtitles container's vertical layout —
-    /// while the NPC's response subtitle is subsequently spawned below it. Call
-    /// <see cref="HideChoiceEcho"/> once the response has been dismissed to remove it.
+    /// normal subtitle, this line is not cleared by an advance/skip, so it stays on screen —
+    /// stacked above via the subtitles container's vertical layout — while the NPC's response
+    /// subtitle is subsequently spawned below it. It disappears on its own after a few seconds
+    /// (see <see cref="AutoHideChoiceEcho"/>) or as soon as a second subtitle spawns after the
+    /// response (see <see cref="_choiceEchoProtected"/>) — never merely because the response was
+    /// advanced past.
     /// </summary>
     public void ShowChoiceEcho(string text, string playerName, Color color)
     {
@@ -330,6 +344,25 @@ public class DialogueManager : NetworkBehaviour
         echo.transform.SetAsFirstSibling();
 
         _activeChoiceEcho = echo.gameObject;
+        _choiceEchoProtected = true;
+
+        float duration = text.Length * secondsPerCharacter + subtitleLingerSeconds;
+        _choiceEchoDestroyCoroutine = StartCoroutine(AutoHideChoiceEcho(echo.gameObject, duration));
+    }
+
+    /// <summary>Auto-hides the choice echo a few seconds after its typewriter reveal finishes, independent of any advance/skip input.</summary>
+    private IEnumerator AutoHideChoiceEcho(GameObject echoObj, float displayDuration)
+    {
+        var textReveal = echoObj.GetComponentInChildren<TMPTextReveal>();
+        if (textReveal != null)
+            yield return new WaitUntil(() => echoObj == null || textReveal == null || !textReveal.IsRevealing);
+
+        if (echoObj == null) yield break;
+
+        yield return new WaitForSeconds(displayDuration);
+
+        if (_activeChoiceEcho == echoObj)
+            HideChoiceEcho();
     }
 
     /// <summary>
@@ -337,6 +370,14 @@ public class DialogueManager : NetworkBehaviour
     /// </summary>
     public void HideChoiceEcho()
     {
+        if (_choiceEchoDestroyCoroutine != null)
+        {
+            StopCoroutine(_choiceEchoDestroyCoroutine);
+            _choiceEchoDestroyCoroutine = null;
+        }
+
+        _choiceEchoProtected = false;
+
         if (_activeChoiceEcho != null)
         {
             Destroy(_activeChoiceEcho);
@@ -382,7 +423,19 @@ public class DialogueManager : NetworkBehaviour
         {
             _waitingSubtitle = null;
             float duration = text.Length * secondsPerCharacter + subtitleLingerSeconds;
-            _subtitleDestroyCoroutine = StartCoroutine(DestroySubtitles(subtitles.gameObject, duration));
+
+            // If the choice echo survived eviction above (protected) to coexist with this
+            // subtitle, stop its independent auto-hide timer and destroy it together with
+            // this subtitle instead — so they disappear at the same time rather than the
+            // (usually shorter) echo vanishing first.
+            GameObject echoToSync = _activeChoiceEcho;
+            if (echoToSync != null && _choiceEchoDestroyCoroutine != null)
+            {
+                StopCoroutine(_choiceEchoDestroyCoroutine);
+                _choiceEchoDestroyCoroutine = null;
+            }
+
+            _subtitleDestroyCoroutine = StartCoroutine(DestroySubtitles(subtitles.gameObject, duration, echoToSync));
         }
 
         return subtitles.gameObject;
@@ -526,19 +579,49 @@ public class DialogueManager : NetworkBehaviour
                || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
     }
 
+    /// <summary>
+    /// Clears the currently displayed subtitle(s) in response to an advance/skip input.
+    /// Deliberately never touches an active <see cref="_activeChoiceEcho"/> — advancing past a
+    /// line must not be what makes the choice echo disappear; see <see cref="AutoHideChoiceEcho"/>
+    /// and <see cref="DestroyPreviousSubtitles"/> for its actual lifecycle.
+    /// </summary>
     public void ClearHistory()
     {
-        DestroyPreviousSubtitles();
+        CancelSubtitleDestroy();
+        foreach (Transform child in subtitlesContainer)
+        {
+            if (_activeChoiceEcho != null && child.gameObject == _activeChoiceEcho) continue;
+            Destroy(child.gameObject);
+        }
     }
 
+    /// <summary>
+    /// Clears previous subtitles ahead of spawning a brand-new one. The choice echo is
+    /// protected for exactly one call — the NPC response subtitle spawned right after
+    /// <see cref="ShowChoiceEcho"/> — so it survives to coexist with that response. Any further
+    /// subtitle spawn after that (a genuinely new/later line) evicts the echo along with it.
+    /// </summary>
     void DestroyPreviousSubtitles()
     {
         CancelSubtitleDestroy();
         foreach (Transform child in subtitlesContainer)
         {
-            // The choice echo has its own explicit lifecycle (see ShowChoiceEcho/HideChoiceEcho)
-            // and must survive the NPC response subtitle being spawned right after it.
-            if (_activeChoiceEcho != null && child.gameObject == _activeChoiceEcho) continue;
+            if (_activeChoiceEcho != null && child.gameObject == _activeChoiceEcho)
+            {
+                if (_choiceEchoProtected)
+                {
+                    _choiceEchoProtected = false;
+                    continue;
+                }
+
+                if (_choiceEchoDestroyCoroutine != null)
+                {
+                    StopCoroutine(_choiceEchoDestroyCoroutine);
+                    _choiceEchoDestroyCoroutine = null;
+                }
+                _activeChoiceEcho = null;
+            }
+
             Destroy(child.gameObject);
         }
     }
@@ -552,7 +635,13 @@ public class DialogueManager : NetworkBehaviour
         }
     }
 
-    IEnumerator DestroySubtitles(GameObject subtitle, float displayDuration)
+    /// <summary>
+    /// Auto-destroys <paramref name="subtitle"/> after its typewriter reveal finishes plus
+    /// <paramref name="displayDuration"/>. If <paramref name="linkedChoiceEcho"/> is provided
+    /// (the choice echo that coexists above this subtitle), it is destroyed at the same moment
+    /// so the two disappear together instead of the echo vanishing on its own earlier timer.
+    /// </summary>
+    IEnumerator DestroySubtitles(GameObject subtitle, float displayDuration, GameObject linkedChoiceEcho = null)
     {
         // Wait for the typewriter animation to complete before starting the display countdown.
         var textReveal = subtitle.GetComponentInChildren<TMPTextReveal>();
@@ -565,6 +654,12 @@ public class DialogueManager : NetworkBehaviour
 
         if (subtitle != null)
             Destroy(subtitle);
+
+        if (linkedChoiceEcho != null && _activeChoiceEcho == linkedChoiceEcho)
+        {
+            Destroy(linkedChoiceEcho);
+            _activeChoiceEcho = null;
+        }
 
         _subtitleDestroyCoroutine = null;
     }

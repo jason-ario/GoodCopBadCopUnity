@@ -440,6 +440,7 @@ public class SpeakingInteraction : NetworkBehaviour
 
     // Server-only — choice-vote gate.
     private readonly Dictionary<ulong, int> _worldChoiceSubmissions = new Dictionary<ulong, int>();
+    private readonly Dictionary<ulong, string> _worldChoicePlayerNames = new Dictionary<ulong, string>();
     private bool _awaitingWorldChoice;
     private bool _worldChoiceResolved;
     private int _resolvedWorldChoiceIndex;
@@ -526,8 +527,21 @@ public class SpeakingInteraction : NetworkBehaviour
 
     private IEnumerator WorldAdvanceTimeoutCoroutine()
     {
+        ShowWorldAdvanceTimerClientRpc(_worldAdvanceTimeoutSeconds, WorldParticipantRpcParams());
         yield return new WaitForSeconds(_worldAdvanceTimeoutSeconds);
         OpenWorldAdvanceGate();
+    }
+
+    [ClientRpc]
+    private void ShowWorldAdvanceTimerClientRpc(float duration, ClientRpcParams rpcParams = default)
+    {
+        DialogueAdvanceTimer.Instance?.Show(duration);
+    }
+
+    [ClientRpc]
+    private void HideWorldAdvanceTimerClientRpc(ClientRpcParams rpcParams = default)
+    {
+        DialogueAdvanceTimer.Instance?.Hide();
     }
 
     private void OpenWorldAdvanceGate()
@@ -542,6 +556,7 @@ public class SpeakingInteraction : NetworkBehaviour
             _worldAdvanceTimerCoroutine = null;
         }
 
+        HideWorldAdvanceTimerClientRpc(WorldParticipantRpcParams());
         SetWorldAwaitingAdvanceClientRpc(false, WorldParticipantRpcParams());
 
         // Reuse the shared subtitle-advance broadcast so the waiting line is cleared for every
@@ -570,6 +585,7 @@ public class SpeakingInteraction : NetworkBehaviour
     public void ServerBeginWorldChoiceVote(string[] choiceTexts, Action<int> onResolved)
     {
         _worldChoiceSubmissions.Clear();
+        _worldChoicePlayerNames.Clear();
         _worldChoiceResolved = false;
         _resolvedWorldChoiceIndex = -1;
         _awaitingWorldChoice = true;
@@ -603,11 +619,11 @@ public class SpeakingInteraction : NetworkBehaviour
     public void SubmitWorldChoicePick(int choiceIndex)
     {
         DialogueChoiceSystem.Instance.HighlightChoice(choiceIndex);
-        SubmitWorldChoiceServerRpc(choiceIndex);
+        SubmitWorldChoiceServerRpc(choiceIndex, GetLocalPlayerName());
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SubmitWorldChoiceServerRpc(int choiceIndex, ServerRpcParams rpcParams = default)
+    private void SubmitWorldChoiceServerRpc(int choiceIndex, string playerName, ServerRpcParams rpcParams = default)
     {
         if (_worldChoiceResolved) return;
 
@@ -616,6 +632,7 @@ public class SpeakingInteraction : NetworkBehaviour
 
         _worldParticipants.Add(senderId);
         _worldChoiceSubmissions[senderId] = choiceIndex;
+        _worldChoicePlayerNames[senderId] = playerName;
 
         HighlightWorldChoiceForOthersClientRpc(choiceIndex, senderId);
 
@@ -638,6 +655,7 @@ public class SpeakingInteraction : NetworkBehaviour
 
     private IEnumerator WorldChoiceTimeoutCoroutine()
     {
+        ShowWorldAdvanceTimerClientRpc(_worldAdvanceTimeoutSeconds, WorldParticipantRpcParams());
         yield return new WaitForSeconds(_worldAdvanceTimeoutSeconds);
         ResolveWorldChoiceVote();
     }
@@ -654,6 +672,8 @@ public class SpeakingInteraction : NetworkBehaviour
             _worldChoiceTimerCoroutine = null;
         }
 
+        HideWorldAdvanceTimerClientRpc(WorldParticipantRpcParams());
+
         var submitted = new List<int>(_worldChoiceSubmissions.Values);
 
         if (submitted.Count == 0)
@@ -669,18 +689,116 @@ public class SpeakingInteraction : NetworkBehaviour
                 : submitted[UnityEngine.Random.Range(0, submitted.Count)];
         }
 
-        FinalizeWorldChoiceClientRpc(WorldParticipantRpcParams());
+        // Resolve the winning player's PlayerObject so bystanders overhearing in InWorldSubtitles
+        // mode can be shown the echo bubble above the correct head (mirrors
+        // ScriptedDialogueRunner's ShowInWorldSubtitleClientRpc winner lookup).
+        ulong winnerPlayerNetId = 0;
+        ulong winnerClientId = FindWorldChoiceWinnerClientId(_resolvedWorldChoiceIndex);
+        if (winnerClientId != ulong.MaxValue &&
+            NetworkManager.Singleton.ConnectedClients.TryGetValue(winnerClientId, out var winnerClient) &&
+            winnerClient.PlayerObject != null)
+        {
+            winnerPlayerNetId = winnerClient.PlayerObject.NetworkObjectId;
+        }
+
+        // Broadcast to every client, not just current participants, so a nearby non-engaged
+        // player "listening in" also sees the pick — mirrors how SayWorldDialogueClientRpc
+        // already broadcasts response lines to overhearing bystanders.
+        FinalizeWorldChoiceClientRpc(
+            WinningChoiceText(_resolvedWorldChoiceIndex),
+            FindWorldChoiceWinnerName(_resolvedWorldChoiceIndex),
+            WorldParticipantIdsSnapshot(),
+            winnerPlayerNetId);
 
         Action<int> callback = _onWorldChoiceResolved;
         _onWorldChoiceResolved = null;
         callback?.Invoke(_resolvedWorldChoiceIndex);
     }
 
-    [ClientRpc]
-    private void FinalizeWorldChoiceClientRpc(ClientRpcParams rpcParams = default)
+    /// <summary>
+    /// Resolves the winning choice's spoken text from the texts most recently shown via
+    /// <see cref="ServerBeginWorldChoiceVote"/>. Returns empty if out of range (e.g. an
+    /// unattended timeout with no options at all).
+    /// </summary>
+    private string WinningChoiceText(int winningIndex)
     {
-        DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
-        DialogueChoiceSystem.Instance?.HideChoicePanel();
+        if (_lastShownWorldChoiceTexts == null || winningIndex < 0 || winningIndex >= _lastShownWorldChoiceTexts.Length)
+            return string.Empty;
+        return _lastShownWorldChoiceTexts[winningIndex];
+    }
+
+    /// <summary>
+    /// Finds the name of the player who submitted <paramref name="winningIndex"/>.
+    /// Falls back to a generic label if no submission matches (e.g. timeout with no picks).
+    /// Mirrors <c>ScriptedDialogueRunner.FindWinnerName</c>.
+    /// </summary>
+    private string FindWorldChoiceWinnerName(int winningIndex)
+    {
+        foreach (var kvp in _worldChoiceSubmissions)
+        {
+            if (kvp.Value == winningIndex && _worldChoicePlayerNames.TryGetValue(kvp.Key, out string name))
+                return name;
+        }
+        return "Detective";
+    }
+
+    /// <summary>
+    /// Finds the clientId of the participant who submitted <paramref name="winningIndex"/>.
+    /// Returns <see cref="ulong.MaxValue"/> if no submission matches (e.g. an unattended timeout).
+    /// Mirrors <c>ScriptedDialogueRunner.FindWinnerClientId</c>.
+    /// </summary>
+    private ulong FindWorldChoiceWinnerClientId(int winningIndex)
+    {
+        foreach (var kvp in _worldChoiceSubmissions)
+        {
+            if (kvp.Value == winningIndex)
+                return kvp.Key;
+        }
+        return ulong.MaxValue;
+    }
+
+    /// <summary>
+    /// Shows the winning player's spoken line as a caption above the NPC's upcoming response
+    /// subtitle. Broadcast to every client: an engaged participant gets the persistent on-screen
+    /// echo (mirrors <c>ScriptedDialogueRunner.FinalizeChoiceClientRpc</c>'s use of
+    /// <see cref="DialogueManager.ShowChoiceEcho"/>); a nearby non-engaged player "listening in"
+    /// instead gets the same overhear treatment <see cref="SayWorldDialogueClientRpc"/> already
+    /// gives response lines — a normal auto-dismissing subtitle, or an in-world bubble above
+    /// <paramref name="winnerPlayerNetId"/>'s head, depending on
+    /// <see cref="GameSettings.WorldDialogueOverhearMode"/>.
+    /// </summary>
+    [ClientRpc]
+    private void FinalizeWorldChoiceClientRpc(string choiceText, string playerName, ulong[] participantIds,
+        ulong winnerPlayerNetId, ClientRpcParams rpcParams = default)
+    {
+        bool isEngagedPlayer = NetworkManager.Singleton != null &&
+                                Array.IndexOf(participantIds, NetworkManager.Singleton.LocalClientId) >= 0;
+
+        if (isEngagedPlayer)
+        {
+            DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
+            DialogueChoiceSystem.Instance?.HideChoicePanel();
+
+            if (!string.IsNullOrEmpty(choiceText))
+                DialogueManager.Instance?.ShowChoiceEcho(choiceText, playerName, Color.white);
+        }
+        else if (!string.IsNullOrEmpty(choiceText) && IsLocalPlayerWithinOverhearProximity())
+        {
+            if (GameSettings.Instance.WorldDialogueOverhearMode == GameSettings.OverhearSubtitleMode.NormalSubtitles)
+            {
+                // Use the same persistent echo caption as the engaged branch (not a regular
+                // SpawnSubtitles call): a regular subtitle would be immediately wiped out by
+                // DestroyPreviousSubtitles the instant the NPC's response line spawns below it,
+                // exactly the bug ShowChoiceEcho/HideChoiceEcho already exists to avoid.
+                DialogueManager.Instance?.ShowChoiceEcho(choiceText, playerName, Color.white);
+            }
+            else if (winnerPlayerNetId != 0 &&
+                     NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(winnerPlayerNetId, out var netObj))
+            {
+                netObj.GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.ShowLine(choiceText, playerName, Color.cyan);
+            }
+        }
+
         OnWorldChoiceFinalized?.Invoke();
     }
 
@@ -705,5 +823,15 @@ public class SpeakingInteraction : NetworkBehaviour
             OpenWorldAdvanceGate();
         else if (_awaitingWorldChoice && !_worldChoiceResolved && _worldChoiceSubmissions.Count >= required)
             ResolveWorldChoiceVote();
+    }
+
+    /// <summary>Mirrors <c>ScriptedDialogueRunner.GetLocalPlayerName</c>.</summary>
+    private string GetLocalPlayerName()
+    {
+        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+        if (transport is Netcode.Transports.Facepunch.FacepunchTransport)
+            return Steamworks.SteamClient.Name;
+
+        return $"Player {NetworkManager.Singleton.LocalClientId}";
     }
 }

@@ -60,147 +60,20 @@ public class CheatConsoleUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Registers all cheat entries shown in the overlay menu.
-    /// Add new <c>_cheats.Add(...)</c> calls here to extend the console.
+    /// Registers all cheat entries shown in the overlay menu. The entries themselves
+    /// come from the shared <see cref="CheatConsoleActions"/> registry (also used by
+    /// the in-editor "Cheat Console" window) — add new cheats there, not here.
     /// </summary>
     private void RegisterCheats()
     {
-        _cheats.Add(("Skip to Day 1 — Booth Start", () =>
+        foreach (var (label, callback) in CheatConsoleActions.BuildCheats())
         {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay(1));
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Free Play — Day 1 Booth (No Tutorial)", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.StartFreePlayDay1());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to Day 1 — Soldier / Alexei Cutscene", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToSoldierSlot());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to Day 1 — Mutant Breach", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToMutantBreach());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to End of Day 1", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay1());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to Day 2 — Start (Inside Bunker)", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToStartOfDay2());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to Day 2 — Vlad Out Back Cutscene", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay2());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to Day 2 — Ocho Booth Encounter", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToOchoBoothEncounter());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to Day 3 — Start (Inside Bunker)", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToStartOfDay3());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to Day 3 — In Booth, All Suspects Processed", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToDay3PostShiftBooth());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to End of Day 4 — Before Mutant Breach", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDay4());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Free Play — Day 4 Booth", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.StartFreePlay());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Free Play — Day 5 Booth", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.StartFreePlayDay5());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Skip to End of Demo (Thanks For Playing)", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.SkipToEndOfDemo());
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Teleport to Power Station", () =>
-        {
-            DebugConsole.Instance.TeleportToPowerStation();
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Unlock All Anomalies + Guidebook Pages", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(() =>
+            _cheats.Add((label, () =>
             {
-                AnomalyUnlockManager.Instance?.UnlockAllAnomalies();
-            });
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Smash Booth Glass", () =>
-        {
-            DebugConsole.Instance.SmashGlass();
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Trigger End of Shift Report", () =>
-        {
-            ShiftManager.Instance?.DebugShowEndOfShiftReport();
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Trigger Mail Delivery Task", () =>
-        {
-            // SortMailTask adds/updates its own "Sort the mail" tutorial objective row
-            // automatically as soon as the delivery triggers — no extra call needed here.
-            SortMailTask.Instance?.TriggerDailyTask();
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Trigger Day 3 Power Outage (Fuse Box)", () =>
-        {
-            DebugConsole.Instance.TriggerDay3PowerOutage();
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Force Next Civilian Suspect — Full Mutant (M)", () =>
-        {
-            DebugConsole.Instance.EnsureGameStartedThen(DebugConsole.Instance.ForceNextSuspectFullMutant);
-            SetVisible(false);
-        }));
-
-        _cheats.Add(("Trigger Mutant Breach", () =>
-        {
-            DebugConsole.Instance.DebugForceMutantBreach();
-            SetVisible(false);
-        }));
+                callback();
+                SetVisible(false);
+            }));
+        }
     }
 
     private void SetVisible(bool visible)

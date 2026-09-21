@@ -15,6 +15,15 @@ public class Radio : Interactable
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip   clickSound;
 
+    [Tooltip("Distance from this radio within which it is considered 'in proximity' (used by AmbientMusicManager to duck ambient music while this radio is on and audible).")]
+    [SerializeField] private float ambientDuckRange = 8f;
+
+    /// <summary>Whether the radio is currently switched on (audible), for systems outside the audio pipeline (e.g. AmbientMusicManager).</summary>
+    public bool IsOn => _isOn.Value;
+
+    /// <summary>Distance within which this radio is considered close enough to duck ambient music while it is on.</summary>
+    public float AmbientDuckRange => ambientDuckRange;
+
     // Whether the radio is currently muted (off) or audible (on).
     private readonly NetworkVariable<bool> _isOn = new NetworkVariable<bool>(
         false,

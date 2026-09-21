@@ -1130,10 +1130,6 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _lastAnimTrigger = chosen.animationTrigger ?? string.Empty;
 
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse, chosen.playLaughSfx));
-
-        // The response has now been advanced past on every client — remove the echo of the
-        // player's choice along with it.
-        HideChoiceEchoClientRpc();
     }
 
     // -------------------------------------------------------------------------
@@ -1250,8 +1246,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         IsScriptedModeActive = false;
 
-        // Safety net: clear any lingering choice echo if the sequence ended before
-        // HideChoiceEchoClientRpc fired normally (e.g. an early exit or disconnect).
+        // Safety net: clear any lingering choice echo if the sequence ended before its own
+        // auto-hide timer fired (e.g. an early exit or disconnect).
         DialogueManager.Instance?.HideChoiceEcho();
 
         // Deactivate any override camera before restoring the default cam state.
@@ -1692,17 +1688,6 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
         DialogueChoiceSystem.Instance?.HideChoicePanel();
         DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.white);
-    }
-
-    /// <summary>
-    /// Hides the player-choice echo caption spawned by <see cref="FinalizeChoiceClientRpc"/>.
-    /// Sent once the NPC's response to that choice has been advanced past, so the echo
-    /// disappears together with the response subtitle instead of lingering indefinitely.
-    /// </summary>
-    [ClientRpc]
-    private void HideChoiceEchoClientRpc()
-    {
-        DialogueManager.Instance?.HideChoiceEcho();
     }
 
     // -------------------------------------------------------------------------
