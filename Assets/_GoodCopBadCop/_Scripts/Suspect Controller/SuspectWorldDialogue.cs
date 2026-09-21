@@ -419,6 +419,9 @@ public class SuspectWorldDialogue : MonoBehaviour
         // gate only opens — clearing the subtitle and moving on to the next line/options — once
         // every current participant has voted, or the timeout fires (see
         // SpeakingInteraction.SubmitWorldAdvanceServerRpc).
+        // Close this player's own spoken-choice echo immediately. The shared NPC response still
+        // waits for every participant's advance vote (or its timeout) before progressing.
+        DialogueManager.Instance.DismissOwnChoiceEchoOnAdvance();
         speaking.SubmitWorldAdvanceServerRpc();
     }
 

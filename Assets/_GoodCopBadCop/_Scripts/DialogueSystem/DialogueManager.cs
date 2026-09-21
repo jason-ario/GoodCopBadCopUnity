@@ -49,13 +49,13 @@ public class DialogueManager : NetworkBehaviour
 
     /// <summary>
     /// The persistent "player choice echo" line spawned by <see cref="ShowChoiceEcho"/>.
-    /// Unlike a normal subtitle, this instance is never cleared by an advance/skip
-    /// (<see cref="ClearHistory"/>) — it disappears only via its own auto-hide timer (see
-    /// <see cref="AutoHideChoiceEcho"/>), by being replaced by a newer echo, or by coexisting
-    /// with exactly one subsequent subtitle (the NPC's response) before yielding to whatever
-    /// comes after that — see <see cref="_choiceEchoProtected"/>.
+    /// It normally ignores advance/skip input and disappears via its own lifecycle; the player
+    /// who actually spoke the choice may opt into immediate local dismissal on advance.
     /// </summary>
     private GameObject _activeChoiceEcho;
+
+    /// <summary>True when the local player owns the active echo and advancing should dismiss it immediately.</summary>
+    private bool _dismissChoiceEchoOnAdvance;
 
     /// <summary>
     /// True for the single subtitle spawn immediately following <see cref="ShowChoiceEcho"/> —
@@ -325,15 +325,14 @@ public class DialogueManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Spawns a persistent caption showing the resolved player dialogue choice. Unlike a
-    /// normal subtitle, this line is not cleared by an advance/skip, so it stays on screen —
-    /// stacked above via the subtitles container's vertical layout — while the NPC's response
-    /// subtitle is subsequently spawned below it. It disappears on its own after a few seconds
-    /// (see <see cref="AutoHideChoiceEcho"/>) or as soon as a second subtitle spawns after the
-    /// response (see <see cref="_choiceEchoProtected"/>) — never merely because the response was
-    /// advanced past.
+    /// Spawns a persistent caption showing the resolved player dialogue choice. It stacks above
+    /// the NPC response subtitle and normally disappears on its own after a few seconds (see
+    /// <see cref="AutoHideChoiceEcho"/>) or as soon as a genuinely later subtitle spawns (see
+    /// <see cref="_choiceEchoProtected"/>). The player who chose the line may additionally
+    /// dismiss their own echo immediately by advancing.
     /// </summary>
-    public void ShowChoiceEcho(string text, string playerName, Color color)
+    /// <param name="dismissOnLocalAdvance">Set only for the player who chose this line, so their own echo closes immediately when they advance.</param>
+    public void ShowChoiceEcho(string text, string playerName, Color color, bool dismissOnLocalAdvance = false)
     {
         HideChoiceEcho();
 
@@ -344,6 +343,7 @@ public class DialogueManager : NetworkBehaviour
         echo.transform.SetAsFirstSibling();
 
         _activeChoiceEcho = echo.gameObject;
+        _dismissChoiceEchoOnAdvance = dismissOnLocalAdvance;
         _choiceEchoProtected = true;
 
         float duration = text.Length * secondsPerCharacter + subtitleLingerSeconds;
@@ -377,6 +377,7 @@ public class DialogueManager : NetworkBehaviour
         }
 
         _choiceEchoProtected = false;
+        _dismissChoiceEchoOnAdvance = false;
 
         if (_activeChoiceEcho != null)
         {
@@ -580,14 +581,26 @@ public class DialogueManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// Immediately dismisses the active choice echo only when it belongs to this local player.
+    /// Call this when the local player submits an advance vote, before the shared advance gate
+    /// has necessarily opened for every participant.
+    /// </summary>
+    public void DismissOwnChoiceEchoOnAdvance()
+    {
+        if (_dismissChoiceEchoOnAdvance)
+            HideChoiceEcho();
+    }
+
+    /// <summary>
     /// Clears the currently displayed subtitle(s) in response to an advance/skip input.
-    /// Deliberately never touches an active <see cref="_activeChoiceEcho"/> — advancing past a
-    /// line must not be what makes the choice echo disappear; see <see cref="AutoHideChoiceEcho"/>
-    /// and <see cref="DestroyPreviousSubtitles"/> for its actual lifecycle.
+    /// Listener echoes remain independent of advance input, but the player who spoke the active
+    /// choice line gets their own echo dismissed immediately when they advance.
     /// </summary>
     public void ClearHistory()
     {
         CancelSubtitleDestroy();
+        DismissOwnChoiceEchoOnAdvance();
+
         foreach (Transform child in subtitlesContainer)
         {
             if (_activeChoiceEcho != null && child.gameObject == _activeChoiceEcho) continue;

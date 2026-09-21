@@ -780,7 +780,11 @@ public class SpeakingInteraction : NetworkBehaviour
             DialogueChoiceSystem.Instance?.HideChoicePanel();
 
             if (!string.IsNullOrEmpty(choiceText))
-                DialogueManager.Instance?.ShowChoiceEcho(choiceText, playerName, Color.white);
+            {
+                bool isLocalWinner = NetworkManager.Singleton.LocalClient?.PlayerObject != null &&
+                                     NetworkManager.Singleton.LocalClient.PlayerObject.NetworkObjectId == winnerPlayerNetId;
+                DialogueManager.Instance?.ShowChoiceEcho(choiceText, playerName, Color.white, isLocalWinner);
+            }
         }
         else if (!string.IsNullOrEmpty(choiceText) && IsLocalPlayerWithinOverhearProximity())
         {

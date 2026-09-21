@@ -46,6 +46,9 @@ public class MusicManager : MonoBehaviour
 
     [SerializeField] private float defaultVolume = .5f;
 
+    [Tooltip("Volume multiplier applied only to Ambient-priority tracks, on top of defaultVolume (e.g. 0.5 = half as loud as normal music).")]
+    [SerializeField] private float _ambientVolumeMultiplier = 0.5f;
+
     private AudioSource _source;
     private float _volumeScale = 1f;
     private MusicPriority _currentPriority = MusicPriority.Ambient;
@@ -94,7 +97,7 @@ public class MusicManager : MonoBehaviour
 
         if (_source != null && _source.isPlaying && !DOTween.IsTweening(_source))
         {
-            _source.volume = defaultVolume * _volumeScale;
+            _source.volume = TargetVolume(_currentPriority);
         }
     }
 
@@ -191,21 +194,32 @@ public class MusicManager : MonoBehaviour
     {
         if (_source == null || !_source.isPlaying || _currentPriority != MusicPriority.Ambient) return;
 
-        float target = (ducked ? 0f : defaultVolume) * _volumeScale;
+        float target = ducked ? 0f : TargetVolume(_currentPriority);
         _source.DOKill();
         _source.DOFade(target, Mathf.Max(0f, duration));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /// <summary>Effective target volume for <paramref name="priority"/>: <see cref="defaultVolume"/> scaled by
+    /// the settings volume, and further scaled by <see cref="_ambientVolumeMultiplier"/> for Ambient tracks.</summary>
+    private float TargetVolume(MusicPriority priority)
+    {
+        float volume = defaultVolume * _volumeScale;
+        if (priority == MusicPriority.Ambient)
+            volume *= _ambientVolumeMultiplier;
+        return volume;
+    }
+
     private void SwapAndPlay(AudioClip clip, bool loop, float fadeIn)
     {
         _source.clip   = clip;
         _source.loop   = loop;
-        _source.volume = fadeIn > 0f ? 0f : defaultVolume * _volumeScale;
+        float target = TargetVolume(_currentPriority);
+        _source.volume = fadeIn > 0f ? 0f : target;
         _source.Play();
 
         if (fadeIn > 0f)
-            _source.DOFade(defaultVolume * _volumeScale, fadeIn);
+            _source.DOFade(target, fadeIn);
     }
 }

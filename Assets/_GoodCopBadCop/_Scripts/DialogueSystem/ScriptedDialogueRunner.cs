@@ -461,7 +461,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        // Second input (or first when typewriter is already done): vote to advance.
+        // Second input (or first when typewriter is already done): submit an advance vote.
+        // The choice winner's echoed line is local presentation, so dismiss it immediately
+        // instead of waiting for the other participant (or the advance timeout) to open the gate.
+        DialogueManager.Instance.DismissOwnChoiceEchoOnAdvance();
         AdvanceScriptedLineServerRpc();
     }
 
@@ -1109,13 +1112,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // winning player's spoken line as a subtitle on all clients.
         var chosen = node.choices[_resolvedChoiceIndex];
         string winnerName = FindWinnerName(_resolvedChoiceIndex);
-        FinalizeChoiceClientRpc(chosen.playerChoiceText, winnerName);
+        ulong winnerClientId = FindWinnerClientId(_resolvedChoiceIndex);
+        FinalizeChoiceClientRpc(chosen.playerChoiceText, winnerName, winnerClientId);
 
         // Mirror the chosen line above the winning player's head for any disengaged bystander,
         // as if they'd said it out loud.
         if (HasDisengagedBystander)
         {
-            ulong winnerClientId = FindWinnerClientId(_resolvedChoiceIndex);
             if (winnerClientId != ulong.MaxValue &&
                 NetworkManager.Singleton.ConnectedClients.TryGetValue(winnerClientId, out var winnerClient) &&
                 winnerClient.PlayerObject != null)
@@ -1683,11 +1686,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// all clients before the NPC delivers their response.
     /// </summary>
     [ClientRpc]
-    private void FinalizeChoiceClientRpc(string choiceText, string playerName)
+    private void FinalizeChoiceClientRpc(string choiceText, string playerName, ulong winnerClientId)
     {
         DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
         DialogueChoiceSystem.Instance?.HideChoicePanel();
-        DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.white);
+
+        bool isLocalWinner = NetworkManager.Singleton != null &&
+                             NetworkManager.Singleton.LocalClientId == winnerClientId;
+        DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.white, isLocalWinner);
     }
 
     // -------------------------------------------------------------------------
