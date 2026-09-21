@@ -39,6 +39,8 @@ namespace GoodCopBadCop.Infrastructure
             builder.Register<ISettingsService, SettingsService>(Lifetime.Scoped);
             builder.Register<ISettingsScreenAdapter, UnitySettingsScreenAdapter>(Lifetime.Scoped);
             builder.RegisterEntryPoint<SettingsApplier>(Lifetime.Scoped);
+            builder.RegisterComponentInHierarchy<GraphicsPreferencesVolumeAnchor>();
+            builder.RegisterEntryPoint<GraphicsPreferencesApplier>(Lifetime.Scoped);
             builder.Register<ILegacyGameObjectInjector, LegacyGameObjectInjector>(Lifetime.Scoped);
             builder.Register<ICameraService, CameraService>(Lifetime.Scoped);
             builder.Register<IAudioService, AudioService>(Lifetime.Scoped);

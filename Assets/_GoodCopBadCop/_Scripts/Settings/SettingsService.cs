@@ -25,6 +25,10 @@ namespace GoodCopBadCop.Settings
         void SetVoiceChatInputMode(EVoiceChatInputMode inputMode);
         void SetVoiceChatProximityRange(int proximityRange);
         void SetVoiceChatMicrophoneName(string microphoneName);
+        void SetQualityPreset(EQualityPreset qualityPreset);
+        void SetBrightness(float value);
+        void SetFilmGrainEnabled(bool isEnabled);
+        void SetChromaticAberrationEnabled(bool isEnabled);
         void Flush();
     }
 
@@ -158,6 +162,26 @@ namespace GoodCopBadCop.Settings
         public void SetVoiceChatMicrophoneName(string microphoneName)
         {
             model.VoiceChatMicrophoneNameMutable.Value = microphoneName ?? string.Empty;
+        }
+
+        public void SetQualityPreset(EQualityPreset qualityPreset)
+        {
+            model.QualityPresetMutable.Value = qualityPreset;
+        }
+
+        public void SetBrightness(float value)
+        {
+            model.BrightnessMutable.Value = UnityEngine.Mathf.Clamp(value, MinimumVolume, MaximumVolume);
+        }
+
+        public void SetFilmGrainEnabled(bool isEnabled)
+        {
+            model.FilmGrainEnabledMutable.Value = isEnabled;
+        }
+
+        public void SetChromaticAberrationEnabled(bool isEnabled)
+        {
+            model.ChromaticAberrationEnabledMutable.Value = isEnabled;
         }
 
         public void Flush()

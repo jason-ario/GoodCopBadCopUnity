@@ -34,6 +34,14 @@ namespace GoodCopBadCop.Settings
         Toggle
     }
 
+    public enum EQualityPreset
+    {
+        Low,
+        Medium,
+        High,
+        Ultra
+    }
+
     public interface ISettingsModel
     {
         ReadOnlyReactiveProperty<EDisplayMode> DisplayMode { get; }
@@ -57,6 +65,10 @@ namespace GoodCopBadCop.Settings
         ReadOnlyReactiveProperty<EVoiceChatInputMode> VoiceChatInputMode { get; }
         ReadOnlyReactiveProperty<int> VoiceChatProximityRange { get; }
         ReadOnlyReactiveProperty<string> VoiceChatMicrophoneName { get; }
+        ReadOnlyReactiveProperty<EQualityPreset> QualityPreset { get; }
+        ReadOnlyReactiveProperty<float> Brightness { get; }
+        ReadOnlyReactiveProperty<bool> FilmGrainEnabled { get; }
+        ReadOnlyReactiveProperty<bool> ChromaticAberrationEnabled { get; }
     }
 
     public sealed class SettingsModel : ISettingsModel, IDisposable
@@ -124,6 +136,18 @@ namespace GoodCopBadCop.Settings
         public readonly PersistentReactiveProperty<string> VoiceChatMicrophoneNameMutable =
             new("settings.voiceChat.microphoneName", string.Empty);
 
+        public readonly PersistentReactiveProperty<EQualityPreset> QualityPresetMutable =
+            new("settings.graphics.qualityPreset", EQualityPreset.High);
+
+        public readonly PersistentReactiveProperty<float> BrightnessMutable =
+            new("settings.graphics.brightness", 50f);
+
+        public readonly PersistentReactiveProperty<bool> FilmGrainEnabledMutable =
+            new("settings.graphics.filmGrainEnabled", true);
+
+        public readonly PersistentReactiveProperty<bool> ChromaticAberrationEnabledMutable =
+            new("settings.graphics.chromaticAberrationEnabled", true);
+
         public ReadOnlyReactiveProperty<EDisplayMode> DisplayMode => DisplayModeMutable;
         public ReadOnlyReactiveProperty<EScreenResolution> ScreenResolution => ScreenResolutionMutable;
         public ReadOnlyReactiveProperty<bool> VSyncEnabled => VSyncEnabledMutable;
@@ -145,6 +169,10 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<EVoiceChatInputMode> VoiceChatInputMode => VoiceChatInputModeMutable;
         public ReadOnlyReactiveProperty<int> VoiceChatProximityRange => VoiceChatProximityRangeMutable;
         public ReadOnlyReactiveProperty<string> VoiceChatMicrophoneName => VoiceChatMicrophoneNameMutable;
+        public ReadOnlyReactiveProperty<EQualityPreset> QualityPreset => QualityPresetMutable;
+        public ReadOnlyReactiveProperty<float> Brightness => BrightnessMutable;
+        public ReadOnlyReactiveProperty<bool> FilmGrainEnabled => FilmGrainEnabledMutable;
+        public ReadOnlyReactiveProperty<bool> ChromaticAberrationEnabled => ChromaticAberrationEnabledMutable;
 
         public void Flush()
         {
@@ -169,6 +197,10 @@ namespace GoodCopBadCop.Settings
             VoiceChatInputModeMutable.Flush();
             VoiceChatProximityRangeMutable.Flush();
             VoiceChatMicrophoneNameMutable.Flush();
+            QualityPresetMutable.Flush();
+            BrightnessMutable.Flush();
+            FilmGrainEnabledMutable.Flush();
+            ChromaticAberrationEnabledMutable.Flush();
         }
 
         public void Dispose()
@@ -194,6 +226,10 @@ namespace GoodCopBadCop.Settings
             VoiceChatInputModeMutable.Dispose();
             VoiceChatProximityRangeMutable.Dispose();
             VoiceChatMicrophoneNameMutable.Dispose();
+            QualityPresetMutable.Dispose();
+            BrightnessMutable.Dispose();
+            FilmGrainEnabledMutable.Dispose();
+            ChromaticAberrationEnabledMutable.Dispose();
         }
     }
 }

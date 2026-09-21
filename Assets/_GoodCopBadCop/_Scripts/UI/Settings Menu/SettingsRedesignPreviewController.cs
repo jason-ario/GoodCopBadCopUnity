@@ -33,7 +33,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             public readonly string Label;
             public readonly string Key;
             public readonly Control Control;
-            public readonly string[] Options;
+            public string[] Options;
             public readonly GameAction RebindAction;
             public int Index;
             public float Value;
@@ -74,6 +74,20 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 if (Control == Control.Rebind) RebindableInput.ResetToDefault(RebindAction);
             }
 
+            public void SetOptions(string[] options)
+            {
+                if (options == null || options.Length == 0)
+                {
+                    return;
+                }
+
+                Options = options;
+                if (Index >= Options.Length)
+                {
+                    Index = 0;
+                }
+            }
+
             public string DisplayValue =>
                 Control == Control.Slider ? Value.ToString("0") :
                 Control == Control.Rebind ? RebindableInput.GetDisplayName(RebindAction) :
@@ -96,8 +110,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static readonly Setting[] Gameplay =
         {
-            new Setting("Language", "language", "English", "Russian"),
-            new Setting("Subtitles", "subtitles", "Off", "On"),
             new Setting("Camera Shake", "camera_shake", "Off", "On"),
             new Setting("Head Bob", "head_bob", "Off", "On"),
             new Setting("Running Effects", "running_effects", "Off", "On")
@@ -124,7 +136,9 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("Voice Chat", "voice_chat_enabled", "Off", "On"),
             new Setting("Voice Input", "voice_input", "Voice Activation", "Push To Talk"),
             new Setting("Microphone Muted", "microphone_muted", "Off", "On"),
-            new Setting("Voice Deafened", "voice_deafened", "Off", "On")
+            new Setting("Voice Deafened", "voice_deafened", "Off", "On"),
+            new Setting("Voice Proximity Range", "voice_proximity_range", 10f),
+            new Setting("Microphone", "microphone", "Default")
         };
 
         private static readonly Setting[] Controls =
@@ -180,6 +194,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> voiceChatMutedChanged = new Subject<bool>();
         private readonly Subject<bool> voiceChatDeafenedChanged = new Subject<bool>();
         private readonly Subject<int> voiceChatInputModeChanged = new Subject<int>();
+        private readonly Subject<int> qualityPresetChanged = new Subject<int>();
+        private readonly Subject<float> brightnessChanged = new Subject<float>();
+        private readonly Subject<bool> filmGrainEnabledChanged = new Subject<bool>();
+        private readonly Subject<bool> chromaticAberrationEnabledChanged = new Subject<bool>();
+        private readonly Subject<int> voiceChatProximityRangeChanged = new Subject<int>();
+        private readonly Subject<string> voiceChatMicrophoneNameChanged = new Subject<string>();
         private readonly Subject<ESettingsMenuTab> tabSelected = new Subject<ESettingsMenuTab>();
         private readonly Subject<Unit> backRequested = new Subject<Unit>();
         private readonly Subject<Unit> closed = new Subject<Unit>();
@@ -205,6 +225,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> VoiceChatMutedChanged { get { return voiceChatMutedChanged; } }
         public Observable<bool> VoiceChatDeafenedChanged { get { return voiceChatDeafenedChanged; } }
         public Observable<int> VoiceChatInputModeChanged { get { return voiceChatInputModeChanged; } }
+        public Observable<int> QualityPresetChanged { get { return qualityPresetChanged; } }
+        public Observable<float> BrightnessChanged { get { return brightnessChanged; } }
+        public Observable<bool> FilmGrainEnabledChanged { get { return filmGrainEnabledChanged; } }
+        public Observable<bool> ChromaticAberrationEnabledChanged { get { return chromaticAberrationEnabledChanged; } }
+        public Observable<int> VoiceChatProximityRangeChanged { get { return voiceChatProximityRangeChanged; } }
+        public Observable<string> VoiceChatMicrophoneNameChanged { get { return voiceChatMicrophoneNameChanged; } }
         public Observable<ESettingsMenuTab> TabSelected { get { return tabSelected; } }
         public Observable<Unit> BackRequested { get { return backRequested; } }
         public Observable<Unit> Closed { get { return closed; } }
@@ -346,10 +372,20 @@ namespace GoodCopBadCop.UI.SettingsMenu
             isInitialized = true;
             EnsureEventSystem();
             CacheHierarchy();
+            PopulateMicrophoneOptions();
             BindTabs();
             BindFooter();
             SelectTab(Tab.Gameplay);
             SelectRow(-1);
+        }
+
+        private static void PopulateMicrophoneOptions()
+        {
+            string[] devices = Microphone.devices;
+            string[] options = new string[devices.Length + 1];
+            options[0] = "Default";
+            Array.Copy(devices, 0, options, 1, devices.Length);
+            Audio[9].SetOptions(options);
         }
 
         private void CacheHierarchy()
@@ -552,6 +588,28 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetVoiceChatDeafenedValue(bool value) { Audio[7].Index = value ? 1 : 0; RefreshActiveSetting("voice_deafened"); }
         public void SetVoiceChatInputModeValue(int value) { Audio[5].Index = value; RefreshActiveSetting("voice_input"); }
 
+        public void SetQualityPresetValue(int value) { Graphics[4].Index = value; RefreshActiveSetting("quality"); }
+        public void SetBrightnessValue(float value) { Graphics[5].Value = value; RefreshActiveSetting("brightness"); }
+        public void SetFilmGrainEnabledValue(bool value) { Graphics[6].Index = value ? 1 : 0; RefreshActiveSetting("film_grain"); }
+        public void SetChromaticAberrationEnabledValue(bool value) { Graphics[7].Index = value ? 1 : 0; RefreshActiveSetting("chromatic_aberration"); }
+        public void SetVoiceChatProximityRangeValue(int value) { Audio[8].Value = value; RefreshActiveSetting("voice_proximity_range"); }
+
+        public void SetVoiceChatMicrophoneNameValue(string value)
+        {
+            int index = 0;
+            if (!string.IsNullOrEmpty(value))
+            {
+                int foundIndex = Array.IndexOf(Audio[9].Options, value);
+                if (foundIndex >= 0)
+                {
+                    index = foundIndex;
+                }
+            }
+
+            Audio[9].Index = index;
+            RefreshActiveSetting("microphone");
+        }
+
         private void RequestTab(Tab tab) { tabSelected.OnNext(ToSettingsMenuTab(tab)); }
 
         private void UpdateTabButtonStates(int activeIndex)
@@ -736,6 +794,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "running_effects":
                 case "head_bob":
                 case "camera_shake":
+                case "quality":
+                case "brightness":
+                case "film_grain":
+                case "chromatic_aberration":
+                case "voice_proximity_range":
+                case "microphone":
                     return true;
                 default:
                     return false;
@@ -1056,6 +1120,14 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "running_effects": runningEffectsEnabledChanged.OnNext(setting.Index == 1); break;
                 case "head_bob": headBobEnabledChanged.OnNext(setting.Index == 1); break;
                 case "camera_shake": cameraShakeEnabledChanged.OnNext(setting.Index == 1); break;
+                case "quality": qualityPresetChanged.OnNext(setting.Index); break;
+                case "brightness": brightnessChanged.OnNext(setting.Value); break;
+                case "film_grain": filmGrainEnabledChanged.OnNext(setting.Index == 1); break;
+                case "chromatic_aberration": chromaticAberrationEnabledChanged.OnNext(setting.Index == 1); break;
+                case "voice_proximity_range": voiceChatProximityRangeChanged.OnNext(Mathf.RoundToInt(setting.Value)); break;
+                case "microphone":
+                    voiceChatMicrophoneNameChanged.OnNext(setting.Index == 0 ? string.Empty : setting.Options[setting.Index]);
+                    break;
             }
         }
         private void Save()

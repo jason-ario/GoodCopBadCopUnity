@@ -53,6 +53,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
             view.VoiceChatMutedChanged.Subscribe(OnVoiceChatMutedChanged).AddTo(ref disposables);
             view.VoiceChatDeafenedChanged.Subscribe(OnVoiceChatDeafenedChanged).AddTo(ref disposables);
             view.VoiceChatInputModeChanged.Subscribe(OnVoiceChatInputModeChanged).AddTo(ref disposables);
+            view.QualityPresetChanged.Subscribe(OnQualityPresetChanged).AddTo(ref disposables);
+            view.BrightnessChanged.Subscribe(OnBrightnessChanged).AddTo(ref disposables);
+            view.FilmGrainEnabledChanged.Subscribe(OnFilmGrainEnabledChanged).AddTo(ref disposables);
+            view.ChromaticAberrationEnabledChanged.Subscribe(OnChromaticAberrationEnabledChanged).AddTo(ref disposables);
+            view.VoiceChatProximityRangeChanged.Subscribe(OnVoiceChatProximityRangeChanged).AddTo(ref disposables);
+            view.VoiceChatMicrophoneNameChanged.Subscribe(OnVoiceChatMicrophoneNameChanged).AddTo(ref disposables);
             view.Closed.Subscribe(_ => OnClosed()).AddTo(ref disposables);
 
             model.SelectedTab
@@ -133,6 +139,30 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             settingsModel.VoiceChatInputMode
                 .Subscribe(inputMode => view.SetVoiceChatInputModeValue((int)inputMode))
+                .AddTo(ref disposables);
+
+            settingsModel.QualityPreset
+                .Subscribe(qualityPreset => view.SetQualityPresetValue((int)qualityPreset))
+                .AddTo(ref disposables);
+
+            settingsModel.Brightness
+                .Subscribe(view.SetBrightnessValue)
+                .AddTo(ref disposables);
+
+            settingsModel.FilmGrainEnabled
+                .Subscribe(view.SetFilmGrainEnabledValue)
+                .AddTo(ref disposables);
+
+            settingsModel.ChromaticAberrationEnabled
+                .Subscribe(view.SetChromaticAberrationEnabledValue)
+                .AddTo(ref disposables);
+
+            settingsModel.VoiceChatProximityRange
+                .Subscribe(view.SetVoiceChatProximityRangeValue)
+                .AddTo(ref disposables);
+
+            settingsModel.VoiceChatMicrophoneName
+                .Subscribe(view.SetVoiceChatMicrophoneNameValue)
                 .AddTo(ref disposables);
         }
 
@@ -269,6 +299,41 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
 
             settingsService.SetVoiceChatInputMode((EVoiceChatInputMode)value);
+        }
+
+        private void OnQualityPresetChanged(int value)
+        {
+            if (!Enum.IsDefined(typeof(EQualityPreset), value))
+            {
+                return;
+            }
+
+            settingsService.SetQualityPreset((EQualityPreset)value);
+        }
+
+        private void OnBrightnessChanged(float value)
+        {
+            settingsService.SetBrightness(value);
+        }
+
+        private void OnFilmGrainEnabledChanged(bool isEnabled)
+        {
+            settingsService.SetFilmGrainEnabled(isEnabled);
+        }
+
+        private void OnChromaticAberrationEnabledChanged(bool isEnabled)
+        {
+            settingsService.SetChromaticAberrationEnabled(isEnabled);
+        }
+
+        private void OnVoiceChatProximityRangeChanged(int value)
+        {
+            settingsService.SetVoiceChatProximityRange(value);
+        }
+
+        private void OnVoiceChatMicrophoneNameChanged(string value)
+        {
+            settingsService.SetVoiceChatMicrophoneName(value);
         }
 
         private void OnClosed()

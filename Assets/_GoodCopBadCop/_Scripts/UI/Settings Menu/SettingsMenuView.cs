@@ -28,6 +28,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<bool> VoiceChatMutedChanged { get; }
         Observable<bool> VoiceChatDeafenedChanged { get; }
         Observable<int> VoiceChatInputModeChanged { get; }
+        Observable<int> QualityPresetChanged { get; }
+        Observable<float> BrightnessChanged { get; }
+        Observable<bool> FilmGrainEnabledChanged { get; }
+        Observable<bool> ChromaticAberrationEnabledChanged { get; }
+        Observable<int> VoiceChatProximityRangeChanged { get; }
+        Observable<string> VoiceChatMicrophoneNameChanged { get; }
         Observable<ESettingsMenuTab> TabSelected { get; }
         Observable<Unit> BackRequested { get; }
         Observable<Unit> Closed { get; }
@@ -53,6 +59,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void SetVoiceChatMutedValue(bool value);
         void SetVoiceChatDeafenedValue(bool value);
         void SetVoiceChatInputModeValue(int value);
+        void SetQualityPresetValue(int value);
+        void SetBrightnessValue(float value);
+        void SetFilmGrainEnabledValue(bool value);
+        void SetChromaticAberrationEnabledValue(bool value);
+        void SetVoiceChatProximityRangeValue(int value);
+        void SetVoiceChatMicrophoneNameValue(string value);
     }
 
     public class SettingsMenuView : MonoBehaviour, ISettingsMenuView
@@ -181,8 +193,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static readonly SettingsMenuControlDefinition[] GameplayControlDefinitions =
         {
-            SettingsMenuControlDefinition.Dropdown("Language", new[] { "English" }, interactable: false),
-            SettingsMenuControlDefinition.Dropdown("Subtitles", OffOnOptions, defaultOptionIndex: 1, interactable: false),
             SettingsMenuControlDefinition.Dropdown(
                 "Camera Shake",
                 OffOnOptions,
@@ -327,6 +337,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> voiceChatMutedChanged = new();
         private readonly Subject<bool> voiceChatDeafenedChanged = new();
         private readonly Subject<int> voiceChatInputModeChanged = new();
+        private readonly Subject<int> qualityPresetChanged = new();
+        private readonly Subject<float> brightnessChanged = new();
+        private readonly Subject<bool> filmGrainEnabledChanged = new();
+        private readonly Subject<bool> chromaticAberrationEnabledChanged = new();
+        private readonly Subject<int> voiceChatProximityRangeChanged = new();
+        private readonly Subject<string> voiceChatMicrophoneNameChanged = new();
         private readonly Subject<ESettingsMenuTab> tabSelected = new();
         private readonly Subject<Unit> backRequested = new();
         private readonly Subject<Unit> closed = new();
@@ -352,6 +368,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> VoiceChatMutedChanged => voiceChatMutedChanged;
         public Observable<bool> VoiceChatDeafenedChanged => voiceChatDeafenedChanged;
         public Observable<int> VoiceChatInputModeChanged => voiceChatInputModeChanged;
+        public Observable<int> QualityPresetChanged => qualityPresetChanged;
+        public Observable<float> BrightnessChanged => brightnessChanged;
+        public Observable<bool> FilmGrainEnabledChanged => filmGrainEnabledChanged;
+        public Observable<bool> ChromaticAberrationEnabledChanged => chromaticAberrationEnabledChanged;
+        public Observable<int> VoiceChatProximityRangeChanged => voiceChatProximityRangeChanged;
+        public Observable<string> VoiceChatMicrophoneNameChanged => voiceChatMicrophoneNameChanged;
         public Observable<ESettingsMenuTab> TabSelected => tabSelected;
         public Observable<Unit> BackRequested => backRequested;
         public Observable<Unit> Closed => closed;
@@ -514,6 +536,36 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetVoiceChatInputModeValue(int value)
         {
             SetDropdownValue(voiceChatInputModeDropdown, value);
+        }
+
+        public void SetQualityPresetValue(int value)
+        {
+            // No Quality Preset dropdown exists in this legacy view; value is applied via GraphicsPreferencesApplier directly.
+        }
+
+        public void SetBrightnessValue(float value)
+        {
+            // No Brightness slider exists in this legacy view; value is applied via GraphicsPreferencesApplier directly.
+        }
+
+        public void SetFilmGrainEnabledValue(bool value)
+        {
+            // No Film Grain dropdown exists in this legacy view; value is applied via GraphicsPreferencesApplier directly.
+        }
+
+        public void SetChromaticAberrationEnabledValue(bool value)
+        {
+            // No Chromatic Aberration dropdown exists in this legacy view; value is applied via GraphicsPreferencesApplier directly.
+        }
+
+        public void SetVoiceChatProximityRangeValue(int value)
+        {
+            // No Voice Chat Proximity Range slider exists in this legacy view; value is applied via VoiceChatSettingsAdapter directly.
+        }
+
+        public void SetVoiceChatMicrophoneNameValue(string value)
+        {
+            // No Microphone dropdown exists in this legacy view; value is applied via VoiceChatSettingsAdapter directly.
         }
         public void ShowTab(ESettingsMenuTab tab)
         {
