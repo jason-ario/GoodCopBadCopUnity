@@ -153,7 +153,7 @@ public class Cigarette : PickableObject
       PlayerCameraController cameraController = playerPickupController.GetComponent<PlayerCameraController>();
       if (cameraController == null) return;
 
-      cameraController.SetSmokingNearClipPlaneActive(isSmoking);
+      cameraController.SetNearClipPlaneTightened(isSmoking);
    }
 
    /// <summary>Starts looping the smoking sound effect.</summary>

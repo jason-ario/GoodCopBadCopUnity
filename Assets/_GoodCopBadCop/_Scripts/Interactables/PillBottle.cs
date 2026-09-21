@@ -10,6 +10,7 @@ public class PillBottle : PickableObject, IAmmoProvider
     [SerializeField] Animator _animator;
     private readonly NetworkVariable<int> _usesRemaining = new(MaxUses, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     [SerializeField] private AudioClip drinkSound;
+    private Coroutine _usePillBottleCoroutine;
 
     // ── IAmmoProvider ─────────────────────────────────────────────────────────
 
@@ -52,7 +53,27 @@ public class PillBottle : PickableObject, IAmmoProvider
         if (isUsing || _usesRemaining.Value <= 0) return;
 
         base.OnStartUse();
-        StartCoroutine(UsePillBottle());
+        _usePillBottleCoroutine = StartCoroutine(UsePillBottle());
+    }
+
+    /// <summary>
+    /// Restores the tightened near clip plane and clears drinking anim/animator state if the
+    /// bottle is unequipped or force-stopped mid-drink (e.g. stowed while the coroutine is
+    /// killed by the GameObject deactivating), so the effect never gets stuck engaged.
+    /// </summary>
+    public override void OnStopUse()
+    {
+        base.OnStopUse();
+
+        if (_usePillBottleCoroutine != null)
+        {
+            StopCoroutine(_usePillBottleCoroutine);
+            _usePillBottleCoroutine = null;
+        }
+
+        playerPickupController.PlayerAnimationController.SetAnimBool("TakingPill", false);
+        _animator.SetBool("TakePill", false);
+        SetNearClipPlaneTightened(false);
     }
 
     IEnumerator UsePillBottle()
@@ -61,15 +82,29 @@ public class PillBottle : PickableObject, IAmmoProvider
         playerPickupController.PlayerAnimationController.EnableHoldObjectTwoArmsMask();
         playerPickupController.PlayerAnimationController.SetAnimBool("TakingPill", true);
         _animator.SetBool("TakePill", true);
+        SetNearClipPlaneTightened(true);
         yield return new WaitForSeconds(2.5f);
         PlayerInstance.Instance.PlayerRadiation.TakeRadiationPill();
         playerPickupController.PlayerAnimationController.SetAnimBool("TakingPill", false);
         _animator.SetBool("TakePill", false);
+        SetNearClipPlaneTightened(false);
 
         ConsumePillServerRpc();
 
         playerPickupController.PlayerAnimationController.EnableRightArmMask();
         isUsing = false;
+        _usePillBottleCoroutine = null;
+    }
+
+    /// <summary>Tightens (or restores) the player's render camera near clip plane while drinking pills, mirroring the cigarette's effect.</summary>
+    private void SetNearClipPlaneTightened(bool isDrinking)
+    {
+        if (playerPickupController == null) return;
+
+        PlayerCameraController cameraController = playerPickupController.GetComponent<PlayerCameraController>();
+        if (cameraController == null) return;
+
+        cameraController.SetNearClipPlaneTightened(isDrinking);
     }
 
     [Rpc(SendTo.Server)]

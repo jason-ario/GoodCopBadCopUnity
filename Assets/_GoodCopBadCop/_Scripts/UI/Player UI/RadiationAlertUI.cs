@@ -30,17 +30,18 @@ public class RadiationAlertUI : MonoBehaviour
     {
         UIController.OnPauseMenuOpened += HandlePauseMenuOpened;
 
-        if (PlayerInstance.Instance != null)
-            SubscribeTo(PlayerInstance.Instance);
+        SubscribeTo(PlayerInstance.Instance);
     }
 
     private void Update()
     {
-        if (_playerRadiation == null || _playerHealth == null)
-        {
-            if (PlayerInstance.Instance != null)
-                SubscribeTo(PlayerInstance.Instance);
-        }
+        // Re-check every frame, not just when the cached refs are null: death/respawn keeps
+        // the old (corpse) PlayerInstance alive rather than destroying it (see
+        // PlayerInstance.DetachFromPlayerObject), so our cached PlayerRadiation/PlayerHealth
+        // never actually become null on their own — they just silently stop firing events on
+        // the corpse. Comparing against the current PlayerInstance.Instance catches that swap.
+        if (PlayerInstance.Instance != _subscribedInstance)
+            SubscribeTo(PlayerInstance.Instance);
 
         // Pause menu / main menu visibility can change without firing a dedicated event this
         // script listens to (e.g. closing the pause menu), so re-evaluate every frame.
@@ -51,6 +52,15 @@ public class RadiationAlertUI : MonoBehaviour
     {
         UIController.OnPauseMenuOpened -= HandlePauseMenuOpened;
 
+        SubscribeTo(null);
+
+        ForceHide();
+    }
+
+    private PlayerInstance _subscribedInstance;
+
+    private void SubscribeTo(PlayerInstance playerInstance)
+    {
         if (_playerRadiation != null)
         {
             _playerRadiation.OnRadiationChanged.RemoveListener(OnRadiationChanged);
@@ -63,19 +73,17 @@ public class RadiationAlertUI : MonoBehaviour
             _playerHealth = null;
         }
 
-        ForceHide();
-    }
+        _subscribedInstance = playerInstance;
+        if (playerInstance == null) return;
 
-    private void SubscribeTo(PlayerInstance playerInstance)
-    {
-        if (_playerRadiation == null && playerInstance.PlayerRadiation != null)
+        if (playerInstance.PlayerRadiation != null)
         {
             _playerRadiation = playerInstance.PlayerRadiation;
             _playerRadiation.OnRadiationChanged.AddListener(OnRadiationChanged);
             OnRadiationChanged(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
         }
 
-        if (_playerHealth == null && playerInstance.PlayerHealth != null)
+        if (playerInstance.PlayerHealth != null)
         {
             _playerHealth = playerInstance.PlayerHealth;
             _playerHealth.OnDeath += HandlePlayerDeath;

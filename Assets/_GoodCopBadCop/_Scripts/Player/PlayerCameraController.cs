@@ -6,10 +6,12 @@ using UnityEngine;
 public class PlayerCameraController : MonoBehaviour
 {
     [SerializeField] private CinemachineCamera camera;
-    [Tooltip("The actual render Camera whose near clip plane is temporarily tightened while smoking (e.g. Player/Camera).")]
+    [Tooltip("The actual render Camera whose near clip plane is temporarily tightened for close-up hand-held items (cigarette, pills, etc).")]
     [SerializeField] private Camera renderCamera;
-    [Tooltip("Near clip plane distance to use while the player is smoking a cigarette.")]
+    [Tooltip("Near clip plane distance to use while the player is holding a close-up item near the camera (smoking, drinking pills, etc).")]
     [SerializeField] private float smokingNearClipPlane = 0.05f;
+    [Tooltip("Seconds to ease the near clip plane between its default and tightened values.")]
+    [SerializeField] private float nearClipPlaneLerpDuration = 0.2f;
     [SerializeField] NoiseSettings normalNoiseSettings;
     [SerializeField] NoiseSettings rumbleNoiseSettings;
     [SerializeField] private float amplitudeGainNormal;
@@ -67,6 +69,7 @@ public class PlayerCameraController : MonoBehaviour
     private bool _cameraShakeEnabled = true;
     private float _defaultNearClipPlane;
     private bool _nearClipPlaneCached;
+    private Tween _nearClipPlaneTween;
 
     private void OnDisable()
     {
@@ -75,6 +78,7 @@ public class PlayerCameraController : MonoBehaviour
         _runningFovTween?.Kill();
         _speedLinesTween?.Kill();
         _runningShakeTween?.Kill();
+        _nearClipPlaneTween?.Kill();
         SetRunningFieldOfViewOffset(0f);
         SetSpeedLinesAlpha(0f);
         _runningHeldTime = 0f;
@@ -360,8 +364,13 @@ public class PlayerCameraController : MonoBehaviour
         ApplyRunningShake(_runningEffectsActive, animate: false);
     }
 
-    /// <summary>Temporarily tightens the render camera's near clip plane while smoking, restoring the cached default when finished.</summary>
-    public void SetSmokingNearClipPlaneActive(bool isSmoking)
+    /// <summary>
+    /// Eases the render camera's near clip plane between its default and a tightened value used
+    /// for close-up hand-held items (e.g. smoking a cigarette, drinking radiation pills), restoring
+    /// the cached default when finished. Lerps over <see cref="nearClipPlaneLerpDuration"/> seconds
+    /// instead of snapping, so the transition isn't jarring.
+    /// </summary>
+    public void SetNearClipPlaneTightened(bool tightened)
     {
         if (renderCamera == null)
             return;
@@ -372,7 +381,15 @@ public class PlayerCameraController : MonoBehaviour
             _nearClipPlaneCached = true;
         }
 
-        renderCamera.nearClipPlane = isSmoking ? smokingNearClipPlane : _defaultNearClipPlane;
+        float target = tightened ? smokingNearClipPlane : _defaultNearClipPlane;
+
+        _nearClipPlaneTween?.Kill();
+        _nearClipPlaneTween = DOTween.To(
+                () => renderCamera.nearClipPlane,
+                value => renderCamera.nearClipPlane = value,
+                target,
+                Mathf.Max(0.01f, nearClipPlaneLerpDuration))
+            .OnKill(() => _nearClipPlaneTween = null);
     }
 
     public void PlaySway(CameraSwaySettings settings)

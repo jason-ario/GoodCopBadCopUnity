@@ -48,6 +48,7 @@ public class GeigerCounterUI : MonoBehaviour
     [SerializeField] private string valueSuffix = " Sv";
 
     private PlayerRadiation _playerRadiation;
+    private PlayerInstance _subscribedInstance;
     private float _targetAngle;
     private float _currentAngle;
 
@@ -75,14 +76,18 @@ public class GeigerCounterUI : MonoBehaviour
 
     private void OnEnable()
     {
-        if (PlayerInstance.Instance?.PlayerRadiation != null)
-            SubscribeTo(PlayerInstance.Instance.PlayerRadiation);
+        SubscribeTo(PlayerInstance.Instance);
     }
 
     private void Update()
     {
-        if (_playerRadiation == null && PlayerInstance.Instance?.PlayerRadiation != null)
-            SubscribeTo(PlayerInstance.Instance.PlayerRadiation);
+        // Compare against the current PlayerInstance rather than just checking for a null
+        // PlayerRadiation: death/respawn keeps the old (corpse) PlayerInstance alive instead of
+        // destroying it (see PlayerInstance.DetachFromPlayerObject), so a cached PlayerRadiation
+        // reference never becomes null on its own — it just stops firing events on the corpse,
+        // freezing the gauge at whatever radiation value it had at death.
+        if (PlayerInstance.Instance != _subscribedInstance)
+            SubscribeTo(PlayerInstance.Instance);
 
         DecayExposureRate();
         AnimateNeedle();
@@ -90,11 +95,7 @@ public class GeigerCounterUI : MonoBehaviour
 
     private void OnDisable()
     {
-        if (_playerRadiation != null)
-        {
-            _playerRadiation.OnRadiationChanged.RemoveListener(OnRadiationChanged);
-            _playerRadiation = null;
-        }
+        SubscribeTo(null);
     }
 
     // ── Gauge configuration ────────────────────────────────────────────────────
@@ -122,9 +123,18 @@ public class GeigerCounterUI : MonoBehaviour
 
     // ── PlayerRadiation subscription ───────────────────────────────────────────
 
-    private void SubscribeTo(PlayerRadiation rad)
+    private void SubscribeTo(PlayerInstance playerInstance)
     {
-        _playerRadiation = rad;
+        if (_playerRadiation != null)
+        {
+            _playerRadiation.OnRadiationChanged.RemoveListener(OnRadiationChanged);
+            _playerRadiation = null;
+        }
+
+        _subscribedInstance = playerInstance;
+        if (playerInstance == null || playerInstance.PlayerRadiation == null) return;
+
+        _playerRadiation = playerInstance.PlayerRadiation;
         _playerRadiation.OnRadiationChanged.AddListener(OnRadiationChanged);
         OnRadiationChanged(_playerRadiation.CurrentRadiation, _playerRadiation.MaxRadiation);
     }

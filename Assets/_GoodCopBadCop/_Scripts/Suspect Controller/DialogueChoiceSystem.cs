@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -39,6 +40,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     // Cached player arms — hidden while in dialogue mode, restored on exit.
     private GameObject _playerArms;
+
+    // Other connected players' body meshes hidden locally (this client only) while in dialogue
+    // mode, so they can't visually block the suspect camera view. Restored in ShowPlayerBody.
+    private readonly List<GameObject> _hiddenOtherPlayerBodies = new();
 
     // ── Controller choice navigation ─────────────────────────────────────────
 
@@ -649,6 +654,44 @@ public class DialogueChoiceSystem : NetworkBehaviour
             _playerArms.SetActive(false);
         else
             Debug.LogWarning("[DialogueChoiceSystem] HidePlayerBody: could not find 'CinemachineCamera/Arms_Socket/Player_Arms' — arms will remain visible.");
+
+        HideOtherPlayers();
+    }
+
+    /// <summary>
+    /// Hides the body mesh ("Art" child) of every connected player other than the local one.
+    /// Purely a local, client-side visibility toggle — never touches network state — so it's
+    /// safe even though dialogue mode itself is tracked per-client. Without this, the other
+    /// player standing near the suspect/booth would visually block the dialogue camera's view.
+    /// </summary>
+    private void HideOtherPlayers()
+    {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null) return;
+
+        NetworkObject localPlayerObject = PlayerInstance.Instance?.GetComponent<NetworkObject>();
+
+        foreach (var client in networkManager.ConnectedClientsList)
+        {
+            NetworkObject playerObject = client.PlayerObject;
+            if (playerObject == null || playerObject == localPlayerObject) continue;
+
+            GameObject otherBody = playerObject.transform.Find("Art")?.gameObject;
+            if (otherBody == null || !otherBody.activeSelf) continue;
+
+            otherBody.SetActive(false);
+            _hiddenOtherPlayerBodies.Add(otherBody);
+        }
+    }
+
+    /// <summary>Restores visibility of every player body hidden by <see cref="HideOtherPlayers"/>.</summary>
+    private void ShowOtherPlayers()
+    {
+        foreach (GameObject body in _hiddenOtherPlayerBodies)
+            if (body != null)
+                body.SetActive(true);
+
+        _hiddenOtherPlayerBodies.Clear();
     }
 
     /// <summary>
@@ -672,6 +715,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
             _playerBody.SetActive(true);
             _playerBody = null;
         }
+
+        ShowOtherPlayers();
     }
 
     // ─── Activity interrupt helpers ─────────────────────────────────────────
