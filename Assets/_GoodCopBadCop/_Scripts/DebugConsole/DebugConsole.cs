@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using GoodCopBadCop.Effects;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -64,7 +65,15 @@ public class DebugConsole : MonoBehaviour
     void Awake()
     {
         Instance = this;
-        if (cutsceneMode)
+
+        bool hideMainMenu = cutsceneMode;
+#if UNITY_EDITOR
+        // The "Game Start Point" editor window jumps straight into gameplay — the main menu
+        // screen must never be shown, same as cutsceneMode.
+        hideMainMenu |= DebugStartPointPrefs.Selected != DebugStartPoint.None;
+#endif
+
+        if (hideMainMenu)
         {
             _mainMenuController.enabled = false;
             mainMenuScreen.SetActive(false);
@@ -73,6 +82,18 @@ public class DebugConsole : MonoBehaviour
     
     private async void Start()
     {
+#if UNITY_EDITOR
+        // Editor-only override set by the "Good Cop Bad Cop > Game Start Point" window.
+        // Takes priority over every other skip flag below — it bootstraps a host session
+        // and jumps straight to the chosen point, skipping the main menu and lobby flow.
+        var editorStartPoint = DebugStartPointPrefs.Selected;
+        if (editorStartPoint != DebugStartPoint.None)
+        {
+            ApplyEditorDebugStartPoint(editorStartPoint);
+            return;
+        }
+#endif
+
         if (skipToBoothReady || skipToAfterShift || autoStart || skipToDay1Booth)
         {
             if (!await LobbyManager.Instance.CreateLobby())
@@ -255,22 +276,22 @@ public class DebugConsole : MonoBehaviour
 
     /// <summary>
     /// Executes <paramref name="onReady"/> immediately if the game is already running,
-    /// otherwise bootstraps a host session and defers the callback until the local player is
-    /// fully spawned.
+    /// otherwise bootstraps a host session, explicitly spawns the local player, and defers the
+    /// callback until the player is fully spawned.
     /// </summary>
     /// <remarks>
     /// This intentionally does NOT wait on <see cref="GameManager.OnGameStart"/>: that event is
     /// only ever raised by <see cref="GameManager.TransitionToLobby"/>'s lobby-transition
     /// coroutine (the normal main-menu "Play" flow calls both <c>TransitionToLobby()</c> and
-    /// <c>TryStartGame()</c> together). <see cref="GameManager.TryStartGame"/> alone — which is
-    /// all cheat/skip flows call — never raises it, so subscribing to it here previously left
-    /// <paramref name="onReady"/> waiting forever.
-    /// Instead this waits for the same signal <see cref="ShiftManager"/>'s own debug skip
-    /// sequences (<c>SkipToBoothReadySequence</c>, <c>SkipToInsideBunkerSequence</c>, etc.) rely
-    /// on: a live <see cref="PlayerInstance"/>/<see cref="PlayerSpawner"/> pair. Netcode spawns
-    /// the local player automatically shortly after <c>StartHost()</c> completes, independent of
-    /// <c>GameManager</c>'s own lobby-transition flow, so this is reliable even when
-    /// <c>TryStartGame(true)</c> is the only bootstrap call made.
+    /// <c>TryStartGame()</c> together, which also plays a fade and the intro cinematic — too
+    /// slow/visible for an instant debug skip). <see cref="GameManager.TryStartGame"/> alone —
+    /// which is all cheat/skip flows call — never spawns a player by itself and never raises
+    /// <c>OnGameStart</c>, so this spawns the local (host) player directly via
+    /// <see cref="GameManager.SpawnPlayerAtLobbyServer"/> — the same per-client path
+    /// <see cref="Networking.LobbyManager"/> uses for late joiners — then waits for the same
+    /// signal <see cref="ShiftManager"/>'s own debug skip sequences (<c>SkipToBoothReadySequence</c>,
+    /// <c>SkipToInsideBunkerSequence</c>, etc.) rely on: a live <see cref="PlayerInstance"/>/
+    /// <see cref="PlayerSpawner"/> pair.
     /// </remarks>
     public async void EnsureGameStartedThen(Action onReady)
     {
@@ -284,6 +305,10 @@ public class DebugConsole : MonoBehaviour
             return;
 
         GameManager.Instance.TryStartGame(true);
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            GameManager.Instance.SpawnPlayerAtLobbyServer(NetworkManager.Singleton.LocalClientId);
+
         StartCoroutine(EnsureGameStartedThenWaitForPlayer(onReady));
     }
 
@@ -292,6 +317,66 @@ public class DebugConsole : MonoBehaviour
         yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
         onReady();
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// Maps a <see cref="DebugStartPoint"/> selected in the "Game Start Point" editor window
+    /// to the matching cheat-console skip flow, bootstrapping a host session first via
+    /// <see cref="EnsureGameStartedThen"/>. Mirrors the entries registered in
+    /// <see cref="CheatConsoleUI.RegisterCheats"/> — keep both lists in sync.
+    /// </summary>
+    private void ApplyEditorDebugStartPoint(DebugStartPoint point)
+    {
+        switch (point)
+        {
+            case DebugStartPoint.Day1BoothStart:
+                EnsureGameStartedThen(() => SkipToDay(1));
+                break;
+            case DebugStartPoint.FreePlayDay1NoTutorial:
+                EnsureGameStartedThen(StartFreePlayDay1);
+                break;
+            case DebugStartPoint.Day1SoldierAlexeiCutscene:
+                EnsureGameStartedThen(SkipToSoldierSlot);
+                break;
+            case DebugStartPoint.Day1MutantBreach:
+                EnsureGameStartedThen(SkipToMutantBreach);
+                break;
+            case DebugStartPoint.EndOfDay1:
+                EnsureGameStartedThen(SkipToEndOfDay1);
+                break;
+            case DebugStartPoint.Day2StartInsideBunker:
+                EnsureGameStartedThen(SkipToStartOfDay2);
+                break;
+            case DebugStartPoint.Day2VladOutBackCutscene:
+                EnsureGameStartedThen(SkipToEndOfDay2);
+                break;
+            case DebugStartPoint.Day2OchoBoothEncounter:
+                EnsureGameStartedThen(SkipToOchoBoothEncounter);
+                break;
+            case DebugStartPoint.Day3StartInsideBunker:
+                EnsureGameStartedThen(SkipToStartOfDay3);
+                break;
+            case DebugStartPoint.Day3InBoothAllSuspectsProcessed:
+                EnsureGameStartedThen(SkipToDay3PostShiftBooth);
+                break;
+            case DebugStartPoint.EndOfDay4BeforeMutantBreach:
+                EnsureGameStartedThen(SkipToEndOfDay4);
+                break;
+            case DebugStartPoint.FreePlayDay4Booth:
+                EnsureGameStartedThen(StartFreePlay);
+                break;
+            case DebugStartPoint.FreePlayDay5Booth:
+                EnsureGameStartedThen(StartFreePlayDay5);
+                break;
+            case DebugStartPoint.EndOfDemo:
+                EnsureGameStartedThen(SkipToEndOfDemo);
+                break;
+            case DebugStartPoint.None:
+            default:
+                break;
+        }
+    }
+#endif
 
     /// <summary>
     /// Called once by <see cref="GameManager.OnGameStart"/> after the lobby join sequence
