@@ -507,7 +507,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         _lastAnimTrigger = string.Empty;
         _joinByInteractionOnly = joinByInteractionOnly;
-        _allowParticipantExit = allowParticipantExit;
+        // A forced conversation asset must never let the player back out via the escape/Back
+        // button, even if a caller mistakenly passes allowParticipantExit: true for it.
+        _allowParticipantExit = allowParticipantExit && !dialogue.isForced;
         _hideNonParticipantUI = hideNonParticipantUI;
 
         // Set the server-side flag immediately so CheckProximityJoins works even if the

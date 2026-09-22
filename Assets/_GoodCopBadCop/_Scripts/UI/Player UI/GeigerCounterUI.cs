@@ -47,10 +47,30 @@ public class GeigerCounterUI : MonoBehaviour
     [SerializeField] private string valueFormat = "{0:F1}";
     [SerializeField] private string valueSuffix = " Sv";
 
+    [Header("Crack Overlay – High Radiation Damage")]
+    [Tooltip("The Image using the GoodCopBadCop/GlassCrackOverlay material, layered over the gauge glass.")]
+    [SerializeField] private Image crackedGlassImage;
+    [Tooltip("Normalised radiation (0-1) at which cracks start to appear. Reaches full crack at 1.")]
+    [SerializeField] [Range(0f, 1f)] private float crackStartThreshold = 0.5f;
+    [Tooltip("How quickly the crack overlay eases toward its target progress.")]
+    [SerializeField] private float crackSmoothSpeed = 4f;
+
+    [Header("High Radiation Shake")]
+    [Tooltip("UIWobble on the gauge, enabled once radiation crosses shakeActivateThreshold. " +
+             "Should start disabled on the GameObject.")]
+    [SerializeField] private UIWobble shakeWobble;
+    [Tooltip("Normalised radiation (0-1) above which the gauge starts shaking.")]
+    [SerializeField] [Range(0f, 1f)] private float shakeActivateThreshold = 0.75f;
+
     private PlayerRadiation _playerRadiation;
     private PlayerInstance _subscribedInstance;
     private float _targetAngle;
     private float _currentAngle;
+
+    private static readonly int CrackProgressId = Shader.PropertyToID("_CrackProgress");
+    private Material _crackMaterialInstance;
+    private float _crackProgressTarget;
+    private float _crackProgressCurrent;
 
     // ── Exposure-rate tracking (drives jitter) ─────────────────────────────────
 
@@ -72,6 +92,7 @@ public class GeigerCounterUI : MonoBehaviour
             needle.localRotation = Quaternion.Euler(0f, 0f, minNeedleAngle);
 
         ConfigureArcImages();
+        BuildCrackMaterialInstance();
     }
 
     private void OnEnable()
@@ -91,6 +112,7 @@ public class GeigerCounterUI : MonoBehaviour
 
         DecayExposureRate();
         AnimateNeedle();
+        AnimateCrackOverlay();
     }
 
     private void OnDisable()
@@ -119,6 +141,21 @@ public class GeigerCounterUI : MonoBehaviour
             arcFillImage.fillAmount    = 0f;
             arcFillImage.color         = arcColorLow;
         }
+    }
+
+    /// <summary>
+    /// Instantiates a private copy of the crack overlay's material so runtime changes to
+    /// _CrackProgress never leak into the shared material asset (mirrors the pattern used by
+    /// <see cref="BreakableGlassController"/>, which uses a MaterialPropertyBlock for the same
+    /// reason on a MeshRenderer).
+    /// </summary>
+    private void BuildCrackMaterialInstance()
+    {
+        if (crackedGlassImage == null || crackedGlassImage.material == null) return;
+
+        _crackMaterialInstance = new Material(crackedGlassImage.material);
+        crackedGlassImage.material = _crackMaterialInstance;
+        _crackMaterialInstance.SetFloat(CrackProgressId, 0f);
     }
 
     // ── PlayerRadiation subscription ───────────────────────────────────────────
@@ -173,6 +210,12 @@ public class GeigerCounterUI : MonoBehaviour
 
         if (radiationValueText != null)
             radiationValueText.text = string.Format(valueFormat, current) + valueSuffix;
+
+        // ── Crack overlay and shake – both scale with the overall/accumulated radiation ────
+        _crackProgressTarget = Mathf.Clamp01(Mathf.InverseLerp(crackStartThreshold, 1f, normalized));
+
+        if (shakeWobble != null)
+            shakeWobble.enabled = normalized >= shakeActivateThreshold;
     }
 
     /// <summary>
@@ -208,5 +251,17 @@ public class GeigerCounterUI : MonoBehaviour
                     + Mathf.Sin(t * 6.83f + 4f)  * 0.20f;
 
         needle.localRotation = Quaternion.Euler(0f, 0f, _currentAngle + noise * jitterAmplitude * _jitterScale);
+    }
+
+    /// <summary>Eases the crack overlay's _CrackProgress toward the radiation-driven target.</summary>
+    private void AnimateCrackOverlay()
+    {
+        if (_crackMaterialInstance == null) return;
+
+        _crackProgressCurrent = Mathf.Lerp(
+            _crackProgressCurrent, _crackProgressTarget,
+            Time.deltaTime * crackSmoothSpeed);
+
+        _crackMaterialInstance.SetFloat(CrackProgressId, _crackProgressCurrent);
     }
 }

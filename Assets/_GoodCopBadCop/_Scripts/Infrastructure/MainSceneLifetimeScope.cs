@@ -41,6 +41,7 @@ namespace GoodCopBadCop.Infrastructure
             builder.RegisterEntryPoint<SettingsApplier>(Lifetime.Scoped);
             builder.RegisterComponentInHierarchy<GraphicsPreferencesVolumeAnchor>();
             builder.RegisterEntryPoint<GraphicsPreferencesApplier>(Lifetime.Scoped);
+            builder.RegisterEntryPoint<TextWobbleApplier>(Lifetime.Scoped);
             builder.Register<ILegacyGameObjectInjector, LegacyGameObjectInjector>(Lifetime.Scoped);
             builder.Register<ICameraService, CameraService>(Lifetime.Scoped);
             builder.Register<IAudioService, AudioService>(Lifetime.Scoped);

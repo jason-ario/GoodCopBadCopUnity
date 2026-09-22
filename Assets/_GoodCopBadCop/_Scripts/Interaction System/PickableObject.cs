@@ -270,7 +270,7 @@ public class PickableObject : Interactable
     /// </summary>
     public void RequestSetStowedNetworked(bool stowed) => SetStowedServerRpc(stowed);
 
-    [ServerRpc]
+    [ServerRpc(RequireOwnership = false)]
     private void SetStowedServerRpc(bool stowed)
     {
         _isStowed.Value = stowed;

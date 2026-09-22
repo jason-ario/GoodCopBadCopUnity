@@ -6,10 +6,10 @@ using UnityEngine;
 public class PlayerCameraController : MonoBehaviour
 {
     [SerializeField] private CinemachineCamera camera;
-    [Tooltip("The actual render Camera whose near clip plane is temporarily tightened for close-up hand-held items (cigarette, pills, etc).")]
+    [Tooltip("The actual render Camera driven by the CinemachineCamera above. Currently unused for near clip tightening (CinemachineBrain overwrites it from the vcam's Lens every frame), kept for other camera lookups.")]
     [SerializeField] private Camera renderCamera;
     [Tooltip("Near clip plane distance to use while the player is holding a close-up item near the camera (smoking, drinking pills, etc).")]
-    [SerializeField] private float smokingNearClipPlane = 0.05f;
+    [SerializeField] private float smokingNearClipPlane = 0f;
     [Tooltip("Seconds to ease the near clip plane between its default and tightened values.")]
     [SerializeField] private float nearClipPlaneLerpDuration = 0.2f;
     [SerializeField] NoiseSettings normalNoiseSettings;
@@ -372,12 +372,12 @@ public class PlayerCameraController : MonoBehaviour
     /// </summary>
     public void SetNearClipPlaneTightened(bool tightened)
     {
-        if (renderCamera == null)
+        if (camera == null)
             return;
 
         if (!_nearClipPlaneCached)
         {
-            _defaultNearClipPlane = renderCamera.nearClipPlane;
+            _defaultNearClipPlane = camera.Lens.NearClipPlane;
             _nearClipPlaneCached = true;
         }
 
@@ -385,11 +385,23 @@ public class PlayerCameraController : MonoBehaviour
 
         _nearClipPlaneTween?.Kill();
         _nearClipPlaneTween = DOTween.To(
-                () => renderCamera.nearClipPlane,
-                value => renderCamera.nearClipPlane = value,
+                () => camera.Lens.NearClipPlane,
+                SetLensNearClipPlane,
                 target,
                 Mathf.Max(0.01f, nearClipPlaneLerpDuration))
             .OnKill(() => _nearClipPlaneTween = null);
+    }
+
+    /// <summary>
+    /// Writes back to the CinemachineCamera's Lens (a struct), since CinemachineBrain re-applies
+    /// the live vcam's Lens.NearClipPlane to the render Camera every frame — tweening the Camera
+    /// component directly would be overwritten immediately and never appear on screen.
+    /// </summary>
+    private void SetLensNearClipPlane(float value)
+    {
+        LensSettings lens = camera.Lens;
+        lens.NearClipPlane = value;
+        camera.Lens = lens;
     }
 
     public void PlaySway(CameraSwaySettings settings)

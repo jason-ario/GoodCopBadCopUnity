@@ -45,6 +45,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             view.RunningEffectsEnabledChanged.Subscribe(OnRunningEffectsEnabledChanged).AddTo(ref disposables);
             view.HeadBobEnabledChanged.Subscribe(OnHeadBobEnabledChanged).AddTo(ref disposables);
             view.CameraShakeEnabledChanged.Subscribe(OnCameraShakeEnabledChanged).AddTo(ref disposables);
+            view.TextWobbleEnabledChanged.Subscribe(OnTextWobbleEnabledChanged).AddTo(ref disposables);
             view.MasterVolumeChanged.Subscribe(OnMasterVolumeChanged).AddTo(ref disposables);
             view.MusicVolumeChanged.Subscribe(OnMusicVolumeChanged).AddTo(ref disposables);
             view.SfxVolumeChanged.Subscribe(OnSfxVolumeChanged).AddTo(ref disposables);
@@ -56,7 +57,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
             view.QualityPresetChanged.Subscribe(OnQualityPresetChanged).AddTo(ref disposables);
             view.BrightnessChanged.Subscribe(OnBrightnessChanged).AddTo(ref disposables);
             view.FilmGrainEnabledChanged.Subscribe(OnFilmGrainEnabledChanged).AddTo(ref disposables);
-            view.ChromaticAberrationEnabledChanged.Subscribe(OnChromaticAberrationEnabledChanged).AddTo(ref disposables);
             view.VoiceChatProximityRangeChanged.Subscribe(OnVoiceChatProximityRangeChanged).AddTo(ref disposables);
             view.VoiceChatMicrophoneNameChanged.Subscribe(OnVoiceChatMicrophoneNameChanged).AddTo(ref disposables);
             view.Closed.Subscribe(_ => OnClosed()).AddTo(ref disposables);
@@ -109,6 +109,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 .Subscribe(view.SetCameraShakeEnabledValue)
                 .AddTo(ref disposables);
 
+            settingsModel.TextWobbleEnabled
+                .Subscribe(view.SetTextWobbleEnabledValue)
+                .AddTo(ref disposables);
+
             settingsModel.MasterVolume
                 .Subscribe(view.SetMasterVolumeValue)
                 .AddTo(ref disposables);
@@ -151,10 +155,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             settingsModel.FilmGrainEnabled
                 .Subscribe(view.SetFilmGrainEnabledValue)
-                .AddTo(ref disposables);
-
-            settingsModel.ChromaticAberrationEnabled
-                .Subscribe(view.SetChromaticAberrationEnabledValue)
                 .AddTo(ref disposables);
 
             settingsModel.VoiceChatProximityRange
@@ -256,6 +256,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
             settingsService.SetCameraShakeEnabled(isEnabled);
         }
 
+        private void OnTextWobbleEnabledChanged(bool isEnabled)
+        {
+            settingsService.SetTextWobbleEnabled(isEnabled);
+        }
+
         private void OnMasterVolumeChanged(float value)
         {
             settingsService.SetMasterVolume(value);
@@ -319,11 +324,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private void OnFilmGrainEnabledChanged(bool isEnabled)
         {
             settingsService.SetFilmGrainEnabled(isEnabled);
-        }
-
-        private void OnChromaticAberrationEnabledChanged(bool isEnabled)
-        {
-            settingsService.SetChromaticAberrationEnabled(isEnabled);
         }
 
         private void OnVoiceChatProximityRangeChanged(int value)

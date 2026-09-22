@@ -59,6 +59,7 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private int _debugSlotIndex = 0;
 
     private GameObject _currentScreen;
+    private GameObject _screenBeforePreGameLobby;
     private List<GameObject> _allScreens;
     private bool _buttonGroupFaded;
     private ISettingsMenuView settingsMenuView;
@@ -140,10 +141,13 @@ public class MainMenuController : MonoBehaviour
 
         // Route back action based on the current screen
         if (_currentScreen == campaignScreen
-            || _currentScreen == multiplayerScreen
-            || _currentScreen == preGameLobbyScreen)
+            || _currentScreen == multiplayerScreen)
         {
             BackToHomeScreen();
+        }
+        else if (_currentScreen == preGameLobbyScreen)
+        {
+            BackFromPreGameLobbyScreen();
         }
         else if (_currentScreen == joinGameScreen)
         {
@@ -237,12 +241,30 @@ public class MainMenuController : MonoBehaviour
 
     /// <summary>
     /// Opens the pre-game lobby screen. Called after networking is established,
-    /// either from the campaign slot flow or the multiplayer hub.
+    /// either from the campaign slot flow or the multiplayer hub. Remembers whichever
+    /// screen was active beforehand so <see cref="BackFromPreGameLobbyScreen"/> can
+    /// return the player there instead of always going to the home screen.
     /// </summary>
     public void OpenPreGameLobbyScreen(bool multiplayerMode)
     {
+        if (_currentScreen != preGameLobbyScreen)
+        {
+            _screenBeforePreGameLobby = _currentScreen;
+        }
+
         preGameLobbyController?.Setup(multiplayerMode);
         SwitchToScreen(preGameLobbyScreen);
+    }
+
+    /// <summary>
+    /// Leaves the pre-game lobby screen, returning to whichever screen led into it
+    /// (the campaign slot screen or the multiplayer hub), falling back to the home
+    /// screen if that isn't known.
+    /// </summary>
+    public void BackFromPreGameLobbyScreen()
+    {
+        SwitchToScreen(_screenBeforePreGameLobby != null ? _screenBeforePreGameLobby : homeScreen);
+        RefreshContinueButton();
     }
 
     /// <summary>Backward-compatible alias kept for existing UnityEvent bindings.</summary>

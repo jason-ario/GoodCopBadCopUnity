@@ -90,6 +90,10 @@ public class Day_01 : DayBase
              "Day number pop-up plays and hidden the moment the player clocks in.")]
     [SerializeField] private GameObject _clockInTutorialArrow;
 
+    [Tooltip("HUD task text shown alongside the tutorial arrow, from the moment the Day number pop-up " +
+             "plays until the player clocks in on the Time Card Machine.")]
+    [SerializeField] private string _taskClockInText = "Clock in for your shift";
+
     [Header("Day 1 — Soldier")]
     [Tooltip("The Soldier's SuspectCharacter placed directly in the scene (not runtime-spawned). " +
              "IMPORTANT: Must stay ACTIVE in the scene at load time so NGO registers his in-scene " +
@@ -251,6 +255,10 @@ public class Day_01 : DayBase
     [SerializeField] private float _vladFolderBarkDelay = 0.8f;
 
     [Header("Day 1 — Tutorial Task HUD")]
+    [Tooltip("HUD task text shown alongside the world-space marker while the player needs to pick up " +
+             "Vlad's ID card and application form.")]
+    [SerializeField] private string _taskPickUpDocsText = "Pick up Vlad's documents";
+
     [Tooltip("HUD task text shown while the player needs to grab a folder and place it on the desk.")]
     [SerializeField] private string _taskFolderDocs = "Grab a folder and place it on the desk";
 
@@ -419,6 +427,11 @@ public class Day_01 : DayBase
     // when TryStartShift subsequently fires OnDayStart.
     private bool _debugSkipActive = false;
 
+    // Clock-in tutorial task shown alongside the tutorial arrow at the very start of the day —
+    // see OnDayStarted / ShowClockInArrow. Completed and removed the instant the player clocks
+    // in (OnClockInAllClientsLocal), or immediately on the debug-skip path.
+    private TutorialObjectiveItem _taskClockIn;
+
     // Tracks which of Vlad's two documents have been picked up so far.
     private PickableObject _vladIDCard;
     private PickableObject _vladAppForm;
@@ -447,8 +460,7 @@ public class Day_01 : DayBase
     private FolderController _currentFolder;
 
     // Active tutorial task entries — created when each step begins, completed when done.
-    // Note: the initial "pick up Vlad's documents" step is intentionally NOT added to the
-    // objective list (see ShowVladPickUpTask) — only the world-space marker guides it.
+    private TutorialObjectiveItem _taskPickUpDocs;
     private TutorialObjectiveItem _taskFolder;
     private TutorialObjectiveItem _taskFile;
     private TutorialObjectiveItem _taskStamp;
@@ -578,6 +590,7 @@ public class Day_01 : DayBase
         // Reset the clock-in tutorial arrow to hidden — OnDayStarted shows it once the
         // Day number pop-up plays.
         ShowClockInArrow(false);
+        _taskClockIn = null;
 
         // Drawer is unlocked so the player can grab a folder during the tutorial.
         _drawer?.SetLocked(false);
@@ -809,6 +822,7 @@ public class Day_01 : DayBase
         _lastBreachTotal = 0;
         _taskTakeOutGore = null;
         _taskClockOut = null;
+        _taskClockIn = null;
         _taskOpenBunker = null;
         _taskGoToBed = null;
         _breachEpilogueAdvanced = false;
@@ -943,6 +957,7 @@ public class Day_01 : DayBase
         // pop-up plays. Runs on every client — the arrow carries no NetworkObject, so it's
         // shown/hidden locally in response to events that are already broadcast to all clients.
         ShowClockInArrow(true);
+        _taskClockIn = TutorialObjectiveList.Instance?.AddObjective(_taskClockInText);
 
         if (!NetworkManager.Singleton.IsServer) return;
 
@@ -970,6 +985,8 @@ public class Day_01 : DayBase
         {
             Debug.Log("[Day_01] OnDayStarted: debug skip active — skipping Day1OpeningSequence.");
             ShowClockInArrow(false);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskClockIn, markComplete: false);
+            _taskClockIn = null;
             return;
         }
 
@@ -1053,9 +1070,16 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Fired on ALL clients by <see cref="TimecardMachine.OnClockInAllClients"/> the instant the
-    /// clock-in punch lands. Purely visual — dismisses the tutorial arrow locally.
+    /// clock-in punch lands. Dismisses the tutorial arrow and completes/removes the matching
+    /// "Clock in for your shift" HUD row, both locally.
     /// </summary>
-    private void OnClockInAllClientsLocal() => ShowClockInArrow(false);
+    private void OnClockInAllClientsLocal()
+    {
+        ShowClockInArrow(false);
+
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskClockIn, preHideDelay: 1f);
+        _taskClockIn = null;
+    }
 
     /// <summary>
     /// Shows or hides the world-space arrow pointing at the Time Card Machine and its matching
@@ -1239,17 +1263,19 @@ public class Day_01 : DayBase
     /// <summary>
     /// Marks the pick-up-documents step. Called as the <see cref="TutorialOverlay"/>
     /// close callback from <see cref="OnVladPaperworkSpawned"/> so it appears after the player
-    /// has seen the handling-items tutorial.
-    /// Deliberately does NOT add a <see cref="TutorialObjectiveList"/> entry — this step is
-    /// only guided by the world-space marker. It's still tracked internally: pickup events on
-    /// both documents (see <see cref="OnVladDocumentPickedUp"/>) report to the server via
+    /// has seen the handling-items tutorial. Adds the matching HUD objective row alongside the
+    /// world-space marker, mirroring every other tutorial arrow in this sequence. It's still
+    /// tracked internally too: pickup events on both documents (see
+    /// <see cref="OnVladDocumentPickedUp"/>) report to the server via
     /// <see cref="TutorialTaskSync"/>, which fires <see cref="OnVladDocsBothPickedUpSync"/> on
-    /// all clients once both are picked up, advancing to the folder task.
+    /// all clients once both are picked up, completing this row and advancing to the folder task.
     /// </summary>
     private void ShowVladPickUpTask()
     {
         if (TutorialMarkerManager.Instance != null && _markerPickUpDocs != null)
             TutorialMarkerManager.Instance.Mark(_markerPickUpDocs);
+
+        _taskPickUpDocs = TutorialObjectiveList.Instance?.AddObjective(_taskPickUpDocsText);
     }
 
     private void OnVladDocumentPickedUp()
@@ -1435,13 +1461,18 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Fires on all clients once the server confirms both Vlad documents were picked up.
-    /// Adds the visible "file documents" task to the objective list — the pick-up step
-    /// itself was never shown there (see <see cref="ShowVladPickUpTask"/>) — and starts the
-    /// folder bark on the server so it plays exactly once.
+    /// Completes/removes the "pick up documents" row, adds the visible "grab a folder" task to
+    /// the objective list, and starts the folder bark on the server so it plays exactly once.
     /// </summary>
     private void OnVladDocsBothPickedUpSync()
     {
         TutorialTaskSync.OnVladDocsBothPickedUpAllClients -= OnVladDocsBothPickedUpSync;
+
+        if (_taskPickUpDocs != null)
+        {
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskPickUpDocs, preHideDelay: 1.5f);
+            _taskPickUpDocs = null;
+        }
 
         if (TutorialMarkerManager.Instance != null)
         {

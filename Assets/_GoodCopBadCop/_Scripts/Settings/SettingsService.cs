@@ -15,6 +15,7 @@ namespace GoodCopBadCop.Settings
         void SetRunningEffectsEnabled(bool isEnabled);
         void SetHeadBobEnabled(bool isEnabled);
         void SetCameraShakeEnabled(bool isEnabled);
+        void SetTextWobbleEnabled(bool isEnabled);
         void SetMasterVolume(float value);
         void SetMusicVolume(float value);
         void SetSfxVolume(float value);
@@ -28,7 +29,6 @@ namespace GoodCopBadCop.Settings
         void SetQualityPreset(EQualityPreset qualityPreset);
         void SetBrightness(float value);
         void SetFilmGrainEnabled(bool isEnabled);
-        void SetChromaticAberrationEnabled(bool isEnabled);
         void Flush();
     }
 
@@ -114,6 +114,11 @@ namespace GoodCopBadCop.Settings
             model.CameraShakeEnabledMutable.Value = isEnabled;
         }
 
+        public void SetTextWobbleEnabled(bool isEnabled)
+        {
+            model.TextWobbleEnabledMutable.Value = isEnabled;
+        }
+
         public void SetMasterVolume(float value)
         {
             model.MasterVolumeMutable.Value = UnityEngine.Mathf.Clamp(value, MinimumVolume, MaximumVolume);
@@ -177,11 +182,6 @@ namespace GoodCopBadCop.Settings
         public void SetFilmGrainEnabled(bool isEnabled)
         {
             model.FilmGrainEnabledMutable.Value = isEnabled;
-        }
-
-        public void SetChromaticAberrationEnabled(bool isEnabled)
-        {
-            model.ChromaticAberrationEnabledMutable.Value = isEnabled;
         }
 
         public void Flush()

@@ -56,7 +56,7 @@ public class TutorialObjectiveList : MonoBehaviour
     private readonly List<TutorialObjectiveItem> _items = new();
     private Coroutine _clearCoroutine;
 
-    /// <summary>Number of tracked rows not yet marked complete. Used for the sidebar's collapsed badge count.</summary>
+    /// <summary>Number of tracked rows not yet marked complete.</summary>
     public int IncompleteCount
     {
         get
@@ -171,8 +171,6 @@ public class TutorialObjectiveList : MonoBehaviour
 
         SFXController.Instance?.Play(newTaskSound, newTaskSoundVolume);
 
-        HUDSidebarController.Instance?.RefreshBadge();
-
         return item;
     }
 
@@ -183,7 +181,6 @@ public class TutorialObjectiveList : MonoBehaviour
     public void CompleteObjective(TutorialObjectiveItem item)
     {
         item?.MarkComplete();
-        HUDSidebarController.Instance?.RefreshBadge();
     }
 
     /// <summary>
@@ -264,7 +261,6 @@ public class TutorialObjectiveList : MonoBehaviour
 
         StartCoroutine(RemoveObjectiveRoutine(item, preHideDelay, onComplete));
         _pendingCompletedRemovals.Add(item);
-        HUDSidebarController.Instance?.RefreshBadge();
     }
 
     // ── Private ─────────────────────────────────────────────────────────
@@ -278,8 +274,6 @@ public class TutorialObjectiveList : MonoBehaviour
         _items.Remove(item);
         if (item != null)
             Destroy(item.gameObject);
-
-        HUDSidebarController.Instance?.RefreshBadge();
 
         // Remove the list once every tracked row is gone; sibling tasks keep it visible.
         if (_items.Count == 0 && _isShowing)
@@ -306,14 +300,14 @@ public class TutorialObjectiveList : MonoBehaviour
         if (header != null)
             header.gameObject.SetActive(false);
 
-        if (taskListContainer is RectTransform listRect)
-        {
-            listRect.anchorMin = new Vector2(0f, 1f);
-            listRect.anchorMax = new Vector2(1f, 1f);
-            listRect.anchoredPosition = Vector2.zero;
-            listRect.sizeDelta = Vector2.zero;
-            listRect.pivot = new Vector2(0.5f, 1f);
-        }
+        // NOTE: taskListContainer (Tasks Panel) is a fixed-width row container sized
+        // and anchored directly in the scene to fit the sidebar (see Task Sidebar/Tasks Panel).
+        // Do NOT force it to a full-stretch, zero-sizeDelta rect here — that was leftover from
+        // when this pointed at a different, full-bleed tutorial-overlay panel. Overwriting its
+        // anchors/size on every Awake collapses its width to 0 at runtime (Tasks Panel's own
+        // VerticalLayoutGroup doesn't control width, so it just reads whatever width this
+        // container currently reports), which made every task row wrap to one character per
+        // line the instant the list first appeared each session.
     }
 
     private void Show()

@@ -83,19 +83,30 @@ public class SuspectRecord
     /// <summary>
     /// The 1-based campaign day on which this suspect was most recently quarantined.
     /// -1 means never quarantined this session.
-    /// DailySuspectManager uses this to skip the suspect on the shift immediately following
-    /// their quarantine: a suspect quarantined on day N is excluded from day N+1 only,
-    /// then re-enters the rotation normally from day N+2 onward.
+    /// DailySuspectManager uses this (via <see cref="IsOnQuarantineCooldown"/>) to skip the
+    /// suspect on shifts while their quarantine is still active — a suspect quarantined on
+    /// day N is excluded through day N + <see cref="SuspectRunRecords.QuarantineDurationDays"/> - 1,
+    /// then re-enters the rotation normally.
     /// </summary>
     public int quarantinedOnDay = -1;
 
     /// <summary>
-    /// Returns true if this suspect is currently serving a one-day quarantine cooldown
-    /// and should be excluded from the given day's shift pool.
+    /// Returns true if this suspect is currently serving their quarantine cooldown and should be
+    /// excluded from the given day's shift pool. Derived from the same
+    /// <see cref="SuspectRunRecords.QuarantineDurationDays"/> / elapsed-days math the Quarantine
+    /// Board uses (via <see cref="SuspectRunRecords.GetRemainingQuarantineDays(SuspectRecord, int)"/>)
+    /// rather than a separately hardcoded day offset, so the shift pool and the board can never
+    /// disagree about whether a suspect is still quarantined.
     /// </summary>
     /// <param name="currentDay">The campaign day being populated (1-based).</param>
     public bool IsOnQuarantineCooldown(int currentDay)
-        => quarantinedOnDay >= 0 && quarantinedOnDay == currentDay - 1;
+    {
+        if (quarantinedOnDay < 0 || currentDay <= quarantinedOnDay)
+            return false;
+
+        int elapsedDays = currentDay - quarantinedOnDay;
+        return elapsedDays < SuspectRunRecords.QuarantineDurationDays;
+    }
 
     public SuspectRecord(SuspectData suspectData)
     {

@@ -8,19 +8,18 @@ using VContainer.Unity;
 namespace GoodCopBadCop.Settings
 {
     /// <summary>
-    /// Applies the Graphics-tab preferences (Quality Preset, Brightness, Film Grain, Chromatic
-    /// Aberration) that have persisted backing (<see cref="ISettingsModel"/>) but previously had no
-    /// runtime effect. Quality Preset adjusts global <see cref="QualitySettings"/> knobs directly
-    /// (the project only defines a single "PC" quality tier, so presets are expressed as knob
-    /// values rather than named tiers). Brightness/Film Grain/Chromatic Aberration drive overrides
-    /// on the always-on global Volume identified by <see cref="GraphicsPreferencesVolumeAnchor"/>.
+    /// Applies the Graphics-tab preferences (Quality Preset, Brightness, Film Grain) that have
+    /// persisted backing (<see cref="ISettingsModel"/>) but previously had no runtime effect.
+    /// Quality Preset adjusts global <see cref="QualitySettings"/> knobs directly (the project
+    /// only defines a single "PC" quality tier, so presets are expressed as knob values rather
+    /// than named tiers). Brightness/Film Grain drive overrides on the always-on global Volume
+    /// identified by <see cref="GraphicsPreferencesVolumeAnchor"/>.
     /// </summary>
     public sealed class GraphicsPreferencesApplier : IInitializable, IDisposable
     {
         private const float MinExposure = -2f;
         private const float MaxExposure = 2f;
         private const float DefaultFilmGrainIntensity = 0.2f;
-        private const float DefaultChromaticAberrationIntensity = 0.3f;
 
         private readonly ISettingsModel model;
         private readonly GraphicsPreferencesVolumeAnchor volumeAnchor;
@@ -28,9 +27,7 @@ namespace GoodCopBadCop.Settings
 
         private ColorAdjustments colorAdjustments;
         private FilmGrain filmGrain;
-        private ChromaticAberration chromaticAberration;
         private float filmGrainMaxIntensity = DefaultFilmGrainIntensity;
-        private float chromaticAberrationMaxIntensity = DefaultChromaticAberrationIntensity;
 
         public GraphicsPreferencesApplier(ISettingsModel model, GraphicsPreferencesVolumeAnchor volumeAnchor)
         {
@@ -48,7 +45,7 @@ namespace GoodCopBadCop.Settings
             {
                 Debug.LogWarning(
                     "[GraphicsPreferencesApplier] No Volume assigned via GraphicsPreferencesVolumeAnchor; " +
-                    "Brightness/Film Grain/Chromatic Aberration will not be applied.");
+                    "Brightness/Film Grain will not be applied.");
                 return;
             }
 
@@ -69,19 +66,8 @@ namespace GoodCopBadCop.Settings
                 ? filmGrain.intensity.value
                 : DefaultFilmGrainIntensity;
 
-            if (!profile.TryGet(out chromaticAberration))
-            {
-                chromaticAberration = profile.Add<ChromaticAberration>(true);
-            }
-            chromaticAberration.active = true;
-            chromaticAberration.intensity.overrideState = true;
-            chromaticAberrationMaxIntensity = chromaticAberration.intensity.value > 0f
-                ? chromaticAberration.intensity.value
-                : DefaultChromaticAberrationIntensity;
-
             model.Brightness.Subscribe(ApplyBrightness).AddTo(ref disposables);
             model.FilmGrainEnabled.Subscribe(ApplyFilmGrain).AddTo(ref disposables);
-            model.ChromaticAberrationEnabled.Subscribe(ApplyChromaticAberration).AddTo(ref disposables);
         }
 
         public void Dispose()
@@ -107,16 +93,6 @@ namespace GoodCopBadCop.Settings
             }
 
             filmGrain.intensity.value = isEnabled ? filmGrainMaxIntensity : 0f;
-        }
-
-        private void ApplyChromaticAberration(bool isEnabled)
-        {
-            if (chromaticAberration == null)
-            {
-                return;
-            }
-
-            chromaticAberration.intensity.value = isEnabled ? chromaticAberrationMaxIntensity : 0f;
         }
 
         private static void ApplyQualityPreset(EQualityPreset preset)

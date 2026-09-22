@@ -112,7 +112,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             new Setting("Camera Shake", "camera_shake", "Off", "On"),
             new Setting("Head Bob", "head_bob", "Off", "On"),
-            new Setting("Running Effects", "running_effects", "Off", "On")
+            new Setting("Running Effects", "running_effects", "Off", "On"),
+            new Setting("Text Wobble", "text_wobble", "Off", "On")
         };
 
         private static readonly Setting[] Graphics =
@@ -122,9 +123,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("VSync", "vsync", "Off", "On"),
             new Setting("FPS Limit", "fps_limit", "Unlimited", "30", "60", "120", "144"),
             new Setting("Quality Preset", "quality", "Low", "Medium", "High", "Ultra"),
-            new Setting("Brightness", "brightness", 50f),
-            new Setting("Film Grain", "film_grain", "Off", "On"),
-            new Setting("Chromatic Aberration", "chromatic_aberration", "Off", "On")
+            new Setting("Brightness", "brightness", 100f),
+            new Setting("Film Grain", "film_grain", "Off", "On")
         };
 
         private static readonly Setting[] Audio =
@@ -186,6 +186,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> runningEffectsEnabledChanged = new Subject<bool>();
         private readonly Subject<bool> headBobEnabledChanged = new Subject<bool>();
         private readonly Subject<bool> cameraShakeEnabledChanged = new Subject<bool>();
+        private readonly Subject<bool> textWobbleEnabledChanged = new Subject<bool>();
         private readonly Subject<float> masterVolumeChanged = new Subject<float>();
         private readonly Subject<float> musicVolumeChanged = new Subject<float>();
         private readonly Subject<float> sfxVolumeChanged = new Subject<float>();
@@ -197,7 +198,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<int> qualityPresetChanged = new Subject<int>();
         private readonly Subject<float> brightnessChanged = new Subject<float>();
         private readonly Subject<bool> filmGrainEnabledChanged = new Subject<bool>();
-        private readonly Subject<bool> chromaticAberrationEnabledChanged = new Subject<bool>();
         private readonly Subject<int> voiceChatProximityRangeChanged = new Subject<int>();
         private readonly Subject<string> voiceChatMicrophoneNameChanged = new Subject<string>();
         private readonly Subject<ESettingsMenuTab> tabSelected = new Subject<ESettingsMenuTab>();
@@ -217,6 +217,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> RunningEffectsEnabledChanged { get { return runningEffectsEnabledChanged; } }
         public Observable<bool> HeadBobEnabledChanged { get { return headBobEnabledChanged; } }
         public Observable<bool> CameraShakeEnabledChanged { get { return cameraShakeEnabledChanged; } }
+        public Observable<bool> TextWobbleEnabledChanged { get { return textWobbleEnabledChanged; } }
         public Observable<float> MasterVolumeChanged { get { return masterVolumeChanged; } }
         public Observable<float> MusicVolumeChanged { get { return musicVolumeChanged; } }
         public Observable<float> SfxVolumeChanged { get { return sfxVolumeChanged; } }
@@ -228,7 +229,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<int> QualityPresetChanged { get { return qualityPresetChanged; } }
         public Observable<float> BrightnessChanged { get { return brightnessChanged; } }
         public Observable<bool> FilmGrainEnabledChanged { get { return filmGrainEnabledChanged; } }
-        public Observable<bool> ChromaticAberrationEnabledChanged { get { return chromaticAberrationEnabledChanged; } }
         public Observable<int> VoiceChatProximityRangeChanged { get { return voiceChatProximityRangeChanged; } }
         public Observable<string> VoiceChatMicrophoneNameChanged { get { return voiceChatMicrophoneNameChanged; } }
         public Observable<ESettingsMenuTab> TabSelected { get { return tabSelected; } }
@@ -579,6 +579,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 RefreshActiveSetting("camera_shake");
             }
         }
+        public void SetTextWobbleEnabledValue(bool value)
+        {
+            int index = Array.IndexOf(Gameplay, Array.Find(Gameplay, s => s.Key == "text_wobble"));
+            if (index >= 0)
+            {
+                Gameplay[index].Index = value ? 1 : 0;
+                RefreshActiveSetting("text_wobble");
+            }
+        }
         public void SetMasterVolumeValue(float value) { Audio[0].Value = value; RefreshActiveSetting("master_volume"); }
         public void SetMusicVolumeValue(float value) { Audio[1].Value = value; RefreshActiveSetting("music_volume"); }
         public void SetSfxVolumeValue(float value) { Audio[2].Value = value; RefreshActiveSetting("sfx_volume"); }
@@ -591,7 +600,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetQualityPresetValue(int value) { Graphics[4].Index = value; RefreshActiveSetting("quality"); }
         public void SetBrightnessValue(float value) { Graphics[5].Value = value; RefreshActiveSetting("brightness"); }
         public void SetFilmGrainEnabledValue(bool value) { Graphics[6].Index = value ? 1 : 0; RefreshActiveSetting("film_grain"); }
-        public void SetChromaticAberrationEnabledValue(bool value) { Graphics[7].Index = value ? 1 : 0; RefreshActiveSetting("chromatic_aberration"); }
         public void SetVoiceChatProximityRangeValue(int value) { Audio[8].Value = value; RefreshActiveSetting("voice_proximity_range"); }
 
         public void SetVoiceChatMicrophoneNameValue(string value)
@@ -794,10 +802,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "running_effects":
                 case "head_bob":
                 case "camera_shake":
+                case "text_wobble":
                 case "quality":
                 case "brightness":
                 case "film_grain":
-                case "chromatic_aberration":
                 case "voice_proximity_range":
                 case "microphone":
                     return true;
@@ -1120,10 +1128,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "running_effects": runningEffectsEnabledChanged.OnNext(setting.Index == 1); break;
                 case "head_bob": headBobEnabledChanged.OnNext(setting.Index == 1); break;
                 case "camera_shake": cameraShakeEnabledChanged.OnNext(setting.Index == 1); break;
+                case "text_wobble": textWobbleEnabledChanged.OnNext(setting.Index == 1); break;
                 case "quality": qualityPresetChanged.OnNext(setting.Index); break;
                 case "brightness": brightnessChanged.OnNext(setting.Value); break;
                 case "film_grain": filmGrainEnabledChanged.OnNext(setting.Index == 1); break;
-                case "chromatic_aberration": chromaticAberrationEnabledChanged.OnNext(setting.Index == 1); break;
                 case "voice_proximity_range": voiceChatProximityRangeChanged.OnNext(Mathf.RoundToInt(setting.Value)); break;
                 case "microphone":
                     voiceChatMicrophoneNameChanged.OnNext(setting.Index == 0 ? string.Empty : setting.Options[setting.Index]);

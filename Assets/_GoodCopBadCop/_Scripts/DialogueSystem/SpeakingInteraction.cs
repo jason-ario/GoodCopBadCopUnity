@@ -676,18 +676,26 @@ public class SpeakingInteraction : NetworkBehaviour
 
         var submitted = new List<int>(_worldChoiceSubmissions.Values);
 
+        // No one ever picked an option — every participant left/disconnected before answering
+        // (see RecheckWorldGatesAfterParticipantChange). There is no real winner to echo, so
+        // resolve the vote silently: broadcasting FinalizeWorldChoiceClientRpc here previously
+        // defaulted to choice 0 and made it look — to the very player who just backed out via
+        // Escape/Back, if they were still standing in overhear range — as if they had picked the
+        // top choice.
         if (submitted.Count == 0)
         {
             _resolvedWorldChoiceIndex = 0;
-            Debug.LogWarning($"[SpeakingInteraction] ResolveWorldChoiceVote on '{speakerName}' called with no submissions. Defaulting to choice 0.");
+
+            Action<int> abandonedCallback = _onWorldChoiceResolved;
+            _onWorldChoiceResolved = null;
+            abandonedCallback?.Invoke(_resolvedWorldChoiceIndex);
+            return;
         }
-        else
-        {
-            bool unanimous = submitted.TrueForAll(v => v == submitted[0]);
-            _resolvedWorldChoiceIndex = unanimous
-                ? submitted[0]
-                : submitted[UnityEngine.Random.Range(0, submitted.Count)];
-        }
+
+        bool unanimous = submitted.TrueForAll(v => v == submitted[0]);
+        _resolvedWorldChoiceIndex = unanimous
+            ? submitted[0]
+            : submitted[UnityEngine.Random.Range(0, submitted.Count)];
 
         // Resolve the winning player's PlayerObject so bystanders overhearing in InWorldSubtitles
         // mode can be shown the echo bubble above the correct head (mirrors

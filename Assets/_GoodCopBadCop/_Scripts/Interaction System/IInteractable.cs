@@ -147,13 +147,15 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     protected virtual void Awake()
     {
         highlightEffect = GetComponent<HighlightEffect>();
-        // Remember the authored style BEFORE any ProfileLoad call overwrites the field
-        // (see _defaultProfile), so ForceHighlightProfile swaps are always reversible.
+        // Remember the authored profile reference (see _defaultProfile) so ForceHighlightProfile
+        // swaps are reversible later. Deliberately do NOT call ProfileLoad here: it copies every
+        // field from the shared HighlightProfile asset onto this component (profile.Load(this)),
+        // clobbering any per-object tweaks made directly on this HighlightEffect in the Inspector/
+        // prefab. Leaving it alone means the component keeps whatever is authored on the object
+        // itself; ApplyHighlightProfile() below still swaps to a hold profile when one is actually
+        // requested (e.g. JunkItem's findability glow).
         _defaultProfile = highlightEffect.profile;
         _appliedProfile = _defaultProfile;
-        // ProfileLoad applies visual style settings from the profile but does not
-        // touch the 'highlighted' state, so call it first.
-        highlightEffect.ProfileLoad(highlightEffect.profile);
         // Force the component enabled so that HighlightEffect.Start() always runs and
         // SetupMaterial() builds the renderer list (rms). If a prefab was saved with
         // the component disabled, Start() never fires, leaving rms null and causing the

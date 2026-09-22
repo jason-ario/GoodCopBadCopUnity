@@ -7,8 +7,16 @@ public class TMPWobbleText : MonoBehaviour
     [SerializeField] private TMPWobbleProfile profile;
     [SerializeField] private bool playOnEnable = true;
 
+    /// <summary>
+    /// Global switch for the Text Wobble accessibility setting. When <c>false</c>, every
+    /// <see cref="TMPWobbleText"/> instance stops animating and its mesh is reset to the
+    /// non-wobbled layout, regardless of individual <see cref="StartWobble"/>/<see cref="StopWobble"/> calls.
+    /// </summary>
+    public static bool GlobalWobbleEnabled { get; set; } = true;
+
     private TextMeshProUGUI tmp;
     private bool isPlaying;
+    private bool wasGloballySuppressed;
 
     private string lastText = string.Empty;
     private float[] randomPhaseX;
@@ -37,6 +45,20 @@ public class TMPWobbleText : MonoBehaviour
     {
         if (!isPlaying || tmp == null || profile == null || !tmp.enabled)
             return;
+
+        if (!GlobalWobbleEnabled)
+        {
+            if (!wasGloballySuppressed)
+            {
+                tmp.ForceMeshUpdate();
+                tmp.UpdateVertexData(TMP_VertexDataUpdateFlags.Vertices);
+                wasGloballySuppressed = true;
+            }
+
+            return;
+        }
+
+        wasGloballySuppressed = false;
 
         string currentText = tmp.text ?? string.Empty;
 

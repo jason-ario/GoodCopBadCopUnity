@@ -20,6 +20,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<bool> RunningEffectsEnabledChanged { get; }
         Observable<bool> HeadBobEnabledChanged { get; }
         Observable<bool> CameraShakeEnabledChanged { get; }
+        Observable<bool> TextWobbleEnabledChanged { get; }
         Observable<float> MasterVolumeChanged { get; }
         Observable<float> MusicVolumeChanged { get; }
         Observable<float> SfxVolumeChanged { get; }
@@ -31,7 +32,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<int> QualityPresetChanged { get; }
         Observable<float> BrightnessChanged { get; }
         Observable<bool> FilmGrainEnabledChanged { get; }
-        Observable<bool> ChromaticAberrationEnabledChanged { get; }
         Observable<int> VoiceChatProximityRangeChanged { get; }
         Observable<string> VoiceChatMicrophoneNameChanged { get; }
         Observable<ESettingsMenuTab> TabSelected { get; }
@@ -51,6 +51,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void SetRunningEffectsEnabledValue(bool value);
         void SetHeadBobEnabledValue(bool value);
         void SetCameraShakeEnabledValue(bool value);
+        void SetTextWobbleEnabledValue(bool value);
         void SetMasterVolumeValue(float value);
         void SetMusicVolumeValue(float value);
         void SetSfxVolumeValue(float value);
@@ -62,7 +63,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void SetQualityPresetValue(int value);
         void SetBrightnessValue(float value);
         void SetFilmGrainEnabledValue(bool value);
-        void SetChromaticAberrationEnabledValue(bool value);
         void SetVoiceChatProximityRangeValue(int value);
         void SetVoiceChatMicrophoneNameValue(string value);
     }
@@ -235,8 +235,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 defaultOptionIndex: 2,
                 interactable: false),
             SettingsMenuControlDefinition.Slider("Brightness", 50f, interactable: false),
-            SettingsMenuControlDefinition.Dropdown("Film Grain", OffOnOptions, defaultOptionIndex: 1, interactable: false),
-            SettingsMenuControlDefinition.Dropdown("Chromatic Aberration", OffOnOptions, defaultOptionIndex: 1, interactable: false)
+            SettingsMenuControlDefinition.Dropdown("Film Grain", OffOnOptions, defaultOptionIndex: 1, interactable: false)
         };
 
         private static readonly SettingsMenuControlDefinition[] AudioControlDefinitions =
@@ -329,6 +328,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> runningEffectsEnabledChanged = new();
         private readonly Subject<bool> headBobEnabledChanged = new();
         private readonly Subject<bool> cameraShakeEnabledChanged = new();
+        private readonly Subject<bool> textWobbleEnabledChanged = new();
         private readonly Subject<float> masterVolumeChanged = new();
         private readonly Subject<float> musicVolumeChanged = new();
         private readonly Subject<float> sfxVolumeChanged = new();
@@ -340,7 +340,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<int> qualityPresetChanged = new();
         private readonly Subject<float> brightnessChanged = new();
         private readonly Subject<bool> filmGrainEnabledChanged = new();
-        private readonly Subject<bool> chromaticAberrationEnabledChanged = new();
         private readonly Subject<int> voiceChatProximityRangeChanged = new();
         private readonly Subject<string> voiceChatMicrophoneNameChanged = new();
         private readonly Subject<ESettingsMenuTab> tabSelected = new();
@@ -360,6 +359,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> RunningEffectsEnabledChanged => runningEffectsEnabledChanged;
         public Observable<bool> HeadBobEnabledChanged => headBobEnabledChanged;
         public Observable<bool> CameraShakeEnabledChanged => cameraShakeEnabledChanged;
+        public Observable<bool> TextWobbleEnabledChanged => textWobbleEnabledChanged;
         public Observable<float> MasterVolumeChanged => masterVolumeChanged;
         public Observable<float> MusicVolumeChanged => musicVolumeChanged;
         public Observable<float> SfxVolumeChanged => sfxVolumeChanged;
@@ -371,7 +371,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<int> QualityPresetChanged => qualityPresetChanged;
         public Observable<float> BrightnessChanged => brightnessChanged;
         public Observable<bool> FilmGrainEnabledChanged => filmGrainEnabledChanged;
-        public Observable<bool> ChromaticAberrationEnabledChanged => chromaticAberrationEnabledChanged;
         public Observable<int> VoiceChatProximityRangeChanged => voiceChatProximityRangeChanged;
         public Observable<string> VoiceChatMicrophoneNameChanged => voiceChatMicrophoneNameChanged;
         public Observable<ESettingsMenuTab> TabSelected => tabSelected;
@@ -498,6 +497,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
             SetDropdownValue(cameraShakeEnabledDropdown, value ? 1 : 0);
         }
 
+        public void SetTextWobbleEnabledValue(bool value)
+        {
+            // No Text Wobble dropdown exists in this legacy view; value is applied via TextWobbleApplier directly.
+        }
+
         public void SetMasterVolumeValue(float value)
         {
             // No Master Volume slider exists in this legacy view; value is applied via SettingsApplier directly.
@@ -551,11 +555,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetFilmGrainEnabledValue(bool value)
         {
             // No Film Grain dropdown exists in this legacy view; value is applied via GraphicsPreferencesApplier directly.
-        }
-
-        public void SetChromaticAberrationEnabledValue(bool value)
-        {
-            // No Chromatic Aberration dropdown exists in this legacy view; value is applied via GraphicsPreferencesApplier directly.
         }
 
         public void SetVoiceChatProximityRangeValue(int value)

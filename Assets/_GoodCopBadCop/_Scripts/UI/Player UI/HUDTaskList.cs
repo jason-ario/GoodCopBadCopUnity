@@ -9,6 +9,9 @@ using UnityEngine;
 /// </summary>
 public class HUDTaskList : MonoBehaviour
 {
+    /// <summary>Seconds a completed row stays visible with its strikethrough before it's removed.</summary>
+    private const float CompletedRowLingerDuration = 0.6f;
+
     private readonly Dictionary<ISystemicThreat, TutorialObjectiveItem> _rows = new();
 
     /// <summary>
@@ -99,9 +102,9 @@ public class HUDTaskList : MonoBehaviour
 
         foreach (ISystemicThreat threat in stale)
         {
-            // Generic HUD task rows should just disappear once their task is no longer active —
-            // no strikethrough/checkmark linger, so the list only ever shows currently-active tasks.
-            list.CompleteAndRemoveObjective(_rows[threat], preHideDelay: 0f, markComplete: false);
+            // Briefly show the strikethrough completion visual before the row disappears, same
+            // as the hand-scripted tutorial rows elsewhere (e.g. Day_01's task transitions).
+            list.CompleteAndRemoveObjective(_rows[threat], preHideDelay: CompletedRowLingerDuration);
             _rows.Remove(threat);
         }
     }

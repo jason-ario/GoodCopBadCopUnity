@@ -1,17 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// Drives the "MAINTENANCE" section of the consolidated HUD sidebar (see
-/// <see cref="HUDSidebarController"/>) — three <see cref="MaintenanceTaskRow"/> rows showing
-/// how many broken fences, pieces of trash/gore, and unscrubbed graffiti pieces are currently
-/// outstanding, each as a "current / total" counter with a progress-filled icon.
+/// Drives the "MAINTENANCE" section of the HUD task sidebar — three <see cref="MaintenanceTaskRow"/>
+/// rows showing how many broken fences, pieces of trash/gore, and unscrubbed graffiti pieces are
+/// currently outstanding, each as a "current / total" counter with a progress-filled icon.
 ///
 /// After Day 1 these three cleanup categories become optional (see <see cref="CleanupTaskGating"/>):
 /// they no longer occupy a slot on the mandatory "CURRENT ORDERS" task list and no longer block
 /// clock-out, but they still spawn, still show compass pips, and still drag down
-/// <see cref="CheckpointIntegrityService"/>'s payout multiplier. The rows live inside the
-/// toggleable TASKS panel, while the separate persistent integrity card keeps the score visible
-/// even when the task details are collapsed.
+/// <see cref="CheckpointIntegrityService"/>'s payout multiplier.
 ///
 /// Purely a read-side display: never registers or blocks anything, just mirrors already-networked
 /// task state. Shows 0/0 for any task that hasn't spawned yet.
@@ -74,8 +71,6 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
 
         CleanGraffitiTask graffiti = CleanGraffitiTask.Instance;
         _graffitiRow?.SetProgress(graffiti != null ? graffiti.ScrubbedCount : 0, graffiti != null ? graffiti.TotalGraffitiCount : 0);
-
-        HUDSidebarController.Instance?.RefreshBadge();
     }
 
     private static bool IsRowComplete(int? current, int? total)

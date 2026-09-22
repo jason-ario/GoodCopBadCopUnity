@@ -16,6 +16,15 @@ public class QuarantineBoardController : MonoBehaviour
     [SerializeField] private QuarantinePolaroid[] _polaroidSlots;
     [SerializeField] private TextMeshPro           _titleText;
 
+    // Sticky slot assignments: once a suspect is placed in a polaroid slot, they keep that
+    // slot for as long as they remain quarantined. Without this, GetActiveQuarantineRecords()
+    // is re-filtered from the master suspect list on every refresh, so adding or removing an
+    // unrelated quarantined suspect can shift everyone else's position in that filtered list —
+    // which reassigns slot indices and makes it look like a still-quarantined suspect's photo
+    // was swapped out / removed early, when they actually just moved to a different slot (or
+    // got pushed past _polaroidSlots.Length and stopped rendering at all).
+    private readonly Dictionary<SuspectData, int> _slotAssignments = new Dictionary<SuspectData, int>();
+
     // -------------------------------------------------------------------------
     // Unity Lifecycle
     // -------------------------------------------------------------------------
@@ -74,28 +83,71 @@ public class QuarantineBoardController : MonoBehaviour
         int currentDay = CampaignManager.Instance.CurrentDay;
         List<SuspectRecord> quarantined = SuspectRunRecords.Instance.GetActiveQuarantineRecords(currentDay);
 
+        UpdateSlotAssignments(quarantined);
+
         for (int i = 0; i < _polaroidSlots.Length; i++)
         {
-            if (_polaroidSlots[i] == null) continue;
+            if (_polaroidSlots[i] != null) _polaroidSlots[i].Hide();
+        }
 
-            if (i < quarantined.Count && quarantined[i].SuspectData != null)
-            {
-                int daysLeft = SuspectRunRecords.Instance.GetRemainingQuarantineDays(quarantined[i], currentDay);
-                _polaroidSlots[i].Setup(quarantined[i].SuspectData, daysLeft);
-            }
-            else
-            {
-                _polaroidSlots[i].Hide();
-            }
+        foreach (SuspectRecord record in quarantined)
+        {
+            if (record.SuspectData == null) continue;
+            if (!_slotAssignments.TryGetValue(record.SuspectData, out int slot)) continue;
+            if (slot < 0 || slot >= _polaroidSlots.Length || _polaroidSlots[slot] == null) continue;
+
+            int daysLeft = SuspectRunRecords.Instance.GetRemainingQuarantineDays(record, currentDay);
+            _polaroidSlots[slot].Setup(record.SuspectData, daysLeft);
         }
 
         if (_titleText != null)
         {
-            // The board's font renders every digit one higher than its value, so we compensate by
-            // subtracting 1 from each number before writing the string.
-            int displayCount = Mathf.Max(0, quarantined.Count - 1);
-            int displayLimit = SuspectRunRecords.QuarantineSlotLimit - 1;
-            _titleText.text = $"Quarantine {displayCount}/{displayLimit}";
+            _titleText.text = $"Quarantine {quarantined.Count}/{SuspectRunRecords.QuarantineSlotLimit}";
+        }
+    }
+
+    /// <summary>
+    /// Keeps <see cref="_slotAssignments"/> in sync with who is actually quarantined right now:
+    /// drops anyone no longer in the active list (so their slot can be reused), then hands each
+    /// newly-quarantined suspect the lowest free slot index. Everyone already assigned keeps
+    /// their existing slot, so a polaroid never changes identity while its suspect is still
+    /// serving their quarantine.
+    /// </summary>
+    private void UpdateSlotAssignments(List<SuspectRecord> quarantined)
+    {
+        var active = new HashSet<SuspectData>();
+        foreach (SuspectRecord record in quarantined)
+        {
+            if (record.SuspectData != null) active.Add(record.SuspectData);
+        }
+
+        List<SuspectData> stale = null;
+        foreach (SuspectData data in _slotAssignments.Keys)
+        {
+            if (!active.Contains(data))
+            {
+                stale ??= new List<SuspectData>();
+                stale.Add(data);
+            }
+        }
+        if (stale != null)
+        {
+            foreach (SuspectData data in stale) _slotAssignments.Remove(data);
+        }
+
+        foreach (SuspectRecord record in quarantined)
+        {
+            if (record.SuspectData == null || _slotAssignments.ContainsKey(record.SuspectData))
+                continue;
+
+            for (int slot = 0; slot < _polaroidSlots.Length; slot++)
+            {
+                if (!_slotAssignments.ContainsValue(slot))
+                {
+                    _slotAssignments[record.SuspectData] = slot;
+                    break;
+                }
+            }
         }
     }
 }

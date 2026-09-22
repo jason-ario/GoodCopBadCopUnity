@@ -528,6 +528,14 @@ public class PlayerInteractionController : NetworkBehaviour
         bool crossedFence = false;
         RaycastHit fenceHit = default;
 
+        // Set once the ray has been let through an interrogation-room glass pane. Unlike the fence,
+        // crossing glass places no restriction on what may be resolved behind it — the whole point is
+        // to let the player interact with the suspect standing on the other side of the window — so
+        // this only supplies a fallback hit (treating the glass as the wall) if nothing interactable
+        // turns out to be back there.
+        bool crossedGlass = false;
+        RaycastHit glassHit = default;
+
         for (int i = 0; i < hits.Length; i++)
         {
             Collider collider = hits[i].collider;
@@ -561,7 +569,14 @@ public class PlayerInteractionController : NetworkBehaviour
                     continue;
                 }
 
-                bestHit = crossedFence ? fenceHit : hits[i];
+                if (!crossedGlass && IsGlassBarrier(collider))
+                {
+                    crossedGlass = true;
+                    glassHit = hits[i];
+                    continue;
+                }
+
+                bestHit = crossedFence ? fenceHit : (crossedGlass ? glassHit : hits[i]);
                 return true;
             }
 
@@ -569,7 +584,7 @@ public class PlayerInteractionController : NetworkBehaviour
             // passes through to check what's behind it.
         }
 
-        bestHit = crossedFence ? fenceHit : hits[0];
+        bestHit = crossedFence ? fenceHit : (crossedGlass ? glassHit : hits[0]);
         return true;
     }
 
@@ -605,6 +620,19 @@ public class PlayerInteractionController : NetworkBehaviour
     private static bool IsPassthroughEligibleJunk(Interactable candidate)
     {
         return candidate is JunkItem junk && junk.CanBeCollected;
+    }
+
+    /// <summary>
+    /// True when <paramref name="collider"/> belongs to a <see cref="BreakableGlassController"/> pane
+    /// (checked on parents, since the glass mesh's collider(s) live on a child of the controller).
+    /// Interrogation-room windows are meant to be seen and talked through, so — unlike the fence —
+    /// this passthrough is unconditional and unrestricted: whatever Interactable is standing behind
+    /// the glass (e.g. the suspect) resolves normally, while the glass itself still blocks movement
+    /// and still shows up as the aim/tooltip target when nothing interactable is back there.
+    /// </summary>
+    private static bool IsGlassBarrier(Collider collider)
+    {
+        return collider.GetComponentInParent<BreakableGlassController>() != null;
     }
 
     /// <summary>

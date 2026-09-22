@@ -70,7 +70,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     private bool _sprintToggleActive;
 
     [Header("Gravity Settings")]
-    [SerializeField] private float gravity = -20f;
+    [SerializeField] private float gravity = -40f;
 
     [Header("Underwater Settings")]
     [Tooltip("Gravity multiplier applied when the camera is inside an underwater zone.")]
@@ -87,7 +87,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     private bool _isUnderwater;
 
     [Header("Jump Settings")]
-    [SerializeField] private float jumpForce = 7f;
+    [SerializeField] private float jumpForce = 10f;
     [SerializeField] private AudioClip jumpSound;
     [SerializeField] private AudioClip landSound;
     [Tooltip("How many seconds before actual ground contact the land sound should play, predicted from the current fall speed and a lookahead ground scan.")]
@@ -371,9 +371,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         if (_isSitting && _canSitOrStand)
         {
-            bool standUpInput = Input.GetKeyDown(KeyCode.Escape)
-                                || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)
-                                || IsJumpDown;
+            bool standUpInput = IsJumpDown;
             if (standUpInput && UIController.Instance.IsPaused == false)
             {
                 StandUp();

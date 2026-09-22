@@ -16,15 +16,8 @@ MonoBehaviour:
   LastName: 
   Nickname: 
   Occupation: State Security Personnel
-  CharacterDescription: "Full uniform, full mask. Doesn't give a name. Doesn't need
-    to. Passes through on rotation like every other one of them \u2014 indistinguishable
-    by design. Treats the checkpoint as an inconvenience and you as a minor obstacle
-    in his day."
-  CharacterArc: "Straight-backed, arms at his sides, head tilted just enough to suggest
-    he's deciding whether you're worth his time. He's not hostile exactly \u2014
-    more like perpetually unimpressed. He follows the process because the state demands
-    it, not because he respects it. If you're efficient and professional, something
-    shifts slightly. He'll never say so. But he'll stop sighing."
+  CharacterDescription: "Full uniform, full mask. Doesn't give a name. Doesn't need to. Passes through on rotation like every other one of them \u2014 indistinguishable by design. Treats the checkpoint as an inconvenience and you as a minor obstacle in his day."
+  CharacterArc: "Straight-backed, arms at his sides, head tilted just enough to suggest he's deciding whether you're worth his time. He's not hostile exactly \u2014 more like perpetually unimpressed. He follows the process because the state demands it, not because he respects it. If you're efficient and professional, something shifts slightly. He'll never say so. But he'll stop sighing."
   DateOfBirth: 02/11/1961
   Sex: Male
   EntryPermitExpiryDate: 03 OCT
@@ -36,6 +29,8 @@ MonoBehaviour:
   alterEgoName: 
   basePersonalityDescriptors: []
   normalBehaviorNotes: 
+  fullMutantDialogue: {fileID: 0}
+  replacementIDPhoto: {fileID: 0}
   IDPhoto: {fileID: 2800000, guid: 5f05c29b0bf5ab4418daa49fbc3ad0e2, type: 3}
   CharacterPrefab: {fileID: 2613975840466510292, guid: 34daa85d9b002634daf0d037a68a022d, type: 3}
   entryReasons:
@@ -122,8 +117,7 @@ MonoBehaviour:
   - Do you have any idea what rank you are detaining right now? Any idea at all?
   killExitLines:
   - "\u2026Didn\u2019t think a post like this would actually follow through\u2026"
-  - "For the record\u2026 I still don\u2019t think\u2026 your paperwork\u2026 was
-    in order\u2026"
+  - "For the record\u2026 I still don\u2019t think\u2026 your paperwork\u2026 was in order\u2026"
   - "Carry on\u2026 You\u2019re more competent\u2026 than you look\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: b5302926c0ee68a4fbdf3c2e970e1a3b, type: 3}
@@ -135,53 +129,39 @@ MonoBehaviour:
   - {fileID: 8300000, guid: ea2da5791667b5549af6ea56bf46b340, type: 3}
   introDialogue: {fileID: 11400000, guid: 0c405ac55e22904479bec12ce560fd59, type: 2}
   questionResponses:
-  - question: Where are you coming from?
+  - question: State your reason for crossing this checkpoint.
     earlyDaysAnswer: Patrol route. Nothing that concerns you.
-    midDaysAnswer: Perimeter sweep. We extended it east after last week. You'd know
-      that if you read the memos.
-    finalDaysAnswer: You don't ask soldiers where they've been. Standard transit,
-      that's all you need.
-    mismatchEarlyDaysAnswer: The other checkpoint. The one further north. They sent
-      me back but I don't remember why. The route was... different.
-    mismatchMidDaysAnswer: The east post. Which is fine. Still operational. Completely
-      operational. I was just there. I think I was just there.
-    mismatchFinalDaysAnswer: I was... walking. The road looked right. Command said
-      the road would look right and it did. That's all I know.
+    midDaysAnswer: Perimeter sweep. We extended it east after last week. You'd know that if you read the memos.
+    finalDaysAnswer: You don't ask soldiers where they've been. Standard transit, that's all you need.
+    mismatchEarlyDaysAnswer: The other checkpoint. The one further north. They sent me back but I don't remember why. The route was... different.
+    mismatchMidDaysAnswer: The east post. Which is fine. Still operational. Completely operational. I was just there. I think I was just there.
+    mismatchFinalDaysAnswer: I was... walking. The road looked right. Command said the road would look right and it did. That's all I know.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
-  - question: Have you been experiencing any strange symptoms lately?
+  - question: Any change in your physical condition I should log for the record?
     earlyDaysAnswer: No. Next question.
-    midDaysAnswer: None that I'm required to disclose to civilian personnel. Move
-      on.
-    finalDaysAnswer: Define strange. Everything is strange now. That's not a symptom,
-      that's just the situation.
-    mismatchEarlyDaysAnswer: No symptoms. I feel very alert. More alert than usual.
-      It's been like this for a few days. Very... focused.
-    mismatchMidDaysAnswer: Nothing. My head is clear. Completely clear. There's just
-      a sound sometimes but that's nothing. That's not a symptom.
-    mismatchFinalDaysAnswer: "I don't feel anything. Is that strange? I used to feel
-      things. It\u2019s very quiet now. Inside. Quiet."
+    midDaysAnswer: None that I'm required to disclose to civilian personnel. Move on.
+    finalDaysAnswer: Define strange. Everything is strange now. That's not a symptom, that's just the situation.
+    mismatchEarlyDaysAnswer: No symptoms. I feel very alert. More alert than usual. It's been like this for a few days. Very... focused.
+    mismatchMidDaysAnswer: Nothing. My head is clear. Completely clear. There's just a sound sometimes but that's nothing. That's not a symptom.
+    mismatchFinalDaysAnswer: I don't feel anything. Is that strange? I used to feel things. It's very quiet now. Inside. Quiet.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
-  - question: Who do you live with?
+  - question: Where's your unit bunked these days?
     earlyDaysAnswer: That's not relevant to transit documentation. Stick to the forms.
     midDaysAnswer: Barracks. Fifteen men. Was fifteen.
     finalDaysAnswer: Nobody asks soldiers that. Are we done?
-    mismatchEarlyDaysAnswer: The others. At the barracks. All of them are still there.
-      Nothing has changed. You don't need to know their names.
-    mismatchMidDaysAnswer: "Just me now. The others were... reassigned. All at once.
-      Very sudden. I don\u2019t know where."
-    mismatchFinalDaysAnswer: I don't know. I go back there and it's dark. It's always
-      dark now. I don't know if anyone else is there. I don't check.
+    mismatchEarlyDaysAnswer: The others. At the barracks. All of them are still there. Nothing has changed. You don't need to know their names.
+    mismatchMidDaysAnswer: Just me now. The others were... reassigned. All at once. Very sudden. I don't know where.
+    mismatchFinalDaysAnswer: I don't know. I go back there and it's dark. It's always dark now. I don't know if anyone else is there. I don't check.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
-    - This checkpoint runs three seconds slower than the eastern one. I have timed
-      it.
+    - This checkpoint runs three seconds slower than the eastern one. I have timed it.
     - Civilian checkpoints waste more time than they save. Not a criticism. An observation.
     - Check the papers. That is all this needs to be.
     midDays:

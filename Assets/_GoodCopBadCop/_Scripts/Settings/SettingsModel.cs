@@ -55,6 +55,7 @@ namespace GoodCopBadCop.Settings
         ReadOnlyReactiveProperty<bool> RunningEffectsEnabled { get; }
         ReadOnlyReactiveProperty<bool> HeadBobEnabled { get; }
         ReadOnlyReactiveProperty<bool> CameraShakeEnabled { get; }
+        ReadOnlyReactiveProperty<bool> TextWobbleEnabled { get; }
         ReadOnlyReactiveProperty<float> MasterVolume { get; }
         ReadOnlyReactiveProperty<float> MusicVolume { get; }
         ReadOnlyReactiveProperty<float> SfxVolume { get; }
@@ -68,7 +69,6 @@ namespace GoodCopBadCop.Settings
         ReadOnlyReactiveProperty<EQualityPreset> QualityPreset { get; }
         ReadOnlyReactiveProperty<float> Brightness { get; }
         ReadOnlyReactiveProperty<bool> FilmGrainEnabled { get; }
-        ReadOnlyReactiveProperty<bool> ChromaticAberrationEnabled { get; }
     }
 
     public sealed class SettingsModel : ISettingsModel, IDisposable
@@ -106,6 +106,9 @@ namespace GoodCopBadCop.Settings
         public readonly PersistentReactiveProperty<bool> CameraShakeEnabledMutable =
             new("settings.gameplay.cameraShakeEnabled", true);
 
+        public readonly PersistentReactiveProperty<bool> TextWobbleEnabledMutable =
+            new("settings.gameplay.textWobbleEnabled", true);
+
         public readonly PersistentReactiveProperty<float> MasterVolumeMutable =
             new("settings.audio.masterVolume", 80f);
 
@@ -140,13 +143,10 @@ namespace GoodCopBadCop.Settings
             new("settings.graphics.qualityPreset", EQualityPreset.High);
 
         public readonly PersistentReactiveProperty<float> BrightnessMutable =
-            new("settings.graphics.brightness", 50f);
+            new("settings.graphics.brightness", 100f);
 
         public readonly PersistentReactiveProperty<bool> FilmGrainEnabledMutable =
             new("settings.graphics.filmGrainEnabled", true);
-
-        public readonly PersistentReactiveProperty<bool> ChromaticAberrationEnabledMutable =
-            new("settings.graphics.chromaticAberrationEnabled", true);
 
         public ReadOnlyReactiveProperty<EDisplayMode> DisplayMode => DisplayModeMutable;
         public ReadOnlyReactiveProperty<EScreenResolution> ScreenResolution => ScreenResolutionMutable;
@@ -159,6 +159,7 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<bool> RunningEffectsEnabled => RunningEffectsEnabledMutable;
         public ReadOnlyReactiveProperty<bool> HeadBobEnabled => HeadBobEnabledMutable;
         public ReadOnlyReactiveProperty<bool> CameraShakeEnabled => CameraShakeEnabledMutable;
+        public ReadOnlyReactiveProperty<bool> TextWobbleEnabled => TextWobbleEnabledMutable;
         public ReadOnlyReactiveProperty<float> MasterVolume => MasterVolumeMutable;
         public ReadOnlyReactiveProperty<float> MusicVolume => MusicVolumeMutable;
         public ReadOnlyReactiveProperty<float> SfxVolume => SfxVolumeMutable;
@@ -172,7 +173,6 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<EQualityPreset> QualityPreset => QualityPresetMutable;
         public ReadOnlyReactiveProperty<float> Brightness => BrightnessMutable;
         public ReadOnlyReactiveProperty<bool> FilmGrainEnabled => FilmGrainEnabledMutable;
-        public ReadOnlyReactiveProperty<bool> ChromaticAberrationEnabled => ChromaticAberrationEnabledMutable;
 
         public void Flush()
         {
@@ -187,6 +187,7 @@ namespace GoodCopBadCop.Settings
             RunningEffectsEnabledMutable.Flush();
             HeadBobEnabledMutable.Flush();
             CameraShakeEnabledMutable.Flush();
+            TextWobbleEnabledMutable.Flush();
             MasterVolumeMutable.Flush();
             MusicVolumeMutable.Flush();
             SfxVolumeMutable.Flush();
@@ -200,7 +201,6 @@ namespace GoodCopBadCop.Settings
             QualityPresetMutable.Flush();
             BrightnessMutable.Flush();
             FilmGrainEnabledMutable.Flush();
-            ChromaticAberrationEnabledMutable.Flush();
         }
 
         public void Dispose()
@@ -216,6 +216,7 @@ namespace GoodCopBadCop.Settings
             RunningEffectsEnabledMutable.Dispose();
             HeadBobEnabledMutable.Dispose();
             CameraShakeEnabledMutable.Dispose();
+            TextWobbleEnabledMutable.Dispose();
             MasterVolumeMutable.Dispose();
             MusicVolumeMutable.Dispose();
             SfxVolumeMutable.Dispose();
@@ -229,7 +230,6 @@ namespace GoodCopBadCop.Settings
             QualityPresetMutable.Dispose();
             BrightnessMutable.Dispose();
             FilmGrainEnabledMutable.Dispose();
-            ChromaticAberrationEnabledMutable.Dispose();
         }
     }
 }

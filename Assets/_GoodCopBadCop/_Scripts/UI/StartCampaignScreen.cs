@@ -363,7 +363,7 @@ public class StartCampaignScreen : MonoBehaviour
     public void ExitLobby()
     {
         LobbyManager.Instance.ExitLobby();
-        MainMenuController.Instance.BackToHomeScreen();
+        MainMenuController.Instance.BackFromPreGameLobbyScreen();
     }
 
     // ---------------------------------------------------------------------------

@@ -52,6 +52,44 @@ public class SuspectCharacter : Interactable
     /// suspect (e.g. Day_02's yard hand-off) once their scripted task is complete.
     /// </summary>
     public void SetWorldDialogue(SuspectWorldDialogue dialogue) => worldDialogue = dialogue;
+
+    [Tooltip("When true, direct interaction (LMB / E) is consumed as a no-op — no intro dialogue " +
+             "request and no SuspectWorldDialogue question conversation are started. Junk collection " +
+             "and rejoining an already-active scripted dialogue still work; only the intro/question " +
+             "dialogue paths below are skipped. Check this in the Inspector for suspects that should " +
+             "never speak on click, or leave it unchecked and drive it at runtime with " +
+             "SetDialogueInteractionDisabled()/SetDialogueInteractionDisabledNetworked() for suspects " +
+             "who are only silent during a scripted sequence (e.g. Vlad while Day 1's tutorial " +
+             "sequence owns his conversation).")]
+    [SerializeField] private bool _dialogueInteractionDisabled;
+
+    /// <summary>True while direct interaction is suppressed — see <see cref="_dialogueInteractionDisabled"/>.</summary>
+    public bool DialogueInteractionDisabled => _dialogueInteractionDisabled;
+
+    /// <summary>
+    /// Local-only toggle for whether direct interaction with this suspect starts any dialogue.
+    /// Safe to call from either server or client scripts that only need the local result (e.g. a
+    /// server-only scripted sequence that also disables input for other reasons). For state that
+    /// must read the same on every client, use <see cref="SetDialogueInteractionDisabledNetworked"/>.
+    /// </summary>
+    public void SetDialogueInteractionDisabled(bool disabled) => _dialogueInteractionDisabled = disabled;
+
+    /// <summary>
+    /// Networked wrapper for <see cref="SetDialogueInteractionDisabled"/> — broadcasts to every
+    /// client so a suspect who shouldn't currently talk (e.g. Vlad mid-tutorial) reads that way in
+    /// everyone's game, not just the caller's. Call from server-side code only.
+    /// </summary>
+    public void SetDialogueInteractionDisabledNetworked(bool disabled)
+    {
+        SetDialogueInteractionDisabledClientRpc(disabled);
+    }
+
+    [ClientRpc]
+    private void SetDialogueInteractionDisabledClientRpc(bool disabled)
+    {
+        SetDialogueInteractionDisabled(disabled);
+    }
+
     [SerializeField] private GameObject bloodExplosion;
     public Transform lookPos;
     public Vector3 standPosOffset;
@@ -987,6 +1025,20 @@ public class SuspectCharacter : Interactable
         // would permanently skip that initialization — Blend has no such lifecycle pitfall. This
         // runs identically and locally on every peer, so no RPC is needed.
         SetLegsAnimatorsBlend(0f);
+
+        // Booth suspects with authored SuspectData.questionResponses get a SuspectWorldDialogue
+        // created automatically, sourced from that data, so direct interaction opens the same
+        // voting/timer/subtitle-driven question conversation used for scene-placed NPCs (see
+        // Interact() below and SuspectWorldDialogue.ResolveOptionsForConversation). The
+        // inspector-assignable worldDialogue field takes priority and is left untouched — it's
+        // reserved for suspects talked to directly with hand-authored per-day dialogue (e.g. the
+        // Day 1 Soldier).
+        if (worldDialogue == null && suspectData != null &&
+            suspectData.questionResponses != null && suspectData.questionResponses.Length > 0)
+        {
+            worldDialogue = gameObject.AddComponent<SuspectWorldDialogue>();
+            worldDialogue.Configure(speaking, animator, null, startSittingNow: false, lookAnimatorRef: lookAnimator, suspectDataRef: suspectData);
+        }
     }
 
     /// <summary>
@@ -1488,34 +1540,39 @@ public class SuspectCharacter : Interactable
             }
         }
 
+        // Suspects flagged silent (see _dialogueInteractionDisabled) consume the click as a
+        // no-op — used for suspects whose entire conversation is driven by an external scripted
+        // sequence instead of this component's own intro/question dialogue (e.g. Vlad during
+        // Day 1's tutorial, where Day_01 plays his dialogue directly).
+        if (_dialogueInteractionDisabled)
+            return;
+
         // Booth suspects with an unplayed, non-forced authored intro start that conversation
         // only when a player deliberately interacts with them. Forced intros already started
         // automatically on arrival (see SuspectController.SayEntryDialogue) and are not
         // re-triggerable here. The server validates current-suspect state and encounter
-        // history before it starts anything.
+        // history before it starts anything; the HasEncountered check here mirrors that so a
+        // suspect whose intro has already played falls through to the question conversation
+        // below instead of silently re-requesting an intro the server will just reject.
         if (SuspectController.Instance?.CurrentSuspect == this &&
-            Data?.introDialogue != null && !Data.introDialogue.isForced)
+            Data?.introDialogue != null && !Data.introDialogue.isForced &&
+            !SuspectEncounterManager.HasEncountered(Data))
         {
             RequestIntroDialogue(player);
             return;
         }
 
         // Scene-placed suspects that are talked to directly (not through the booth) can be
-        // configured with a SuspectWorldDialogue for a simple 3-choice conversation.
+        // configured with a SuspectWorldDialogue for a simple 3-choice conversation. Booth
+        // suspects with authored SuspectData.questionResponses are lazily given one of their
+        // own (see Awake), sourced from that data, so the player can ask questions independent
+        // of the linear scripted intro/cutscene sequence — including checking for story
+        // mismatches via SuspectCharacter.GetQuestionResponse / StoryMismatchAnomaly.
         if (worldDialogue != null)
         {
             worldDialogue.BeginConversation();
             return;
         }
-
-        // Booth suspects: direct interaction used to open the free-form question dialogue
-        // (sourced from SuspectData.questionResponses) so the player could ask questions
-        // independent of the linear scripted intro/cutscene sequence — including checking for
-        // story mismatches via SuspectCharacter.GetQuestionResponse / StoryMismatchAnomaly.
-        // DISABLED FOR NOW: booth suspects should only speak via their scripted intro/exit
-        // dialogue (ScriptedDialogueRunner), not via a player-initiated choice-based dialogue.
-        // The scripted intro/exit flow and SuspectWorldDialogue conversations above are
-        // unaffected by this.
     }
 
     private void RequestIntroDialogue(PlayerInteractionController player)

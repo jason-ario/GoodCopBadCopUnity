@@ -154,7 +154,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TMPWidthFitter
   horizontalPadding: 6.42
-  maximumTextWidth: 1000
 --- !u!114 &6312536301404610609
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -184,7 +183,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c27507d999965240b21ed05ea2189d6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
-  profile: {fileID: 0}
+  profile: {fileID: 11400000, guid: 633322603464f5d448dd18acb3fa60de, type: 2}
   playOnEnable: 0
 --- !u!1 &4440882086164474402
 GameObject:
@@ -248,6 +247,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   textReveal: {fileID: 6312536301404610609}
+  maxCharactersPerLine: 50
   continuePrompt: {fileID: 5962076655665494463}
   _wobbleText: {fileID: 1257336724781513000}
 --- !u!114 &6192829123893769921

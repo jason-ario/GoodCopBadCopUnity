@@ -12,20 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
   m_Name: Day02_Intro_Ocho
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 1
   nodes:
   - type: 0
     npcLine: So. You're the one who decides who lives.
     animationTrigger: TalkCocky
     cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: Relax, relax. I'm not applying for a job. Just admiring the view from
-      this side of the glass, for once.
+    npcLine: Relax, relax. I'm not applying for a job. Just admiring the view from this side of the glass, for once.
     animationTrigger: TalkBigLaugh
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 1
     choices: []
   - type: 1
@@ -33,6 +35,7 @@ MonoBehaviour:
     animationTrigger: TalkPoint
     cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
     - playerChoiceText: It felt like doing my job.
@@ -48,14 +51,15 @@ MonoBehaviour:
     animationTrigger: TalkDismissing
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 1
     choices: []
   - type: 1
-    npcLine: Here's a fun one. If I sat down right now and told you I was infected,
-      would you even check? Or would you just... stamp?
+    npcLine: Here's a fun one. If I sat down right now and told you I was infected, would you even check? Or would you just... stamp?
     animationTrigger: TalkShrug
     cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
     - playerChoiceText: I'd check every time.
@@ -71,6 +75,7 @@ MonoBehaviour:
     animationTrigger: ShortLaugh
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 1
     choices: []
   - type: 0
@@ -78,14 +83,15 @@ MonoBehaviour:
     animationTrigger: TalkPoint
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: First one, does it get easier? The killing, I mean. Or does it just
-      get quieter?
+    npcLine: First one, does it get easier? The killing, I mean. Or does it just get quieter?
     animationTrigger: TalkLookAway
     cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
     - playerChoiceText: It gets quieter.
@@ -97,11 +103,11 @@ MonoBehaviour:
       animationTrigger: TalkBigCocky
       playLaughSfx: 1
   - type: 0
-    npcLine: Alright, alright, enough therapy. Let's get to the paperwork before
-      I start crying.
+    npcLine: Alright, alright, enough therapy. Let's get to the paperwork before I start crying.
     animationTrigger: ShortLaugh
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 1
     choices: []
   - type: 0
@@ -109,5 +115,6 @@ MonoBehaviour:
     animationTrigger: TalkDismissing
     cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices: []

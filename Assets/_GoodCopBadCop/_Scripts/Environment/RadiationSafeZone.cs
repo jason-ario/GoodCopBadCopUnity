@@ -19,16 +19,35 @@ public class RadiationSafeZone : MonoBehaviour
     public UnityEvent OnPlayerEnter;
     public UnityEvent OnPlayerExit;
 
-    // Players currently inside this volume.
+    // Players currently inside this volume, per physics trigger events. Used only to drive
+    // OnPlayerEnter/OnPlayerExit (narrative/audio hooks) — NOT used to answer Contains(), which
+    // does a live geometric check instead (see below).
     private readonly HashSet<PlayerRadiation> _playersInside = new();
+
+    private Collider _collider;
 
     private void Awake()
     {
-        GetComponent<Collider>().isTrigger = true;
+        _collider = GetComponent<Collider>();
+        _collider.isTrigger = true;
     }
 
-    /// <summary>Returns true if <paramref name="player"/> is currently inside this zone.</summary>
-    public bool Contains(PlayerRadiation player) => _playersInside.Contains(player);
+    /// <summary>
+    /// Returns true if <paramref name="player"/> is currently inside this zone.
+    ///
+    /// Deliberately does a live bounds check against <see cref="Collider.bounds"/> rather than
+    /// trusting the OnTriggerEnter/Exit-driven <see cref="_playersInside"/> cache: physics trigger
+    /// events are unreliable for this purpose — they never fire for a collider that starts the
+    /// session already overlapping (e.g. the player spawning inside the zone), and toggling a
+    /// nearby Collider/Rigidbody (as interactables like the booth drawer do while grabbing) can
+    /// generate a spurious Exit even though the player never moved. Both failure modes previously
+    /// caused OffTrailRadiation to treat an in-zone player as unprotected.
+    /// </summary>
+    public bool Contains(PlayerRadiation player)
+    {
+        if (player == null || _collider == null) return false;
+        return _collider.bounds.Contains(player.transform.position);
+    }
 
     private void OnTriggerEnter(Collider other)
     {

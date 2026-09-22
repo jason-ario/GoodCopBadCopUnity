@@ -630,7 +630,7 @@ public class DailySuspectManager : MonoBehaviour
                 }
             }
 
-            // Exclude suspects serving a one-day quarantine cooldown (quarantined yesterday).
+            // Exclude suspects still serving their quarantine cooldown.
             if (runRecord != null && runRecord.IsOnQuarantineCooldown(currentDay))
             {
                 Debug.Log($"[DailySuspectManager] '{suspect.name}' excluded — on quarantine cooldown (quarantined on day {runRecord.quarantinedOnDay}).");

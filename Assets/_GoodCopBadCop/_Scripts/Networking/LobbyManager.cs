@@ -311,12 +311,34 @@ public class LobbyManager : MonoBehaviour
 
         if (transport is FacepunchTransport)
         {
+            // Joining a lobby you (or another local session) just left can race Steam's
+            // backend: Lobby.Leave() takes effect locally immediately, but the matchmaking
+            // servers process the membership change asynchronously. A rejoin attempted in
+            // that window can spuriously fail (e.g. RoomEnter.Error) even though the lobby
+            // still exists, surfacing as "Lobby not found" to the player. Retry a few times
+            // with a short backoff instead of failing on the first attempt.
+            const int MaxJoinAttempts = 4;
+            const float JoinRetryDelaySeconds = 0.75f;
+
             var lobby = new Lobby(lobbyId);
-            RoomEnter joinResult = await lobby.Join();
+            RoomEnter joinResult = RoomEnter.Error;
+
+            for (int attempt = 1; attempt <= MaxJoinAttempts; attempt++)
+            {
+                joinResult = await lobby.Join();
+                if (joinResult == RoomEnter.Success)
+                    break;
+
+                Debug.LogWarning($"[JoinLobby] Attempt {attempt}/{MaxJoinAttempts} failed to join lobby {lobbyId}. Result: {joinResult}" +
+                    (attempt < MaxJoinAttempts ? $" — retrying in {JoinRetryDelaySeconds}s..." : ""));
+
+                if (attempt < MaxJoinAttempts)
+                    await Task.Delay(TimeSpan.FromSeconds(JoinRetryDelaySeconds));
+            }
 
             if (joinResult != RoomEnter.Success)
             {
-                Debug.LogError($"[JoinLobby] Failed to join lobby {lobbyId}. Result: {joinResult}");
+                Debug.LogError($"[JoinLobby] Failed to join lobby {lobbyId} after {MaxJoinAttempts} attempts. Result: {joinResult}");
                 OnJoinFailed?.Invoke(joinResult.ToString());
                 return;
             }
@@ -598,6 +620,12 @@ public class LobbyManager : MonoBehaviour
             {
                 CurrentLobby.Leave();
                 CurrentLobby = default;
+
+                // Leave() takes effect locally right away, but Steam's matchmaking backend
+                // processes the membership change asynchronously. Give it a brief moment so
+                // an immediate rejoin of the same lobby (e.g. re-entering a join code) doesn't
+                // race the leave and spuriously fail with "lobby not found".
+                await Task.Delay(300);
             }
 
             NetworkManager networkManager = NetworkManager.Singleton;

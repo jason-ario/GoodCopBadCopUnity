@@ -147,7 +147,7 @@ public class SuspectWorldDialogue : MonoBehaviour
     /// authoring <see cref="daySets"/> in the Inspector for scene-placed suspects; use this only
     /// for prefab instances spawned purely at runtime.
     /// </summary>
-    public void Configure(SpeakingInteraction speakingRef, Animator animatorRef, DaySet[] sets, bool startSittingNow = true, FLookAnimator lookAnimatorRef = null)
+    public void Configure(SpeakingInteraction speakingRef, Animator animatorRef, DaySet[] sets, bool startSittingNow = true, FLookAnimator lookAnimatorRef = null, SuspectData suspectDataRef = null)
     {
         UnsubscribeFromSpeaking();
         speaking = speakingRef;
@@ -155,6 +155,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         daySets = sets;
         startSitting = startSittingNow;
         lookAnimator = lookAnimatorRef;
+        if (suspectDataRef != null) suspectData = suspectDataRef;
         SubscribeToSpeaking();
     }
 
@@ -191,14 +192,22 @@ public class SuspectWorldDialogue : MonoBehaviour
 
         if (suspectData != null && suspectData.questionResponses != null && suspectData.questionResponses.Length > 0)
         {
+            // When this component lives on a full SuspectCharacter (e.g. a booth suspect's
+            // player-initiated question conversation — see SuspectCharacter.Awake), resolve each
+            // answer through GetQuestionResponse so the current day band, active
+            // StoryMismatchAnomaly, and uncanny/replacement overrides are honored exactly like
+            // the interrogation-booth scripted flow. Falls back to the plain early-days answer
+            // for legacy/manual setups with no SuspectCharacter (e.g. scene-placed NPCs).
+            SuspectCharacter character = GetComponent<SuspectCharacter>();
             var resolved = new DialogueOption[suspectData.questionResponses.Length];
             for (int i = 0; i < resolved.Length; i++)
             {
                 SuspectData.QuestionResponseSet qr = suspectData.questionResponses[i];
+                string response = character != null ? character.GetQuestionResponse(i) : null;
                 resolved[i] = new DialogueOption
                 {
                     playerLine = qr.question,
-                    npcResponse = qr.earlyDaysAnswer
+                    npcResponse = !string.IsNullOrEmpty(response) ? response : qr.earlyDaysAnswer
                 };
             }
             _options = resolved;

@@ -16,12 +16,8 @@ MonoBehaviour:
   LastName: Syrnikov
   Nickname: Mafia Boss
   Occupation: Businessman
-  CharacterDescription: "An enormous, intimidating man who exudes confidence. He
-    maintains unwavering, aggressive eye contact and speaks with the smooth, dangerous
-    authority of someone who owns the city\u2014and everyone in it."
-  CharacterArc: His arc is about predatory control; he treats the checkpoint like
-    a minor inconvenience, subtly threatening the player while implying that the
-    law is just a suggestion for a man of his stature.
+  CharacterDescription: "An enormous, intimidating man who exudes confidence. He maintains unwavering, aggressive eye contact and speaks with the smooth, dangerous authority of someone who owns the city\u2014and everyone in it."
+  CharacterArc: His arc is about predatory control; he treats the checkpoint like a minor inconvenience, subtly threatening the player while implying that the law is just a suggestion for a man of his stature.
   DateOfBirth: 15/05/1955
   Sex: Male
   EntryPermitExpiryDate: 28 DEC
@@ -33,6 +29,8 @@ MonoBehaviour:
   alterEgoName: 
   basePersonalityDescriptors: []
   normalBehaviorNotes: 
+  fullMutantDialogue: {fileID: 0}
+  replacementIDPhoto: {fileID: 0}
   IDPhoto: {fileID: 2800000, guid: 787204351f454a94586a01bf2ac4638b, type: 3}
   CharacterPrefab: {fileID: 1877861835964210737, guid: e60ae3ec43fc66b469ce5b7011d0d57d, type: 3}
   entryReasons:
@@ -65,19 +63,15 @@ MonoBehaviour:
     lastVerdict: 0
     dialoguesEarlyDays:
     - "You look nervous, officer. Relax. I\u2019m just a businessman coming home."
-    - "Here are the papers. Make sure you don't smudge the ink; I\u2019m a man who
-      likes things clean."
-    - You have a difficult job. It would be a shame if something made it even harder
-      for you.
+    - "Here are the papers. Make sure you don't smudge the ink; I\u2019m a man who likes things clean."
+    - You have a difficult job. It would be a shame if something made it even harder for you.
     dialoguesMidDays:
     - The world is changing, but men like me? We always find a way to stay on top.
-    - "Don't look at the sky, look at me. I\u2019m the one who decides if you have
-      a good night."
+    - "Don't look at the sky, look at me. I\u2019m the one who decides if you have a good night."
     - "Is there a problem with the date? I\u2019m sure we can reach an... understanding."
     dialoguesFinalDays:
     - Even when this city is ash, I will still be the one holding the shovel.
-    - "Stamping that paper is the smartest thing you\u2019ll do all day. Don't disappoint
-      me."
+    - "Stamping that paper is the smartest thing you\u2019ll do all day. Don't disappoint me."
     - "I\u2019m going home to count what\u2019s left. Get out of my way."
   uncannyEntryDialogues:
     lastVerdict: 0
@@ -124,8 +118,7 @@ MonoBehaviour:
   killExitLines:
   - "You have no idea\u2026 what you\u2019ve\u2026 just started\u2026"
   - "Remember my face\u2026 the men who answer to me\u2026 certainly will\u2026"
-  - "Even this\u2026 is just a negotiation tactic\u2026 I\u2019ll be back at the
-    table\u2026"
+  - "Even this\u2026 is just a negotiation tactic\u2026 I\u2019ll be back at the table\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: 93563d8dcf132654cb6df83b1a4f00b9, type: 3}
   - {fileID: 8300000, guid: 197c5b812471dfc48ad6395ef15d8ea5, type: 3}
@@ -139,42 +132,33 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 2bd959cca4ad2c849aa7515fa6f29923, type: 3}
   introDialogue: {fileID: 11400000, guid: 2b0d28dc1905fe4478aee2c13c77d063, type: 2}
   questionResponses:
-  - question: Where are you coming from?
-    earlyDaysAnswer: The docks. Import work. Standard.
-    midDaysAnswer: The docks are restricted. I've been working on getting clearance.
-    finalDaysAnswer: Around. I don't say more than I need to.
-    mismatchEarlyDaysAnswer: The office. Clean work. No docks, no shipments. Just
-      paperwork. Everything above board.
-    mismatchMidDaysAnswer: The office. I've always run a legitimate operation. The
-      docks are not relevant to my work.
-    mismatchFinalDaysAnswer: The docks. Full access. No restrictions. Everything
-      is proceeding as normal. Nothing to report.
+  - question: What exactly is your business at the docks?
+    earlyDaysAnswer: Import and logistics. Same as it says on the permit.
+    midDaysAnswer: Getting harder to move anything through there. Restrictions are an inconvenience for a man who imports for a living.
+    finalDaysAnswer: Doesn't matter anymore what's on the manifest. Nothing's coming through those docks now.
+    mismatchEarlyDaysAnswer: I don't deal with the docks personally. My people handle logistics. I run the office.
+    mismatchMidDaysAnswer: The docks are none of my concern. I've never needed to go there myself.
+    mismatchFinalDaysAnswer: Full access, still moving cargo daily. Nothing's changed at the docks at all.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
-  - question: Have you been experiencing any strange symptoms lately?
-    earlyDaysAnswer: Nothing. I'm healthy.
-    midDaysAnswer: I've been coughing. The air near the docks is bad.
-    finalDaysAnswer: I don't answer questions like that.
-    mismatchEarlyDaysAnswer: A cough, yes. Came on recently. I'm looking into the
-      cause. Could be environmental.
-    mismatchMidDaysAnswer: No cough. My lungs are fine. I stay away from the docks
-      precisely because of the air.
-    mismatchFinalDaysAnswer: Nothing. Perfectly healthy. I take care of myself. No
-      issues of any kind.
+  - question: How's your health held up through all this?
+    earlyDaysAnswer: Perfectly fine. I don't get sick. Never have.
+    midDaysAnswer: A cough. Comes from breathing dock air for thirty years, not from whatever you're implying.
+    finalDaysAnswer: I don't discuss my health with a checkpoint officer. Next question.
+    mismatchEarlyDaysAnswer: A cough, yes. Came on recently. I'm looking into the cause. Could be environmental.
+    mismatchMidDaysAnswer: No cough. My lungs are fine. I stay away from the docks precisely because of the air.
+    mismatchFinalDaysAnswer: Nothing. Perfectly healthy. I take care of myself. No issues of any kind.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
-  - question: Who do you live with?
-    earlyDaysAnswer: Colleagues. We rotate.
-    midDaysAnswer: Two men. We watch each other's backs.
-    finalDaysAnswer: That's not your business.
-    mismatchEarlyDaysAnswer: My wife and our two boys. North hill. Private residence.
-      That's all you need to know.
-    mismatchMidDaysAnswer: Alone. I don't trust colleagues enough to share a roof.
-      Never have.
-    mismatchFinalDaysAnswer: My wife and my sons. At home. Safe. That is not your
-      concern.
+  - question: Who's minding your interests while you're standing here?
+    earlyDaysAnswer: Men who answer to me. Enough said.
+    midDaysAnswer: Two of mine, watching my back these days. Can't be too careful with the reorganizing going on.
+    finalDaysAnswer: That's not something I discuss with a man holding a stamp.
+    mismatchEarlyDaysAnswer: My people. All still loyal, all in place. Nothing has changed on that front.
+    mismatchMidDaysAnswer: No one. They stopped answering days ago. I haven't told anyone that.
+    mismatchFinalDaysAnswer: My men. Everywhere. Watching everything. Exactly as it should be.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
