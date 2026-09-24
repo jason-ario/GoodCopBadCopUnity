@@ -982,7 +982,6 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         if (_isCrouching) SetCrouching(false);
 
         SetMovementLocked(true);
-        UIController.Instance.ShowBackButton(StandUp);
         _isSitting = true;
         chairSeatedAt = chair;
         cameraTransform.DOKill();
@@ -995,7 +994,6 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     {
         if (!_isSitting || camStandPos == null) return;
         _isSitting = false;
-        UIController.Instance.HideBackButton();
 
         transform.DOMove(chairSeatedAt.StandingPos.position, sitStandDuration);
         chairSeatedAt.OnStoodUp();

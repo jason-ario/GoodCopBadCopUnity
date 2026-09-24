@@ -479,6 +479,11 @@ public class DialogueChoiceSystem : NetworkBehaviour
     {
         if (!IsInDialogueMode) return;
 
+        // The dialogue choice panel and NPC-line subtitles are hidden (via
+        // DialogueManager's CanvasGroup) while the pause menu is open — don't let gamepad
+        // navigation/confirm or the line-skip shortcuts drive UI the player can't currently see.
+        if (UIController.Instance != null && UIController.Instance.IsPaused) return;
+
         // ── Controller: navigate and confirm choices ──────────────────────────
         if (dialogueChoiceContainer.activeSelf && !_localChoiceLocked)
         {

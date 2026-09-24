@@ -241,6 +241,18 @@ public class UIController : MonoBehaviour
         if (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
             return;
 
+        // Guard: never reveal the HUD while any diegetic view (bunker door wheel, tool locker,
+        // mini fridge, task page, electric panel, quarantine board, etc.) is open. Those views
+        // call ClosePlayerUI() themselves on open and ShowPlayerUI() on close, but a completely
+        // unrelated delayed coroutine can still call ShowPlayerUI() in between — e.g. the Day
+        // Number pop-up (StartShiftScreen.ShowDayNumber) finishing its multi-second reveal after
+        // the player has since opened the bunker door wheel — which would otherwise pop the HUD
+        // back up over a screen that explicitly hides it. DiegeticViewController.Close() always
+        // clears IsAnyViewActive before calling ShowPlayerUI(), so this never blocks the
+        // legitimate restore once the view actually closes.
+        if (DiegeticViewController.IsAnyViewActive)
+            return;
+
         playerUI.SetActive(true);
     }
     
@@ -697,6 +709,8 @@ public class UIController : MonoBehaviour
 
         if (_endDayPopup != null)
             _endDayPopup.SetActive(true);
+
+        ClosePlayerUI();
     }
 
     /// <summary>
@@ -711,13 +725,17 @@ public class UIController : MonoBehaviour
 
         if (_endDayPopup != null)
             _endDayPopup.SetActive(true);
+
+        ClosePlayerUI();
     }
 
-    /// <summary>Closes the End Day confirmation popup.</summary>
+    /// <summary>Closes the End Day confirmation popup and restores the player HUD.</summary>
     public void CloseEndDayPopup()
     {
         if (_endDayPopup != null)
             _endDayPopup.SetActive(false);
+
+        ShowPlayerUI();
     }
 
     // ─── Thanks For Playing ───────────────────────────────────────────────────

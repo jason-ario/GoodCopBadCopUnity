@@ -2,9 +2,13 @@ using UnityEngine;
 
 /// <summary>
 /// Handles player-initiated throwing of held pickable objects.
-/// Hold F to charge a throw; release F to launch. A ballistic arc LineRenderer
-/// previews the trajectory during charge. The actual throw is executed as a
-/// server-authoritative physics event via <see cref="PickableObject.ThrowServerRpc"/>.
+/// Hold the throw input to aim; a fixed-strength ballistic arc LineRenderer
+/// previews the trajectory and rotates with the camera as the player looks
+/// around. Releasing the input launches the item at that fixed speed along
+/// the current look direction — there is no charge-up, so the throw is
+/// always the same strength and can be redirected freely before release.
+/// The actual throw is executed as a server-authoritative physics event via
+/// <see cref="PickableObject.ThrowServerRpc"/>.
 ///
 /// Attach to the same GameObject as <see cref="PlayerPickupController"/>.
 /// Wire up a <see cref="LineRenderer"/> in the Inspector for the arc preview.
@@ -13,14 +17,8 @@ using UnityEngine;
 public class ThrowController : MonoBehaviour
 {
     [Header("Throw Settings")]
-    [Tooltip("Minimum launch speed (m/s) when charge is at zero.")]
-    [SerializeField] private float minThrowForce = 6f;
-
-    [Tooltip("Maximum launch speed (m/s) at full charge.")]
-    [SerializeField] private float maxThrowForce = 22f;
-
-    [Tooltip("Time in seconds to reach full charge.")]
-    [SerializeField] private float maxChargeTime = 1.5f;
+    [Tooltip("Fixed launch speed (m/s) applied to every throw. Aim by looking around while holding the throw input; there is no charge-up.")]
+    [SerializeField] private float throwForce = 22f;
 
     [Header("Arc Preview")]
     [Tooltip("LineRenderer used to display the throw trajectory arc. Optional.")]
@@ -32,27 +30,45 @@ public class ThrowController : MonoBehaviour
     [Tooltip("Time step between arc sample points (seconds). Smaller = smoother but shorter arc.")]
     [SerializeField] private float arcTimeStep = 0.05f;
 
-    private float _chargeTime;
-    private bool _isCharging;
+    private bool _isAiming;
     private Camera _cam;
     private PlayerPickupController _pickupController;
+    private PlayerInventory _inventory;
 
-    /// <summary>True while the player is holding F to charge a throw.</summary>
-    public bool IsCharging => _isCharging;
-
-    /// <summary>0–1 ratio of how far the charge has progressed toward full.</summary>
-    public float ChargeRatio => maxChargeTime > 0f ? _chargeTime / maxChargeTime : 0f;
+    /// <summary>True while the player is holding the throw input to aim.</summary>
+    public bool IsCharging => _isAiming;
 
     private void Awake()
     {
         _pickupController = GetComponent<PlayerPickupController>();
+        _inventory = GetComponent<PlayerInventory>();
         _cam = GetComponentInChildren<Camera>();
     }
 
+    private void OnEnable()
+    {
+        if (_inventory != null) _inventory.OnActiveSlotChanged += HandleActiveSlotChanged;
+    }
+
+    private void OnDisable()
+    {
+        if (_inventory != null) _inventory.OnActiveSlotChanged -= HandleActiveSlotChanged;
+    }
+
     /// <summary>
-    /// Begins accumulating throw charge. No-op when no item is held, or when the
+    /// Cancels an in-progress aim the moment the player swaps their equipped hotbar slot
+    /// (hotkey 1/2, scroll cycling, or a full-to-full swap) — never leave the aim active
+    /// while the held item itself is changing out from under it.
+    /// </summary>
+    private void HandleActiveSlotChanged(int newSlot)
+    {
+        if (_isAiming) CancelCharge();
+    }
+
+    /// <summary>
+    /// Begins aiming a throw. No-op when no item is held, or when the
     /// held item's <see cref="PickableItemData.canBeThrown"/> flag is false (e.g. stamps).
-    /// Called by <see cref="PlayerInteractionController"/> on F key down.
+    /// Called by <see cref="PlayerInteractionController"/> on throw-input down.
     /// </summary>
     public void StartCharge()
     {
@@ -61,50 +77,45 @@ public class ThrowController : MonoBehaviour
         PickableItemData heldItemData = _pickupController.HeldObject.ItemData;
         if (heldItemData != null && !heldItemData.canBeThrown) return;
 
-        _chargeTime = 0f;
-        _isCharging = true;
+        _isAiming = true;
         if (throwArcLine != null) throwArcLine.gameObject.SetActive(true);
     }
 
     /// <summary>
-    /// Advances charge time and refreshes the arc preview.
-    /// Call every frame while F is held.
+    /// Refreshes the arc preview to follow the current look direction.
+    /// Call every frame while the throw input is held.
     /// </summary>
     public void UpdateCharge(float deltaTime)
     {
-        if (!_isCharging) return;
-        _chargeTime = Mathf.Min(_chargeTime + deltaTime, maxChargeTime);
+        if (!_isAiming) return;
         UpdateArcPreview();
     }
 
     /// <summary>
-    /// Releases the held item as a throw with the force accumulated so far.
-    /// Detaches the item from the player's hand and sends a server RPC to apply
-    /// physics velocity and re-enable <c>NetworkTransform</c> on all clients.
+    /// Releases the held item as a throw at the fixed <see cref="throwForce"/> speed,
+    /// launched along the current camera look direction. Detaches the item from the
+    /// player's hand and sends a server RPC to apply physics velocity and re-enable
+    /// <c>NetworkTransform</c> on all clients.
     /// </summary>
     public void ReleaseThrow()
     {
-        if (!_isCharging) return;
+        if (!_isAiming) return;
 
-        float savedCharge = _chargeTime;
         CancelCharge();
 
         PickableObject released = _pickupController.ReleaseHeldObjectForThrow();
         if (released == null) return;
 
-        float force = Mathf.Lerp(minThrowForce, maxThrowForce, savedCharge / maxChargeTime);
-        Vector3 velocity = _cam.transform.forward * force;
-
+        Vector3 velocity = _cam.transform.forward * throwForce;
         released.ThrowServerRpc(released.transform.position, velocity);
     }
 
     /// <summary>
-    /// Cancels an in-progress charge without throwing (e.g. item dropped while charging).
+    /// Cancels an in-progress aim without throwing (e.g. item dropped while aiming).
     /// </summary>
     public void CancelCharge()
     {
-        _isCharging = false;
-        _chargeTime = 0f;
+        _isAiming = false;
         if (throwArcLine != null) throwArcLine.gameObject.SetActive(false);
     }
 
@@ -117,8 +128,7 @@ public class ThrowController : MonoBehaviour
         if (throwArcLine == null || _pickupController.HeldObject == null) return;
 
         Vector3 startPos = _pickupController.HeldObject.transform.position;
-        float force = Mathf.Lerp(minThrowForce, maxThrowForce, _chargeTime / maxChargeTime);
-        Vector3 initialVelocity = _cam.transform.forward * force;
+        Vector3 initialVelocity = _cam.transform.forward * throwForce;
 
         throwArcLine.positionCount = arcSegments;
         for (int i = 0; i < arcSegments; i++)

@@ -30,6 +30,9 @@ public class InWorldSubtitle : MonoBehaviour
     private Coroutine _autoHideRoutine;
     private Camera _mainCamera;
 
+    /// <summary>True while the bubble is meant to be showing, independent of the pause-menu override below.</summary>
+    private bool _isShown;
+
     private void Awake()
     {
         if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
@@ -38,7 +41,13 @@ public class InWorldSubtitle : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (!billboard || !canvasGroup || canvasGroup.alpha <= 0f) return;
+        // Force-hide (without touching _isShown or the auto-hide timer) while the pause menu is
+        // open, so the bubble doesn't float on top of it; restores automatically once unpaused.
+        bool isPaused = UIController.Instance != null && UIController.Instance.IsPaused;
+        if (canvasGroup != null)
+            canvasGroup.alpha = (_isShown && !isPaused) ? 1f : 0f;
+
+        if (!billboard || !_isShown || isPaused) return;
 
         if (_mainCamera == null) _mainCamera = Camera.main;
         if (_mainCamera == null) return;
@@ -91,6 +100,8 @@ public class InWorldSubtitle : MonoBehaviour
 
     private void SetVisible(bool visible)
     {
+        _isShown = visible;
+
         if (canvasGroup != null)
             canvasGroup.alpha = visible ? 1f : 0f;
 

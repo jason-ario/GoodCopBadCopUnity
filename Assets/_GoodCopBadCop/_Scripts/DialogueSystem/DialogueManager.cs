@@ -45,6 +45,11 @@ public class DialogueManager : NetworkBehaviour
     [SerializeField] private Subtitles playerSubtitlesPrefab;
     [SerializeField] RectTransform subtitlesContainer;
 
+    [Tooltip("CanvasGroup on this same GameObject (the dialogue system's root Canvas), used to " +
+             "visually hide all subtitles and dialogue choices — without touching their own " +
+             "active-state bookkeeping — while the pause menu is open.")]
+    [SerializeField] private CanvasGroup dialogueCanvasGroup;
+
     private Subtitles _waitingSubtitle;
 
     /// <summary>
@@ -70,6 +75,24 @@ public class DialogueManager : NetworkBehaviour
     private void Awake()
     {
         Instance = this;
+    }
+
+    /// <summary>
+    /// Hides all subtitles and dialogue choice UI (via <see cref="dialogueCanvasGroup"/>) while
+    /// the pause menu is open, and reveals them again as soon as it closes. Toggling the Canvas
+    /// Group's alpha/interactivity — rather than any container's active state — leaves ongoing
+    /// coroutines (typewriter reveal, auto-hide timers) and flags such as
+    /// <see cref="HasActiveSubtitles"/> completely undisturbed, so dialogue resumes exactly
+    /// where it left off once the player unpauses.
+    /// </summary>
+    private void Update()
+    {
+        if (dialogueCanvasGroup == null) return;
+
+        bool isPaused = UIController.Instance != null && UIController.Instance.IsPaused;
+        dialogueCanvasGroup.alpha = isPaused ? 0f : 1f;
+        dialogueCanvasGroup.interactable = !isPaused;
+        dialogueCanvasGroup.blocksRaycasts = !isPaused;
     }
     
 
@@ -572,6 +595,8 @@ public class DialogueManager : NetworkBehaviour
     /// </summary>
     private bool IsAdvanceInputPressed()
     {
+        if (UIController.Instance != null && UIController.Instance.IsPaused) return false;
+
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
         return Input.GetKeyDown(KeyCode.E)

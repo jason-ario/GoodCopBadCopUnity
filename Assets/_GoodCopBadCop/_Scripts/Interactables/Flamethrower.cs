@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
@@ -98,6 +99,14 @@ public class Flamethrower : PickableObject, IAmmoProvider
     private const float HitCheckInterval = 0.2f;
     private float _hitCheckTimer;
 
+    /// <summary>
+    /// Extra slack (in metres) added on top of <see cref="_maxFlameRange"/> + <see cref="_flameWidth"/>
+    /// when sanity-checking a client-reported flame hit against the shooter's reported origin.
+    /// Covers latency-driven position drift between the moment the client resolved the hit and
+    /// the moment the RPC lands on the server. This is a sanity bound, NOT a hit test.
+    /// </summary>
+    private const float FlameDistanceMargin = 2f;
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     protected override void Awake()
@@ -156,14 +165,14 @@ public class Flamethrower : PickableObject, IAmmoProvider
         // Drain fuel every frame.
         DrainFuelServerRpc(_fuelDrainRate * Time.deltaTime);
 
-        // Throttled enemy hit check — avoids sending a heavy RPC every frame.
+        // Throttled enemy hit check — avoids resolving/sending every frame.
         _hitCheckTimer -= Time.deltaTime;
         if (_hitCheckTimer <= 0f)
         {
             _hitCheckTimer = HitCheckInterval;
             Camera cam = Camera.main;
             if (cam != null)
-                FireHitCheckServerRpc(cam.transform.position, cam.transform.forward);
+                ResolveAndReportFlameHits(cam.transform.position, cam.transform.forward);
         }
     }
 
@@ -293,19 +302,24 @@ public class Flamethrower : PickableObject, IAmmoProvider
     }
 
     /// <summary>
-    /// Server-side: SphereCasts along the aim direction to find enemies inside the
-    /// current flame range. Newly detected enemies are ignited on all clients via
-    /// <see cref="IgniteEnemyClientRpc"/>. Already-ignited enemies are skipped.
+    /// Client-authoritative flame hit check: the SphereCast runs here, against the world exactly
+    /// as this player sees it, and the resolved target lists are reported to the server. The
+    /// server used to re-cast the sphere itself from the reported origin/direction — a stream
+    /// that visibly engulfed a moving mutant or fellow player on the shooter's own screen could
+    /// sweep past an already-moved target on the server and land nothing. See
+    /// <see cref="FireHitCheckServerRpc"/>.
     /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    private void FireHitCheckServerRpc(Vector3 origin, Vector3 direction, ServerRpcParams rpcParams = default)
+    private void ResolveAndReportFlameHits(Vector3 origin, Vector3 direction)
     {
-        if (!TryGetHolder(rpcParams.Receive.SenderClientId, out _)) return;
+        ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
 
-        ulong shooterClientId = rpcParams.Receive.SenderClientId;
+        float fuelRatio       = Mathf.Clamp01(_fuel.Value / MaxFuel);
+        float effectiveRange  = Mathf.Lerp(_minVelocityRatio * _maxFlameRange, _maxFlameRange, fuelRatio);
 
-        float fuelRatio  = Mathf.Clamp01(_fuel.Value / MaxFuel);
-        float effectiveRange = Mathf.Lerp(_minVelocityRatio * _maxFlameRange, _maxFlameRange, fuelRatio);
+        List<NetworkObjectReference> firePitsToIgnite = new();
+        List<NetworkObjectReference> enemiesToIgnite  = new();
+        List<NetworkObjectReference> corpsesToBurn    = new();
+        List<NetworkObjectReference> playersToDamage  = new();
 
         RaycastHit[] hits = Physics.SphereCastAll(origin, _flameWidth, direction, effectiveRange, ~0, QueryTriggerInteraction.Collide);
         foreach (RaycastHit hit in hits)
@@ -314,8 +328,8 @@ public class Flamethrower : PickableObject, IAmmoProvider
             FirePit firePit = hit.collider.GetComponentInParent<FirePit>();
             if (firePit != null)
             {
-                if (!firePit.IsLit)
-                    firePit.Ignite();
+                if (!firePit.IsLit && firePit.NetworkObject != null)
+                    firePitsToIgnite.Add(new NetworkObjectReference(firePit.NetworkObject));
                 continue;
             }
 
@@ -327,29 +341,22 @@ public class Flamethrower : PickableObject, IAmmoProvider
             CorpseResurrectionController corpse = hit.collider.GetComponentInParent<CorpseResurrectionController>();
             if (corpse != null)
             {
-                // Never burn the shooter's own player.
+                // Never report hits against the shooter's own player.
                 NetworkObject corpseNetObj = corpse.GetComponent<NetworkObject>();
-                if (corpseNetObj != null && corpseNetObj.OwnerClientId == shooterClientId)
+                if (corpseNetObj == null || corpseNetObj.OwnerClientId == localClientId)
                     continue;
 
                 PlayerHealth corpsePlayerHealth = corpse.GetComponent<PlayerHealth>();
                 if (corpsePlayerHealth != null && corpsePlayerHealth.IsDead)
                 {
-                    // Cancel any pending resurrection (no-op once already resurrected).
-                    corpse.BurnCorpse();
-
-                    // Ignite fire VFX + damage-over-time on all clients. SetOnFire ticks damage
-                    // into the same MutantEnemy component that drives the resurrected corpse,
-                    // permanently destroying it regardless of resurrection state — fire is the
-                    // only thing that can finish it off for good.
                     SetOnFire corpseSetOnFire = corpse.GetComponent<SetOnFire>();
                     if (corpseSetOnFire != null && !corpseSetOnFire.IsAtMaxFire)
-                        IgniteEnemyClientRpc(new NetworkObjectReference(corpse.NetworkObject));
+                        corpsesToBurn.Add(new NetworkObjectReference(corpseNetObj));
                 }
                 else if (corpsePlayerHealth != null)
                 {
                     // Living fellow player caught in the flame — friendly-fire damage.
-                    corpsePlayerHealth.TakeDamage(_playerDamagePerTick, EffectKeys.FriendlyFlamethrowerDamage);
+                    playersToDamage.Add(new NetworkObjectReference(corpseNetObj));
                 }
 
                 // Never fall through to the MutantEnemy check below for players.
@@ -358,18 +365,98 @@ public class Flamethrower : PickableObject, IAmmoProvider
 
             // ── Mutant enemies ────────────────────────────────────────────────
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            if (enemy != null)
+            if (enemy != null && !enemy.IsDead && enemy.NetworkObject != null)
             {
-                if (!enemy.IsDead)
-                {
-                    // Skip enemies already at max flames — SetOnFire handles re-ignition
-                    // automatically once emitters burn out and the count drops below the cap.
-                    SetOnFire setOnFire = enemy.GetComponent<SetOnFire>();
-                    if (setOnFire != null && !setOnFire.IsAtMaxFire)
-                        IgniteEnemyClientRpc(new NetworkObjectReference(enemy.NetworkObject));
-                }
-                continue;
+                // Skip enemies already at max flames — SetOnFire handles re-ignition
+                // automatically once emitters burn out and the count drops below the cap.
+                SetOnFire setOnFire = enemy.GetComponent<SetOnFire>();
+                if (setOnFire != null && !setOnFire.IsAtMaxFire)
+                    enemiesToIgnite.Add(new NetworkObjectReference(enemy.NetworkObject));
             }
+        }
+
+        if (firePitsToIgnite.Count == 0 && enemiesToIgnite.Count == 0 &&
+            corpsesToBurn.Count == 0 && playersToDamage.Count == 0)
+            return;
+
+        FireHitCheckServerRpc(origin, firePitsToIgnite.ToArray(), enemiesToIgnite.ToArray(),
+            corpsesToBurn.ToArray(), playersToDamage.ToArray());
+    }
+
+    /// <summary>
+    /// Server-side: validates the shooter, then applies the flame effects the CLIENT resolved in
+    /// <see cref="ResolveAndReportFlameHits"/> — igniting fire pits/enemies, burning corpses, and
+    /// damaging fellow players caught in the stream. The server no longer sphere-casts itself: it
+    /// trusts what the shooter's own machine is engulfing, so a stream that visibly connects
+    /// always lands. Ignition/health state remain server-owned, and <paramref name="origin"/> is
+    /// used only for the distance sanity bound below (NOT a hit test) — it rejects a report that
+    /// could only come from a bug or a modified client, it does not re-decide what was hit.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void FireHitCheckServerRpc(Vector3 origin,
+        NetworkObjectReference[] firePitsToIgnite, NetworkObjectReference[] enemiesToIgnite,
+        NetworkObjectReference[] corpsesToBurn, NetworkObjectReference[] playersToDamage,
+        ServerRpcParams rpcParams = default)
+    {
+        if (!TryGetHolder(rpcParams.Receive.SenderClientId, out _)) return;
+
+        ulong shooterClientId = rpcParams.Receive.SenderClientId;
+        float maxReportedDistance = _maxFlameRange + _flameWidth + FlameDistanceMargin;
+
+        foreach (NetworkObjectReference r in firePitsToIgnite)
+        {
+            if (!r.TryGet(out NetworkObject obj)) continue;
+            if (Vector3.Distance(origin, obj.transform.position) > maxReportedDistance) continue;
+
+            FirePit firePit = obj.GetComponent<FirePit>();
+            if (firePit != null && !firePit.IsLit)
+                firePit.Ignite();
+        }
+
+        foreach (NetworkObjectReference r in enemiesToIgnite)
+        {
+            if (!r.TryGet(out NetworkObject obj)) continue;
+            if (Vector3.Distance(origin, obj.transform.position) > maxReportedDistance) continue;
+
+            MutantEnemy enemy = obj.GetComponent<MutantEnemy>();
+            if (enemy == null || enemy.IsDead) continue;
+
+            SetOnFire setOnFire = enemy.GetComponent<SetOnFire>();
+            if (setOnFire != null && !setOnFire.IsAtMaxFire)
+                IgniteEnemyClientRpc(new NetworkObjectReference(obj));
+        }
+
+        foreach (NetworkObjectReference r in corpsesToBurn)
+        {
+            if (!r.TryGet(out NetworkObject obj)) continue;
+            if (obj.OwnerClientId == shooterClientId) continue; // never let a report burn the shooter
+            if (Vector3.Distance(origin, obj.transform.position) > maxReportedDistance) continue;
+
+            CorpseResurrectionController corpse = obj.GetComponent<CorpseResurrectionController>();
+            PlayerHealth corpsePlayerHealth      = obj.GetComponent<PlayerHealth>();
+            if (corpse == null || corpsePlayerHealth == null || !corpsePlayerHealth.IsDead) continue;
+
+            // Cancel any pending resurrection (no-op once already resurrected).
+            corpse.BurnCorpse();
+
+            // Ignite fire VFX + damage-over-time on all clients. SetOnFire ticks damage into the
+            // same MutantEnemy component that drives the resurrected corpse, permanently
+            // destroying it regardless of resurrection state — fire is the only thing that can
+            // finish it off for good.
+            SetOnFire corpseSetOnFire = corpse.GetComponent<SetOnFire>();
+            if (corpseSetOnFire != null && !corpseSetOnFire.IsAtMaxFire)
+                IgniteEnemyClientRpc(new NetworkObjectReference(obj));
+        }
+
+        foreach (NetworkObjectReference r in playersToDamage)
+        {
+            if (!r.TryGet(out NetworkObject obj)) continue;
+            if (obj.OwnerClientId == shooterClientId) continue; // never let a report hurt the shooter
+            if (Vector3.Distance(origin, obj.transform.position) > maxReportedDistance) continue;
+
+            PlayerHealth playerHealth = obj.GetComponent<PlayerHealth>();
+            if (playerHealth != null && !playerHealth.IsDead)
+                playerHealth.TakeDamage(_playerDamagePerTick, EffectKeys.FriendlyFlamethrowerDamage);
         }
     }
 
