@@ -56,6 +56,12 @@ public class PlayerPickupController : NetworkBehaviour
     public ObjectContainer LeftArmBodyObjectContainer => leftArmBodyObjectContainer;
     public ObjectContainer LeftArmCamObjectContainer => leftArmCamObjectContainer;
 
+    // The world object this (non-owner) proxy is currently snapping to its body arm socket —
+    // resolved from the replicated _heldObjectRef in ApplyBodyConstraint. HeldObject is owner-only,
+    // so PlayerAnimationController.ApplyProxyPitchBones reads this to get the held item's
+    // PickableItemData (e.g. its per-item arm pitch clamp) on observers' machines.
+    public PickableObject ProxyHeldObject => _followWorldObj;
+
 
     private PlayerMovementController _playerMovementController;
     public PlayerMovementController PlayerMovementController => _playerMovementController;

@@ -48,19 +48,17 @@ public class PickableItemData : ScriptableObject
     public bool useRightIK;
     public bool useAimIK;
 
-    [Header("Held Item Pitch Clamp (First-Person)")]
-    [Tooltip("When enabled, clamps how far the first-person arms rotate to follow the camera's " +
-             "vertical look while this item is held. Without this, an item held far out in front " +
-             "of the camera (e.g. the supply box) swings down into the player's own view/chest when " +
-             "looking down steeply, and up into the camera when looking up, because the first-person " +
-             "arm rig is a direct child of the camera and normally inherits its pitch 1:1. Camera aim " +
-             "itself is never affected — only the visual arm/item follow lags behind past the clamp.")]
+    [Header("Held Item Pitch Clamp (Third-Person / Observers)")]
+    [Tooltip("When enabled, overrides the default arm pitch clamp on PlayerAnimationController for " +
+             "how far OTHER players see this player's body arms swing to follow their vertical look " +
+             "while this item is held. Keeps large items (e.g. the supply box) from swinging into the " +
+             "holder's body. The holder's own first-person arms are never affected.")]
     public bool clampArmPitchWhenHeld = false;
 
-    [Tooltip("Maximum downward arm pitch (degrees) the arms will follow when looking down while holding this item.")]
+    [Tooltip("Maximum downward look pitch (degrees) the observed body arms will follow while holding this item.")]
     public float armPitchClampDown = 20f;
 
-    [Tooltip("Maximum upward arm pitch (degrees) the arms will follow when looking up while holding this item.")]
+    [Tooltip("Maximum upward look pitch (degrees) the observed body arms will follow while holding this item.")]
     public float armPitchClampUp = 30f;
 
     [Header("UI")]

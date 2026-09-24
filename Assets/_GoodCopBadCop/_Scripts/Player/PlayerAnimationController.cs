@@ -306,13 +306,6 @@ public class PlayerAnimationController : NetworkBehaviour
     private Transform _leftForeArmBone;
     private Transform _leftHandBone;
 
-    // First-person ("cam") arm bones — the visible arms rendered for the local owner only,
-    // resolved from armsAnimator's humanoid rig. Distinct from the body bones above (which
-    // drive the third-person representation seen by other players). Used exclusively by
-    // ApplyHeldItemPitchClamp to hold large held items steady past a per-item look-pitch clamp.
-    private Transform _camRightUpperArmBone;
-    private Transform _camLeftUpperArmBone;
-
     private Coroutine rightRigOnOffCoroutine;
     private Coroutine leftRigOnOffCoroutine;
 
@@ -465,51 +458,6 @@ public class PlayerAnimationController : NetworkBehaviour
                 _leftUpperArmBone, _leftForeArmBone, _leftHandBone,
                 LeftArmIKTarget.position, leftElbowHintOwner, leftArmRig.weight);
         }
-
-        ApplyHeldItemPitchClamp();
-    }
-
-    /// <summary>
-    /// Clamps how far the local player's first-person arms visually follow the camera's vertical
-    /// look while a large held item (flagged via <see cref="PickableItemData.clampArmPitchWhenHeld"/>,
-    /// e.g. the supply box) is equipped. The FP arm rig is parented directly under the camera and
-    /// normally inherits its pitch 1:1, so an item held far out in front swings down into the
-    /// player's own view/chest when looking down steeply (and up into the camera when looking up).
-    /// This rotates the FP upper-arm bones directly in world space, pivoting at the shoulder joint
-    /// itself rather than a distant root transform, by exactly the excess pitch past the item's
-    /// clamp angles — mirroring the sign convention used by ApplyProxyPitchBones's held-item arm
-    /// swing (Quaternion.AngleAxis(pitchDegrees, transform.right)), so no additional axis flip is
-    /// needed here despite Arms_Socket's baked 180-degree Y rotation: that flip only matters when
-    /// composing a LOCAL rotation under Arms_Socket/Player_Arms, not when applying a world-space
-    /// rotation straight to the bone's own Transform.rotation. Camera aim itself is completely
-    /// unaffected. Skips either arm while its Animation Rigging IK constraint is actively driving
-    /// the hand (weight > ~0), since rotating the upper arm bone underneath an active two-bone IK
-    /// solve would just pull the hand off its IK target. Local owner only.
-    /// </summary>
-    private void ApplyHeldItemPitchClamp()
-    {
-        if (_camRightUpperArmBone == null && _camLeftUpperArmBone == null) return;
-        if (_playerPickupController == null || _playerMovementController == null) return;
-
-        PickableItemData itemData = _playerPickupController.HeldObject != null
-            ? _playerPickupController.HeldObject.ItemData
-            : null;
-
-        if (itemData == null || !itemData.clampArmPitchWhenHeld) return;
-
-        float pitch = _playerMovementController.CameraPitch;
-        float clampedPitch = Mathf.Clamp(pitch, -itemData.armPitchClampUp, itemData.armPitchClampDown);
-        float compensation = clampedPitch - pitch;
-
-        if (Mathf.Approximately(compensation, 0f)) return;
-
-        Quaternion delta = Quaternion.AngleAxis(compensation, transform.right);
-
-        if (_camRightUpperArmBone != null && camRightArmRig.weight < 0.01f)
-            _camRightUpperArmBone.rotation = delta * _camRightUpperArmBone.rotation;
-
-        if (_camLeftUpperArmBone != null && camLeftArmRig.weight < 0.01f)
-            _camLeftUpperArmBone.rotation = delta * _camLeftUpperArmBone.rotation;
     }
 
     /// <summary>
@@ -600,14 +548,6 @@ public class PlayerAnimationController : NetworkBehaviour
         _rightHandBone     = bodyAnimator.GetBoneTransform(HumanBodyBones.RightHand);
         _leftForeArmBone   = bodyAnimator.GetBoneTransform(HumanBodyBones.LeftLowerArm);
         _leftHandBone      = bodyAnimator.GetBoneTransform(HumanBodyBones.LeftHand);
-
-        // First-person arm bones, resolved from the separate "cam" humanoid rig (armsAnimator).
-        // Only meaningful for the owner, but harmless to resolve for everyone.
-        if (armsAnimator != null)
-        {
-            _camRightUpperArmBone = armsAnimator.GetBoneTransform(HumanBodyBones.RightUpperArm);
-            _camLeftUpperArmBone  = armsAnimator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
-        }
 
         // Measure the arm reach after one frame so the Animator has evaluated
         // and bone positions are valid in world space.
@@ -881,7 +821,23 @@ public class PlayerAnimationController : NetworkBehaviour
         bool rightArmHolding = netLayer1Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
         bool leftArmHolding  = netLayer4Weight.Value > 0.01f || netLayer2Weight.Value > 0.01f;
 
-        float armPitch = Mathf.Clamp(netPitch.Value, -armPitchClampUp, armPitchClampDown);
+        // Per-item override: large held items (e.g. the supply box, flagged via
+        // PickableItemData.clampArmPitchWhenHeld) use their own tighter pitch range so observers
+        // don't see the item swing down into / up through the holder's body. The held world
+        // object follows the body arm socket via SyncWorldObjectToBody() at the end of this
+        // method, so it inherits the clamped arm pose automatically. First-person (owner) arms
+        // are intentionally unaffected.
+        float clampUp   = armPitchClampUp;
+        float clampDown = armPitchClampDown;
+        PickableObject proxyHeld = _playerPickupController != null ? _playerPickupController.ProxyHeldObject : null;
+        PickableItemData proxyItemData = proxyHeld != null ? proxyHeld.ItemData : null;
+        if (proxyItemData != null && proxyItemData.clampArmPitchWhenHeld)
+        {
+            clampUp   = proxyItemData.armPitchClampUp;
+            clampDown = proxyItemData.armPitchClampDown;
+        }
+
+        float armPitch = Mathf.Clamp(netPitch.Value, -clampUp, clampDown);
 
         if (rightArmHolding && _rightUpperArmBone != null && !netRightArmRigActive.Value && rightArmRig.weight < 0.01f)
         {

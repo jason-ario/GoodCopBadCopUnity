@@ -73,8 +73,18 @@ public class RadiationAlertUI : MonoBehaviour
             _playerHealth = null;
         }
 
+        // Drop the flag from the previous instance. The corpse's radiation keeps accruing on the
+        // server after death, so without this a stale "high" value would survive the swap to a
+        // null instance (revive handoff / despawn), where there's no PlayerHealth left to report
+        // IsDead — and the alert would pop up while the player is still dead.
+        _radiationIsHigh = false;
+
         _subscribedInstance = playerInstance;
-        if (playerInstance == null) return;
+        if (playerInstance == null)
+        {
+            RefreshVisibility();
+            return;
+        }
 
         if (playerInstance.PlayerRadiation != null)
         {
