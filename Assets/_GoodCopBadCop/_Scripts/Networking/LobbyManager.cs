@@ -500,6 +500,22 @@ public class LobbyManager : MonoBehaviour
         if (!NetworkManager.Singleton.IsHost)
             return;
 
+        // NGO fires OnClientConnectedCallback for the host's own LocalClientId too, synchronously
+        // inside StartHost() — not just for remote clients joining. The normal main-menu "Play"
+        // flow is shielded from this because it calls GameManager.BeginLobbyTransition() first,
+        // routing the host's self-connect into the harmless "IsTransitioningToLobby" branch below.
+        // Debug/editor skip flows (DebugConsole.EnsureGameStartedThen — used by every "Game Start
+        // Point" option and cheat-console skip) never set that flag, so without this guard the
+        // host's self-connect fell into the "game started, intro not started" branch and called
+        // GameManager.InitializeLobbyJoinClient(..., gameAlreadyStarted: true), which re-invokes
+        // CampaignManager.StartCampaign() a second time — independently of and later than any
+        // debug JumpToDay() call. That second StartCampaign() re-reads SaveDataManager's day,
+        // which (with no save slot selected, as these skips bypass the campaign-select screen)
+        // always falls back to Day 1, silently reverting the debug jump every time. This handler
+        // is only meant for OTHER clients connecting to the host's lobby, so skip self entirely.
+        if (clientId == NetworkManager.Singleton.LocalClientId)
+            return;
+
         await Task.Delay(50);
 
         Debug.Log($"[Host] OnClientConnected clientId={clientId} GameManager.Instance={GameManager.Instance != null}");

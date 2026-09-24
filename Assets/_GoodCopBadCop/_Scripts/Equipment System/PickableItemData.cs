@@ -48,6 +48,21 @@ public class PickableItemData : ScriptableObject
     public bool useRightIK;
     public bool useAimIK;
 
+    [Header("Held Item Pitch Clamp (First-Person)")]
+    [Tooltip("When enabled, clamps how far the first-person arms rotate to follow the camera's " +
+             "vertical look while this item is held. Without this, an item held far out in front " +
+             "of the camera (e.g. the supply box) swings down into the player's own view/chest when " +
+             "looking down steeply, and up into the camera when looking up, because the first-person " +
+             "arm rig is a direct child of the camera and normally inherits its pitch 1:1. Camera aim " +
+             "itself is never affected — only the visual arm/item follow lags behind past the clamp.")]
+    public bool clampArmPitchWhenHeld = false;
+
+    [Tooltip("Maximum downward arm pitch (degrees) the arms will follow when looking down while holding this item.")]
+    public float armPitchClampDown = 20f;
+
+    [Tooltip("Maximum upward arm pitch (degrees) the arms will follow when looking up while holding this item.")]
+    public float armPitchClampUp = 30f;
+
     [Header("UI")]
     [Tooltip("Icon displayed in the inventory HUD slot when this item is carried.")]
     [SerializeField] private Sprite icon;
