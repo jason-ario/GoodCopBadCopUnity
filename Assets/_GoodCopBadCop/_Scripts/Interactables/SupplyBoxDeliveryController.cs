@@ -145,6 +145,11 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
 
         Transform contentsParent = _activeBox.ContentsParent;
 
+        // Path from the box's NetworkObject root down to the contents transform, resolved
+        // independently on every client via PlaceInSlotFromServer/PlaceInSlotClientRpc below —
+        // see the comment on that call for why this replaces a plain server-only SetParent.
+        string contentsPath = GetRelativePath(_activeBoxNetObj.transform, contentsParent);
+
         foreach (GameObject prefab in prefabs)
         {
             if (prefab == null) continue;
@@ -184,7 +189,27 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
 
             if (pickable != null)
             {
-                pickable.SetParent(contentsParent);
+                // A plain pickable.SetParent(contentsParent) here only sets up the
+                // ParentConstraint on the server's own instance — clients never receive it and
+                // instead fall back to this item's NetworkTransform to replicate its position.
+                // That NetworkTransform is server-owned, so while a non-host client is carrying
+                // the box, that client's own view of the box moves instantly (owner-authoritative
+                // NT with zero self-latency) but each item inside must round-trip client → server
+                // (to update the server's ParentConstraint-driven position) → back out to every
+                // client again, visibly lagging behind the box.
+                //
+                // PlaceInSlotFromServer avoids this the same way FolderController/ExamNotebook do
+                // for filed documents: it disables this item's NetworkTransform everywhere and
+                // broadcasts the box + contents-path reference so every client (host and all
+                // clients alike) independently resolves the contents transform and applies its
+                // own local ParentConstraint via SetParent. The item then tracks the box's
+                // current local transform every frame on every machine, with no network hop at
+                // all, regardless of who is holding it.
+                pickable.PlaceInSlotFromServer(
+                    new NetworkObjectReference(_activeBoxNetObj),
+                    contentsPath,
+                    contentsParent.position,
+                    contentsParent.rotation);
                 pickable.LockInteractableNetworked();
                 _activeBox.RegisterItem(pickable);
             }
@@ -231,5 +256,28 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
         }
 
         Debug.Log("[SupplyBoxDeliveryController] Supply box spawned and ready for pickup.", this);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds a slash-separated relative path from <paramref name="root"/> down to
+    /// <paramref name="target"/>, e.g. "Contents". Mirrors
+    /// <see cref="FolderController.GetRelativePath"/>/PlayerPickupController's identical helper
+    /// so PlaceInSlotClientRpc can resolve the same transform via Transform.Find on every client.
+    /// Returns an empty string when target == root.
+    /// </summary>
+    private static string GetRelativePath(Transform root, Transform target)
+    {
+        if (target == root) return string.Empty;
+
+        List<string> parts = new List<string>();
+        Transform current = target;
+        while (current != null && current != root)
+        {
+            parts.Insert(0, current.name);
+            current = current.parent;
+        }
+        return string.Join("/", parts);
     }
 }

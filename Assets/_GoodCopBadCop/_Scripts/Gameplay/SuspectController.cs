@@ -238,13 +238,22 @@ public class SuspectController : NetworkBehaviour
             suspectCam.SetActive(false);
     }
 
+    /// <summary>
+    /// Points the current suspect's <see cref="FLookAnimator"/> at the local player's camera.
+    /// Runs independently on every machine (see <see cref="NotifySuspectArrivedClientRpc"/>) —
+    /// each client only ever assigns its own <see cref="PlayerInstance.CameraTransform"/>, the
+    /// same local look-point convention used by <see cref="SuspectWorldDialogue"/>, so host and
+    /// client each see the suspect looking at their own camera.
+    /// </summary>
     public void EnableLook()
     {
         if (suspectCharacter == null) return;
         if (suspectCharacter.lookAnimator == null) return;
-        if (Camera.main == null) return;
 
-        suspectCharacter.lookAnimator.ObjectToFollow = Camera.main.transform;
+        Transform playerCameraTransform = PlayerInstance.Instance != null ? PlayerInstance.Instance.CameraTransform : null;
+        if (playerCameraTransform == null) return;
+
+        suspectCharacter.lookAnimator.ObjectToFollow = playerCameraTransform;
     }
 
     public void NextSuspect()
@@ -771,12 +780,18 @@ public class SuspectController : NetworkBehaviour
             .OnComplete(OnRotationComplete);
 
         suspectCharacter.SetLocomotionState(false);
-        EnableLook();
     }
 
+    /// <summary>
+    /// Fires on every client (host included) when a suspect finishes walking to the booth
+    /// window. Each machine calls <see cref="EnableLook"/> locally so the suspect's look
+    /// animator targets that machine's own local player camera — a single server-side call
+    /// would only ever point at the host's camera, leaving remote clients unset.
+    /// </summary>
     [ClientRpc]
     private void NotifySuspectArrivedClientRpc(int index)
     {
+        EnableLook();
         OnSuspectArrived?.Invoke(index);
     }
 

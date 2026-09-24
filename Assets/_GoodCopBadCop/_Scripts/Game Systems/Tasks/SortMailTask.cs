@@ -88,6 +88,13 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
              "appearing immediately on day change.")]
     [SerializeField] private DeliveryTruckController _deliveryTruck;
 
+    [Header("Gate Button Tutorial")]
+    [Tooltip("The checkpoint gate button's Interactable. While the shipment-is-waiting-at-the-gate " +
+             "alert is showing (see NotifyShipmentWaitingAtGate), it is force-highlighted and pointed at " +
+             "with a pooled TutorialMarker arrow (see TutorialMarkerManager) so players know where to go " +
+             "to let the truck through. Both are cleared as soon as the gate opens (NotifyShipmentGateOpened).")]
+    [SerializeField] private GateButtonInteractable _gateButtonInteractable;
+
     [Header("Goods Categories")]
     [Tooltip("The full pool of goods categories that can appear on packages. Every delivery, " +
              "_prohibitedCountPerDay of these are drawn at random to be today's contraband; the " +
@@ -879,7 +886,9 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// truck arrives at the gate and stops, waiting for a player to open it (e.g. via the gate
     /// button) before continuing on to the drop-off point. The alert keeps fading out and back
     /// in on a loop — it does not disappear for good — until <see cref="NotifyShipmentGateOpened"/>
-    /// is called once the gate is actually opened.
+    /// is called once the gate is actually opened. Also force-highlights <see cref="_gateButtonInteractable"/>
+    /// and points a pooled <see cref="TutorialMarker"/> at it for the same duration, so players
+    /// always have a visual cue for where to go.
     /// </summary>
     public void NotifyShipmentWaitingAtGate()
     {
@@ -891,11 +900,16 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void NotifyShipmentWaitingAtGateClientRpc()
     {
         UIController.Instance?.ShowMailDeliveryNotification("A shipment is waiting at the gate.", loop: true);
+
+        _gateButtonInteractable?.SetForceHighlight(true);
+        if (_gateButtonInteractable != null)
+            TutorialMarkerManager.Instance?.Mark(_gateButtonInteractable.transform);
     }
 
     /// <summary>
-    /// Dismisses the looping "shipment is waiting at the gate" alert on every client. Called by
-    /// <see cref="DeliveryTruckController"/> as soon as a player opens the checkpoint gate.
+    /// Dismisses the looping "shipment is waiting at the gate" alert on every client, and clears
+    /// the gate button's force-highlight and tutorial arrow (see <see cref="NotifyShipmentWaitingAtGate"/>).
+    /// Called by <see cref="DeliveryTruckController"/> as soon as a player opens the checkpoint gate.
     /// </summary>
     public void NotifyShipmentGateOpened()
     {
@@ -907,6 +921,10 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void NotifyShipmentGateOpenedClientRpc()
     {
         UIController.Instance?.HideMailDeliveryNotification();
+
+        _gateButtonInteractable?.SetForceHighlight(false);
+        if (_gateButtonInteractable != null)
+            TutorialMarkerManager.Instance?.Unmark(_gateButtonInteractable.transform);
     }
 
     /// <summary>

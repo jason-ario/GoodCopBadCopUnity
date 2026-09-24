@@ -314,7 +314,18 @@ public class DebugConsole : MonoBehaviour
 
     private IEnumerator EnsureGameStartedThenWaitForPlayer(Action onReady)
     {
-        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
+        // Also wait for CampaignManager's initial StartCampaign() (fired asynchronously by
+        // GameManager.TryStartGame's StartGameClientRpc, even for the host) to have actually
+        // applied Day 1 — ActiveDay is only set once ApplyDay runs. Without this, PlayerInstance/
+        // PlayerSpawner can become ready BEFORE the queued StartGameClientRpc is processed, so
+        // onReady() (e.g. a debug JumpToDay(2)) would run first and then get silently stomped
+        // back to the save's Day 1 when StartCampaign() finally arrives — the exact bug where
+        // the "Game Start Point" window's later-day options still showed "Day 1".
+        yield return new WaitUntil(() =>
+            PlayerInstance.Instance != null &&
+            PlayerSpawner.Instance != null &&
+            CampaignManager.Instance != null &&
+            CampaignManager.Instance.ActiveDay != null);
         onReady();
     }
 

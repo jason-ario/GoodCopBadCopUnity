@@ -159,19 +159,25 @@ public class PlayerTutorialUI : MonoBehaviour
 
     private void SetPlayerUIActive(bool active)
     {
-        // Guard: never reveal the HUD while a scripted cutscene or dialogue session is still
-        // active. Mirrors the guard in UIController.ShowPlayerUI() — without this, Dismiss()
-        // (called by SetSuspectCamActive(false) whenever the suspect cam deactivates, e.g. via
-        // ScriptedDialogueRunner.ClearCamerasKeepMode during the Day 1 Alexei cutscene) would
-        // directly SetActive(true) the HUD GameObject, bypassing UIController's guard entirely
-        // and popping the HUD back up mid-cutscene, before the player has regained control.
-        if (active && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
+        // Route through UIController rather than touching PlayerUI.Instance.gameObject
+        // directly. UIController.ShowPlayerUI()/ClosePlayerUI() are the single authoritative
+        // choke point for HUD visibility and already guard against revealing the HUD while a
+        // scripted cutscene, dialogue session, or any open diegetic view (bunker door wheel,
+        // tool locker, mini fridge, etc. — see DiegeticViewController.IsAnyViewActive) is
+        // active. Setting PlayerUI.Instance.gameObject directly bypassed every one of those
+        // guards: Dismiss() (called by SetSuspectCamActive(false) whenever the suspect cam
+        // deactivates, or by any other tutorial-bar sequence ending) could pop the HUD back up
+        // over a screen that explicitly hides it, or before the player has regained control.
+        if (UIController.Instance == null)
+        {
+            Debug.LogWarning("[PlayerTutorialUI] UIController.Instance is null — could not toggle Player UI.", this);
             return;
+        }
 
-        if (PlayerUI.Instance != null)
-            PlayerUI.Instance.gameObject.SetActive(active);
+        if (active)
+            UIController.Instance.ShowPlayerUI();
         else
-            Debug.LogWarning("[PlayerTutorialUI] PlayerUI.Instance is null — could not toggle Player UI.", this);
+            UIController.Instance.ClosePlayerUI();
     }
 
     private IEnumerator SequenceCoroutine(string message, float holdDuration)
