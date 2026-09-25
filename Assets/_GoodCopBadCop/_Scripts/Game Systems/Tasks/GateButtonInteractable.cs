@@ -1,4 +1,3 @@
-using HighlightPlus;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -17,17 +16,6 @@ public class GateButtonInteractable : Interactable
     [Header("Gate")]
     [Tooltip("The checkpoint gate this button opens.")]
     [SerializeField] private CheckpointGateController checkpointGate;
-
-    [Header("Objective Highlight")]
-    [Tooltip("Alternate highlight style shown while the button is force-highlighted as an active " +
-             "objective (e.g. by SortMailTask while a shipment is waiting at the gate) and the reticle " +
-             "is not aimed at it — see Interactable.ForceHighlightProfile. A distinct yellow " +
-             "outline/glow so the call-out reads clearly as 'go here', separate from the ordinary " +
-             "hover highlight. Falls back to the authored hover style if left unassigned.")]
-    [SerializeField] private HighlightProfile objectiveHighlightProfile;
-
-    protected override HighlightProfile ForceHighlightProfile => objectiveHighlightProfile;
-
 
     [Header("Press Feedback")]
     [Tooltip("The button's own Animator (drives the 'Press' trigger). Defaults to the Animator on this GameObject.")]
