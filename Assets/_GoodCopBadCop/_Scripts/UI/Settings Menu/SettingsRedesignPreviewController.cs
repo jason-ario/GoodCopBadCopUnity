@@ -37,7 +37,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             public readonly GameAction RebindAction;
             public int Index;
             public float Value;
-            private readonly int defaultIndex;
+            private int defaultIndex;
             private readonly float defaultValue;
 
             public Setting(string label, string key, params string[] options)
@@ -65,6 +65,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 Key = key;
                 Control = Control.Rebind;
                 RebindAction = rebindAction;
+            }
+
+            public Setting WithDefaultIndex(int index)
+            {
+                defaultIndex = index;
+                Index = index;
+                return this;
             }
 
             public void ResetToDefault()
@@ -110,10 +117,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static readonly Setting[] Gameplay =
         {
-            new Setting("Camera Shake", "camera_shake", "Off", "On"),
-            new Setting("Head Bob", "head_bob", "Off", "On"),
-            new Setting("Running Effects", "running_effects", "Off", "On"),
-            new Setting("Text Wobble", "text_wobble", "Off", "On")
+            new Setting("Camera Shake", "camera_shake", "Off", "On").WithDefaultIndex(1),
+            new Setting("Head Bob", "head_bob", "Off", "On").WithDefaultIndex(1),
+            new Setting("Running Effects", "running_effects", "Off", "On").WithDefaultIndex(1),
+            new Setting("Text Wobble", "text_wobble", "Off", "On").WithDefaultIndex(1)
         };
 
         private static readonly Setting[] Graphics =

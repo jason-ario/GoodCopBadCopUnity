@@ -87,7 +87,8 @@ public class TutorialArrowScreenIndicator : MonoBehaviour
             && viewportPoint.x >= 0f && viewportPoint.x <= 1f
             && viewportPoint.y >= 0f && viewportPoint.y <= 1f;
 
-        if (onScreen)
+        // Hide while the marker is on screen, or while it's out of range (its world arrow is faded out too).
+        if (onScreen || !marker.IsWithinVisibleRange(cam.transform.position))
         {
             ReleaseArrow(marker);
             return;
