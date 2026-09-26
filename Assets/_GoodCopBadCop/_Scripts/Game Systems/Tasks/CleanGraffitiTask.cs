@@ -32,6 +32,13 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool.")]
     [SerializeField] private string _dailyTaskId = "CleanGraffiti";
 
+    [Header("Item Success Feedback")]
+    [Tooltip("2D success cue played on every client each time a scrubbed graffiti piece advances this " +
+             "task (same cue as a task row's sub-task progress ding). Deduplicated via TaskSuccessCue.")]
+    [SerializeField] private AudioClip _itemSuccessSfxClip;
+    [Tooltip("Volume for _itemSuccessSfxClip.")]
+    [SerializeField] private float _itemSuccessSfxVolume = 0.6f;
+
     [Header("Spawning")]
     [Tooltip("Minimum number of graffiti pieces to spawn when triggered (inclusive).")]
     [SerializeField] private int _minGraffitiCount = 2;
@@ -202,7 +209,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private int RollGraffitiCount()
     {
         bool isSinglePlayer = NetworkManager.Singleton == null
-            || NetworkManager.Singleton.ConnectedClients.Count <= 1;
+            || DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) <= 1;
 
         int minCount = _minGraffitiCount;
         int maxCount = _maxGraffitiCount;
@@ -330,9 +337,14 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer || _isComplete) return;
 
+        int previousScrubbed = _scrubbed.Value;
         _scrubbed.Value = Mathf.Clamp(_scrubbed.Value + 1, 0, _totalCount.Value);
 
-        if (_scrubbed.Value < _totalCount.Value) return;
+        bool completesTask = _scrubbed.Value >= _totalCount.Value;
+        if (_scrubbed.Value > previousScrubbed)
+            PlayItemSuccessSfxClientRpc(completesTask);
+
+        if (!completesTask) return;
 
         _isComplete = true;
 
@@ -346,6 +358,11 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         Debug.Log("[CleanGraffitiTask] All graffiti scrubbed — task complete.");
     }
+
+    /// <summary>Per-piece success cue on every client; see <see cref="TaskSuccessCue.PlayCleanupItemCue"/>.</summary>
+    [ClientRpc]
+    private void PlayItemSuccessSfxClientRpc(bool completesTask) =>
+        TaskSuccessCue.PlayCleanupItemCue(this, _itemSuccessSfxClip, _itemSuccessSfxVolume, completesTask);
 
     [ClientRpc]
     private void MarkCompleteClientRpc()

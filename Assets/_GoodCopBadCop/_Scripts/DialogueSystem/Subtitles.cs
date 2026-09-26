@@ -19,6 +19,9 @@ public class Subtitles : MonoBehaviour
     [SerializeField] private float promptBobAmount = 3f;
 
     [Header("Speaker Name Label")]
+    [Tooltip("When false the name tag is never shown, regardless of the speaker name passed to SetText. " +
+             "Disabled on Player Subtitles (player lines and choice echoes).")]
+    [SerializeField] private bool showNameTag = true;
     [Tooltip("Root of the name tag pinned to the subtitle's top-left corner. Hidden when there is no speaker name.")]
     [SerializeField] private CanvasGroup nameTag;
     [SerializeField] private TMP_Text nameLabel;
@@ -137,7 +140,7 @@ public class Subtitles : MonoBehaviour
     {
         if (nameTag == null || nameLabel == null) return;
 
-        string display = FormatName(lastDisplayName);
+        string display = showNameTag ? FormatName(lastDisplayName) : null;
         bool hasName = !string.IsNullOrEmpty(display);
         nameTag.gameObject.SetActive(hasName);
         if (!hasName) return;

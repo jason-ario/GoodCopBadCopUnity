@@ -4,160 +4,187 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 /// <summary>
-/// Client-visual controller that pulses a full-screen red Color Adjustments post-processing
-/// override while a mutant breach alarm is active, then restores the profile's original values.
-/// Uses the exact same Time.time-based pulse formula as <see cref="AlarmLightController"/> so the
-/// screen flash and the physical alarm lights stay in sync. Driven entirely by
-/// <see cref="MutantBreachManager"/> via ClientRpc — this component has no networking of its own
-/// and should never be triggered directly except for local testing.
+/// Client-visual controller that pulses a red screen-edge Vignette on the Alert Volume while a
+/// mutant breach alarm is active, then fades it back out.
+/// Deliberately does NOT touch Color Adjustments (color filter / post exposure): URP volume blending
+/// replaces overridden values, so tinting the full frame wiped out the base grade and the green fog.
+/// Only the vignette's color/intensity/smoothness are overridden, pulsing from the base volume's own
+/// vignette values so the rest of the look is untouched.
+/// Uses the same Time.time-based pulse formula as <see cref="AlarmLightController"/> so the screen
+/// pulse and the physical alarm lights stay in sync. Driven entirely by <see cref="MutantBreachManager"/>
+/// via ClientRpc — this component has no networking of its own.
 /// </summary>
 public class PostProcessAlarmController : MonoBehaviour
 {
     [Header("Alert Volume")]
-    [Tooltip("Global Volume whose profile's Color Adjustments override gets pulsed red while the alarm is active.")]
+    [Tooltip("Global Volume used for the alarm overrides. A Vignette override is added to its runtime profile if missing.")]
     [SerializeField] private Volume alertVolume;
 
     [Header("Pulse")]
-    [Tooltip("Color the screen tints toward at the peak of each pulse.")]
-    [SerializeField] private Color alarmColor = Color.red;
+    [Tooltip("Vignette color at the peak of each pulse.")]
+    [SerializeField] private Color alarmColor = new Color(0.85f, 0.05f, 0.05f, 1f);
 
-    [Tooltip("Pulses per second. Match AlarmLightController.pulseSpeed on the same breach so the screen flash and the physical alarm lights stay in sync.")]
+    [Tooltip("Pulses per second. Match AlarmLightController.pulseSpeed so the screen pulse and alarm lights stay in sync.")]
     [SerializeField] private float pulseSpeed = 1.3f;
 
-    [Tooltip("Minimum blend strength of the red tint pulse (0 = no tint).")]
-    [SerializeField, Range(0f, 1f)] private float minWeight = 0f;
+    [Tooltip("Vignette intensity at the peak of each pulse (the trough is the base volume's own vignette intensity).")]
+    [SerializeField, Range(0f, 1f)] private float peakVignetteIntensity = 0.45f;
 
-    [Tooltip("Maximum blend strength of the red tint pulse (1 = fully replaces the image color with alarmColor).")]
-    [SerializeField, Range(0f, 1f)] private float maxWeight = 0.85f;
+    [Tooltip("Vignette smoothness at the peak of each pulse. Higher = softer edge that bleeds further inward.")]
+    [SerializeField, Range(0.01f, 1f)] private float peakVignetteSmoothness = 0.6f;
 
-    [Tooltip("Extra exposure boost (EV, added on top of the player's Brightness setting) applied at the peak of each pulse, so the red reads clearly even over dark scenery.")]
-    [SerializeField] private float peakPostExposure = 0.5f;
+    [Tooltip("Seconds to fade the vignette out when the alarm stops.")]
+    [SerializeField, Min(0f)] private float fadeOutDuration = 0.75f;
 
-    [Header("Brightness Source")]
-    [Tooltip("Base volume that carries the player's Brightness preference. Auto-found in the scene if left empty.")]
-    [SerializeField] private GoodCopBadCop.Settings.GraphicsPreferencesVolumeAnchor brightnessVolumeAnchor;
+    [Header("Base Look Source")]
+    [Tooltip("Base volume whose vignette the pulse starts from. Auto-found in the scene if left empty.")]
+    [SerializeField] private GoodCopBadCop.Settings.GraphicsPreferencesVolumeAnchor baseVolumeAnchor;
 
-    private ColorAdjustments _colorAdjustments;
-    private ColorAdjustments _brightnessAdjustments;
-    private VolumeProfile _profile;
-    private bool _originalActive;
-    private bool _originalPostExposureOverride;
-    private Color _originalColorFilter;
-    private float _originalPostExposure;
-    private Coroutine _pulseCoroutine;
+    private Vignette _alarmVignette;
+    private Coroutine _routine;
 
     private void Awake()
     {
         if (alertVolume == null)
         {
-            Debug.LogWarning("[PostProcessAlarmController] No alertVolume assigned — screen flash disabled.", this);
+            Debug.LogWarning("[PostProcessAlarmController] No alertVolume assigned — alarm vignette disabled.", this);
             return;
         }
 
-        // The Alert Volume GameObject starts disabled in the scene; keep it enabled at all times
-        // (weight 0 = no visual effect) so this controller's coroutines can run when triggered.
+        // The Alert Volume GameObject starts disabled in the scene; keep it enabled (weight 0 = no effect).
         alertVolume.gameObject.SetActive(true);
         alertVolume.weight = 0f;
 
-        _profile = alertVolume.profile != null ? alertVolume.profile : alertVolume.sharedProfile;
-        if (_profile == null || !_profile.TryGet(out _colorAdjustments))
-            Debug.LogWarning("[PostProcessAlarmController] Alert Volume's profile has no Color Adjustments override — screen flash disabled.", this);
-    }
-
-    /// <summary>Starts the red pulsing screen flash. Safe to call if already running.</summary>
-    public void StartAlarm()
-    {
-        if (_pulseCoroutine != null || _colorAdjustments == null || alertVolume == null)
-            return;
-
-        CacheOriginalState();
-        alertVolume.weight = 1f;
-        _pulseCoroutine = StartCoroutine(PulseLoop());
-    }
-
-    /// <summary>Stops the pulsing loop, restores the profile's original values, and zeroes the volume weight.</summary>
-    public void StopAlarm()
-    {
-        if (_pulseCoroutine != null)
+        // Runtime instance, so edits never touch the profile asset.
+        VolumeProfile profile = alertVolume.profile;
+        if (profile == null)
         {
-            StopCoroutine(_pulseCoroutine);
-            _pulseCoroutine = null;
+            Debug.LogWarning("[PostProcessAlarmController] Alert Volume has no profile — alarm vignette disabled.", this);
+            return;
         }
 
-        RestoreOriginalState();
+        // Never let the alert volume override the base color grade (this is what killed the green fog).
+        if (profile.TryGet(out ColorAdjustments colorAdjustments))
+            colorAdjustments.active = false;
 
+        if (!profile.TryGet(out _alarmVignette))
+            _alarmVignette = profile.Add<Vignette>();
+
+        _alarmVignette.active = true;
+        _alarmVignette.color.overrideState = true;
+        _alarmVignette.intensity.overrideState = true;
+        _alarmVignette.smoothness.overrideState = true;
+    }
+
+    /// <summary>Starts the pulsing red vignette. Safe to call if already running.</summary>
+    public void StartAlarm()
+    {
+        if (_alarmVignette == null || alertVolume == null)
+            return;
+
+        if (_routine != null)
+            StopCoroutine(_routine);
+
+        EnsureAlertVolumeWinsTies();
+        alertVolume.weight = 1f;
+        _routine = StartCoroutine(PulseLoop());
+    }
+
+    /// <summary>Stops the pulse and fades the vignette back to the base look.</summary>
+    public void StopAlarm()
+    {
+        if (_routine != null)
+        {
+            StopCoroutine(_routine);
+            _routine = null;
+        }
+
+        if (alertVolume == null) return;
+
+        if (isActiveAndEnabled && fadeOutDuration > 0f && alertVolume.weight > 0f)
+            _routine = StartCoroutine(FadeOut());
+        else
+            alertVolume.weight = 0f;
+    }
+
+    private void OnDisable()
+    {
+        _routine = null;
         if (alertVolume != null)
             alertVolume.weight = 0f;
     }
 
-    private void CacheOriginalState()
+    private Volume ResolveBaseVolume()
     {
-        _originalActive = _colorAdjustments.active;
-        _originalPostExposureOverride = _colorAdjustments.postExposure.overrideState;
-        _originalColorFilter = _colorAdjustments.colorFilter.value;
-        _originalPostExposure = _colorAdjustments.postExposure.value;
+        if (baseVolumeAnchor == null)
+            baseVolumeAnchor = FindAnyObjectByType<GoodCopBadCop.Settings.GraphicsPreferencesVolumeAnchor>();
 
-        ResolveBrightnessAdjustments();
-
-        _colorAdjustments.active = true;
-        _colorAdjustments.colorFilter.overrideState = true;
-        _colorAdjustments.postExposure.overrideState = true;
-    }
-
-    private void RestoreOriginalState()
-    {
-        if (_colorAdjustments == null) return;
-
-        _colorAdjustments.active = _originalActive;
-        _colorAdjustments.postExposure.overrideState = _originalPostExposureOverride;
-        _colorAdjustments.colorFilter.value = _originalColorFilter;
-        _colorAdjustments.postExposure.value = _originalPostExposure;
+        Volume baseVolume = baseVolumeAnchor != null ? baseVolumeAnchor.Volume : null;
+        return baseVolume == alertVolume ? null : baseVolume;
     }
 
     /// <summary>
-    /// Finds the ColorAdjustments override on the base volume that GraphicsPreferencesApplier writes
-    /// the Brightness preference into. The alert volume's postExposure override replaces (not adds to)
-    /// that value while active, so the pulse must be expressed relative to it.
+    /// Both volumes are global; at equal priority URP's tie-break order is not deterministic across
+    /// game instances, so make sure the alert vignette always layers on top of the base one.
     /// </summary>
-    private void ResolveBrightnessAdjustments()
+    private void EnsureAlertVolumeWinsTies()
     {
-        if (_brightnessAdjustments != null) return;
-
-        if (brightnessVolumeAnchor == null)
-            brightnessVolumeAnchor = FindAnyObjectByType<GoodCopBadCop.Settings.GraphicsPreferencesVolumeAnchor>();
-
-        Volume baseVolume = brightnessVolumeAnchor != null ? brightnessVolumeAnchor.Volume : null;
-        if (baseVolume == null || baseVolume == alertVolume) return;
-
-        // Use the instanced profile (same one GraphicsPreferencesApplier modifies at runtime).
-        VolumeProfile baseProfile = baseVolume.profile;
-        if (baseProfile != null)
-            baseProfile.TryGet(out _brightnessAdjustments);
+        Volume baseVolume = ResolveBaseVolume();
+        if (baseVolume != null && alertVolume.priority <= baseVolume.priority)
+            alertVolume.priority = baseVolume.priority + 1f;
     }
 
-    private float GetBrightnessExposure()
+    private void GetBaseVignette(out Color color, out float intensity, out float smoothness)
     {
-        if (_brightnessAdjustments != null && _brightnessAdjustments.active && _brightnessAdjustments.postExposure.overrideState)
-            return _brightnessAdjustments.postExposure.value;
-        return _originalPostExposure;
+        color = Color.black;
+        intensity = 0f;
+        smoothness = 0.2f;
+
+        Volume baseVolume = ResolveBaseVolume();
+        if (baseVolume == null) return;
+
+        VolumeProfile baseProfile = baseVolume.HasInstantiatedProfile() ? baseVolume.profile : baseVolume.sharedProfile;
+        if (baseProfile == null || !baseProfile.TryGet(out Vignette baseVignette) || !baseVignette.active)
+            return;
+
+        if (baseVignette.color.overrideState) color = baseVignette.color.value;
+        if (baseVignette.intensity.overrideState) intensity = baseVignette.intensity.value;
+        if (baseVignette.smoothness.overrideState) smoothness = baseVignette.smoothness.value;
+    }
+
+    private void ApplyPulse(float t)
+    {
+        GetBaseVignette(out Color baseColor, out float baseIntensity, out float baseSmoothness);
+
+        _alarmVignette.color.value = Color.Lerp(baseColor, alarmColor, t);
+        _alarmVignette.intensity.value = Mathf.Lerp(baseIntensity, Mathf.Max(baseIntensity, peakVignetteIntensity), t);
+        _alarmVignette.smoothness.value = Mathf.Lerp(baseSmoothness, peakVignetteSmoothness, t);
     }
 
     private IEnumerator PulseLoop()
     {
         while (true)
         {
-            // Same PingPong(Time.time * pulseSpeed, 1f) formula as AlarmLightController.PulseLoop —
-            // keeps the screen flash in lockstep with the physical alarm lights.
+            // Same PingPong(Time.time * pulseSpeed, 1f) formula as AlarmLightController.PulseLoop.
             float t = Mathf.PingPong(Time.time * pulseSpeed, 1f);
-            float weight = Mathf.Lerp(minWeight, maxWeight, t);
-
-            // Sampled every frame so a Brightness change mid-alarm is respected.
-            float baseExposure = GetBrightnessExposure();
-
-            _colorAdjustments.colorFilter.value = Color.Lerp(_originalColorFilter, alarmColor, weight);
-            _colorAdjustments.postExposure.value = Mathf.Lerp(baseExposure, baseExposure + peakPostExposure, weight);
-
+            // Smoothstep softens the turnaround at each end so the pulse reads as a throb, not a strobe.
+            ApplyPulse(t * t * (3f - 2f * t));
             yield return null;
         }
+    }
+
+    private IEnumerator FadeOut()
+    {
+        float startWeight = alertVolume.weight;
+        float elapsed = 0f;
+        while (elapsed < fadeOutDuration)
+        {
+            elapsed += Time.deltaTime;
+            alertVolume.weight = Mathf.Lerp(startWeight, 0f, elapsed / fadeOutDuration);
+            yield return null;
+        }
+
+        alertVolume.weight = 0f;
+        _routine = null;
     }
 }

@@ -115,6 +115,14 @@ public class PlayerPickupController : NetworkBehaviour
     /// </summary>
     public event Action<PickableObject> OnHeldObjectChanged;
 
+    /// <summary>
+    /// Fired on the local owner client when the held item is stowed to the body. The hand is
+    /// empty afterwards. Kept separate from <see cref="OnHeldObjectChanged"/> because
+    /// <see cref="PlayerInventory"/> treats a null there as a drop and would clear the slot;
+    /// HUD elements that only care about "what is in hand" should listen to both.
+    /// </summary>
+    public event Action<PickableObject> OnHeldItemStowed;
+
     [SerializeField] Transform leftHandSocket;
     public Transform LeftHandSocket => leftHandSocket;
     
@@ -1357,6 +1365,8 @@ public class PlayerPickupController : NetworkBehaviour
         ObjectPlacer.Instance.DeactivatePlacer();
 
         // Deliberately NOT firing OnHeldObjectChanged — PlayerInventory manages stow state directly.
+        // HUD listeners (battery bar, ammo counter) still need to know the hand is now empty.
+        OnHeldItemStowed?.Invoke(stowed);
         return stowed;
     }
 

@@ -21,6 +21,7 @@ public class CompassController : MonoBehaviour
         { CompassMarkerCategory.Graffiti, new Color(0.95f, 0.40f, 0.10f) }, // orange
         { CompassMarkerCategory.Fence,    new Color(0.60f, 0.65f, 0.70f) }, // steel gray
         { CompassMarkerCategory.Blood,    new Color(0.75f, 0.05f, 0.05f) }, // dark red
+        { CompassMarkerCategory.Enemy,    new Color(1.00f, 0.10f, 0.10f) }, // bright red
     };
 
     [Header("Layout")]
@@ -206,9 +207,14 @@ public class CompassController : MonoBehaviour
             case CompassMarkerCategory.Fence:
                 return FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive;
             case CompassMarkerCategory.Blood:
-                // Blood splatters are purely cosmetic and no longer owned by any cleanup task —
-                // always show their compass pip, same as the untracked default categories.
-                return true;
+                // Only while a blood-cleanup task is actually asking the player to mop. Blood decals
+                // are also scattered cosmetically (end-of-trail splatters, mutant hits) — showing
+                // those unconditionally put red pips on the pack's location long before any kill
+                // task existed, reading as enemy markers.
+                return CleanBloodTask.Instance != null && CleanBloodTask.Instance.IsActive;
+            case CompassMarkerCategory.Enemy:
+                // Enemy pips only exist while there is a task to kill them.
+                return KillMutantTask.Current != null;
             default:
                 return true;
         }

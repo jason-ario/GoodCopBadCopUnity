@@ -160,7 +160,12 @@ public class Flamethrower : PickableObject, IAmmoProvider
 
     private void Update()
     {
-        if (!IsOwner || !isUsing || _fuel.Value <= 0f) return;
+        // Server safety net: a flame can never keep burning on a flamethrower nobody holds
+        // (e.g. holder disconnected or dropped it before their stop RPC arrived).
+        if (IsServer && _isFiring.Value && !IsHeld)
+            _isFiring.Value = false;
+
+        if (!isUsing || !IsLocalHolder || _fuel.Value <= 0f) return;
 
         // Drain fuel every frame.
         DrainFuelServerRpc(_fuelDrainRate * Time.deltaTime);
@@ -199,7 +204,7 @@ public class Flamethrower : PickableObject, IAmmoProvider
         // The owner drives VFX directly in OnStartUse/OnStopUse for instant,
         // lag-free feedback. Applying the NetworkVariable echo here would create
         // a race: a delayed StopFlame() could kill a flame the owner just restarted.
-        if (IsOwner) return;
+        if (IsLocalHolder) return;
 
         if (current)
             StartFlame();
@@ -283,8 +288,20 @@ public class Flamethrower : PickableObject, IAmmoProvider
     [ServerRpc(RequireOwnership = false)]
     private void SetFiringServerRpc(bool firing, ServerRpcParams rpcParams = default)
     {
-        if (!TryGetHolder(rpcParams.Receive.SenderClientId, out _)) return;
-        if (firing && _fuel.Value <= 0f) return;
+        ulong senderId = rpcParams.Receive.SenderClientId;
+
+        if (firing)
+        {
+            if (!TryGetHolder(senderId, out _)) return;
+            if (_fuel.Value <= 0f) return;
+        }
+        else
+        {
+            // Stopping is always safe. Accept it from the holder, or when nobody else holds the
+            // item — a stop sent right as the player drops it would otherwise be rejected
+            // (HeldObjectRef already cleared) and leave the flame stuck on for everyone else.
+            if (IsHeldByOtherPlayerOnServer(senderId)) return;
+        }
 
         _isFiring.Value = firing;
     }
@@ -559,6 +576,12 @@ public class Flamethrower : PickableObject, IAmmoProvider
     /// Returns <see langword="true"/> and outputs the <see cref="PlayerPickupController"/>
     /// when <paramref name="clientId"/> is connected and currently holding this flamethrower.
     /// </summary>
+    /// <remarks>
+    /// Uses the replicated <see cref="PlayerPickupController.HeldObjectRef"/> rather than
+    /// <see cref="PlayerPickupController.HeldObject"/>: the latter is a plain field only ever set on
+    /// the holder's own machine, so on the server it reads null for every non-host client and would
+    /// silently reject all of their firing/drain/hit RPCs (same fix as <c>Pistol.FireServerRpc</c>).
+    /// </remarks>
     private bool TryGetHolder(ulong clientId, out PlayerPickupController ppc)
     {
         ppc = null;
@@ -567,6 +590,24 @@ public class Flamethrower : PickableObject, IAmmoProvider
             return false;
 
         ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        return ppc?.HeldObject == this;
+        if (ppc == null) return false;
+
+        return ppc.HeldObjectRef.TryGet(out NetworkObject heldNetObj) && heldNetObj == NetworkObject;
     }
+
+    /// <summary>
+    /// Server-only: true when some player OTHER than <paramref name="clientId"/> is holding this item.
+    /// </summary>
+    private bool IsHeldByOtherPlayerOnServer(ulong clientId)
+        => IsHeld && !TryGetHolder(clientId, out _);
+
+    /// <summary>
+    /// True on the machine of the player currently holding and driving this flamethrower.
+    /// Deliberately independent of NetworkObject ownership (which may still be in flight right
+    /// after pickup), mirroring how <c>Pistol</c> fires purely from the local holder's input.
+    /// </summary>
+    private bool IsLocalHolder =>
+        playerPickupController != null &&
+        playerPickupController.IsOwner &&
+        playerPickupController.HeldObject == this;
 }

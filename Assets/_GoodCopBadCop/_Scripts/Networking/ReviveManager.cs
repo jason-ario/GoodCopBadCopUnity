@@ -116,7 +116,8 @@ public class ReviveManager : NetworkBehaviour
 
         CorpseResurrectionController corpse = deadPlayerObject.GetComponent<CorpseResurrectionController>();
         bool hasActiveCorpse = corpse != null && corpse.HasActiveCorpse;
-        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClients.Count <= 1;
+        bool isSinglePlayer = DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) <= 1;
+        bool spawnAtBooth = !isNewDay && ShouldReviveAtBooth();
 
         if (hasActiveCorpse)
         {
@@ -130,7 +131,9 @@ public class ReviveManager : NetworkBehaviour
 
             bool replacementSpawned = isNewDay
                 ? PlayerSpawner.Instance.ReplacePlayerAtOutsideBunker(clientId)
-                : PlayerSpawner.Instance.ReplacePlayerAtLobby(clientId, isSinglePlayer);
+                : spawnAtBooth
+                    ? PlayerSpawner.Instance.ReplacePlayerAtBooth(clientId)
+                    : PlayerSpawner.Instance.ReplacePlayerAtLobby(clientId, isSinglePlayer);
             if (!replacementSpawned)
                 return;
 
@@ -148,12 +151,31 @@ public class ReviveManager : NetworkBehaviour
 
             if (isNewDay)
                 PlayerSpawner.Instance.SpawnPlayerAtOutsideBunker(clientId);
+            else if (spawnAtBooth)
+                PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
             else
                 PlayerSpawner.Instance.SpawnPlayerAtLobby(clientId, isSinglePlayer);
         }
 
         OnPlayerRevived?.Invoke(clientId);
-        Debug.Log($"[ReviveManager] Revived client {clientId} (isNewDay: {isNewDay}).");
+        Debug.Log($"[ReviveManager] Revived client {clientId} (isNewDay: {isNewDay}, atBooth: {spawnAtBooth}).");
+    }
+
+    /// <summary>
+    /// Day 1 only: a mid-game revive that happens before the shift has ended respawns the
+    /// player inside the booth instead of at the lobby, so they rejoin the shift directly.
+    /// The shift counts as ended once <see cref="ShiftManager.EndShift"/> has run, i.e. the
+    /// day is in <see cref="ShiftManager.DayPhase.PostShift"/> and <c>shiftStarted</c> is cleared.
+    /// SERVER ONLY.
+    /// </summary>
+    private static bool ShouldReviveAtBooth()
+    {
+        ShiftManager shift = ShiftManager.Instance;
+        if (shift == null || shift.CurrentDay != 1)
+            return false;
+
+        bool shiftEnded = shift.CurrentPhase == ShiftManager.DayPhase.PostShift && !shift.shiftStarted.Value;
+        return !shiftEnded;
     }
 
     // ── ServerRpc ──────────────────────────────────────────────────────────────

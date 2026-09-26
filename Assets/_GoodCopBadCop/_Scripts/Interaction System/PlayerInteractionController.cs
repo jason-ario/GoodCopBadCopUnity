@@ -551,6 +551,13 @@ public class PlayerInteractionController : NetworkBehaviour
             Collider collider = hits[i].collider;
             Interactable candidate = ResolveInteractable(collider);
 
+            // Objects that opt out of targeting entirely (e.g. ink stamp pickups in their holder)
+            // are transparent to the ray — including child colliders with no Interactable of
+            // their own — so the ray reaches the holder behind them.
+            Interactable owner = candidate != null ? candidate : collider.GetComponentInParent<Interactable>();
+            if (owner != null && owner.PassesInteractionRayThrough)
+                continue;
+
             // An attached Interactable always stops the ray, whether the collider is a
             // trigger or solid â€” this is a legitimate interaction target either way.
             if (candidate != null && candidate.IsInteractable)

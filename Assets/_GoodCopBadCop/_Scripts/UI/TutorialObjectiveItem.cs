@@ -90,7 +90,8 @@ public class TutorialObjectiveItem : MonoBehaviour
         if (checkboxUnchecked != null) checkboxUnchecked.SetActive(false);
         if (checkboxChecked != null) checkboxChecked.SetActive(true);
 
-        SFXController.Instance?.Play(completeSound, completeSoundVolume);
+        // Routed through TaskSuccessCue so a cleanup item cue for the task-finishing item yields to it.
+        TaskSuccessCue.PlayCompletion(completeSound, completeSoundVolume);
     }
 
     /// <summary>
@@ -172,7 +173,8 @@ public class TutorialObjectiveItem : MonoBehaviour
     /// Replaces the display text in place (e.g. to refresh a progress count like "0/3").
     /// Plays <see cref="progressSound"/> whenever the text actually changes, so a "1/10 -> 2/10"
     /// style counter gets a mini success cue on every increment without spamming rows whose
-    /// text is unchanged. Does not affect completion state — call before <see cref="MarkComplete"/>.
+    /// text is unchanged. Gated by <see cref="TaskSuccessCue"/> so it never stacks with a
+    /// cleanup item cue for the same item. Does not affect completion state — call before <see cref="MarkComplete"/>.
     /// </summary>
     public void UpdateText(string text)
     {
@@ -182,7 +184,8 @@ public class TutorialObjectiveItem : MonoBehaviour
         bool changed = label.text != prefixed;
         label.text = prefixed;
 
+        // Deduplicated against per-item cleanup cues (TaskSuccessCue) so one finished item never dings twice.
         if (changed && !_isComplete)
-            SFXController.Instance?.Play(progressSound, progressSoundVolume);
+            TaskSuccessCue.TryPlay(progressSound, progressSoundVolume);
     }
 }

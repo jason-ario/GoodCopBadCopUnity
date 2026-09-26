@@ -52,6 +52,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool.")]
     [SerializeField] private string _dailyTaskId = "TakeOutTrash";
 
+    [Header("Item Success Feedback")]
+    [Tooltip("2D success cue played on every client each time a deposited bag advances this task " +
+             "(same cue as a task row's sub-task progress ding). Deduplicated via TaskSuccessCue.")]
+    [SerializeField] private AudioClip _itemSuccessSfxClip;
+    [Tooltip("Volume for _itemSuccessSfxClip.")]
+    [SerializeField] private float _itemSuccessSfxVolume = 0.6f;
+
     [Header("Spawning")]
     [Tooltip("Minimum number of trash items to spawn when TriggerTask is called (inclusive).")]
     [SerializeField] private int _minSpawnCount = 8;
@@ -476,7 +483,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private static int RollScaledSpawnCount(int min, int max)
     {
         bool isSinglePlayer = NetworkManager.Singleton == null
-            || NetworkManager.Singleton.ConnectedClients.Count <= 1;
+            || DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) <= 1;
 
         if (isSinglePlayer)
         {
@@ -835,10 +842,15 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _pendingBonusCollected -= uncounted;
         int counted = junkCount - uncounted;
 
+        int previousDeposited = _depositedCount.Value;
         _depositedCount.Value = Mathf.Min(_depositedCount.Value + counted, _totalCount.Value);
         Debug.Log($"[TakeOutTrashTask] {junkCount} item(s) deposited ({counted} task item(s), " +
                   $"{uncounted} outside the checkpoint). Total deposited: " +
                   $"{_depositedCount.Value}/{_totalCount.Value}");
+
+        // One cue per deposit that actually advanced the task (a bag is the unit of work here).
+        if (_depositedCount.Value > previousDeposited)
+            PlayItemSuccessSfxClientRpc(_depositedCount.Value >= _totalCount.Value);
 
         if (_depositedCount.Value < _totalCount.Value) return;
 
@@ -885,6 +897,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         OnAllItemsDeposited?.Invoke();
         OnDailyTaskCompleted?.Invoke();
     }
+
+    /// <summary>Per-item success cue on every client; see <see cref="TaskSuccessCue.PlayCleanupItemCue"/>.</summary>
+    [ClientRpc]
+    private void PlayItemSuccessSfxClientRpc(bool completesTask) =>
+        TaskSuccessCue.PlayCleanupItemCue(this, _itemSuccessSfxClip, _itemSuccessSfxVolume, completesTask);
 
     /// <summary>
     /// Explicitly (re-)adds this task to <see cref="TaskRegistry"/> on every client. Called

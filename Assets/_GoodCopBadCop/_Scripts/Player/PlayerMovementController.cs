@@ -1012,18 +1012,24 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         }
     }
     
-    public void ResetCameraPos(bool instant = true, float duration = 0.5f, UnityAction callback = null)
+    /// <summary>
+    /// Returns the camera to its stand/sit rest position. <paramref name="localOffset"/> is added
+    /// on top of the rest position (camera-parent local space) — e.g. the telephone nudges the
+    /// camera slightly forward while the phone is held so the player can't see into their own body.
+    /// </summary>
+    public void ResetCameraPos(bool instant = true, float duration = 0.5f, UnityAction callback = null, Vector3 localOffset = default)
     {
         cameraTransform.DOKill();
 
+        Vector3 targetPos = (_isSitting ? camSitPos.localPosition : camStandPos.localPosition) + localOffset;
+
         if (instant)
         {
-            cameraTransform.localPosition = _isSitting ? camSitPos.localPosition : camStandPos.localPosition;
+            cameraTransform.localPosition = targetPos;
             callback?.Invoke();
         }
         else
         {
-            Vector3 targetPos = _isSitting ? camSitPos.localPosition : camStandPos.localPosition;
             cameraTransform.DOLocalMove(targetPos, duration).OnComplete(() =>  callback?.Invoke());
             cameraTransform.DOLocalRotate(targetLookEuler, duration);
         }

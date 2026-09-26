@@ -8,12 +8,27 @@ public class SpectateManager : MonoBehaviour
 
     [SerializeField] private SpectatorUI spectatorUI;
 
-    private List<PlayerInstance> _teammates = new List<PlayerInstance>();
-    private int _currentIndex = 0;
+    private readonly List<PlayerInstance> _teammates = new List<PlayerInstance>();
     private bool _isSpectating = false;
 
     /// <summary>The teammate whose perspective is currently being watched.</summary>
     private PlayerInstance _currentTarget;
+
+    private const float RetargetInterval = 0.5f;
+    private float _retargetTimer;
+
+    public bool IsSpectating => _isSpectating;
+    public PlayerInstance CurrentTarget => _currentTarget;
+
+    /// <summary>Number of players that can currently be spectated.</summary>
+    public int SpectatableCount
+    {
+        get
+        {
+            UpdateTeammateList();
+            return _teammates.Count;
+        }
+    }
 
     private void Awake()
     {
@@ -29,47 +44,65 @@ public class SpectateManager : MonoBehaviour
     {
         if (!_isSpectating) return;
 
-        if (Input.GetMouseButtonDown(0))
+        // Clicks inside the dev console must not cycle targets.
+        if (!DevSessionBrowser.IsOpen)
         {
-            SpectateNext();
+            if (Input.GetMouseButtonDown(0))
+                SpectateNext();
+            else if (Input.GetMouseButtonDown(1))
+                SpectatePrevious();
+        }
+
+        // Automatically move on if the watched player died, despawned or disconnected.
+        _retargetTimer -= Time.unscaledDeltaTime;
+        if (_retargetTimer <= 0f)
+        {
+            _retargetTimer = RetargetInterval;
+            if (!IsValidTarget(_currentTarget))
+                SpectateNext();
         }
     }
 
     public void StartSpectating()
     {
         _isSpectating = true;
-        _currentIndex = -1;
-        UpdateTeammateList();
-        
-        spectatorUI.gameObject.SetActive(true);
+        _retargetTimer = RetargetInterval;
+
+        if (spectatorUI != null)
+            spectatorUI.gameObject.SetActive(true);
 
         SpectateNext();
     }
 
-    public void SpectateNext()
+    public void SpectateNext() => Step(+1);
+
+    public void SpectatePrevious() => Step(-1);
+
+    private void Step(int direction)
     {
+        UpdateTeammateList();
+
         if (_teammates.Count == 0)
         {
-            UpdateTeammateList();
-            if (_teammates.Count == 0)
-            {
-                ClearCurrentTarget();
-                return;
-            }
-        }
-
-        _currentIndex = (_currentIndex + 1) % _teammates.Count;
-        PlayerInstance target = _teammates[_currentIndex];
-
-        // Guard against stale or self references — skip to the next valid entry.
-        if (target == null || target == PlayerInstance.Instance)
-        {
-            if (_teammates.Count > 1)
-                SpectateNext();
+            ClearCurrentTarget();
             return;
         }
 
-        ApplySpectatorTarget(target);
+        int currentIndex = IsValidTarget(_currentTarget) ? _teammates.IndexOf(_currentTarget) : -1;
+        int nextIndex = currentIndex < 0
+            ? (direction > 0 ? 0 : _teammates.Count - 1)
+            : ((currentIndex + direction) % _teammates.Count + _teammates.Count) % _teammates.Count;
+
+        ApplySpectatorTarget(_teammates[nextIndex]);
+    }
+
+    private static bool IsValidTarget(PlayerInstance target)
+    {
+        return target != null
+            && target != PlayerInstance.Instance
+            && target.IsSpawned
+            && target.PlayerHealth != null
+            && !target.PlayerHealth.IsDead;
     }
 
     /// <summary>
@@ -80,25 +113,35 @@ public class SpectateManager : MonoBehaviour
     {
         if (_currentTarget == newTarget) return;
 
-        // Restore previous target: deactivate their camera and clear visual overrides.
-        _currentTarget?.PlayerAnimationController?.SetSpectatorMode(false);
-        _currentTarget?.SetSpectatedByCamera(false);
+        RestoreCurrentTarget();
 
         _currentTarget = newTarget;
 
-        // Activate the new target's CinemachineCamera so the dead player's
+        // Activate the new target's CinemachineCamera so the spectating client's
         // CinemachineBrain picks it up as the live camera (correct FOV, noise, etc.).
         _currentTarget.SetSpectatedByCamera(true);
-        _currentTarget.PlayerAnimationController?.SetSpectatorMode(true);
+        if (_currentTarget.PlayerAnimationController != null)
+            _currentTarget.PlayerAnimationController.SetSpectatorMode(true);
 
         Debug.Log($"[SpectateManager] Now spectating {_currentTarget.name}.");
+    }
+
+    private void RestoreCurrentTarget()
+    {
+        // Unity-null check (not ?.) so a destroyed target is skipped safely.
+        if (_currentTarget == null) return;
+
+        if (_currentTarget.PlayerAnimationController != null)
+            _currentTarget.PlayerAnimationController.SetSpectatorMode(false);
+        _currentTarget.SetSpectatedByCamera(false);
     }
 
     /// <summary>Clears spectator-mode visuals and resets the tracked target.</summary>
     private void ClearCurrentTarget()
     {
-        _currentTarget?.PlayerAnimationController?.SetSpectatorMode(false);
-        _currentTarget?.SetSpectatedByCamera(false);
+        if (ReferenceEquals(_currentTarget, null)) return;
+
+        RestoreCurrentTarget();
         _currentTarget = null;
         Debug.Log("[SpectateManager] No spectatable teammates available.");
     }
@@ -116,16 +159,31 @@ public class SpectateManager : MonoBehaviour
     private void UpdateTeammateList()
     {
         _teammates.Clear();
-        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager != null && networkManager.IsListening)
         {
-            if (client.PlayerObject != null)
+            foreach (var client in networkManager.ConnectedClientsList)
             {
+                if (client.PlayerObject == null) continue;
+
                 var player = client.PlayerObject.GetComponent<PlayerInstance>();
-                if (player != null && player != PlayerInstance.Instance && !player.PlayerHealth.IsDead)
-                {
+                if (IsValidTarget(player) && !_teammates.Contains(player))
                     _teammates.Add(player);
-                }
             }
         }
+
+        // Fallback for clients whose ConnectedClients view is incomplete (e.g. a hidden dev
+        // spectator with no player object of its own): scan spawned player objects directly.
+        if (_teammates.Count == 0)
+        {
+            foreach (var player in FindObjectsByType<PlayerInstance>(FindObjectsSortMode.None))
+            {
+                if (player.NetworkObject != null && player.NetworkObject.IsPlayerObject && IsValidTarget(player))
+                    _teammates.Add(player);
+            }
+        }
+
+        _teammates.Sort((a, b) => a.OwnerClientId.CompareTo(b.OwnerClientId));
     }
 }

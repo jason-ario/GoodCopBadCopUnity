@@ -139,6 +139,21 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// NetworkObjectIds of the still-alive mutants in this threat's pack. Server-written (pack spawn,
+    /// each pack mutant's removal, cleanup) so every peer — including late joiners — knows which
+    /// mutants to show as <see cref="CompassMarkerCategory.Enemy"/> compass pips. Pips are only
+    /// registered while <see cref="KillMutantTask"/> is active — see <see cref="SyncEnemyCompassMarkers"/>.
+    /// </summary>
+    private readonly NetworkList<ulong> _packMutantIds = new(
+        new List<ulong>(),
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Local (every peer) set of pack mutant transforms currently registered as compass Enemy pips.</summary>
+    private readonly HashSet<Transform> _enemyCompassMarkers = new();
+    private readonly List<Transform> _enemyMarkerScratch = new();
+
     // ── Local state ──────────────────────────────────────────────────────────
 
     private GameObject _spawnedCorpse;
@@ -238,8 +253,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     public void TriggerDailyTask()
     {
         if (!IsServer) return;
-        SetFollowTrailTaskActive(true);
+        // Spawn first, then activate — see ActivateFollowTrailTaskIfUndiscovered.
         TriggerTrailEvent();
+        ActivateFollowTrailTaskIfUndiscovered();
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
     }
 
@@ -280,6 +296,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _followTrailActive.OnValueChanged += OnFollowTrailActiveChanged;
         _killMutantCount.OnValueChanged   += OnKillMutantCountChanged;
         _trailParticlePositions.OnListChanged += OnTrailParticlePositionsChanged;
+        _networkThreatLevel.OnValueChanged += OnThreatLevelChanged;
+        _isDiscovered.OnValueChanged       += OnDiscoveredChanged;
 
         // Apply initial values for late-joining clients so they see any already-active tasks.
         if (_meetVladActive.Value)         MeetVladOutBackTask.CreateAndRegister();
@@ -305,6 +323,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _followTrailActive.OnValueChanged -= OnFollowTrailActiveChanged;
         _killMutantCount.OnValueChanged   -= OnKillMutantCountChanged;
         _trailParticlePositions.OnListChanged -= OnTrailParticlePositionsChanged;
+        _networkThreatLevel.OnValueChanged -= OnThreatLevelChanged;
+        _isDiscovered.OnValueChanged       -= OnDiscoveredChanged;
 
         // The replicated list is gone, so the local VFX mirroring it must go too — otherwise
         // a client that disconnects mid-event leaves the trail floating in its scene.
@@ -314,11 +334,67 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // session and keep the next one from registering a fresh row (see KillMutantTask).
         KillMutantTask.CompleteAndRemove();
         _killTaskActivated = false;
+
+        ClearEnemyCompassMarkers();
     }
 
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        ClearEnemyCompassMarkers();
+    }
+
+    private void Update()
+    {
+        if (IsSpawned) SyncEnemyCompassMarkers();
+    }
+
+    // ── Enemy compass pips — run on ALL peers ─────────────────────────────────
+
+    /// <summary>
+    /// Keeps <see cref="CompassMarkerRegistry"/> in step with the live pack: while the kill task is
+    /// active, every still-alive pack mutant is registered as an Enemy pip; otherwise none are.
+    /// Resolved every frame from <see cref="_packMutantIds"/> rather than on list-change callbacks
+    /// because a client can receive the id before the mutant's own spawn message lands.
+    /// </summary>
+    private void SyncEnemyCompassMarkers()
+    {
+        bool showEnemies = KillMutantTask.Current != null && _packMutantIds.Count > 0;
+        if (!showEnemies && _enemyCompassMarkers.Count == 0) return;
+
+        _enemyMarkerScratch.Clear();
+        if (showEnemies && NetworkManager != null && NetworkManager.SpawnManager != null)
+        {
+            foreach (ulong id in _packMutantIds)
+            {
+                if (!NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(id, out NetworkObject netObj) || netObj == null)
+                    continue;
+                if (netObj.TryGetComponent(out MutantEnemy mutant) && mutant.IsDead)
+                    continue;
+                _enemyMarkerScratch.Add(netObj.transform);
+            }
+        }
+
+        // Unregister markers no longer wanted (killed, despawned, or kill task ended).
+        _enemyCompassMarkers.RemoveWhere(t =>
+        {
+            if (t != null && _enemyMarkerScratch.Contains(t)) return false;
+            CompassMarkerRegistry.Unregister(t);
+            return true;
+        });
+
+        foreach (Transform t in _enemyMarkerScratch)
+        {
+            if (_enemyCompassMarkers.Add(t))
+                CompassMarkerRegistry.Register(t, CompassMarkerCategory.Enemy);
+        }
+    }
+
+    private void ClearEnemyCompassMarkers()
+    {
+        foreach (Transform t in _enemyCompassMarkers)
+            CompassMarkerRegistry.Unregister(t);
+        _enemyCompassMarkers.Clear();
     }
 
     // ── NetworkVariable callbacks — fire on ALL clients ───────────────────────
@@ -340,6 +416,14 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             // second, duplicate row for the same task alongside HUDTaskList's row.
             TaskRegistry.Instance?.AddThreat(this);
 
+            // Re-sync the HUD one frame later on this peer. The server/host runs this callback
+            // synchronously in the middle of the trail spawn, so any UI churn in the same frame
+            // (rows destroyed or the list torn down) would otherwise leave this row missing
+            // until some unrelated registry change. HUDTaskList.ForceRebuild re-adds rows whose
+            // items were destroyed and is a no-op when the row is intact.
+            if (_hudResyncRoutine != null) StopCoroutine(_hudResyncRoutine);
+            _hudResyncRoutine = StartCoroutine(ResyncHudNextFrame());
+
             // Fires locally on every client (this NetworkVariable callback runs on ALL peers),
             // so the tutorial overlay pops up for everyone the very first time the "Follow the
             // trail" task ever becomes active — never again on subsequent days/triggers.
@@ -353,6 +437,35 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         {
             TaskRegistry.Instance?.RemoveThreat(this);
         }
+    }
+
+    private Coroutine _hudResyncRoutine;
+
+    private IEnumerator ResyncHudNextFrame()
+    {
+        yield return null;
+        _hudResyncRoutine = null;
+
+        if (!_followTrailActive.Value) yield break;
+
+        TaskRegistry.Instance?.AddThreat(this); // idempotent — no-op when already registered
+        FindAnyObjectByType<HUDTaskList>(FindObjectsInactive.Include)?.ForceRebuild();
+        TaskRegistry.Instance?.NotifyTaskStateChanged();
+    }
+
+    /// <summary>
+    /// ThreatDescription is derived from <see cref="_networkThreatLevel"/> and
+    /// <see cref="_isDiscovered"/>, which change after the row is created (on the host they
+    /// change in the same frame, right after activation). Refresh row labels so the host
+    /// doesn't keep a stale "No active trail." suffix. Runs on every peer.
+    /// </summary>
+    private void OnThreatLevelChanged(float previous, float current) => RefreshTrailRowLabel();
+    private void OnDiscoveredChanged(bool previous, bool current)    => RefreshTrailRowLabel();
+
+    private void RefreshTrailRowLabel()
+    {
+        if (_followTrailActive.Value)
+            TaskRegistry.Instance?.NotifyTaskStateChanged();
     }
 
     private void OnKillMutantCountChanged(int previous, int current)
@@ -386,6 +499,21 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer) return;
         _followTrailActive.Value = active;
+    }
+
+    /// <summary>
+    /// Activates the "Follow the trail" HUD task after <see cref="TriggerTrailEvent()"/> has
+    /// spawned the event. Must be called AFTER spawning: the host runs
+    /// <see cref="OnFollowTrailActiveChanged"/> synchronously inside the NetworkVariable setter,
+    /// so activating before the spawn made the host build its HUD row and tutorial against
+    /// pre-spawn state while remote clients only saw the final batched state. Skipped when the
+    /// spawn already resolved the trail (a player was inside the destination radius on the
+    /// proximity routine's first synchronous check). Server only.
+    /// </summary>
+    public void ActivateFollowTrailTaskIfUndiscovered()
+    {
+        if (!IsServer || _isDiscovered.Value) return;
+        _followTrailActive.Value = true;
     }
 
     /// <summary>
@@ -745,6 +873,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
             _packKillHandlers[capturedMutant] = handler;
             capturedMutant.OnRemovedFromPlay += handler;
+
+            if (IsSpawned && capturedMutant.NetworkObject != null && capturedMutant.NetworkObject.IsSpawned)
+                _packMutantIds.Add(capturedMutant.NetworkObjectId);
         }
 
         _packMutantsRemaining = _packKillHandlers.Count;
@@ -776,6 +907,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // duplicate invocation double-counting one kill.
         bool wasTracked = mutant != null && _packKillHandlers.Remove(mutant);
         if (!IsServer || !wasTracked) return;
+
+        if (IsSpawned && mutant.NetworkObject != null)
+            _packMutantIds.Remove(mutant.NetworkObjectId);
 
         if (mutant != null && !mutant.DiedPermanently)
             Debug.Log($"[FollowTrailThreat] Pack mutant '{mutant.name}' left play by fleeing — counting it as resolved so the kill task can complete.", this);
@@ -831,6 +965,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _packMutantsRemaining      = 0;
         _packSpawnComplete         = false;
         _packKillCompletionPending = false;
+
+        if (IsServer && IsSpawned) _packMutantIds.Clear();
     }
 
     /// <summary>
@@ -1124,7 +1260,9 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (_trailParticlesPrefab == null) return;
 
-        _spawnedTrailParticles.Add(Instantiate(_trailParticlesPrefab, position, Quaternion.identity));
+        // Random yaw so the (projected decal) splatters don't all share one orientation.
+        Quaternion yaw = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
+        _spawnedTrailParticles.Add(Instantiate(_trailParticlesPrefab, position, yaw));
     }
 
     private void DestroyLocalTrailParticles()

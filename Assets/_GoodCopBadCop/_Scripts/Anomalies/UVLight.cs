@@ -40,15 +40,76 @@ public class UVLight : MonoBehaviour
     /// </summary>
     public float Radius => range;
 
+    // ── Global shader data (GraffitiScrubDecal UV glow) ─────────────────────────
+    // Pushed as GLOBAL properties with distinct names from the per-renderer _UVLight* arrays
+    // (UVReveal / Character Shader rely on per-renderer MaterialPropertyBlocks and must not be
+    // affected). Any shader can read these without a per-object driver component — used so
+    // blood splatter decals glow under UV light while GraffitiInteractable owns their MPB.
+    private const int MaxGlobalLights = 4; // Must match UV_GLOW_MAX_LIGHTS in GraffitiScrubDecal.shader.
+
+    private static readonly int GlowPositionsId  = Shader.PropertyToID("_UVGlowLightPositions");
+    private static readonly int GlowDirectionsId = Shader.PropertyToID("_UVGlowLightDirections");
+    private static readonly int GlowParamsId     = Shader.PropertyToID("_UVGlowLightParams");
+    private static readonly int GlowCountId      = Shader.PropertyToID("_UVGlowLightCount");
+
+    private static readonly Vector4[] s_globalPositions  = new Vector4[MaxGlobalLights];
+    private static readonly Vector4[] s_globalDirections = new Vector4[MaxGlobalLights];
+    private static readonly Vector4[] s_globalParams     = new Vector4[MaxGlobalLights];
+    private static int s_lastPushFrame = -1;
+
     private void OnEnable()
     {
         if (!ActiveLights.Contains(this))
             ActiveLights.Add(this);
+        PushShaderGlobals();
     }
 
     private void OnDisable()
     {
         ActiveLights.Remove(this);
+        // Push immediately so the glow switches off even when no other light is left to update.
+        PushShaderGlobals();
+    }
+
+    private void LateUpdate()
+    {
+        // Every active light runs this; only the first one per frame does the work.
+        if (s_lastPushFrame == Time.frameCount) return;
+        s_lastPushFrame = Time.frameCount;
+        PushShaderGlobals();
+    }
+
+    /// <summary>
+    /// Writes all active UV lights (capped at <see cref="MaxGlobalLights"/>) into the global
+    /// _UVGlowLight* shader arrays consumed by GraffitiScrubDecal's UV glow.
+    /// </summary>
+    public static void PushShaderGlobals()
+    {
+        int count = 0;
+        for (int i = 0; i < ActiveLights.Count && count < MaxGlobalLights; i++)
+        {
+            UVLight light = ActiveLights[i];
+            if (light == null) continue;
+
+            Vector3 p = light.Position;
+            Vector3 d = light.Direction;
+            s_globalPositions[count]  = new Vector4(p.x, p.y, p.z, light.Range);
+            s_globalDirections[count] = new Vector4(d.x, d.y, d.z, 0f);
+            s_globalParams[count]     = new Vector4(Mathf.Cos(light.ConeHalfAngleDeg * Mathf.Deg2Rad), 0f, 0f, 0f);
+            count++;
+        }
+
+        for (int i = count; i < MaxGlobalLights; i++)
+        {
+            s_globalPositions[i]  = Vector4.zero;
+            s_globalDirections[i] = Vector4.zero;
+            s_globalParams[i]     = Vector4.zero;
+        }
+
+        Shader.SetGlobalVectorArray(GlowPositionsId,  s_globalPositions);
+        Shader.SetGlobalVectorArray(GlowDirectionsId, s_globalDirections);
+        Shader.SetGlobalVectorArray(GlowParamsId,     s_globalParams);
+        Shader.SetGlobalFloat(GlowCountId, count);
     }
 
 #if UNITY_EDITOR

@@ -68,6 +68,28 @@ public class Mop : PickableObject
              "Set the AudioSource clip, loop = true, and Play On Awake = false in the Inspector.")]
     [SerializeField] private AudioSource _scrubAudio;
 
+    [Tooltip("Target volume of the scrub loop while the mop is touching a surface.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _scrubVolume = 1f;
+
+    [Tooltip("Distance (m) within which the scrub loop plays at full volume. The listener sits on " +
+             "the player's head ~1.5-2 m from the mop head, so this must cover that gap or the " +
+             "holder hears their own mop attenuated.")]
+    [SerializeField] private float _scrubAudioMinDistance = 3f;
+
+    [Tooltip("Distance (m) at which the scrub loop fades to silence (linear rolloff).")]
+    [SerializeField] private float _scrubAudioMaxDistance = 15f;
+
+    [Tooltip("Seconds to fade the loop in when contact starts.")]
+    [SerializeField] private float _scrubAudioFadeIn = 0.05f;
+
+    [Tooltip("Seconds to fade the loop out after contact ends. Also bridges brief contact " +
+             "flicker during strokes so the loop isn't constantly cut and restarted.")]
+    [SerializeField] private float _scrubAudioFadeOut = 0.25f;
+
+    /// <summary>Volume the scrub loop is currently fading toward (0 = silent / stopping).</summary>
+    private float _scrubAudioTargetVolume;
+
     private Coroutine _scrubRoutine;
     private GraffitiInteractable _activeGraffiti;
 
@@ -89,6 +111,47 @@ public class Mop : PickableObject
 
     /// <summary>Mirror loop run on non-owning clients while <see cref="_isScrubbing"/> is true.</summary>
     private Coroutine _remoteScrubVisualRoutine;
+
+    // ── Unity lifecycle ────────────────────────────────────────────────────────
+
+    protected override void Awake()
+    {
+        base.Awake();
+
+        if (_scrubAudio != null)
+        {
+            // Networked positional loop (mirrored on every client via _isScrubbing), so keep it
+            // short-range 3D — but with a min distance large enough that the holder hears it at
+            // full volume. Doppler off: the mop swings fast during strokes and would warble.
+            SpatialAudioUtility.ConfigureShortRange3D(_scrubAudio, _scrubAudioMinDistance, _scrubAudioMaxDistance);
+            _scrubAudio.loop        = true;
+            _scrubAudio.playOnAwake = false;
+            _scrubAudio.priority    = 64;
+            _scrubAudio.volume      = 0f;
+        }
+    }
+
+    private void Update()
+    {
+        if (_scrubAudio == null) return;
+
+        float current = _scrubAudio.volume;
+        if (Mathf.Approximately(current, _scrubAudioTargetVolume))
+        {
+            if (_scrubAudioTargetVolume <= 0f && _scrubAudio.isPlaying)
+                _scrubAudio.Pause();
+            return;
+        }
+
+        float fade = _scrubAudioTargetVolume > current ? _scrubAudioFadeIn : _scrubAudioFadeOut;
+        float step = fade > 0f ? (_scrubVolume / fade) * Time.deltaTime : 1f;
+        _scrubAudio.volume = Mathf.MoveTowards(current, _scrubAudioTargetVolume, step);
+    }
+
+    private void OnDisable()
+    {
+        StopScrubAudioImmediate();
+    }
 
     // ── Network lifecycle ───────────────────────────────────────────────────────
 
@@ -327,19 +390,46 @@ public class Mop : PickableObject
         if (surfaceNormal != Vector3.zero)
             _scrubParticles.transform.rotation = Quaternion.FromToRotation(Vector3.up, surfaceNormal);
         if (!_scrubParticles.isPlaying)
-        {
             _scrubParticles.Play();
-            if (_scrubAudio != null && !_scrubAudio.isPlaying)
-                _scrubAudio.Play();
-        }
+
+        // Audio is driven independently of the particle state: ParticleSystem.Stop() leaves
+        // isPlaying true while live particles fade out, so gating audio on !isPlaying meant
+        // re-contacting within that window never restarted the (already stopped) loop.
+        StartScrubAudio();
     }
 
-    /// <summary>Stops <see cref="_scrubParticles"/> and <see cref="_scrubAudio"/> if playing.</summary>
+    /// <summary>Stops <see cref="_scrubParticles"/> and fades out <see cref="_scrubAudio"/>.</summary>
     private void StopScrubVisuals()
     {
         if (_scrubParticles != null && _scrubParticles.isPlaying)
             _scrubParticles.Stop();
-        _scrubAudio?.Stop();
+        _scrubAudioTargetVolume = 0f;
+    }
+
+    /// <summary>
+    /// Fades the scrub loop in. Resumes (rather than restarts) a paused loop so rapid
+    /// contact on/off during strokes stays continuous instead of re-triggering the clip's attack.
+    /// </summary>
+    private void StartScrubAudio()
+    {
+        if (_scrubAudio == null) return;
+
+        _scrubAudioTargetVolume = _scrubVolume;
+        if (_scrubAudio.isPlaying) return;
+
+        if (_scrubAudio.time > 0f)
+            _scrubAudio.UnPause();
+        else
+            _scrubAudio.Play();
+    }
+
+    /// <summary>Hard-stops the scrub loop with no fade (used when the mop is disabled).</summary>
+    private void StopScrubAudioImmediate()
+    {
+        _scrubAudioTargetVolume = 0f;
+        if (_scrubAudio == null) return;
+        _scrubAudio.Stop();
+        _scrubAudio.volume = 0f;
     }
 
     /// <summary>

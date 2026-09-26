@@ -40,8 +40,8 @@ using HighlightPlus;
 ///
 /// Prefab setup:
 ///   - NetworkObject on this GameObject.
-///   - NavMeshObstacle on this GameObject (carving disabled — this obstacle only pushes
-///     agents away via runtime avoidance rather than cutting a hole in the baked navmesh).
+///   - NavMeshObstacle on this GameObject. It is only a bake marker that excludes the fence
+///     from the Mutant NavMesh, and is disabled at runtime (see ApplyNavMeshObstacleState).
 ///     Hit-feedback shakes the active child mesh root instead of this GameObject's own
 ///     transform, so the obstacle itself never moves.
 ///   - Four child GameObjects (one per visual state) assigned to DamageStateMeshRoots.
@@ -81,6 +81,7 @@ public class PerimiterFence : NetworkBehaviour
     [Header("VFX")]
     [Tooltip("Particle system prefab spawned at the contact point when a mutant hits this fence.")]
     [SerializeField] private ParticleSystem _mutantHitParticlePrefab;
+
 
     // ── Networked state ────────────────────────────────────────────────────────
 
@@ -406,12 +407,17 @@ public class PerimiterFence : NetworkBehaviour
     }
 
     /// <summary>
-    /// Enables/disables the NavMeshObstacle based on damage state so mutants can pathfind
-    /// straight through this fence once it reaches its most-damaged (passable) state.
-    /// Carving is intentionally left OFF at all times — even with the shake moved off this
-    /// transform (see <see cref="PlayMutantHitFeedbackClientRpc"/>), carving still caused
-    /// mutant navigation problems, so this obstacle now only pushes agents away at runtime via
-    /// NavMeshObstacle's built-in avoidance rather than cutting a hole in the baked navmesh.
+    /// Keeps this fence's NavMeshObstacle permanently disabled at runtime.
+    ///
+    /// Fence navigation is split across two baked NavMeshes instead:
+    ///   - The NPC surface (Humanoid, ignoreNavMeshObstacle = false) bakes this fence's collider
+    ///     in, so regular NPCs always path around it.
+    ///   - The Mutant surface (ignoreNavMeshObstacle = true) leaves it out, so mutants path
+    ///     straight through fence lines. <c>MutantEnemy</c> detects the fence on its route and
+    ///     smashes it (see <c>FindBlockingFenceTowardTarget</c> / <c>FindBlockingFenceAlongPath</c>).
+    /// The component must stay on this GameObject because that is what excludes the fence
+    /// from the Mutant bake. It must never be enabled: carving would cut both meshes (obstacles
+    /// have no agent-type filter), and its avoidance would push mutants sideways along the fence.
     /// The physical BoxCollider is never touched here, so the player can never walk through the
     /// fence regardless of its damage state.
     /// </summary>
@@ -419,10 +425,8 @@ public class PerimiterFence : NetworkBehaviour
     {
         if (_navMeshObstacle == null) return;
 
-        // Only the worst damage state (index == MaxDamageLevel) is passable by mutants.
-        bool passable = state >= MaxDamageLevel;
         _navMeshObstacle.carving = false;
-        _navMeshObstacle.enabled = !passable;
+        _navMeshObstacle.enabled = false;
     }
 
     // ── Public server API ──────────────────────────────────────────────────────

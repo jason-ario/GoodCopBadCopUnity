@@ -158,9 +158,8 @@ public class MailCubbySlot : MonoBehaviour
 
     /// <summary>
     /// Turns this cubby's own outline highlight on or off, if it has one assigned. Not called by
-    /// <see cref="MailCubbyManager"/> — see <see cref="MailCubbyManager.HighlightDeliveryDestinations"/>,
-    /// which highlights every configured delivery destination together. No-op if this cubby has no
-    /// <see cref="HighlightEffect"/> assigned or found.
+    /// <see cref="MailCubbyManager"/> or the mail-sorting tutorial (delivery destinations are no
+    /// longer called out). No-op if this cubby has no <see cref="HighlightEffect"/> assigned or found.
     /// </summary>
     public void SetHighlight(bool highlight)
     {

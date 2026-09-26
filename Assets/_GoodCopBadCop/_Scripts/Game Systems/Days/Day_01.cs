@@ -1677,7 +1677,25 @@ public class Day_01 : DayBase
             SaveDataManager.Instance.DocumentationExamTutorialComplete = true;
         }
 
-        Debug.Log("[Day_01] Quarantine tutorial complete — folder handed off.");
+        // The quarantine tutorial is the last stamp-gated beat of Day 1 — every stamp
+        // (pass, quarantine, and kill) is freely usable from here on.
+        UnlockAllStampsAfterTutorial();
+
+        Debug.Log("[Day_01] Quarantine tutorial complete — folder handed off, all stamps unlocked.");
+    }
+
+    /// <summary>
+    /// Unlocks the green (pass), yellow (quarantine), and red (kill) stamp slots once the
+    /// Day 1 stamp tutorials are finished. Server-only because the hand-off / arrival events
+    /// fire on every client and each slot already replicates via its NetworkVariable.
+    /// </summary>
+    private void UnlockAllStampsAfterTutorial()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        _greenStampSlot?.SetSlotInteractable(true);
+        _yellowStampSlot?.SetSlotInteractable(true);
+        _redStampSlot?.SetSlotInteractable(true);
     }
 
     /// <summary>
@@ -2252,8 +2270,8 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Fires on all clients when any suspect arrives. Reacts to index 3 (a random suspect).
-    /// Unlocks the green stamp (re-enabling it after the quarantine tutorial locked it for
-    /// index 2) and arms the Soldier sequence for after this suspect is processed.
+    /// Unlocks every stamp (safety net for the quarantine tutorial hand-off unlock) and arms
+    /// the Soldier sequence for after this suspect is processed.
     /// </summary>
     private void OnStampsRestoredAtWindow(int index)
     {
@@ -2261,9 +2279,9 @@ public class Day_01 : DayBase
 
         SuspectController.OnSuspectArrived -= OnStampsRestoredAtWindow;
 
-        // Quarantine tutorial (index 2) locked the green stamp. Unlock it now so the
-        // player can use both green and yellow stamps when processing index 3.
-        _greenStampSlot?.SetSlotInteractable(true);
+        // Safety net: OnQuarantineFolderHandedOff normally unlocks every stamp already, but
+        // guarantee pass/quarantine/kill are all usable for index 3 regardless.
+        UnlockAllStampsAfterTutorial();
 
         if (!NetworkManager.Singleton.IsServer) return;
 

@@ -2,7 +2,7 @@
 /// HUD task shown after the shift ends on days that run the post-shift Vlad Out-Back sequence.
 /// Registered by the day script when the shift ends; removed when the player approaches Vlad
 /// and the sequence advances past the intro meeting.
-/// Mirrors the lightweight <see cref="GoToBunkerTask"/> pattern — no NetworkBehaviour needed.
+/// Lightweight registry-only task — no NetworkBehaviour needed.
 /// </summary>
 public class MeetVladOutBackTask : ISystemicThreat
 {

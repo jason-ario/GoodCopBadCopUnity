@@ -1459,9 +1459,6 @@ public class Day_02 : DayBase, IDailyTask
             return;
         }
 
-        // Show "Follow the trail" in every client's HUD via the NetworkVariable.
-        FollowTrailThreat.Instance.SetFollowTrailTaskActive(true);
-
         // Pack spawning and kill task activation are handled by FollowTrailThreat when the
         // destination is discovered, using PackSpawner/PackSize on the FollowTrailLocation.
         // The override just needs to start KillMutantSequence to wait for all kills.
@@ -1472,6 +1469,14 @@ public class Day_02 : DayBase, IDailyTask
 
         // Spawn corpse (if assigned), trail particles, and destination interactable.
         FollowTrailThreat.Instance.TriggerTrailEvent(_day2TrailLocationIndex);
+
+        // Show "Follow the trail" in every client's HUD via the NetworkVariable — only AFTER
+        // the trail event exists. The host runs OnValueChanged synchronously inside this setter,
+        // so activating first made the host build its HUD row/tutorial against pre-spawn state
+        // and then run the whole Cleanup/SpawnEvent churn on top of it in the same frame, while
+        // remote clients only ever saw the final batched state. Activating last gives the host
+        // the same final state the clients receive.
+        FollowTrailThreat.Instance.ActivateFollowTrailTaskIfUndiscovered();
 
         // Spawn Ocho in the tree line as soon as the trail task goes live.
         SpawnOcho();

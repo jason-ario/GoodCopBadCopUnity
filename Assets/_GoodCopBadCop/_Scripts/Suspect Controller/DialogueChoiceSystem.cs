@@ -141,6 +141,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
         // Exit any open diegetic view (tool locker, mini fridge, etc.) before locking the player.
         DiegeticViewController.Current?.Close();
 
+        // Hang up the phone / close the HQ Order Screen before the dialogue lock is applied.
+        Telephone.Instance?.ForceHangUpForDialogue();
+
         // Break the player out of any ongoing held-item activity (e.g. mopping) so the
         // use animation and coroutine don't persist through the cutscene.
         ForceStopHeldObjectUse();
@@ -258,6 +261,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
         // Exit any open diegetic view (tool locker, mini fridge, etc.) before locking the player.
         DiegeticViewController.Current?.Close();
 
+        // Hang up the phone / close the HQ Order Screen before the dialogue lock is applied.
+        Telephone.Instance?.ForceHangUpForDialogue();
+
         // Break the player out of any ongoing held-item activity (e.g. mopping) so the
         // use animation and coroutine don't persist through the cutscene.
         ForceStopHeldObjectUse();
@@ -330,6 +336,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
         PlayerInstance.Instance?.SetIsInCutscene(true);
 
         DiegeticViewController.Current?.Close();
+
+        // Hang up the phone / close the HQ Order Screen before the dialogue lock is applied.
+        Telephone.Instance?.ForceHangUpForDialogue();
 
         // Break the player out of any ongoing held-item activity (e.g. mopping) so the
         // use animation and coroutine don't persist through the cutscene.

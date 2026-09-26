@@ -15,7 +15,7 @@ public class LobbyRow : MonoBehaviour
 
         // Defensive: metadata might be missing
         lobbyName.text = lobby.GetData("host");
-        players.text = $"{lobby.MemberCount}/{lobby.MaxMembers}";
+        players.text = DevSpectatorConfig.FormatBrowserPlayerCount(lobby);
     }
 
     // Wired to the Join button

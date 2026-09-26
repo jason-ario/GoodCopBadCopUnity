@@ -39,6 +39,10 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip doorOpenClip;
     [SerializeField] private AudioClip doorCloseClip;
+    [Tooltip("Distance (m) within which gate sounds play at full volume.")]
+    [SerializeField, Min(0f)] private float audioMinDistance = 1f;
+    [Tooltip("Distance (m) at which gate sounds fade to silence (linear rolloff).")]
+    [SerializeField, Min(0.1f)] private float audioMaxDistance = 12f;
 
     [Header("Gate Settings")]
     [SerializeField] private float waitDelay = 0.5f;
@@ -53,6 +57,9 @@ public class GateStartShiftController : Interactable, IHeldItemPassthrough
     protected override void Awake()
     {
         base.Awake();
+        // Gate sounds are replicated to every client; keep them positional and short-range
+        // so players far from the gate don't hear it.
+        SpatialAudioUtility.ConfigureShortRange3D(audioSource, audioMinDistance, audioMaxDistance);
     }
 
     private void Update()

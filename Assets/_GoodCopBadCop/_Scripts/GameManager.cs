@@ -378,7 +378,7 @@ public class GameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+        bool isSinglePlayer = DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) == 1;
         _networkIsSinglePlayer.Value = isSinglePlayer;
 
         PlayerSpawner.Instance.SpawnPlayerAtLobby(clientId, isSinglePlayer);
@@ -386,7 +386,7 @@ public class GameManager : NetworkBehaviour
 
     private void SpawnAllPlayersAtLobby()
     {
-        bool isSinglePlayer = NetworkManager.Singleton.ConnectedClientsList.Count == 1;
+        bool isSinglePlayer = DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) == 1;
         _networkIsSinglePlayer.Value = isSinglePlayer;
 
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)

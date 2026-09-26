@@ -71,6 +71,14 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
              "in-world glow on the fence itself. See PerimiterFence.RefreshRepairHighlight.")]
     [SerializeField] private bool _showRepairHighlights = true;
 
+    [Header("Item Success Feedback")]
+    [Tooltip("2D success cue played on every client each time a tracked fence segment is fully " +
+             "repaired (same cue as a task row's sub-task progress ding). Complements the fence's own " +
+             "positional repair-complete sound. Deduplicated via TaskSuccessCue.")]
+    [SerializeField] private AudioClip _itemSuccessSfxClip;
+    [Tooltip("Volume for _itemSuccessSfxClip.")]
+    [SerializeField] private float _itemSuccessSfxVolume = 0.6f;
+
     // ── Public API ───────────────────────────────────────────────────────────
 
     /// <summary>Display name for this task.</summary>
@@ -382,14 +390,18 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         if (fence != null && fence.IsBroken && !_trackedFences.Contains(fence))
             _trackedFences.Add(fence);
 
-        RecomputeProgress();
+        RecomputeProgress(playItemCue: true);
     }
 
     /// <summary>
     /// Recounts repaired/total from live fence state and completes the task when nothing tracked
     /// is broken any more. Server-only.
     /// </summary>
-    private void RecomputeProgress()
+    /// <param name="playItemCue">
+    /// True only for live fence state changes (a hammer repair), so trigger/restore recounts never
+    /// play the per-segment success cue.
+    /// </param>
+    private void RecomputeProgress(bool playItemCue = false)
     {
         if (!IsServer || _isComplete.Value) return;
 
@@ -403,8 +415,12 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
             if (_trackedFences[i].IsRepaired) repaired++;
         }
 
+        int previousRepaired = _fencesRepaired.Value;
         _targetFenceCount.Value = total;
         _fencesRepaired.Value   = Mathf.Clamp(repaired, 0, total);
+
+        if (playItemCue && _fencesRepaired.Value > previousRepaired)
+            PlayItemSuccessSfxClientRpc(total > 0 && repaired >= total);
 
         if (total <= 0 || repaired < total) return;
 
@@ -431,6 +447,11 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     }
 
     // ── Registry management ──────────────────────────────────────────────────
+
+    /// <summary>Per-segment success cue on every client; see <see cref="TaskSuccessCue.PlayCleanupItemCue"/>.</summary>
+    [ClientRpc]
+    private void PlayItemSuccessSfxClientRpc(bool completesTask) =>
+        TaskSuccessCue.PlayCleanupItemCue(this, _itemSuccessSfxClip, _itemSuccessSfxVolume, completesTask);
 
     [ClientRpc]
     private void RegisterInTaskRegistryClientRpc()

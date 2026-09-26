@@ -19,4 +19,10 @@ public enum CompassMarkerCategory
 
     /// <summary>An uncleaned blood splatter (also a <see cref="GraffitiInteractable"/>, on a blood decal prefab).</summary>
     Blood,
+
+    /// <summary>
+    /// A living enemy the player is currently tasked with killing (e.g. the Follow Trail pack while
+    /// <see cref="KillMutantTask"/> is active). Registered by <see cref="FollowTrailThreat"/>.
+    /// </summary>
+    Enemy,
 }

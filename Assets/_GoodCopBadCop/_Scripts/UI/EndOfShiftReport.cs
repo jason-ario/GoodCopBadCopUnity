@@ -6,69 +6,62 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
-/// The end-of-shift report screen. Plays an animated reveal of the day's results and then offers a
-/// Continue button that advances the campaign to the next day.
+/// The end-of-shift report: an itemized, informational shift summary. Lists every processed
+/// subject (anomalies caught, verdict, coupons issued), tallies the verdicts, and totals the day's
+/// earnings. It never awards money — every coupon shown was already paid out at verdict time by
+/// <see cref="SuspectController"/>.
 ///
 /// This screen is a full-screen modal that disables player control, so it is the single most
-/// dangerous place in the game to get stuck: if the Continue affordance never appears, or appears
-/// but does nothing, the player's only recourse is to quit. Everything below is therefore built so
-/// that <b>the player can always leave</b>:
+/// dangerous place in the game to get stuck. Everything below is built so that
+/// <b>the player can always leave</b>:
 ///
-/// 1. The affordance is shown by <see cref="DriveReportRoutine"/>, which is separate from and
-///    watches over the reveal. A reveal that stalls or dies cannot suppress the button.
-/// 2. Every reveal wait is bounded (see <see cref="TMPTextReveal.RevealTextBounded"/>) and the whole
-///    sequence is capped by <see cref="_maxTotalRevealDuration"/>.
+/// 1. The Continue affordance is shown by <see cref="DriveReportRoutine"/>, which supervises the
+///    reveal. A reveal that stalls or dies cannot suppress the button.
+/// 2. Every reveal wait is bounded and the whole sequence is capped by <see cref="_maxTotalRevealDuration"/>.
 /// 3. Any input skips the remaining animation.
 /// 4. Both players get a working Continue button — not just the host.
 /// 5. Pressing Continue starts <see cref="WatchdogAfterContinue"/>: if the transition has not torn
 ///    this screen down in time, the screen dismisses itself and restores control.
-/// 6. Payout is applied before the animation, so aborting or skipping it never costs the player money.
 /// </summary>
 public class EndOfShiftReportUI : MonoBehaviour
 {
-    [System.Serializable]
-    public class ReportRowData
-    {
-        public string label;
-        public int amount;
-        public bool isPenalty;
-        public bool isHeader;
-        
-        public ReportRowData(string label, int amount, bool isPenalty = false, bool isHeader = false)
-        {
-            this.label = label;
-            this.amount = amount;
-            this.isPenalty = isPenalty;
-            this.isHeader = isHeader;
-        }
-    }
+    [Header("Header")]
+    [SerializeField] private GameObject banner;
+    [SerializeField] private TMPTextReveal subHeaderText;
 
-    [Header("Rows")]
-    [SerializeField] private List<EndOfShiftReportRow> rows = new List<EndOfShiftReportRow>();
+    [Header("Subjects")]
+    [Tooltip("Parent the itemized subject rows are cloned into.")]
+    [SerializeField] private RectTransform _subjectListRoot;
+    [Tooltip("Inactive row used as the clone source for every subject.")]
+    [SerializeField] private EndOfShiftReportRow _subjectRowTemplate;
+    [Tooltip("Shown instead of rows when no subjects were processed.")]
+    [SerializeField] private GameObject _emptyListLabel;
+    [Tooltip("Scroll view wrapping the subject list. Auto-scrolls to each new row as it is revealed.")]
+    [SerializeField] private ScrollRect _subjectScroll;
+    [Tooltip("Seconds to ease the scroll view down to a newly revealed row.")]
+    [SerializeField] private float _autoScrollDuration = 0.25f;
+    [Tooltip("Maximum rows before the remainder collapses into a single '+N more' line. 0 = unlimited (list scrolls).")]
+    [SerializeField] private int _maxListedSubjects = 0;
 
-    [Header("Residents Who Fully Mutated")]
-    [SerializeField] private GameObject residentsMutatedRoot;
-    [SerializeField] private TextMeshProUGUI residentsMutatedText;
-    [SerializeField] private TMPTextReveal residentsMutatedReveal;
-    [SerializeField] private TMPWobbleText residentsMutatedWobble;
+    [Header("Verdict Tallies")]
+    [SerializeField] private CanvasGroup _talliesGroup;
+    [SerializeField] private TextMeshProUGUI _passedCountText;
+    [SerializeField] private TextMeshProUGUI _quarantinedCountText;
+    [SerializeField] private TextMeshProUGUI _killedCountText;
+    [SerializeField] private TextMeshProUGUI _fledCountText;
+    [Tooltip("Fled tally cell — hidden on days nobody fled.")]
+    [SerializeField] private GameObject _fledCell;
 
-    [Header("Civilians Killed")]
-    [SerializeField] private GameObject civiliansKilledRoot;
-    [SerializeField] private TextMeshProUGUI civiliansKilledText;
-    [SerializeField] private TMPTextReveal civiliansKilledReveal;
-    [SerializeField] private TMPWobbleText civiliansKilledWobble;
+    [Header("Total Earnings")]
+    [SerializeField] private CanvasGroup _totalGroup;
+    [SerializeField] private TextMeshProUGUI _totalEarnedText;
+    [SerializeField] private TMPTextReveal _totalEarnedReveal;
+    [SerializeField] private TMPWobbleText _totalEarnedWobble;
+    [SerializeField] private TMPWobbleProfile _totalWobbleProfile;
 
-    [Header("Net Earnings")]
-    [SerializeField] private GameObject netEarningsRoot;
-    [SerializeField] private TextMeshProUGUI netEarningsText;
-    [SerializeField] private TMPTextReveal netEarningsReveal;
-    [SerializeField] private TMPWobbleText netEarningsWobble;
-
-    [Header("Current Population")]
-    [SerializeField] private GameObject currentPopulationRoot;
-    [SerializeField] private TextMeshProUGUI currentPopulationText;
-    [SerializeField] private TMPTextReveal currentPopulationReveal;
-    [SerializeField] private TMPWobbleText currentPopulationWobble;
+    [Header("Population Footer")]
+    [SerializeField] private CanvasGroup _footerGroup;
+    [SerializeField] private TextMeshProUGUI _populationFooterText;
 
     [Header("Continue")]
     [SerializeField] private GameObject continueButton;
@@ -81,8 +74,10 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     [Header("Timing")]
     [SerializeField] private float initialDelay = 0.35f;
-    [SerializeField] private float rewardRevealDelay = 0.18f;
-    [SerializeField] private float lineRevealDelay = 0.45f;
+    [SerializeField] private float rowFadeDuration = 0.18f;
+    [SerializeField] private float rowRevealDelay = 0.12f;
+    [SerializeField] private float sectionFadeDuration = 0.3f;
+    [SerializeField] private float sectionRevealDelay = 0.3f;
     [SerializeField] private float finalDelayBeforeContinue = 0.4f;
 
     [Header("Failsafes")]
@@ -95,30 +90,19 @@ public class EndOfShiftReportUI : MonoBehaviour
     [Tooltip("When true, any key / click / gamepad press skips the rest of the reveal animation.")]
     [SerializeField] private bool _allowSkipInput = true;
 
-    [Header("Colors")]
-    [SerializeField] private Color rewardColor = Color.white;
-    [SerializeField] private Color penaltyColor = new Color(1f, 0.3f, 0.3f);
+    [Header("Verdict Colors")]
+    [SerializeField] private Color passedColor = new Color(0.22f, 0.42f, 0.16f);
+    [SerializeField] private Color quarantinedColor = new Color(0.78f, 0.42f, 0.08f);
+    [SerializeField] private Color killedColor = new Color(0.66f, 0.13f, 0.1f);
+    [SerializeField] private Color fledColor = new Color(0.45f, 0.4f, 0.35f);
+    [SerializeField] private Color mutedColor = new Color(0.36f, 0.22f, 0.04f, 0.45f);
 
-    [Header("Wobble Profiles")]
-    [SerializeField] private TMPWobbleProfile normalLabelProfile;
-    [SerializeField] private TMPWobbleProfile rewardValueProfile;
-    [SerializeField] private TMPWobbleProfile penaltyValueProfile;
-    [SerializeField] private TMPWobbleProfile positiveTotalProfile;
-    [SerializeField] private TMPWobbleProfile negativeTotalProfile;
-
-    [SerializeField] private GameObject banner; 
-    [SerializeField] TMPTextReveal subHeaderText;
+    private readonly List<EndOfShiftReportRow> _spawnedRows = new List<EndOfShiftReportRow>();
 
     private Coroutine driverRoutine;
     private Coroutine revealRoutine;
 
-    // Cached payload for the current report, so the failsafe path can snap straight to the
-    // final state without re-deriving anything.
-    private List<ReportRowData> _reportRows;
-    private int _residentsMutated;
-    private int _civiliansKilled;
-    private int _currentPopulation;
-    private int _netTotal;
+    private ShiftReportData _data;
 
     private bool _revealComplete;
     private bool _skipRequested;
@@ -128,22 +112,17 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     private void Awake()
     {
+        if (_subjectRowTemplate != null)
+            _subjectRowTemplate.gameObject.SetActive(false);
+
         HideAll();
     }
 
-    public void PlayReport(
-        List<ReportRowData> reportRows,
-        int residentsFullyMutatedOvernight = 0,
-        int civiliansKilledOvernight = 0,
-        int currentPopulation = 0)
+    public void PlayReport(ShiftReportData data)
     {
         StopAllReportRoutines();
 
-        _reportRows = reportRows ?? new List<ReportRowData>();
-        _residentsMutated = residentsFullyMutatedOvernight;
-        _civiliansKilled = civiliansKilledOvernight;
-        _currentPopulation = currentPopulation;
-        _netTotal = ComputeNetTotal(_reportRows);
+        _data = data ?? new ShiftReportData(0, null, -1, 0, 0);
 
         _revealComplete = false;
         _skipRequested = false;
@@ -152,12 +131,7 @@ public class EndOfShiftReportUI : MonoBehaviour
 
         gameObject.SetActive(true);
 
-        // Award the day's pay up front rather than partway through the reveal. The payout must not
-        // depend on an animation running to completion — a skipped, stalled, or interrupted reveal
-        // would otherwise silently rob the player of the entire day's earnings.
-        if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.IsServer)
-            GlobalHostVariables.Instance.AddMoney(_netTotal);
-
+        // Deliberately no payout here: coupons are issued per subject at verdict time.
         driverRoutine = StartCoroutine(DriveReportRoutine());
     }
 
@@ -169,54 +143,22 @@ public class EndOfShiftReportUI : MonoBehaviour
             subHeaderText.SetTextInstant(" ");
         _contentContainer?.SetActive(false);
 
-        if (rows != null)
-        {
-            for (int i = 0; i < rows.Count; i++)
-            {
-                if (rows[i] != null)
-                    rows[i].Hide();
-            }
-        }
-        
-        Canvas.ForceUpdateCanvases();
+        ClearRows();
 
-        if (residentsMutatedRoot != null)
-            residentsMutatedRoot.SetActive(false);
-        if (residentsMutatedReveal != null)
-            residentsMutatedReveal.Clear();
-        else if (residentsMutatedText != null)
-            residentsMutatedText.text = "";
-        if (residentsMutatedWobble != null)
-            residentsMutatedWobble.StopWobble();
+        if (_emptyListLabel != null)
+            _emptyListLabel.SetActive(false);
 
-        if (civiliansKilledRoot != null)
-            civiliansKilledRoot.SetActive(false);
-        if (civiliansKilledReveal != null)
-            civiliansKilledReveal.Clear();
-        else if (civiliansKilledText != null)
-            civiliansKilledText.text = "";
-        if (civiliansKilledWobble != null)
-            civiliansKilledWobble.StopWobble();
+        SetGroupAlpha(_talliesGroup, 0f);
+        SetGroupAlpha(_totalGroup, 0f);
+        SetGroupAlpha(_footerGroup, 0f);
 
-        if (netEarningsRoot != null)
-            netEarningsRoot.SetActive(false);
+        if (_totalEarnedReveal != null)
+            _totalEarnedReveal.Clear();
+        else if (_totalEarnedText != null)
+            _totalEarnedText.text = "";
 
-        if (netEarningsReveal != null)
-            netEarningsReveal.Clear();
-        else if (netEarningsText != null)
-            netEarningsText.text = "";
-
-        if (netEarningsWobble != null)
-            netEarningsWobble.StopWobble();
-
-        if (currentPopulationRoot != null)
-            currentPopulationRoot.SetActive(false);
-        if (currentPopulationReveal != null)
-            currentPopulationReveal.Clear();
-        else if (currentPopulationText != null)
-            currentPopulationText.text = "";
-        if (currentPopulationWobble != null)
-            currentPopulationWobble.StopWobble();
+        if (_totalEarnedWobble != null)
+            _totalEarnedWobble.StopWobble();
 
         if (continueButton != null)
             continueButton.SetActive(false);
@@ -226,13 +168,9 @@ public class EndOfShiftReportUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Owns the reveal and, unconditionally, the appearance of the Continue affordance.
-    ///
-    /// The affordance used to be the last statement of the reveal coroutine itself, which meant any
-    /// stall anywhere in that long chain of nested animation waits left the player on a modal
-    /// screen with no button. Here the reveal is a supervised child: whether it completes, is
-    /// skipped, or hangs past <see cref="_maxTotalRevealDuration"/>, control returns to this method
-    /// and the button appears.
+    /// Owns the reveal and, unconditionally, the appearance of the Continue affordance. Whether the
+    /// reveal completes, is skipped, or hangs past <see cref="_maxTotalRevealDuration"/>, control
+    /// returns here and the button appears.
     /// </summary>
     private IEnumerator DriveReportRoutine()
     {
@@ -276,11 +214,6 @@ public class EndOfShiftReportUI : MonoBehaviour
             _skipRequested = true;
     }
 
-    /// <summary>
-    /// True on the frame the player presses anything that should skip the reveal. Deliberately
-    /// broad — on a screen whose only job is "show numbers, then let me leave", impatience must
-    /// never be punished with a wait the player cannot shorten.
-    /// </summary>
     private static bool AnySkipInputThisFrame()
     {
         Keyboard keyboard = Keyboard.current;
@@ -315,50 +248,28 @@ public class EndOfShiftReportUI : MonoBehaviour
         _contentContainer?.SetActive(true);
 
         if (subHeaderText != null)
-            yield return subHeaderText.RevealTextBounded("Checkpoint Performance Summary", _maxSingleRevealDuration);
+            yield return subHeaderText.RevealTextBounded(SubHeaderLabel(), _maxSingleRevealDuration);
 
-        int count = Mathf.Min(_reportRows.Count, rows.Count);
+        // Build every row up front (invisible) so the layout is final before anything animates.
+        PopulateStaticContent();
 
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < _spawnedRows.Count; i++)
         {
             if (_skipRequested)
                 break;
 
-            ReportRowData data = _reportRows[i];
-            EndOfShiftReportRow row = rows[i];
-
-            if (row == null)
-                continue;
-
-            row.Show(); 
-            row.Clear();
-            
-            yield return row.RevealLabel(data.label, normalLabelProfile, _maxSingleRevealDuration);
-
-            yield return WaitUnscaled(rewardRevealDelay);
-
-            if (!data.isHeader && data.amount != 0)
-            {
-                yield return row.RevealValue(
-                    FormatValue(data.amount, data.isPenalty),
-                    data.isPenalty ? penaltyColor : rewardColor,
-                    data.isPenalty ? penaltyValueProfile : rewardValueProfile,
-                    _maxSingleRevealDuration);
-            }
-
-            yield return WaitUnscaled(lineRevealDelay);
+            yield return RevealRow(_spawnedRows[i]);
+            yield return WaitUnscaled(rowRevealDelay);
         }
 
-        yield return RevealNetTotal(_netTotal);
+        yield return WaitUnscaled(sectionRevealDelay);
+        yield return FadeGroup(_talliesGroup, sectionFadeDuration);
 
-        // Reveal residents who fully mutated overnight and went on to kill civilians.
-        yield return RevealResidentsMutated(_residentsMutated);
+        yield return WaitUnscaled(sectionRevealDelay);
+        yield return RevealTotal();
 
-        // Reveal overnight civilians killed panel (purely informational — no monetary impact).
-        yield return RevealCiviliansKilled(_civiliansKilled);
-
-        // Reveal the updated current population, accounting for any overnight civilian deaths.
-        yield return RevealCurrentPopulation(_currentPopulation);
+        yield return WaitUnscaled(sectionRevealDelay);
+        yield return FadeGroup(_footerGroup, sectionFadeDuration);
 
         yield return WaitUnscaled(finalDelayBeforeContinue);
 
@@ -378,55 +289,261 @@ public class EndOfShiftReportUI : MonoBehaviour
         _contentContainer?.SetActive(true);
 
         if (subHeaderText != null)
-            subHeaderText.SetTextInstant("Checkpoint Performance Summary");
+            subHeaderText.SetTextInstant(SubHeaderLabel());
 
-        int count = Mathf.Min(_reportRows.Count, rows.Count);
-        for (int i = 0; i < count; i++)
+        if (_spawnedRows.Count == 0)
+            PopulateStaticContent();
+
+        foreach (EndOfShiftReportRow row in _spawnedRows)
         {
-            ReportRowData data = _reportRows[i];
-            if (rows[i] == null)
-                continue;
-
-            rows[i].SetInstant(
-                data.label,
-                FormatValue(data.amount, data.isPenalty),
-                data.isPenalty ? penaltyColor : rewardColor,
-                showValue: !data.isHeader && data.amount != 0);
+            row.gameObject.SetActive(true);
+            row.SetAlpha(1f);
         }
 
-        SnapPanel(netEarningsRoot, netEarningsReveal, netEarningsText,
-            $"Net Daily Earnings: {FormatSignedNumber(_netTotal)}");
-        if (netEarningsText != null)
-            netEarningsText.color = _netTotal < 0 ? penaltyColor : rewardColor;
+        RebuildSubjectLayout();
+        SetScrollPosition(0f);
 
-        SnapPanel(residentsMutatedRoot, residentsMutatedReveal, residentsMutatedText,
-            $"Residents Who Fully Mutated: {_residentsMutated}");
-        SnapPanel(civiliansKilledRoot, civiliansKilledReveal, civiliansKilledText,
-            $"Civilians Killed: {_civiliansKilled}");
-        SnapPanel(currentPopulationRoot, currentPopulationReveal, currentPopulationText,
-            $"Current Population: {_currentPopulation}");
-    }
+        SetGroupAlpha(_talliesGroup, 1f);
+        SetGroupAlpha(_totalGroup, 1f);
+        SetGroupAlpha(_footerGroup, 1f);
 
-    private static void SnapPanel(GameObject root, TMPTextReveal reveal, TextMeshProUGUI text, string label)
-    {
-        if (root != null)
-            root.SetActive(true);
-
-        if (reveal != null)
-            reveal.SetTextInstant(label);
-        else if (text != null)
-            text.text = label;
+        if (_totalEarnedReveal != null)
+            _totalEarnedReveal.SetTextInstant(TotalLabel());
+        else if (_totalEarnedText != null)
+            _totalEarnedText.text = TotalLabel();
     }
 
     /// <summary>
-    /// Reveals the Continue button to <b>every</b> player.
-    ///
-    /// Previously the button was host-only and clients got a passive "waiting for host" label. That
-    /// is a dead end by construction: a client whose transition never arrives — because the host's
-    /// coroutine stalled, or the RPC landed while this client was mid-reveal — has no affordance at
-    /// all and cannot leave the screen. Letting either player continue is safe because
-    /// <see cref="ShiftManager.StartInBetweenShiftSequence"/> is latched server-side, so duplicate
-    /// or simultaneous presses collapse into a single transition.
+    /// Writes every non-animated value (rows, tallies, footer) and leaves each section transparent
+    /// so the reveal only has to fade them in. Idempotent: rebuilds rows from scratch each call.
+    /// </summary>
+    private void PopulateStaticContent()
+    {
+        BuildRows();
+
+        SetCount(_passedCountText, _data.PassedCount);
+        SetCount(_quarantinedCountText, _data.QuarantinedCount);
+        SetCount(_killedCountText, _data.KilledCount);
+        SetCount(_fledCountText, _data.FledCount);
+        if (_fledCell != null)
+            _fledCell.SetActive(_data.FledCount > 0);
+
+        if (_populationFooterText != null)
+            _populationFooterText.text = FooterLabel();
+
+        RebuildSubjectLayout();
+        SetScrollPosition(1f);
+    }
+
+    /// <summary>
+    /// Switches a row on, then fades it in while easing the scroll view down so the newest row is
+    /// always in view. Caller-driven on unscaled time, like every other reveal wait.
+    /// </summary>
+    private IEnumerator RevealRow(EndOfShiftReportRow row)
+    {
+        row.gameObject.SetActive(true);
+        row.SetAlpha(0f);
+        RebuildSubjectLayout();
+
+        if (_subjectScroll != null)
+            _subjectScroll.StopMovement();
+
+        float startScroll = _subjectScroll != null ? _subjectScroll.verticalNormalizedPosition : 0f;
+        float duration = Mathf.Max(rowFadeDuration, _autoScrollDuration);
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+
+            row.SetAlpha(rowFadeDuration > 0f ? Mathf.Clamp01(elapsed / rowFadeDuration) : 1f);
+
+            if (_subjectScroll != null)
+            {
+                float t = _autoScrollDuration > 0f ? Mathf.Clamp01(elapsed / _autoScrollDuration) : 1f;
+                float eased = 1f - (1f - t) * (1f - t);
+                _subjectScroll.verticalNormalizedPosition = Mathf.Lerp(startScroll, 0f, eased);
+            }
+
+            yield return null;
+        }
+
+        row.SetAlpha(1f);
+        SetScrollPosition(0f);
+    }
+
+    private void RebuildSubjectLayout()
+    {
+        if (_subjectListRoot != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_subjectListRoot);
+
+        if (_subjectScroll != null && _subjectScroll.viewport != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_subjectScroll.viewport);
+    }
+
+    /// <summary>1 = top, 0 = bottom.</summary>
+    private void SetScrollPosition(float normalized)
+    {
+        if (_subjectScroll == null)
+            return;
+
+        _subjectScroll.StopMovement();
+        _subjectScroll.verticalNormalizedPosition = normalized;
+    }
+
+    private void BuildRows()
+    {
+        ClearRows();
+
+        List<ShiftSubjectResult> subjects = _data.Subjects;
+        bool hasSubjects = subjects.Count > 0;
+
+        if (_emptyListLabel != null)
+            _emptyListLabel.SetActive(!hasSubjects);
+
+        if (!hasSubjects || _subjectRowTemplate == null || _subjectListRoot == null)
+            return;
+
+        int maxRows = _maxListedSubjects > 0 ? _maxListedSubjects : int.MaxValue;
+        bool overflow = subjects.Count > maxRows;
+        int listed = overflow ? maxRows - 1 : subjects.Count;
+
+        for (int i = 0; i < listed; i++)
+        {
+            ShiftSubjectResult subject = subjects[i];
+            EndOfShiftReportRow row = SpawnRow();
+            row.SetSubject(subject, VerdictLabel(subject.Verdict), VerdictColor(subject.Verdict), mutedColor);
+        }
+
+        if (overflow)
+        {
+            int hiddenCoupons = 0;
+            for (int i = listed; i < subjects.Count; i++)
+                hiddenCoupons += subjects[i].CouponsEarned;
+
+            SpawnRow().SetOverflow(subjects.Count - listed, hiddenCoupons, mutedColor);
+        }
+    }
+
+    private EndOfShiftReportRow SpawnRow()
+    {
+        EndOfShiftReportRow row = Instantiate(_subjectRowTemplate, _subjectListRoot);
+        row.name = $"Subject Row {_spawnedRows.Count + 1}";
+        // Rows stay inactive until revealed, so the scroll content only grows as rows appear.
+        row.gameObject.SetActive(false);
+        row.SetAlpha(0f);
+        _spawnedRows.Add(row);
+        return row;
+    }
+
+    private void ClearRows()
+    {
+        foreach (EndOfShiftReportRow row in _spawnedRows)
+        {
+            if (row == null)
+                continue;
+
+            // Deactivate first: Destroy is deferred, and a still-active row would otherwise be
+            // counted by the layout rebuild that immediately follows.
+            row.gameObject.SetActive(false);
+            Destroy(row.gameObject);
+        }
+        _spawnedRows.Clear();
+    }
+
+    private IEnumerator RevealTotal()
+    {
+        if (_totalGroup != null)
+            SetGroupAlpha(_totalGroup, 1f);
+
+        if (_totalEarnedWobble != null && _totalWobbleProfile != null)
+        {
+            _totalEarnedWobble.SetProfile(_totalWobbleProfile, true);
+            _totalEarnedWobble.StartWobble();
+        }
+
+        if (_totalEarnedReveal != null)
+            yield return _totalEarnedReveal.RevealTextBounded(TotalLabel(), _maxSingleRevealDuration);
+        else if (_totalEarnedText != null)
+            _totalEarnedText.text = TotalLabel();
+    }
+
+    private string SubHeaderLabel() =>
+        _data != null && _data.Day > 0 ? $"Day {_data.Day}  -  Shift Summary" : "Shift Summary";
+
+    private string TotalLabel() => _data.TotalCouponsEarned.ToString();
+
+    private string FooterLabel()
+    {
+        var parts = new List<string>(3);
+        if (_data.PopulationAlive >= 0)
+            parts.Add($"City Population: {_data.PopulationAlive}");
+        parts.Add($"Civilians Lost Overnight: {Mathf.Max(0, _data.CiviliansKilledOvernight)}");
+        parts.Add($"Residents Fully Mutated: {Mathf.Max(0, _data.ResidentsMutatedOvernight)}");
+        return string.Join("     |     ", parts);
+    }
+
+    private static string VerdictLabel(ShiftSubjectVerdict verdict)
+    {
+        switch (verdict)
+        {
+            case ShiftSubjectVerdict.Passed: return "PASSED";
+            case ShiftSubjectVerdict.Quarantined: return "QUARANTINED";
+            case ShiftSubjectVerdict.Killed: return "KILLED";
+            default: return "FLED";
+        }
+    }
+
+    private Color VerdictColor(ShiftSubjectVerdict verdict)
+    {
+        switch (verdict)
+        {
+            case ShiftSubjectVerdict.Passed: return passedColor;
+            case ShiftSubjectVerdict.Quarantined: return quarantinedColor;
+            case ShiftSubjectVerdict.Killed: return killedColor;
+            default: return fledColor;
+        }
+    }
+
+    private static void SetCount(TextMeshProUGUI text, int count)
+    {
+        if (text != null)
+            text.text = count.ToString();
+    }
+
+    private static void SetGroupAlpha(CanvasGroup group, float alpha)
+    {
+        if (group != null)
+            group.alpha = alpha;
+    }
+
+    /// <summary>Unscaled, caller-driven fade; snaps if the group is missing or inactive.</summary>
+    private static IEnumerator FadeGroup(CanvasGroup group, float duration)
+    {
+        if (group == null)
+            yield break;
+
+        if (duration <= 0f || !group.gameObject.activeInHierarchy)
+        {
+            group.alpha = 1f;
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            group.alpha = Mathf.Clamp01(elapsed / duration);
+            yield return null;
+        }
+
+        group.alpha = 1f;
+    }
+
+    /// <summary>
+    /// Reveals the Continue button to <b>every</b> player. Letting either player continue is safe
+    /// because <see cref="ShiftManager.StartInBetweenShiftSequence"/> is latched server-side, so
+    /// duplicate or simultaneous presses collapse into a single transition.
     /// </summary>
     private void ShowContinueAffordance()
     {
@@ -457,113 +574,6 @@ public class EndOfShiftReportUI : MonoBehaviour
             _continueButtonComponent.interactable = interactable;
     }
 
-    private IEnumerator RevealResidentsMutated(int count)
-    {
-        if (residentsMutatedRoot == null)
-            yield break;
-
-        residentsMutatedRoot.SetActive(true);
-
-        string label = $"Residents Who Fully Mutated: {count}";
-
-        if (residentsMutatedWobble != null && penaltyValueProfile != null)
-        {
-            residentsMutatedWobble.SetProfile(penaltyValueProfile, true);
-            residentsMutatedWobble.StartWobble();
-        }
-
-        if (residentsMutatedReveal != null)
-            yield return residentsMutatedReveal.RevealTextBounded(label, _maxSingleRevealDuration);
-        else if (residentsMutatedText != null)
-            residentsMutatedText.text = label;
-
-        yield return WaitUnscaled(lineRevealDelay);
-    }
-
-    private IEnumerator RevealCiviliansKilled(int count)
-    {
-        if (civiliansKilledRoot == null)
-            yield break;
-
-        civiliansKilledRoot.SetActive(true);
-
-        string label = $"Civilians Killed: {count}";
-
-        if (civiliansKilledWobble != null && penaltyValueProfile != null)
-        {
-            civiliansKilledWobble.SetProfile(penaltyValueProfile, true);
-            civiliansKilledWobble.StartWobble();
-        }
-
-        if (civiliansKilledReveal != null)
-            yield return civiliansKilledReveal.RevealTextBounded(label, _maxSingleRevealDuration);
-        else if (civiliansKilledText != null)
-            civiliansKilledText.text = label;
-
-        yield return WaitUnscaled(lineRevealDelay);
-    }
-
-    private IEnumerator RevealCurrentPopulation(int count)
-    {
-        if (currentPopulationRoot == null)
-            yield break;
-
-        currentPopulationRoot.SetActive(true);
-
-        string label = $"Current Population: {count}";
-
-        if (currentPopulationWobble != null && positiveTotalProfile != null)
-        {
-            currentPopulationWobble.SetProfile(positiveTotalProfile, true);
-            currentPopulationWobble.StartWobble();
-        }
-
-        if (currentPopulationReveal != null)
-            yield return currentPopulationReveal.RevealTextBounded(label, _maxSingleRevealDuration);
-        else if (currentPopulationText != null)
-            currentPopulationText.text = label;
-
-        yield return WaitUnscaled(lineRevealDelay);
-    }
-
-    private IEnumerator RevealNetTotal(int total)
-    {
-        if (netEarningsRoot != null)
-            netEarningsRoot.SetActive(true);
-
-        if (netEarningsText != null)
-            netEarningsText.color = total < 0 ? penaltyColor : rewardColor;
-
-        TMPWobbleProfile profileToUse = total < 0 ? negativeTotalProfile : positiveTotalProfile;
-        string totalString = $"Net Daily Earnings: {FormatSignedNumber(total)}";
-
-        if (netEarningsWobble != null && profileToUse != null)
-        {
-            netEarningsWobble.SetProfile(profileToUse, true);
-            netEarningsWobble.StartWobble();
-        }
-
-        if (netEarningsReveal != null)
-        {
-            yield return netEarningsReveal.RevealTextBounded(totalString, _maxSingleRevealDuration);
-            if (netEarningsText != null)
-                netEarningsText.text = totalString;
-        }
-        else if (netEarningsText != null)
-            netEarningsText.text = totalString;
-    }
-
-    private static int ComputeNetTotal(List<ReportRowData> reportRows)
-    {
-        int total = 0;
-        for (int i = 0; i < reportRows.Count; i++)
-        {
-            ReportRowData data = reportRows[i];
-            total += data.isPenalty ? -Mathf.Abs(data.amount) : Mathf.Abs(data.amount);
-        }
-        return total;
-    }
-
     /// <summary>Unscaled wait so the report always progresses, even if something zeroed timeScale.</summary>
     private static IEnumerator WaitUnscaled(float seconds)
     {
@@ -576,23 +586,6 @@ public class EndOfShiftReportUI : MonoBehaviour
             elapsed += Time.unscaledDeltaTime;
             yield return null;
         }
-    }
-
-    private string FormatValue(int amount, bool isPenalty)
-    {
-        int absAmount = Mathf.Abs(amount);
-        if (amount == 0)
-        {
-            return "0";
-        }
-        return isPenalty ? $"Penalty {absAmount}" : $"Rewards {absAmount}";
-    }
-
-    private string FormatSignedNumber(int value)
-    {
-        if (value > 0) return $"+{value}";
-        if (value < 0) return value.ToString();
-        return "0";
     }
 
     public void OnContinueButtonPressed()
@@ -630,15 +623,9 @@ public class EndOfShiftReportUI : MonoBehaviour
     }
 
     /// <summary>
-    /// The final safety net. Pressing Continue is supposed to end with the shift transition
-    /// deactivating this screen; if that has not happened within <see cref="_continueWatchdogTimeout"/>
-    /// seconds, the press effectively did nothing and the player is stuck behind a modal overlay with
-    /// no remaining input. That is the exact "buttons do nothing" trap this guards against — most
-    /// often hit when the other player already advanced the shift, so the server had already consumed
-    /// the transition and this peer's own request was dropped as a duplicate.
-    ///
-    /// Note this coroutine lives on the report root, so the success case cancels it automatically:
-    /// deactivating the screen destroys the coroutine before it can ever fire.
+    /// The final safety net: if the shift transition has not deactivated this screen within
+    /// <see cref="_continueWatchdogTimeout"/> seconds of pressing Continue, dismiss it locally.
+    /// Lives on the report root, so the success case cancels it automatically on deactivation.
     /// </summary>
     private IEnumerator WatchdogAfterContinue()
     {
