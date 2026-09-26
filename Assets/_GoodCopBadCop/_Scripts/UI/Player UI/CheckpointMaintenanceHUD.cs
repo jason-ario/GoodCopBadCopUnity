@@ -1,13 +1,16 @@
 using UnityEngine;
 
 /// <summary>
-/// Drives the "MAINTENANCE" section of the HUD task sidebar — three <see cref="MaintenanceTaskRow"/>
-/// rows showing how many broken fences, pieces of trash/gore, and unscrubbed graffiti pieces are
-/// currently outstanding, each as a "current / total" counter with a progress-filled icon.
+/// Drives the maintenance rows inside the HUD's Checkpoint Integrity panel — three
+/// <see cref="MaintenanceTaskRow"/> rows each showing a single number: how many broken fence
+/// segments, pieces of trash/gore, and unscrubbed graffiti/blood pieces are currently outstanding.
 ///
-/// The graffiti row also includes every blood splatter <see cref="CleanBloodTask"/> counts (i.e.
-/// splatters that landed inside the checkpoint cleanup bounds — the same in/out rule used for gore
-/// junk). Out-of-bounds blood only appears once mopped, as a bonus +1/+1, same as the trash row.
+/// Counts include items that belong to an active task as well as ones that don't:
+///   - Fences: every authored segment currently broken in the world
+///     (<see cref="FenceRepairTask.BrokenFenceCount"/>), not only the active repair round.
+///   - Trash: <see cref="TakeOutTrashTask"/> total minus deposited (in-bounds items only).
+///   - Graffiti: graffiti pieces + in-bounds blood splatters counted by <see cref="CleanBloodTask"/>,
+///     minus scrubbed.
 ///
 /// After Day 1 these cleanup categories become optional (see <see cref="CleanupTaskGating"/>):
 /// they no longer occupy a slot on the mandatory "CURRENT ORDERS" task list and no longer block
@@ -15,29 +18,34 @@ using UnityEngine;
 /// <see cref="CheckpointIntegrityService"/>'s payout multiplier.
 ///
 /// Purely a read-side display: never registers or blocks anything, just mirrors already-networked
-/// task state. Shows 0/0 for any task that hasn't spawned yet.
+/// state. Refreshes on task progress events and also polls at <see cref="_pollInterval"/>, because
+/// fence damage outside an active repair round raises no client-side event.
 /// </summary>
 public class CheckpointMaintenanceHUD : MonoBehaviour
 {
-    [Tooltip("Row showing perimeter fence segments repaired / total.")]
+    [Tooltip("Row showing the number of broken perimeter fence segments.")]
     [SerializeField] private MaintenanceTaskRow _fenceRow;
 
-    [Tooltip("Row showing trash/gore items deposited / total.")]
+    [Tooltip("Row showing the number of trash/gore items still to deposit.")]
     [SerializeField] private MaintenanceTaskRow _trashRow;
 
-    [Tooltip("Row showing graffiti pieces + in-bounds blood splatters scrubbed / total.")]
+    [Tooltip("Row showing the number of graffiti pieces + in-bounds blood splatters still to scrub.")]
     [SerializeField] private MaintenanceTaskRow _graffitiRow;
 
-    /// <summary>Number of maintenance rows that are not yet fully complete. Used for the sidebar's collapsed badge count.</summary>
+    [Tooltip("Seconds between polled refreshes (catches world changes that raise no event).")]
+    [SerializeField, Min(0.05f)] private float _pollInterval = 0.25f;
+
+    private float _pollTimer;
+
+    /// <summary>Number of maintenance rows with outstanding items. Used for the sidebar's collapsed badge count.</summary>
     public int IncompleteCount
     {
         get
         {
             int count = 0;
-            if (!IsRowComplete(FenceRepairTask.Instance?.RepairedCount, FenceRepairTask.Instance?.TotalCount)) count++;
-            if (!IsRowComplete(TakeOutTrashTask.Instance?.DepositedCount, TakeOutTrashTask.Instance?.TotalCount)) count++;
-            GetGraffitiAndBloodCounts(out int scrubbed, out int total);
-            if (!IsRowComplete(scrubbed, total)) count++;
+            if (GetOutstandingFenceCount() > 0) count++;
+            if (GetOutstandingTrashCount() > 0) count++;
+            if (GetOutstandingGraffitiCount() > 0) count++;
             return count;
         }
     }
@@ -56,6 +64,27 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
         total    = (graffiti != null ? graffiti.TotalGraffitiCount : 0) + (blood != null ? blood.TotalCount : 0);
     }
 
+    /// <summary>Broken fence segments currently in the world (task-tracked or not).</summary>
+    public static int GetOutstandingFenceCount()
+    {
+        FenceRepairTask fence = FenceRepairTask.Instance;
+        return fence != null ? fence.BrokenFenceCount : 0;
+    }
+
+    /// <summary>Counted trash/gore items not yet deposited.</summary>
+    public static int GetOutstandingTrashCount()
+    {
+        TakeOutTrashTask trash = TakeOutTrashTask.Instance;
+        return trash != null ? Mathf.Max(0, trash.TotalCount - trash.DepositedCount) : 0;
+    }
+
+    /// <summary>Counted graffiti + blood pieces not yet scrubbed.</summary>
+    public static int GetOutstandingGraffitiCount()
+    {
+        GetGraffitiAndBloodCounts(out int scrubbed, out int total);
+        return Mathf.Max(0, total - scrubbed);
+    }
+
     private void OnEnable()
     {
         FenceRepairTask.OnProgressChanged     += Refresh;
@@ -65,10 +94,7 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
         CleanGraffitiTask.OnProgressChanged   += Refresh;
         CleanBloodTask.OnProgressChanged      += Refresh;
 
-        if (_fenceRow != null) _fenceRow.SetLabel("Fix broken fence");
-        if (_trashRow != null) _trashRow.SetLabel("Throw away trash");
-        if (_graffitiRow != null) _graffitiRow.SetLabel("Remove graffiti");
-
+        _pollTimer = 0f;
         Refresh();
     }
 
@@ -82,21 +108,19 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
         CleanBloodTask.OnProgressChanged      -= Refresh;
     }
 
-    private void Refresh()
+    private void Update()
     {
-        FenceRepairTask fence = FenceRepairTask.Instance;
-        _fenceRow?.SetProgress(fence != null ? fence.RepairedCount : 0, fence != null ? fence.TotalCount : 0);
+        _pollTimer += Time.unscaledDeltaTime;
+        if (_pollTimer < _pollInterval) return;
 
-        TakeOutTrashTask trash = TakeOutTrashTask.Instance;
-        _trashRow?.SetProgress(trash != null ? trash.DepositedCount : 0, trash != null ? trash.TotalCount : 0);
-
-        GetGraffitiAndBloodCounts(out int scrubbed, out int total);
-        _graffitiRow?.SetProgress(scrubbed, total);
+        _pollTimer = 0f;
+        Refresh();
     }
 
-    private static bool IsRowComplete(int? current, int? total)
+    private void Refresh()
     {
-        if (total == null || total <= 0) return true;
-        return current != null && current >= total;
+        if (_fenceRow != null)    _fenceRow.SetCount(GetOutstandingFenceCount());
+        if (_trashRow != null)    _trashRow.SetCount(GetOutstandingTrashCount());
+        if (_graffitiRow != null) _graffitiRow.SetCount(GetOutstandingGraffitiCount());
     }
 }

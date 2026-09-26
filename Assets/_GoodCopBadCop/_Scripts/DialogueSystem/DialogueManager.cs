@@ -189,7 +189,14 @@ public class DialogueManager : NetworkBehaviour
         // their existing wait-for-input behaviour.
         bool showWaitForInput = waitForInput &&
             (ScriptedDialogueRunner.ActiveDialogueSpeakerNetId == 0 || ScriptedDialogueRunner.IsScriptedModeActive);
-        SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, showWaitForInput);
+
+        // Booth/suspect and scripted lines are broadcast to every client. Only conversation
+        // participants and players within overhear range of the speaker see the subtitle;
+        // everyone else just hears the (spatialized) voice audio.
+        if (OverhearRange.CanLocalPlayerSee(speaking.transform))
+            SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, showWaitForInput);
+        else if (clearHistory)
+            ClearHistory();
 
         // Lines flagged to play a laugh instead of normal speech (e.g. ScriptedDialogueNode/
         // Choice.playLaughSfx) show their subtitle immediately but skip the voice-clip cycling
@@ -655,6 +662,24 @@ public class DialogueManager : NetworkBehaviour
             if (_activeChoiceEcho != null && child.gameObject == _activeChoiceEcho) continue;
             Destroy(child.gameObject);
         }
+    }
+
+    /// <summary>
+    /// Local, unconditional teardown of every on-screen dialogue subtitle — NPC lines, player
+    /// lines, the choice echo, and any wait-for-input line — plus the active dialogue voice audio.
+    /// Used when a conversation is force-ended (e.g. a verdict closes out the suspect mid-dialogue)
+    /// so nothing from it lingers on screen. Megaphone audio is unaffected.
+    /// </summary>
+    public void ForceClearAllSubtitles()
+    {
+        StopDialogueAudio();
+        CancelSubtitleDestroy();
+        HideChoiceEcho();
+        _waitingSubtitle = null;
+
+        if (subtitlesContainer == null) return;
+        foreach (Transform child in subtitlesContainer)
+            Destroy(child.gameObject);
     }
 
     /// <summary>

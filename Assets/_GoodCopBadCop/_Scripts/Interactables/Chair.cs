@@ -16,6 +16,24 @@ public class Chair : Interactable
              "spinning the chair/object itself.")]
     public bool rotateSeatWithPlayer = true;
 
+    private const string DefaultSitText = "Sit";
+
+    // Movement controller of the player currently seated here (null when free). Used to stop the
+    // reticle from targeting/hinting this chair while someone is sitting in it.
+    private PlayerMovementController _occupant;
+
+    /// <summary>Every chair shows the reticle's key hint (e.g. [E] Sit).</summary>
+    public override bool ShowInteractHint => true;
+
+    public override bool IsInteractable => base.IsInteractable && (_occupant == null || !_occupant.IsSitting);
+
+    protected override void Awake()
+    {
+        base.Awake();
+        if (string.IsNullOrWhiteSpace(interactText))
+            interactText = DefaultSitText;
+    }
+
     private void Start()
     {
         standingPos.transform.parent = null;
@@ -29,14 +47,16 @@ public class Chair : Interactable
 
     void Sit(PlayerInteractionController player)
     {
-        player.GetComponent<PlayerMovementController>().Sit(this);
+        _occupant = player.GetComponent<PlayerMovementController>();
+        _occupant.Sit(this);
         player.transform.DOMove(sitPos.position, sitDuration);
         player.transform.DORotate(sitPos.eulerAngles, sitDuration).OnComplete(() => OnSeated(player.transform));
     }
 
     public void SitImmediate(PlayerInteractionController player)
     {
-        player.GetComponent<PlayerMovementController>().Sit(this);
+        _occupant = player.GetComponent<PlayerMovementController>();
+        _occupant.Sit(this);
         player.transform.position = sitPos.position;
         player.transform.rotation = sitPos.rotation;
         OnSeated(player.transform);
@@ -57,6 +77,7 @@ public class Chair : Interactable
     // reparented and clearing it would incorrectly detach it from its original hierarchy.
     public void OnStoodUp()
     {
+        _occupant = null;
         if (rotateSeatWithPlayer)
         {
             transform.parent = null;

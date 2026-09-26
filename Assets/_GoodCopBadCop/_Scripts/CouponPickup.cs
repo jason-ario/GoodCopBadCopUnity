@@ -25,6 +25,14 @@ public class CouponPickup : Interactable
     /// </summary>
     public static event System.Action OnAnyPickedUp;
 
+    private static readonly System.Collections.Generic.HashSet<CouponPickup> _active = new();
+
+    /// <summary>Every coupon currently network-spawned on this machine. Do not mutate.</summary>
+    public static System.Collections.Generic.IReadOnlyCollection<CouponPickup> Active => _active;
+
+    /// <summary>Fired on every machine when a coupon network-spawns (e.g. to attach tutorial highlights).</summary>
+    public static event System.Action<CouponPickup> OnAnySpawned;
+
     [Header("Coupon Settings")]
     [Tooltip("Amount of coupon currency awarded to the shared pool on pickup.")]
     [SerializeField] private int _couponAmount = 5;
@@ -51,12 +59,15 @@ public class CouponPickup : Interactable
     {
         base.OnNetworkSpawn();
         ActiveCount++;
+        _active.Add(this);
+        OnAnySpawned?.Invoke(this);
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         ActiveCount--;
+        _active.Remove(this);
     }
 
     // ── Interaction ──────────────────────────────────────────────────────────

@@ -48,6 +48,13 @@ public enum HighlightHold
     /// Cleared only when that package is correctly sorted or despawned.
     /// </summary>
     MailDelivery = 1 << 2,
+
+    /// <summary>
+    /// Held automatically by <see cref="TutorialMarker"/> for as long as a tutorial arrow points at
+    /// this object (design rule: every arrowed interactable is also highlighted). Like every other
+    /// hold, it renders with the object's authored highlight. Never set this manually — go through the arrow.
+    /// </summary>
+    TutorialArrow = 1 << 3,
 }
 
 [RequireComponent(typeof(HighlightEffect))]
@@ -87,33 +94,6 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public bool IsForceHighlighted => _highlightHolds != HighlightHold.None;
 
     /// <summary>
-    /// The profile this object's <see cref="HighlightEffect"/> was authored with in the Inspector
-    /// (normally the shared "Highlighted" asset). Cached in <see cref="Awake"/> because
-    /// <see cref="HighlightEffect.ProfileLoad"/> overwrites <c>HighlightEffect.profile</c> — without
-    /// this there would be no record of the original style to swap back to.
-    /// </summary>
-    private HighlightProfile _defaultProfile;
-
-    /// <summary>Profile currently loaded into the effect, so repeat swaps are free.</summary>
-    private HighlightProfile _appliedProfile;
-
-    /// <summary>True while the reticle is on this object (see <see cref="Highlight"/>).</summary>
-    private bool _hovered;
-
-    /// <summary>Keeps the missing-authored-profile warning to one line per object.</summary>
-    private bool _warnedMissingDefaultProfile;
-
-    /// <summary>
-    /// Optional alternate style used while the highlight is being HELD on by a non-hover source
-    /// (see <see cref="HighlightHold"/>) and the player is not actually aiming at the object.
-    /// Lets a persistent, ambient glow read differently from the sharp "you are targeting this"
-    /// hover highlight — <see cref="JunkItem"/> uses it for the softer amber findability glow so a
-    /// yard full of lit-up gore doesn't look like a yard full of active interaction prompts.
-    /// Return null (the default) to always use the authored profile.
-    /// </summary>
-    protected virtual HighlightProfile ForceHighlightProfile => null;
-
-    /// <summary>
     /// Whether this object can be interacted with RIGHT NOW. <see cref="PlayerInteractionController"/>
     /// tests this instead of the raw <c>enabled</c> flag when deciding whether the reticle may target
     /// it, so a subclass whose availability depends on runtime state can express that without having
@@ -147,15 +127,10 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     protected virtual void Awake()
     {
         highlightEffect = GetComponent<HighlightEffect>();
-        // Remember the authored profile reference (see _defaultProfile) so ForceHighlightProfile
-        // swaps are reversible later. Deliberately do NOT call ProfileLoad here: it copies every
-        // field from the shared HighlightProfile asset onto this component (profile.Load(this)),
-        // clobbering any per-object tweaks made directly on this HighlightEffect in the Inspector/
-        // prefab. Leaving it alone means the component keeps whatever is authored on the object
-        // itself; ApplyHighlightProfile() below still swaps to a hold profile when one is actually
-        // requested (e.g. JunkItem's findability glow).
-        _defaultProfile = highlightEffect.profile;
-        _appliedProfile = _defaultProfile;
+        // Every hover and every hold (tutorial, junk, mail, arrow) uses this one authored highlight —
+        // there is no per-source profile swapping. Deliberately do NOT call ProfileLoad here: it
+        // copies every field from the shared HighlightProfile asset onto this component, clobbering
+        // any per-object tweaks made directly on this HighlightEffect in the Inspector/prefab.
         // Force the component enabled so that HighlightEffect.Start() always runs and
         // SetupMaterial() builds the renderer list (rms). If a prefab was saved with
         // the component disabled, Start() never fires, leaving rms null and causing the
@@ -169,17 +144,10 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
     public virtual void Highlight(bool highlight)
     {
-        _hovered = highlight;
-
         // While any hold is active (tutorial call-out, pickup affordance), ignore hover-driven
         // attempts to turn the highlight off — it should only clear via SetForceHighlight(false).
-        // The style still has to change back to the hold's own (softer) profile, since the object
-        // stays lit but is no longer the thing the player is aiming at.
         if (_highlightHolds != HighlightHold.None && !highlight)
-        {
-            ApplyHighlightProfile();
             return;
-        }
 
         // Some subclasses (e.g. WorldPurchaseActionInteractable / WorldShopItemInteractable)
         // share this HighlightEffect with a ShopItem component, which drives its own
@@ -189,10 +157,6 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         // 'enabled' every call so this class's invariant — always enabled, visibility
         // solely via 'highlighted' — holds no matter what else touched the component.
         highlightEffect.enabled = true;
-
-        // Hovering always shows the authored (default) style, even on an object that is also being
-        // held lit by another system — the hover highlight is the targeting feedback.
-        ApplyHighlightProfile();
 
         // Drive visibility through 'highlighted', not 'enabled'.
         // Toggling 'enabled' was the cause of the broken-first-hover bug: each
@@ -245,7 +209,6 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         if (highlightEffect != null)
         {
             highlightEffect.enabled = true;
-            ApplyHighlightProfile();
             highlightEffect.highlighted = anyHold;
         }
 
@@ -257,54 +220,6 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         {
             OnStopHighlight();
         }
-    }
-
-    /// <summary>
-    /// Loads whichever of <see cref="ForceHighlightProfile"/> / the authored profile matches the
-    /// current state: the authored one while hovered (or while nothing holds the highlight), the
-    /// hold profile otherwise.
-    ///
-    /// No-ops unless BOTH profiles exist — with no authored baseline a swap could never be undone,
-    /// so an object whose HighlightEffect has no profile assigned is simply left alone rather than
-    /// permanently restyled.
-    /// </summary>
-    private void ApplyHighlightProfile()
-    {
-        if (highlightEffect == null) return;
-
-        HighlightProfile holdProfile = ForceHighlightProfile;
-        if (holdProfile == null) return;
-
-        if (_defaultProfile == null)
-        {
-            // Nothing to swap back to on hover, so the object is left on its inline settings. Say so
-            // once: the visible symptom is an item glowing with the wrong style for no stated reason,
-            // which is otherwise indistinguishable from the hold profile failing to load.
-            if (!_warnedMissingDefaultProfile)
-            {
-                _warnedMissingDefaultProfile = true;
-                Debug.LogWarning($"[Interactable] '{name}' wants the '{holdProfile.name}' hold highlight " +
-                                 "profile but its HighlightEffect has no profile assigned in the " +
-                                 "Inspector, so the swap is skipped (there would be no authored style " +
-                                 "to restore on hover). Assign the shared highlight profile to fix.", this);
-            }
-
-            return;
-        }
-
-        bool useHoldProfile = !_hovered && _highlightHolds != HighlightHold.None;
-        HighlightProfile desired = useHoldProfile ? holdProfile : _defaultProfile;
-
-        if (desired == _appliedProfile) return;
-
-        _appliedProfile = desired;
-        highlightEffect.ProfileLoad(desired);
-
-        // HighlightProfile.Load overwrites effectNameFilter with the profile's own (empty) value,
-        // which would silently widen the effect to every child renderer — reassert the authored
-        // filter exactly as Awake does.
-        if (!string.IsNullOrEmpty(highlightNameFilter))
-            highlightEffect.effectNameFilter = highlightNameFilter;
     }
 
     protected virtual void OnHighlight()

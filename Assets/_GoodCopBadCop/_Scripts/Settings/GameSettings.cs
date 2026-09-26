@@ -73,15 +73,18 @@ public class GameSettings : ScriptableObject
         NormalSubtitles
     }
 
-    [Header("World Dialogue Overhearing")]
+    [Header("Dialogue Overhearing")]
     [Tooltip("How a client who is NOT the engaged player sees another player's world-dialogue conversation " +
              "with an NPC, while within OverhearSubtitleProximity of the speaker. InWorldSubtitles shows a " +
              "floating bubble above the NPC's head. NormalSubtitles shows the regular bottom-of-screen " +
              "subtitle instead. Outside that proximity, the conversation is not shown at all.")]
     [SerializeField] private OverhearSubtitleMode _overhearSubtitleMode = OverhearSubtitleMode.InWorldSubtitles;
 
-    [Tooltip("Max distance (meters) at which a non-engaged player can overhear another player's world-dialogue " +
-             "conversation at all, shown either as an in-world bubble or as NormalSubtitles depending on OverhearSubtitleMode.")]
+    [Tooltip("Max distance (meters) from a speaker at which a non-participating player can see that conversation's " +
+             "subtitles at all. Applies to every conversation type: booth/suspect dialogue and player choices, " +
+             "scripted dialogue, world dialogue, in-world subtitle bubbles, and NPC barks. Players outside this " +
+             "range see no subtitles for that conversation. Evaluated through OverhearRange.")]
+    [Min(0f)]
     [SerializeField] private float _overhearSubtitleProximity = 8f;
 
     /// <summary>How non-engaged players overhear another player's world-dialogue conversation.</summary>
@@ -91,7 +94,10 @@ public class GameSettings : ScriptableObject
         set => _overhearSubtitleMode = value;
     }
 
-    /// <summary>Max distance (meters) at which an overheard conversation is shown at all (in either mode).</summary>
+    /// <summary>
+    /// Max distance (meters) at which a non-participant sees any conversation's subtitles (booth,
+    /// scripted, world dialogue, in-world bubbles, barks). Query through <see cref="OverhearRange"/>.
+    /// </summary>
     public float OverhearSubtitleProximity
     {
         get => _overhearSubtitleProximity;

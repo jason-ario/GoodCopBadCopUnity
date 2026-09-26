@@ -784,6 +784,7 @@ public class Day_01 : DayBase
         // Post-Vlad ATM / button sequence cleanup.
         ShiftManager.OnNextSuspectReadyForBell -= OnVladVerdictReadyIntercept;
         CouponPickup.OnAnyPickedUp             -= OnCouponPickedUp;
+        CouponPickup.OnAnySpawned              -= OnCouponSpawnedForArrow;
         SwitchButton.OnPressed                 -= OnVladButtonPressed;
         TutorialMarkerManager.Instance?.UnmarkAll();
 
@@ -916,6 +917,7 @@ public class Day_01 : DayBase
         // Post-Vlad ATM / button sequence cleanup.
         ShiftManager.OnNextSuspectReadyForBell -= OnVladVerdictReadyIntercept;
         CouponPickup.OnAnyPickedUp             -= OnCouponPickedUp;
+        CouponPickup.OnAnySpawned              -= OnCouponSpawnedForArrow;
         SwitchButton.OnPressed                 -= OnVladButtonPressed;
 
         // Trash/graffiti task tutorial cleanup (safe to call even if tasks never started).
@@ -1031,63 +1033,9 @@ public class Day_01 : DayBase
         if (!NetworkManager.Singleton.IsServer) return;
         if (_debugSkipActive) return;
 
-        // Vlad's scripted opening only belongs on a genuinely fresh Day 1 (or a save captured
-        // before he was fully processed — see CampaignManager.StartCampaign, which discards a
-        // mid-shift restore in that exact case so this still runs from the top). Once his
-        // tutorial has actually been completed (SaveDataManager.Day1VladProcessed), every later
-        // clock-in on this save — whether from resuming mid-Day-1 after a quit/reload, or from
-        // any other re-entry into this method — must NOT re-arm his forced spawn/dialogue.
-        // Without this check, Day1OpeningSequence unconditionally re-armed
-        // SuspectController.InterceptNextSuspectSpawn on every single clock-in, hijacking
-        // whichever suspect the restored SuspectIndex actually pointed at (spawning Vlad again,
-        // or leaving OnVladArrivedAtWindow's index-0 check to fire his dialogue onto whoever
-        // actually landed on lineup slot 0) instead of continuing the lineup from where the
-        // player left off.
-        if (SaveDataManager.Instance?.Day1VladProcessed ?? false)
-        {
-            StartCoroutine(Day1ResumedShiftStart());
-            return;
-        }
-
+        // Saves only ever load from the start of a day, so every Day 1 clock-in is a fresh
+        // Day 1 and always runs Vlad's scripted opening from the top.
         StartCoroutine(Day1OpeningSequence());
-    }
-
-    /// <summary>
-    /// Runs instead of <see cref="Day1OpeningSequence"/> whenever the player clocks in on Day 1
-    /// after Vlad's scripted tutorial has already been fully processed on this save file (see
-    /// <see cref="SaveDataManager.Day1VladProcessed"/>) — i.e. every clock-in on a mid-Day-1
-    /// resume from here on, since Vlad only ever needs to appear once per save. Starts the
-    /// shift normally, with no Vlad intercept, no forced no-paperwork/skip-entry-dialogue, and
-    /// no bell bypass, so the suspect lineup continues from wherever
-    /// <see cref="SuspectController.SuspectIndex"/> was left (restored by
-    /// <see cref="ShiftManager.RestoreWorkdaySaveState"/>) instead of forcing Vlad back into
-    /// that slot.
-    /// </summary>
-    private IEnumerator Day1ResumedShiftStart()
-    {
-        yield return new WaitForSeconds(_shutterOpenDelay);
-
-        // Vlad's arrival-only dialogue hook must never fire again this session. A resumed
-        // suspect can legitimately land back on lineup index 0 (e.g. a retry after a failed
-        // spawn attempt) — without unsubscribing here, OnVladArrivedAtWindow's index-0 check
-        // would force his scripted dialogue onto whoever that suspect actually is.
-        SuspectController.OnSuspectArrived -= OnVladArrivedAtWindow;
-
-        ShutterController.Instance.OpenShutter();
-        _lever?.AnimateOpenServerSide(1f);
-
-        // DayActivated unconditionally re-locks every tutorial-gated interactable and re-arms
-        // HandOffPoint.BlockVerdict every time Day 1 activates, including on this resumed
-        // session — but the sequence that normally unlocks/clears them (Vlad's own tutorial)
-        // will never run again this session, since he was already processed. Force them back
-        // to their unlocked/cleared state, mirroring ShiftManager.ResumeSavedDay's Day 2+ restore.
-        ForceUnlockTutorialItems();
-        HandOffPoint.BlockVerdict = false;
-        SuspectController.Instance?.ClearBlockVerdictAcrossAllClients();
-
-        ShiftManager.Instance.TryStartShift();
-
-        Debug.Log("[Day_01] Vlad's tutorial was already processed on this save — resuming the shift normally.");
     }
 
     /// <summary>
@@ -1152,7 +1100,13 @@ public class Day_01 : DayBase
         // sequence via ScriptedDialogueRunner takes full control of the conversation.
         SuspectController.ForceNextSuspectNoPaperwork = true;
         SuspectController.ForceNextSuspectSkipEntryDialogue = true;
-        SuspectController.InterceptNextSuspectSpawn = () => SuspectController.Instance.SpawnScriptedSuspect(_vladPrefab);
+        // Vlad is fully non-interactable for all of Day 1 — his conversation is driven entirely
+        // by the scripted tutorial, so clicking him must never open intro/question choices.
+        SuspectController.InterceptNextSuspectSpawn = () =>
+        {
+            SuspectController.Instance.SpawnScriptedSuspect(_vladPrefab);
+            SuspectController.Instance.CurrentSuspect?.SetInteractionLockedServer(true);
+        };
 
         // Vlad is a tutorial character — bypass the bell mechanic for his slot only.
         // When the shift signals the first suspect is ready, auto-summon him immediately.
@@ -1295,7 +1249,12 @@ public class Day_01 : DayBase
     private void ShowVladPickUpTask()
     {
         if (TutorialMarkerManager.Instance != null && _markerPickUpDocs != null)
+        {
             TutorialMarkerManager.Instance.Mark(_markerPickUpDocs);
+            // Runtime-spawned docs: highlight them alongside the arrow (each stops glowing once held).
+            TutorialMarkerManager.Instance.AddHighlight(_markerPickUpDocs, _vladIDCard);
+            TutorialMarkerManager.Instance.AddHighlight(_markerPickUpDocs, _vladAppForm);
+        }
 
         _taskPickUpDocs = TutorialObjectiveList.Instance?.AddObjective(_taskPickUpDocsText);
     }
@@ -2016,11 +1975,23 @@ public class Day_01 : DayBase
         _taskCollectCoupons = TutorialObjectiveList.Instance?.AddObjective(_taskCollectCouponsText);
 
         if (TutorialMarkerManager.Instance != null && _markerATM != null)
+        {
             TutorialMarkerManager.Instance.Mark(_markerATM);
+            // Highlight the dispensed coupons (network-spawned) for as long as the ATM arrow is up.
+            foreach (CouponPickup coupon in CouponPickup.Active)
+                TutorialMarkerManager.Instance.AddHighlight(_markerATM, coupon);
+        }
 
+        CouponPickup.OnAnySpawned += OnCouponSpawnedForArrow;
         CouponPickup.OnAnyPickedUp += OnCouponPickedUp;
 
         Debug.Log("[Day_01] Vlad verdict broadcast received — showing 'Collect coupons' task.");
+    }
+
+    private void OnCouponSpawnedForArrow(CouponPickup coupon)
+    {
+        if (_markerATM != null)
+            TutorialMarkerManager.Instance?.AddHighlight(_markerATM, coupon);
     }
 
     /// <summary>
@@ -2060,6 +2031,7 @@ public class Day_01 : DayBase
 
         // All coupons collected — complete the coupon task and unmark the ATM arrow.
         CouponPickup.OnAnyPickedUp -= OnCouponPickedUp;
+        CouponPickup.OnAnySpawned  -= OnCouponSpawnedForArrow;
 
         if (TutorialMarkerManager.Instance != null && _markerATM != null)
             TutorialMarkerManager.Instance.Unmark(_markerATM);
@@ -2195,12 +2167,6 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnClosingDialogueComplete()
     {
-        // Mark Vlad's tutorial appearance as fully processed. Read by CampaignManager.StartCampaign
-        // on a future load/resume to decide whether Day 1 can safely resume mid-shift or must
-        // restart its opening sequence from the beginning (see Day1VladProcessed doc comment).
-        if (SaveDataManager.Instance != null)
-            SaveDataManager.Instance.Day1VladProcessed = true;
-
         // Silence Vlad's generic exit bark — his story ends with "Don't fuck it up."
         SuspectController.ForceNextSuspectSkipExitDialogue = true;
 

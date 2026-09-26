@@ -1,5 +1,4 @@
 using System;
-using HighlightPlus;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -170,12 +169,6 @@ public class JunkItem : Interactable
         if (string.IsNullOrEmpty(interactText))
             interactText = DefaultInteractText;
     }
-
-    /// <summary>
-    /// Junk glowing because an active task requires it uses the softer amber profile, so a yard
-    /// scattered with optional gore reads as scenery rather than as a screenful of objectives.
-    /// </summary>
-    protected override HighlightProfile ForceHighlightProfile => JunkPickupHighlightService.CollectibleProfile;
 
     // ── Findability highlight registration ────────────────────────────────────
 

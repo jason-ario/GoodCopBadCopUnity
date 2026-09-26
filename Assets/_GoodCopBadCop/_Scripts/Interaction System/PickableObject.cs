@@ -449,6 +449,10 @@ public class PickableObject : Interactable
                 _colliderController?.SetReleased();
         }
 
+        // Runs regardless of the interactable lock so subclasses can re-assert state that
+        // SetHeld/SetReleased above may have clobbered (e.g. slot-owned pickups).
+        OnHolderCollidersRefreshed(current != ulong.MaxValue);
+
         if (_interactableLocked) return;
         // Only apply holder-based logic when no tutorial override is active.
         if (_networkInteractableOverride.Value == -1)
@@ -480,6 +484,13 @@ public class PickableObject : Interactable
     /// ReleaseHolderServerRpc round-trip has necessarily completed.
     /// </summary>
     protected virtual void OnHeldStateChanged(bool isHeld) { }
+
+    /// <summary>
+    /// Called on every machine right after held/released collider state is refreshed in
+    /// OnHoldingClientChanged, before the interactable-lock early-out. Override to re-assert
+    /// interactable state that PickableColliderController.SetReleased may have clobbered.
+    /// </summary>
+    protected virtual void OnHolderCollidersRefreshed(bool isHeld) { }
 
     private void OnNetworkInteractableOverrideChanged(int previous, int current)
         => ApplyNetworkInteractableState();

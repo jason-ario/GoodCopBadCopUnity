@@ -683,7 +683,8 @@ public class Day_02 : DayBase, IDailyTask
                 _spawnedVlad,
                 _vladIntroDialogue,
                 () => introDone = true,
-                lockOutsidePlayers: true);
+                lockOutsidePlayers: true,
+                participantRadius: _introProximityRadius);
             yield return new WaitUntil(() => introDone);
             _spawnedVlad.SetCanInteractNetworked(true);
         }
@@ -758,7 +759,8 @@ public class Day_02 : DayBase, IDailyTask
                 _spawnedVlad,
                 _vladToolLockerDialogue,
                 () => lockerDone = true,
-                lockOutsidePlayers: true);
+                lockOutsidePlayers: true,
+                participantRadius: _toolLockerProximityRadius);
             yield return new WaitUntil(() => lockerDone);
             _spawnedVlad.SetCanInteractNetworked(true);
         }
@@ -1338,7 +1340,8 @@ public class Day_02 : DayBase, IDailyTask
                 _spawnedVladOutBack,
                 _vladOutBackIntroDialogue,
                 () => introDone = true,
-                lockOutsidePlayers: true);
+                lockOutsidePlayers: true,
+                participantRadius: _outBackProximityRadius);
             yield return new WaitUntil(() => introDone);
         }
 
@@ -1399,7 +1402,8 @@ public class Day_02 : DayBase, IDailyTask
                 _spawnedVladOutBack,
                 _vladDeadAnimalPart1Dialogue,
                 () => part1Done = true,
-                lockOutsidePlayers: true);
+                lockOutsidePlayers: true,
+                participantRadius: _outBackProximityRadius);
             yield return new WaitUntil(() => part1Done);
         }
 
@@ -1424,7 +1428,8 @@ public class Day_02 : DayBase, IDailyTask
                 _spawnedVladOutBack,
                 _vladDeadAnimalPart2Dialogue,
                 () => part2Done = true,
-                lockOutsidePlayers: true);
+                lockOutsidePlayers: true,
+                participantRadius: _outBackProximityRadius);
             yield return new WaitUntil(() => part2Done);
         }
 

@@ -43,10 +43,12 @@ public class InWorldSubtitle : MonoBehaviour
     {
         // Force-hide (without touching _isShown or the auto-hide timer) while the pause menu is
         // open, so the bubble doesn't float on top of it; restores automatically once unpaused.
-        // Likewise force-hide locally while the dialogue choice panel is showing.
+        // Likewise force-hide locally while the dialogue choice panel is showing, or while the
+        // local player is outside overhear range (GameSettings.OverhearSubtitleProximity).
         bool isPaused = UIController.Instance != null && UIController.Instance.IsPaused;
         bool choicesVisible = DialogueChoiceSystem.Instance != null && DialogueChoiceSystem.Instance.IsChoicePanelVisible;
-        bool forceHidden = isPaused || choicesVisible;
+        bool outOfRange = _isShown && !OverhearRange.IsLocalPlayerWithin(transform.position);
+        bool forceHidden = isPaused || choicesVisible || outOfRange;
         if (canvasGroup != null)
             canvasGroup.alpha = (_isShown && !forceHidden) ? 1f : 0f;
 

@@ -30,12 +30,18 @@ public class PostProcessAlarmController : MonoBehaviour
     [Tooltip("Maximum blend strength of the red tint pulse (1 = fully replaces the image color with alarmColor).")]
     [SerializeField, Range(0f, 1f)] private float maxWeight = 0.85f;
 
-    [Tooltip("Extra exposure boost applied at the peak of each pulse, so the red reads clearly even over dark scenery.")]
+    [Tooltip("Extra exposure boost (EV, added on top of the player's Brightness setting) applied at the peak of each pulse, so the red reads clearly even over dark scenery.")]
     [SerializeField] private float peakPostExposure = 0.5f;
 
+    [Header("Brightness Source")]
+    [Tooltip("Base volume that carries the player's Brightness preference. Auto-found in the scene if left empty.")]
+    [SerializeField] private GoodCopBadCop.Settings.GraphicsPreferencesVolumeAnchor brightnessVolumeAnchor;
+
     private ColorAdjustments _colorAdjustments;
+    private ColorAdjustments _brightnessAdjustments;
     private VolumeProfile _profile;
     private bool _originalActive;
+    private bool _originalPostExposureOverride;
     private Color _originalColorFilter;
     private float _originalPostExposure;
     private Coroutine _pulseCoroutine;
@@ -87,8 +93,11 @@ public class PostProcessAlarmController : MonoBehaviour
     private void CacheOriginalState()
     {
         _originalActive = _colorAdjustments.active;
+        _originalPostExposureOverride = _colorAdjustments.postExposure.overrideState;
         _originalColorFilter = _colorAdjustments.colorFilter.value;
         _originalPostExposure = _colorAdjustments.postExposure.value;
+
+        ResolveBrightnessAdjustments();
 
         _colorAdjustments.active = true;
         _colorAdjustments.colorFilter.overrideState = true;
@@ -100,8 +109,37 @@ public class PostProcessAlarmController : MonoBehaviour
         if (_colorAdjustments == null) return;
 
         _colorAdjustments.active = _originalActive;
+        _colorAdjustments.postExposure.overrideState = _originalPostExposureOverride;
         _colorAdjustments.colorFilter.value = _originalColorFilter;
         _colorAdjustments.postExposure.value = _originalPostExposure;
+    }
+
+    /// <summary>
+    /// Finds the ColorAdjustments override on the base volume that GraphicsPreferencesApplier writes
+    /// the Brightness preference into. The alert volume's postExposure override replaces (not adds to)
+    /// that value while active, so the pulse must be expressed relative to it.
+    /// </summary>
+    private void ResolveBrightnessAdjustments()
+    {
+        if (_brightnessAdjustments != null) return;
+
+        if (brightnessVolumeAnchor == null)
+            brightnessVolumeAnchor = FindAnyObjectByType<GoodCopBadCop.Settings.GraphicsPreferencesVolumeAnchor>();
+
+        Volume baseVolume = brightnessVolumeAnchor != null ? brightnessVolumeAnchor.Volume : null;
+        if (baseVolume == null || baseVolume == alertVolume) return;
+
+        // Use the instanced profile (same one GraphicsPreferencesApplier modifies at runtime).
+        VolumeProfile baseProfile = baseVolume.profile;
+        if (baseProfile != null)
+            baseProfile.TryGet(out _brightnessAdjustments);
+    }
+
+    private float GetBrightnessExposure()
+    {
+        if (_brightnessAdjustments != null && _brightnessAdjustments.active && _brightnessAdjustments.postExposure.overrideState)
+            return _brightnessAdjustments.postExposure.value;
+        return _originalPostExposure;
     }
 
     private IEnumerator PulseLoop()
@@ -113,8 +151,11 @@ public class PostProcessAlarmController : MonoBehaviour
             float t = Mathf.PingPong(Time.time * pulseSpeed, 1f);
             float weight = Mathf.Lerp(minWeight, maxWeight, t);
 
+            // Sampled every frame so a Brightness change mid-alarm is respected.
+            float baseExposure = GetBrightnessExposure();
+
             _colorAdjustments.colorFilter.value = Color.Lerp(_originalColorFilter, alarmColor, weight);
-            _colorAdjustments.postExposure.value = Mathf.Lerp(_originalPostExposure, peakPostExposure, weight);
+            _colorAdjustments.postExposure.value = Mathf.Lerp(baseExposure, baseExposure + peakPostExposure, weight);
 
             yield return null;
         }

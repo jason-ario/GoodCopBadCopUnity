@@ -814,6 +814,14 @@ public class DialogueChoiceSystem : NetworkBehaviour
     private void SpawnPlayerSubtitleClientRpc(string choiceText, string playerName, ulong senderClientId)
     {
         if (NetworkManager.Singleton.LocalClientId == senderClientId) return;
+
+        // Only booth participants and players within overhear range of the booth conversation
+        // (the current suspect) see the other player's spoken choice.
+        Transform conversationSource = SuspectController.Instance != null && SuspectController.Instance.CurrentSuspect != null
+            ? SuspectController.Instance.CurrentSuspect.transform
+            : null;
+        if (!OverhearRange.CanLocalPlayerSee(conversationSource)) return;
+
         DialogueManager.Instance.SpawnSubtitles(choiceText, playerName, Color.white, true);
     }
 

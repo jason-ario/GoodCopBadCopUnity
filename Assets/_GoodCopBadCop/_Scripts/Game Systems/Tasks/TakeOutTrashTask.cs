@@ -539,7 +539,6 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // no longer gate the timecard machine.
         if (CleanupTaskGating.IsMandatoryDay)
             ShiftManager.Instance?.RegisterPendingDailyTask(this);
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log($"[TakeOutTrashTask] Task triggered ({(useGorePrefabs ? "gore" : "trash")} pool) — " +
                   $"spawned {_spawnedItems.Count}, pre-existing {preExistingCount}, total {_totalCount.Value}.");
@@ -871,7 +870,6 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Flip the active flag — OnIsActiveChanged fires on all clients to remove the task.
         _isActive.Value = false;
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         // Broadcast completion to every client, not just wherever this ServerRpc-triggered
         // code happens to run (the server/host process). Day_01 subscribes to these events

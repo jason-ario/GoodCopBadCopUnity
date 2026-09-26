@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// Tracks every live <see cref="PickableObject"/> in the scene so their transforms can be
 /// captured to, and restored from, the active save file. Used for:
-///   - general save/load persistence (see <see cref="SaveDataManager.SaveDuskCheckpoint"/>), and
+///   - day-start checkpoint persistence (see <see cref="SaveDataManager.CommitDayStartCheckpoint"/>), and
 ///   - resetting pickables back to their last checkpoint position when a player dies and
 ///     retries, instead of leaving them wherever they were thrown/dropped mid-attempt.
 ///

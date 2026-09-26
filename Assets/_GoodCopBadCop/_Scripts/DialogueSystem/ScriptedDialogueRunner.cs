@@ -141,6 +141,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private bool _allowParticipantExit;
     private bool _hideNonParticipantUI;
 
+    // Per-sequence proximity radius. Forced outside conversations (lockOutsidePlayers) seed and
+    // late-join strictly by distance so an out-of-range co-op partner is never pulled in; they
+    // join once they walk within _activeJoinRadius (callers pass their trigger radius here).
+    private float _activeJoinRadius = -1f;
+    private float EffectiveJoinRadius => _activeJoinRadius > 0f ? _activeJoinRadius : _joinRadius;
+
     // Throttle for the per-frame proximity scan — removed; cost is negligible for 2 players.
 
     // -------------------------------------------------------------------------
@@ -263,11 +269,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// <see cref="ExitScriptedMode"/> (or chaining <see cref="PlayMegaphoneDialogue"/>)
     /// when the full sequence is finished.
     /// </para>
+    /// <para>
+    /// <paramref name="participantRadius"/> overrides the inspector join radius for this
+    /// sequence only (&lt;= 0 keeps the default). With <paramref name="lockOutsidePlayers"/>,
+    /// only players within that radius are locked in at the start; others join (and are
+    /// locked) when they walk into range.
+    /// </para>
     /// </summary>
     public void PlayDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
         Action onComplete = null, bool deferExit = false, bool lockOutsidePlayers = false,
         ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
-        bool allowParticipantExit = false, bool hideNonParticipantUI = true)
+        bool allowParticipantExit = false, bool hideNonParticipantUI = true,
+        float participantRadius = -1f)
     {
         if (!IsServer) return;
 
@@ -288,7 +301,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             initialParticipantClientId,
             joinByInteractionOnly,
             allowParticipantExit,
-            hideNonParticipantUI));
+            hideNonParticipantUI,
+            participantRadius));
     }
 
     /// <summary>
@@ -325,6 +339,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _joinByInteractionOnly = false;
         _allowParticipantExit = false;
         _hideNonParticipantUI = true;
+        _activeJoinRadius = -1f;
         HideInWorldSubtitleClientRpc(speakerNetId);
         SetActiveDialogueSpeakerClientRpc(0);
         ExitScriptedModeClientRpc(false, exitRecipients);
@@ -499,9 +514,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private IEnumerator RunDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
         Action onComplete, bool deferExit = false, bool lockOutsidePlayers = false,
         ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
-        bool allowParticipantExit = false, bool hideNonParticipantUI = true)
+        bool allowParticipantExit = false, bool hideNonParticipantUI = true,
+        float participantRadius = -1f)
     {
         ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
+        _activeJoinRadius = participantRadius;
 
         Debug.Log($"[ScriptedDialogueRunner] RunDialogue — IsSpawned={IsSpawned}, IsServer={IsServer}, speakerNetId={speakerNetId}, deferExit={deferExit}");
 
@@ -579,6 +596,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             _joinByInteractionOnly = false;
             _allowParticipantExit = false;
             _hideNonParticipantUI = true;
+            _activeJoinRadius = -1f;
             HideInWorldSubtitleClientRpc(speakerNetId);
             SetActiveDialogueSpeakerClientRpc(0);
             ExitScriptedModeClientRpc(lockOutsidePlayers, exitRecipients);
@@ -696,8 +714,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     ///
     /// Rules (applied in order):
     /// <list type="bullet">
-    ///   <item>When <paramref name="lockOutsidePlayers"/> is <c>true</c>, every connected
-    ///         client is a participant — outside players are explicitly locked in.</item>
+    ///   <item>When <paramref name="lockOutsidePlayers"/> is <c>true</c> (forced outside
+    ///         conversation), only clients within <see cref="EffectiveJoinRadius"/> are seeded
+    ///         (fallback: the nearest client). Out-of-range players join on arrival.</item>
     ///   <item>Inside players (<see cref="PlayerInstance.IsOutside"/> == false) are always
     ///         included regardless of their distance from the speaker, because they are in
     ///         the booth and will always enter dialogue mode.</item>
@@ -720,15 +739,37 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        // When all players are explicitly locked in, include everyone.
-        if (lockOutsidePlayers || _currentSpeakerTransform == null)
+        // No speaker to measure against — include everyone so the dialogue is never unblockable.
+        if (_currentSpeakerTransform == null)
         {
             _participants.UnionWith(NetworkManager.Singleton.ConnectedClientsIds);
-            Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — all {_participants.Count} clients seeded (lockOutsidePlayers={lockOutsidePlayers}).");
+            Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — all {_participants.Count} clients seeded (no speaker transform).");
             return;
         }
 
         Vector3 speakerPos = _currentSpeakerTransform.position;
+
+        // Forced outside conversations: lock in only players within range. An out-of-range
+        // partner stays free and is pulled in by CheckProximityJoins once they arrive.
+        if (lockOutsidePlayers)
+        {
+            foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+            {
+                if (IsClientWithinJoinRadius(clientId, speakerPos))
+                    _participants.Add(clientId);
+            }
+
+            // Fallback: nobody in range (e.g. the trigger player stepped back during the
+            // settle beat) — take only the nearest player, never the whole session.
+            if (_participants.Count == 0 && TryGetNearestClient(speakerPos, out ulong nearest))
+                _participants.Add(nearest);
+            if (_participants.Count == 0)
+                _participants.UnionWith(NetworkManager.Singleton.ConnectedClientsIds);
+
+            Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — forced: {_participants.Count}/{NetworkManager.Singleton.ConnectedClientsIds.Count} in range (radius={EffectiveJoinRadius}).");
+            return;
+        }
+
         foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
         {
             // Inside players are always in the booth and will always enter dialogue mode —
@@ -948,7 +989,21 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return false;
         if (client.PlayerObject == null) return false;
 
-        return Vector3.Distance(origin, client.PlayerObject.transform.position) <= _joinRadius;
+        return Vector3.Distance(origin, client.PlayerObject.transform.position) <= EffectiveJoinRadius;
+    }
+
+    /// <summary>Finds the connected client whose PlayerObject is closest to <paramref name="origin"/>.</summary>
+    private bool TryGetNearestClient(Vector3 origin, out ulong nearestClientId)
+    {
+        nearestClientId = ulong.MaxValue;
+        float best = float.MaxValue;
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null) continue;
+            float d = Vector3.Distance(origin, client.PlayerObject.transform.position);
+            if (d < best) { best = d; nearestClientId = client.ClientId; }
+        }
+        return nearestClientId != ulong.MaxValue;
     }
 
     /// <summary>
@@ -1165,6 +1220,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         if (ownerNetId == 0) return;
         if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(ownerNetId, out var netObj)) return;
+
+        // Bystander bubbles are only visible within overhear range of whoever is speaking.
+        if (!OverhearRange.IsLocalPlayerWithin(netObj.transform)) return;
 
         var anchor = netObj.GetComponent<InWorldSubtitleAnchor>();
         anchor?.Subtitle?.ShowLine(text, speakerName, isPlayerLine ? Color.cyan : Color.white);
@@ -1693,9 +1751,27 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
         DialogueChoiceSystem.Instance?.HideChoicePanel();
 
+        // Non-participants only see the spoken choice while within overhear range of the
+        // conversation (the active scripted speaker).
+        if (!OverhearRange.CanLocalPlayerSee(ResolveActiveDialogueSpeakerTransform())) return;
+
         bool isLocalWinner = NetworkManager.Singleton != null &&
                              NetworkManager.Singleton.LocalClientId == winnerClientId;
         DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.white, isLocalWinner);
+    }
+
+    /// <summary>
+    /// Client-side lookup of the transform for <see cref="ActiveDialogueSpeakerNetId"/> (broadcast
+    /// to every client regardless of participation). Returns null when no speaker is active/spawned.
+    /// </summary>
+    private static Transform ResolveActiveDialogueSpeakerTransform()
+    {
+        ulong netId = ActiveDialogueSpeakerNetId;
+        if (netId == 0 || NetworkManager.Singleton == null || NetworkManager.Singleton.SpawnManager == null)
+            return null;
+        return NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(netId, out var netObj)
+            ? netObj.transform
+            : null;
     }
 
     // -------------------------------------------------------------------------

@@ -124,8 +124,8 @@ public class GlobalHostVariables : NetworkBehaviour
 
     /// <summary>
     /// Server-only. Forces the shared money pool to an exact value, clamped to non-negative.
-    /// Used to restore the coupon total to its last Dusk checkpoint when a death-retry
-    /// fast-forwards back into the post-shift phase (see <see cref="ShiftManager.RestartIntoPostShiftPhase"/>).
+    /// Used to restore the coupon total from the day-start checkpoint when a save is loaded or a
+    /// lost day is retried (see <see cref="SaveDataManager.CommitDayStartCheckpoint"/>).
     /// </summary>
     public void SetMoney(int amount)
     {

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using HighlightPlus;
 using UnityEngine;
 
 /// <summary>
@@ -28,83 +27,6 @@ public static class JunkPickupHighlightService
     private static readonly HashSet<JunkItem> _registered = new HashSet<JunkItem>();
 
     private static bool _enabled = true;
-
-    /// <summary>
-    /// Resources path of the profile used for the ambient findability glow — a softer, amber-tinted
-    /// variant of the shared "Highlighted" profile. Loaded from Resources rather than serialized on
-    /// each prefab because collectible junk comes from many unrelated prefabs (trash props, every
-    /// gore chunk, mutant corpses, suspect bodies), and several of them are only ever spawned at
-    /// runtime — one shared lookup keeps them consistent with zero per-prefab authoring.
-    /// </summary>
-    /// <remarks>
-    /// This is a plain string lookup with no compile-time or asset-reference safety net: renaming the
-    /// asset in the Project window silently breaks it, and the only symptom is every collectible item
-    /// quietly falling back to the sharp white hover style (which is exactly what happened once). So
-    /// the exact paths are tried first, and a folder scan matching <see cref="ProfileNameFragment"/>
-    /// is used as a backstop — any future rename that keeps "Junk Collectible" in the name keeps
-    /// working.
-    /// </remarks>
-    private static readonly string[] ProfileResourcePaths =
-    {
-        "Highlight/Junk Collectible - Highlight",
-        "Highlight/Junk Collectible",
-    };
-
-    /// <summary>Folder scanned, and name fragment matched, when neither exact path resolves.</summary>
-    private const string ProfileResourceFolder = "Highlight";
-    private const string ProfileNameFragment = "Junk Collectible";
-
-    private static HighlightProfile _collectibleProfile;
-    private static bool _profileLoadAttempted;
-
-    /// <summary>
-    /// The softer amber profile shown while an item is glowing only because it is collectible (i.e.
-    /// the player is not aiming at it). Null if the asset is missing, in which case items simply keep
-    /// their authored highlight style. Looked up once and cached for the process lifetime.
-    /// </summary>
-    public static HighlightProfile CollectibleProfile
-    {
-        get
-        {
-            if (_profileLoadAttempted) return _collectibleProfile;
-
-            _profileLoadAttempted = true;
-
-            foreach (string path in ProfileResourcePaths)
-            {
-                _collectibleProfile = Resources.Load<HighlightProfile>(path);
-                if (_collectibleProfile != null) break;
-            }
-
-            if (_collectibleProfile == null)
-            {
-                // Backstop: find it by name fragment so a rename can't silently kill the glow.
-                foreach (HighlightProfile candidate in Resources.LoadAll<HighlightProfile>(ProfileResourceFolder))
-                {
-                    if (candidate == null || !candidate.name.Contains(ProfileNameFragment)) continue;
-
-                    _collectibleProfile = candidate;
-                    Debug.Log($"[JunkPickupHighlightService] Collectible-junk profile found as " +
-                              $"'{candidate.name}' by folder scan rather than at its expected path — " +
-                              "the asset has been renamed. Still working, but update " +
-                              "ProfileResourcePaths to keep the fast path.");
-                    break;
-                }
-            }
-
-            if (_collectibleProfile == null)
-            {
-                Debug.LogWarning("[JunkPickupHighlightService] No HighlightProfile found at any of " +
-                                 $"Resources/{string.Join(", Resources/", ProfileResourcePaths)}, and " +
-                                 $"none in Resources/{ProfileResourceFolder} whose name contains " +
-                                 $"'{ProfileNameFragment}' — collectible junk, gore and mutant corpses " +
-                                 "will all glow with their default (white hover) style instead of the " +
-                                 "softer amber one.");
-            }
-
-            return _collectibleProfile;
-        }
-    }
 
     /// <summary>
     /// Global on/off for the whole affordance. Single lever for suppressing the glow when it would

@@ -89,7 +89,10 @@ public class DailyPickupSpawnManager : NetworkBehaviour
         if (_initializedDay == day)
             return;
 
-        WorkdaySaveState savedState = SaveDataManager.Instance?.GetWorkdayState(day);
+        // On a load, the day-start checkpoint already holds this day's rolled pickups; restore
+        // them so a reload does not re-roll. A fresh day has no baseline yet and rolls normally
+        // (ShiftManager captures the result into the checkpoint right after OnDayStart).
+        WorkdaySaveState savedState = SaveDataManager.Instance?.GetDayStartWorkdayState(day);
 
         if (savedState != null && savedState.DailyPickupsInitialized)
             RestoreSavedPickups(savedState.DailyPickups);
@@ -98,8 +101,6 @@ public class DailyPickupSpawnManager : NetworkBehaviour
 
         _initializedDay = day;
         DailyPickupSaveData[] snapshot = CaptureSaveData();
-        SaveDataManager.Instance?.SaveDayStartDailyPickupState(day, snapshot);
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
         Debug.Log($"[DailyPickupSpawnManager] Initialized {snapshot.Length} persistent daily pickup(s) for Day {day}.");
     }
 

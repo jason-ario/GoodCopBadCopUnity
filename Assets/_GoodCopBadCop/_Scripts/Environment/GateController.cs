@@ -61,6 +61,13 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
         _openedIn.OnValueChanged  += OnOpenDirectionChanged;
         _isLocked.OnValueChanged  += OnIsLockedChanged;
 
+        // In-scene NetworkObjects spawn in no guaranteed order. If the padlock spawned first, its
+        // Lock()/Unlock() call on this gate was a no-op (IsServer is false until this behaviour
+        // spawns), so adopt the padlock's current state here. A padlock that is still present
+        // reports its own NetworkVariable (defaults to locked); a destroyed one means unlocked.
+        if (IsServer && _lockController != null)
+            _isLocked.Value = _lockController.IsLocked;
+
         // Sync visual state on late join.
         ApplyGateVisuals(_gateOpen.Value, _openedIn.Value);
     }
@@ -68,12 +75,7 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
     private void Update()
     {
         if (!_autoOpenForSuspects) return;
-        if (_gateOpen.Value || _isLocked.Value) return;
-
-        // Also block auto-open while the physical padlock is locked, even if the gate's
-        // own _isLocked NetworkVariable hasn't been driven by the lock controller yet
-        // (e.g. lockableTarget not wired in the Inspector).
-        if (_lockController != null && _lockController.IsLocked) return;
+        if (_gateOpen.Value || IsLocked) return;
 
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
@@ -129,8 +131,15 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
 
     // ── ILockable ─────────────────────────────────────────────────────────────
 
-    /// <inheritdoc/>
-    public bool IsLocked => _isLocked.Value;
+    /// <summary>
+    /// True while the gate's own lock flag is set OR its spawned padlock is still locked. The
+    /// padlock check is a safety net so the gate can never be opened while the padlock is on it,
+    /// even if the padlock's Lock() call was missed. Despawned/destroyed padlocks are ignored so
+    /// late-joining clients don't read the padlock's default (locked) value.
+    /// </summary>
+    public bool IsLocked =>
+        _isLocked.Value
+        || (_lockController != null && _lockController.IsSpawned && _lockController.IsLocked);
 
     /// <summary>Locks the gate so it cannot be opened. Must be called on the server.</summary>
     public void Lock()
@@ -148,7 +157,7 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
 
     public override void Interact(PlayerInteractionController player)
     {
-        if (_isLocked.Value)
+        if (IsLocked)
         {
             PlayLockedTriedOpeningServerRpc();
             return;
@@ -188,6 +197,15 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
     [ServerRpc(RequireOwnership = false)]
     private void ToggleGateServerRpc(bool openedIn, ulong senderClientId)
     {
+        // Server-authoritative lock check: reject and correct any client that predicted an open
+        // while the gate is actually locked.
+        if (IsLocked && !_gateOpen.Value)
+        {
+            BroadcastGateStateClientRpc(_gateOpen.Value, _openedIn.Value, ulong.MaxValue);
+            PlayLockedTriedOpeningClientRpc();
+            return;
+        }
+
         if (_gateOpen.Value)
         {
             _gateOpen.Value = false;

@@ -9,7 +9,9 @@ public class SuspectRunRecords : MonoBehaviour
     private List<SuspectRecord> records = new List<SuspectRecord>();
     public IReadOnlyList<SuspectRecord> Records => records;
     public SuspectSet allSuspects;
-    public Vector2 startingInfectionScore = new Vector2(0, 10);
+    [Tooltip("Inclusive range (0–100 scale) a suspect's infection is rolled from at first meeting. " +
+             "Keep the max below AnomalyController.FULLY_MUTATED_THRESHOLD (80) unless first-meeting full mutants are desired.")]
+    public Vector2 startingInfectionScore = new Vector2(0, 70);
     public Vector2 inspectionScoreIncreasePerDay = new Vector2(5, 20);
 
     [Header("Replacement System")]

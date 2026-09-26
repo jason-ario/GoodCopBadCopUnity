@@ -151,9 +151,9 @@ public class PauseMenuController : MonoBehaviour
 
     private async void ReturnToMainMenu()
     {
-        // Snapshot item placement while the session is still live; after ExitLobbyAsync every
-        // pickable is despawned and can no longer be captured.
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
+        // Progress is only persisted at the start of each day. Drop anything done since then so
+        // the menu (and a later Continue) reflects the day-start checkpoint on disk.
+        SaveDataManager.Instance?.RevertToLastCheckpoint();
 
         if (LobbyManager.Instance != null)
             await LobbyManager.Instance.ExitLobbyAsync();
@@ -163,8 +163,6 @@ public class PauseMenuController : MonoBehaviour
 
     private async void QuitGame()
     {
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
-
         if (LobbyManager.Instance != null)
             await LobbyManager.Instance.ExitLobbyAsync();
 

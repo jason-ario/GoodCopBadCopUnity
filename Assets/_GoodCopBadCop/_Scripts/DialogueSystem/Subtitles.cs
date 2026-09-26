@@ -9,6 +9,25 @@ public class Subtitles : MonoBehaviour
     [SerializeField] private int maxCharactersPerLine = 50;
     [SerializeField] private CanvasGroup continuePrompt;
 
+    [Header("Continue Prompt Animation")]
+    [Tooltip("Seconds for the continue prompt to fade in once the typewriter finishes.")]
+    [SerializeField] private float promptFadeInDuration = 0.25f;
+    [Tooltip("Idle alpha pulse range (min..1) while the prompt is waiting for input.")]
+    [SerializeField, Range(0f, 1f)] private float promptPulseMinAlpha = 0.45f;
+    [SerializeField] private float promptPulseSpeed = 3f;
+    [Tooltip("Vertical idle bob distance in canvas units.")]
+    [SerializeField] private float promptBobAmount = 3f;
+
+    [Header("Speaker Name Label")]
+    [Tooltip("Root of the name tag pinned to the subtitle's top-left corner. Hidden when there is no speaker name.")]
+    [SerializeField] private CanvasGroup nameTag;
+    [SerializeField] private TMP_Text nameLabel;
+    [Tooltip("Show only the first word of the speaker name (e.g. 'Vlad' from 'Vlad Petrov').")]
+    [SerializeField] private bool firstNameOnly = true;
+    [Tooltip("Label color used when the speaker color is white/unset.")]
+    [SerializeField] private Color defaultNameColor = new Color(1f, 0.8f, 0.35f, 1f);
+    [SerializeField] private float nameTagFadeInDuration = 0.2f;
+
     [Header("Wobble Effect")]
     [Tooltip("TMPWobbleText component on the subtitle TMP object. Assign in the prefab.")]
     [SerializeField] private TMPWobbleText _wobbleText;
@@ -67,6 +86,7 @@ public class Subtitles : MonoBehaviour
         {
             IsPromptActive = false;
             continuePrompt.alpha = 0;
+            if (_promptRect != null) _promptRect.anchoredPosition = _promptBasePos;
         }
     }
 
@@ -80,8 +100,84 @@ public class Subtitles : MonoBehaviour
             yield return new WaitUntil(() => !textReveal.IsRevealing);
         }
 
+        // Input gating depends only on IsPromptActive; the fade/pulse is purely cosmetic.
         IsPromptActive = true;
-        continuePrompt.alpha = 1;
+        _promptActiveTime = 0f;
+    }
+
+    private RectTransform _promptRect;
+    private Vector2 _promptBasePos;
+    private float _promptActiveTime;
+    private Coroutine _nameTagFade;
+
+    private void Awake()
+    {
+        if (continuePrompt != null)
+        {
+            _promptRect = continuePrompt.transform as RectTransform;
+            if (_promptRect != null) _promptBasePos = _promptRect.anchoredPosition;
+        }
+    }
+
+    private void Update()
+    {
+        if (!IsPromptActive || continuePrompt == null) return;
+
+        _promptActiveTime += Time.unscaledDeltaTime;
+
+        float fadeIn = promptFadeInDuration > 0f ? Mathf.Clamp01(_promptActiveTime / promptFadeInDuration) : 1f;
+        float wave = (Mathf.Cos(_promptActiveTime * promptPulseSpeed) + 1f) * 0.5f; // starts at 1
+        continuePrompt.alpha = fadeIn * Mathf.Lerp(promptPulseMinAlpha, 1f, wave);
+
+        if (_promptRect != null)
+            _promptRect.anchoredPosition = _promptBasePos + Vector2.up * (Mathf.Sin(_promptActiveTime * promptPulseSpeed) * promptBobAmount);
+    }
+
+    private void UpdateNameLabel()
+    {
+        if (nameTag == null || nameLabel == null) return;
+
+        string display = FormatName(lastDisplayName);
+        bool hasName = !string.IsNullOrEmpty(display);
+        nameTag.gameObject.SetActive(hasName);
+        if (!hasName) return;
+
+        nameLabel.text = display;
+        bool useSpeakerColor = lastDisplayColor.a > 0f && lastDisplayColor != Color.white;
+        nameLabel.color = useSpeakerColor ? lastDisplayColor : defaultNameColor;
+
+        if (Application.isPlaying && nameTagFadeInDuration > 0f && isActiveAndEnabled)
+        {
+            if (_nameTagFade != null) StopCoroutine(_nameTagFade);
+            _nameTagFade = StartCoroutine(FadeInNameTag());
+        }
+        else
+        {
+            nameTag.alpha = 1f;
+        }
+    }
+
+    private IEnumerator FadeInNameTag()
+    {
+        float t = 0f;
+        nameTag.alpha = 0f;
+        while (t < nameTagFadeInDuration)
+        {
+            t += Time.unscaledDeltaTime;
+            nameTag.alpha = Mathf.Clamp01(t / nameTagFadeInDuration);
+            yield return null;
+        }
+        nameTag.alpha = 1f;
+        _nameTagFade = null;
+    }
+
+    private string FormatName(string rawName)
+    {
+        if (string.IsNullOrWhiteSpace(rawName)) return null;
+        string trimmed = rawName.Trim();
+        if (!firstNameOnly) return trimmed;
+        int space = trimmed.IndexOf(' ');
+        return space > 0 ? trimmed.Substring(0, space) : trimmed;
     }
 
     /// <summary>Sets the subtitle text and starts the typewriter reveal.</summary>
@@ -92,6 +188,7 @@ public class Subtitles : MonoBehaviour
         lastDisplayColor = nameColor;
 
         UpdateVisuals();
+        UpdateNameLabel();
     }
 
     private void UpdateVisuals()

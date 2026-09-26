@@ -113,9 +113,12 @@ public class SuspectRecord
         SuspectData = suspectData;
         if (SuspectRunRecords.Instance != null)
         {
-            infectionScore = (int)UnityEngine.Random.Range(
-                SuspectRunRecords.Instance.startingInfectionScore.x,
-                SuspectRunRecords.Instance.startingInfectionScore.y);
+            // Inclusive integer roll across the full configured range so every first meeting
+            // can land anywhere from nearly clean to heavily infected.
+            Vector2 range = SuspectRunRecords.Instance.startingInfectionScore;
+            int min = Mathf.RoundToInt(Mathf.Min(range.x, range.y));
+            int max = Mathf.RoundToInt(Mathf.Max(range.x, range.y));
+            infectionScore = Mathf.Clamp(UnityEngine.Random.Range(min, max + 1), 0, 100);
         }
         else
         {

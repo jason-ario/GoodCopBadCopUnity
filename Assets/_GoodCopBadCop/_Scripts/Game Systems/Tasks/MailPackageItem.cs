@@ -1,4 +1,3 @@
-using HighlightPlus;
 using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Components;
@@ -105,9 +104,6 @@ public class MailPackageItem : PickableObject
 
     /// <summary>True once this package has been correctly sorted and is pending despawn. Server-only guard against double-counting.</summary>
     public bool IsResolved { get; private set; }
-
-    /// <summary>Uses the existing soft amber pickup style for the persistent mail-package glow.</summary>
-    protected override HighlightProfile ForceHighlightProfile => JunkPickupHighlightService.CollectibleProfile;
 
     public string ResidentName => _residentName.Value.ToString();
     public string GoodsLabel   => _goodsLabel.Value.ToString();

@@ -88,6 +88,27 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// <summary>Number of fences broken this round (the round's target).</summary>
     public int TotalCount => _targetFenceCount.Value;
 
+    /// <summary>
+    /// Number of authored fence segments currently broken in the world (damage state &gt; 0),
+    /// whether or not they are tracked by an active repair round — e.g. segments a mutant broke
+    /// before <see cref="TriggerTask"/> ran still count. Reads replicated health, so it is valid
+    /// on every client.
+    /// </summary>
+    public int BrokenFenceCount
+    {
+        get
+        {
+            if (_allFences == null) return 0;
+
+            int count = 0;
+            foreach (PerimiterFence fence in _allFences)
+            {
+                if (fence != null && fence.IsBroken) count++;
+            }
+            return count;
+        }
+    }
+
     /// <summary>Captures the visual damage state of each authored fence in stable inspector order.</summary>
     public FenceTaskSaveState CaptureSaveState()
     {
@@ -345,7 +366,6 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
         // A trigger that broke nothing is immediately satisfied.
         RecomputeProgress();
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
     }
 
     // ── Repair flow ──────────────────────────────────────────────────────────
@@ -385,7 +405,6 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
         _targetFenceCount.Value = total;
         _fencesRepaired.Value   = Mathf.Clamp(repaired, 0, total);
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         if (total <= 0 || repaired < total) return;
 

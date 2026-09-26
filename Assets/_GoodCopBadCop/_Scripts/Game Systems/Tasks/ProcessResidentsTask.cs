@@ -214,7 +214,5 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
 
         if (_totalCount.Value > 0 && _processedCount.Value >= _totalCount.Value)
             _isActive.Value = false;
-
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
     }
 }

@@ -93,6 +93,19 @@ public class TutorialMarkerManager : MonoBehaviour
     public bool IsMarked(Transform target) => target != null && _active.ContainsKey(target);
 
     /// <summary>
+    /// Highlights <paramref name="interactable"/> for as long as the marker on
+    /// <paramref name="target"/> is shown. Use for runtime/network-spawned objects the arrow cannot
+    /// resolve on its own (e.g. Vlad's documents, ATM coupons). No-op if <paramref name="target"/> is
+    /// not currently marked.
+    /// </summary>
+    public void AddHighlight(Transform target, Interactable interactable)
+    {
+        if (target == null || interactable == null) return;
+        if (_active.TryGetValue(target, out TutorialMarker marker))
+            marker.AddHighlightTarget(interactable);
+    }
+
+    /// <summary>
     /// Returns a live view of every Transform currently marked (i.e. every active tutorial
     /// objective). Used by <see cref="CompassController"/> to render a directional pip for each
     /// one on the bottom-of-screen compass. Do not mutate the returned collection.

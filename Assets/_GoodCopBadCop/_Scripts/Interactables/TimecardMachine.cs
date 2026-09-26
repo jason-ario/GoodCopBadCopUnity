@@ -357,7 +357,6 @@ public class TimecardMachine : Interactable
         // joins after this point (see HasClockedOutThisCycle). Set before the event/RPC so
         // anything reacting to the punch can safely read it.
         _clockedOutThisCycle.Value = true;
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         OnClockOutServer?.Invoke();
         PunchCardClientRpc();

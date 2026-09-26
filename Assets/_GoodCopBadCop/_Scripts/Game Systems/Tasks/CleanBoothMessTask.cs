@@ -185,7 +185,6 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         // (see OnActiveChanged), so the remaining-blood/junk counts must already be correct or the
         // freshly-added row would render "nothing left to clean" for a frame.
         _isActive.Value = true;
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log($"[CleanBoothMessTask] Task triggered. {_networkRemainingBlood.Value} splatter(s), {_networkRemainingJunk.Value} junk item(s) spawned.");
     }
@@ -198,7 +197,6 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         if (!IsServer) return;
         _networkRemainingBlood.Value = Mathf.Max(0, _networkRemainingBlood.Value - 1);
         UpdateThreatLevel();
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
         CheckCompletion();
     }
 
@@ -208,7 +206,6 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         if (!IsServer) return;
         _networkRemainingJunk.Value = Mathf.Max(0, _networkRemainingJunk.Value - 1);
         UpdateThreatLevel();
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
         CheckCompletion();
     }
 

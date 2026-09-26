@@ -882,6 +882,21 @@ public class FolderController : PickableObject
         onStampedComplete?.Invoke();
         Debug.Log($"[FolderController] UseStampSequence complete — isStamped NetworkVariable will fire OnAnyFolderStamped on all clients. NetworkObjectId={NetworkObjectId}");
         // OnAnyFolderStamped is now fired via isStamped.OnValueChanged on all clients.
+
+        // If the folder was stamped while already sitting at the window hand-off point, its
+        // earlier placement was rejected as unstamped and nothing re-checks it — the player had
+        // to pick it up and set it down again. Only the stamping player's client does this so
+        // DeliverVerdict is issued exactly once.
+        if (isStampingLocalPlayer)
+        {
+            // isStamped is server-written; on a laggy non-host client it may not have
+            // replicated yet by the end of the sequence.
+            float timeout = Time.time + 3f;
+            while (!isStamped.Value && Time.time < timeout)
+                yield return null;
+
+            HandOffPoint.TryHandOffRestingFolder(this);
+        }
     }
 
     public override void OnStartUse()

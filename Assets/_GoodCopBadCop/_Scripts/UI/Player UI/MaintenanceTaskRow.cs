@@ -41,4 +41,18 @@ public class MaintenanceTaskRow : MonoBehaviour
         iconFill.fillAmount = Mathf.Clamp01(t);
         iconFill.color = Color.Lerp(incompleteColor, completeColor, t);
     }
+
+    /// <summary>Shows a single outstanding-item count (e.g. "3") in the counter field.</summary>
+    public void SetCount(int outstanding)
+    {
+        int safe = Mathf.Max(0, outstanding);
+
+        if (countText != null)
+            countText.text = safe.ToString();
+
+        if (iconFill == null) return;
+
+        iconFill.fillAmount = 1f;
+        iconFill.color = safe == 0 ? completeColor : incompleteColor;
+    }
 }

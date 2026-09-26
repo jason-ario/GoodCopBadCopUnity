@@ -164,7 +164,6 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // longer gate the timecard machine.
         if (CleanupTaskGating.IsMandatoryDay)
             ShiftManager.Instance?.RegisterPendingDailyTask(this);
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
     }
 
     /// <summary>
@@ -344,7 +343,6 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Hide from HUD once all pieces are clean.
         _isActive.Value = false;
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log("[CleanGraffitiTask] All graffiti scrubbed — task complete.");
     }

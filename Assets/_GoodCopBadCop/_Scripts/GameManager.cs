@@ -510,15 +510,15 @@ public class GameManager : NetworkBehaviour
 
     /// <summary>
     /// Reloads the active scene for all connected clients via NGO's network scene manager,
-    /// preserving the network session and active save slot. A day loss discards its in-progress
-    /// snapshot and restores the immutable day-start baseline for every player. SERVER ONLY.
+    /// preserving the network session and active save slot. A day loss discards every change
+    /// made since the last day-start checkpoint so the day replays from its beginning. SERVER ONLY.
     /// </summary>
     public void RestartDay()
     {
         if (!IsServer) return;
 
         _isRestartingDay = true;
-        SaveDataManager.Instance?.ResetCurrentWorkdayToDayStart();
+        SaveDataManager.Instance?.RevertToLastCheckpoint();
         string sceneName = SceneManager.GetActiveScene().name;
 
         if (NetworkManager.Singleton.SceneManager != null)

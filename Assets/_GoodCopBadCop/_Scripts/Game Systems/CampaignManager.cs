@@ -183,20 +183,6 @@ public class CampaignManager : NetworkBehaviour
             _currentDay = Mathf.Max(1, SaveDataManager.Instance.CurrentDay);
             _networkCurrentDay.Value = _currentDay;
 
-            // Day 1 safety net: Vlad's scripted tutorial is not resumable mid-sequence — his
-            // walk-in, dialogue, and paperwork tutorial only ever run once, at the top of
-            // Day1OpeningSequence, and only on a genuinely fresh clock-in (see
-            // Day_01.OnPlayerClockedIn). So if the player reloads before he was fully processed,
-            // there is no partial state worth keeping: treat it exactly like a brand-new Day 1
-            // by resetting the save's entire in-progress workday (cash, pickables, suspect
-            // progress) back to the immutable day-start baseline BEFORE the coupon total below
-            // is read, so a stale mid-day cash amount is never applied.
-            if (_currentDay == 1 && !(SaveDataManager.Instance?.Day1VladProcessed ?? false))
-            {
-                Debug.Log("[CampaignManager] Day 1 resumed before Vlad's tutorial was processed — resetting the save's Day 1 progress back to the start of the day.");
-                SaveDataManager.Instance?.ResetCurrentWorkdayToDayStart();
-            }
-
             // Restore the coupon total from the active save slot. GlobalHostVariables.money is
             // a NetworkVariable that always starts at 0 on scene load, so without this the
             // player's persisted cash silently resets to 0 whenever a save file is loaded.
@@ -213,20 +199,18 @@ public class CampaignManager : NetworkBehaviour
         if (IsServer)
             TryEnsurePopulationInitialized();
 
-        // Keep an immutable reference before day activation. Activation may schedule a fresh task
-        // and autosave it, but it must never replace the state selected for this resume.
-        // On Day 1 before Vlad is processed this is always null: the reset above just wrote a
-        // clean (or empty) WorkdayState back, and GetWorkdayState only returns a snapshot that
-        // is both valid and belongs to this exact day, so ApplyDay below always activates a
-        // completely fresh Day 1 in that case.
-        _pendingWorkdayRestore = IsServer ? SaveDataManager.Instance?.GetWorkdayState(_currentDay) : null;
+        // Saves only ever load from the start of a day. Grab the day-start checkpoint before
+        // activation so the freshly rolled task output can be replaced with the saved baseline.
+        // Day 1 has no prior day to carry state from, so it always starts from the scene's
+        // authored state (which also guarantees Vlad's tutorial runs from the top).
+        _pendingWorkdayRestore = IsServer && _currentDay > 1
+            ? SaveDataManager.Instance?.GetDayStartWorkdayState(_currentDay)
+            : null;
 
         ApplyDay(_currentDay);
 
         if (IsServer && _pendingWorkdayRestore != null)
             StartCoroutine(RestoreSavedWorkdayAfterDayBootstrap());
-        else if (IsServer)
-            StartCoroutine(CaptureDayStartWorkdayAfterBootstrap());
 
         Debug.Log($"[CampaignManager] Campaign started on Day {_currentDay}.");
     }
@@ -240,15 +224,6 @@ public class CampaignManager : NetworkBehaviour
         WorkdaySaveState state = _pendingWorkdayRestore;
         _pendingWorkdayRestore = null;
         ShiftManager.Instance?.RestoreWorkdaySaveState(state);
-    }
-
-    private IEnumerator CaptureDayStartWorkdayAfterBootstrap()
-    {
-        // Day scripts and task schedulers create their initial objects synchronously during
-        // activation; wait one frame for NetworkObject registration before freezing the baseline.
-        yield return null;
-        if (SaveDataManager.Instance != null && ShiftManager.Instance != null)
-            SaveDataManager.Instance.SaveDayStartWorkdayState(ShiftManager.Instance.CaptureWorkdaySaveState());
     }
 
     /// <summary>

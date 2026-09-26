@@ -589,7 +589,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         MailCubbyManager.Instance?.HighlightDeliveryDestinations();
 
         OnMailDelivered?.Invoke();
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         string spawnResult = failedSpawnCount > 0
             ? $"spawned {_spawnedPackages.Count} package(s); {failedSpawnCount} attempt(s) failed"
@@ -664,7 +663,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             _resolvedPackages.Add(package.NetworkObject);
 
             _sortedCount.Value = Mathf.Min(_sortedCount.Value + 1, _totalCount.Value);
-            SaveDataManager.Instance?.SaveCurrentWorkdayState();
             Debug.Log($"[SortMailTask] Correctly sorted '{package.ResidentName}' ({package.GoodsLabel}) into {binType}. " +
                       $"{_sortedCount.Value}/{_totalCount.Value}");
 

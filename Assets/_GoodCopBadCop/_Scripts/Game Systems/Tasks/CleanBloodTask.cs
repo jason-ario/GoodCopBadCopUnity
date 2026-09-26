@@ -313,7 +313,6 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // toward Checkpoint Integrity's graffiti category, it just no longer gates the timecard.
         if (CleanupTaskGating.IsMandatoryDay)
             ShiftManager.Instance?.RegisterPendingDailyTask(this);
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log("[CleanBloodTask] Task triggered — awaiting blood splatter registrations.");
     }
@@ -568,7 +567,6 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // re-adds this as a new task via ActivateDynamically — that's a genuinely new cleanup job,
         // not a duplicate of this one.
         _isActive.Value = false;
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log($"[CleanBloodTask] All required blood scrubbed ({_scrubbed.Value}/{RequiredCount}) — task complete.");
     }

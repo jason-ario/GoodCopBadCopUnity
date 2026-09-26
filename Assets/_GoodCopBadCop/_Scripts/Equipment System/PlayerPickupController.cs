@@ -983,9 +983,18 @@ public class PlayerPickupController : NetworkBehaviour
             out Quaternion placementRotation);
         DisableArmIKs();
         
-        if (ObjectPlacer.Instance.PlacementBoard != null)
+        PlacementBoard placementBoard = ObjectPlacer.Instance.PlacementBoard;
+
+        // Fallback: the ghost can visually sit on the window hand-off point while the aim
+        // raycast actually grazed the frame/ledge next to the board's collider, resolving no
+        // board — the hand-off then silently didn't register until the folder was re-placed.
+        // Resolve by the final drop position instead.
+        if (placementBoard == null && dropPoint == null && hasPlacementPose)
+            placementBoard = HandOffPoint.FindAt(placementPosition);
+
+        if (placementBoard != null)
         {
-            ObjectPlacer.Instance.PlacementBoard.OnPlaced(_heldObject);
+            placementBoard.OnPlaced(_heldObject);
         }
         
         if (_heldObject != null)

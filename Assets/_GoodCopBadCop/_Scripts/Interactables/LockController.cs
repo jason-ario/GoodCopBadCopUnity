@@ -75,18 +75,40 @@ public class LockController : Interactable
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _isLocked.OnValueChanged += OnIsLockedChanged;
 
+        // Resolve saved state before subscribing so a silent restore-unlock does not play the
+        // unlock animation/sound on the host.
         if (IsServer)
             CheckSavedUnlockState();
+        else if (!_isLocked.Value)
+        {
+            // Joined in the window between the server's silent unlock and its despawn.
+            HideLocally();
+            return;
+        }
         else
             ApplyLockedState(_isLocked.Value);
+
+        _isLocked.OnValueChanged += OnIsLockedChanged;
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         _isLocked.OnValueChanged -= OnIsLockedChanged;
+
+        // Late-joining clients never spawn an in-scene padlock the server already despawned
+        // (e.g. restored-as-unlocked from save); NGO only invokes OnNetworkDespawn on it and
+        // leaves the GameObject active. Hide it so it is not visible or interactable.
+        if (NetworkManager != null && NetworkManager.ShutdownInProgress) return;
+        HideLocally();
+    }
+
+    private void HideLocally()
+    {
+        StopAllCoroutines();
+        if (gameObject.activeSelf)
+            gameObject.SetActive(false);
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────

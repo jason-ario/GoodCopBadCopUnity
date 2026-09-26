@@ -100,6 +100,63 @@ public class SuspectCharacter : Interactable
         SetDialogueInteractionDisabled(disabled);
     }
 
+    /// <summary>
+    /// Server-written hard lock on ALL direct interaction with this living suspect: the reticle
+    /// can't target them, no highlight, and Interact/InteractAlternate are no-ops (no intro, no
+    /// question choices, no scripted-dialogue rejoin). Stronger than
+    /// <see cref="_dialogueInteractionDisabled"/>. Junk collection after death is unaffected.
+    /// Networked so late joiners read the same state. Used for Day 1's tutorial Vlad.
+    /// </summary>
+    private readonly NetworkVariable<bool> _interactionLocked = new NetworkVariable<bool>(false);
+
+    /// <summary>True while <see cref="_interactionLocked"/> is set.</summary>
+    public bool InteractionLocked => _interactionLocked.Value;
+
+    /// <summary>Server-only. Locks or unlocks all direct interaction — see <see cref="_interactionLocked"/>.</summary>
+    public void SetInteractionLockedServer(bool locked)
+    {
+        if (!IsServer) return;
+        _interactionLocked.Value = locked;
+    }
+
+    /// <summary>
+    /// Server-written, permanent close-out set the moment a verdict (Pass/Quarantine/Kill) is
+    /// executed for this suspect. Once set, no player can start or rejoin any dialogue with them
+    /// (intro, question conversation, scripted rejoin) and the reticle can't target them — only
+    /// junk collection after death remains. Networked so late joiners read the same state and so
+    /// nothing that later re-enables <see cref="interactionCollider"/> can reopen interaction.
+    /// </summary>
+    private readonly NetworkVariable<bool> _verdictClosed = new NetworkVariable<bool>(false);
+
+    /// <summary>True once a verdict has been delivered for this suspect — see <see cref="_verdictClosed"/>.</summary>
+    public bool IsVerdictClosed => _verdictClosed.Value;
+
+    /// <summary>Server-only. Permanently closes this suspect out from further interaction/dialogue.</summary>
+    public void CloseForVerdictServer()
+    {
+        if (!IsServer) return;
+        _verdictClosed.Value = true;
+    }
+
+    /// <summary>
+    /// Local, per-client teardown of any dialogue this client is presenting for this suspect:
+    /// ends the local player's question conversation (leaving the engagement, hiding the choice
+    /// panel, back button, and world subtitle) and clears this suspect's dialogue subtitles.
+    /// Called on every client when a verdict closes the suspect out.
+    /// </summary>
+    public void ForceEndDialogueForVerdictLocal()
+    {
+        if (worldDialogue != null && worldDialogue.InConversation)
+            worldDialogue.EndConversation();
+
+        GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.Hide();
+    }
+
+    private bool IsJunkCollectible => _junkItem != null && _junkItem.IsCollectible.Value;
+
+    public override bool IsInteractable => base.IsInteractable
+        && ((!_interactionLocked.Value && !_verdictClosed.Value) || IsJunkCollectible);
+
     [SerializeField] private GameObject bloodExplosion;
     public Transform lookPos;
     public Vector3 standPosOffset;
@@ -1536,6 +1593,14 @@ public class SuspectCharacter : Interactable
             return;
         }
 
+        // Hard-locked suspects (e.g. Day 1 tutorial Vlad) ignore every direct interaction path.
+        if (_interactionLocked.Value)
+            return;
+
+        // A delivered verdict permanently closes this suspect out from every dialogue path.
+        if (_verdictClosed.Value)
+            return;
+
         // The input that ends a dialogue can also reach world interaction on the same frame.
         // Keep this suspect's dialogue entry paths closed briefly after control is restored.
         if (Time.unscaledTime < _dialogueInteractionBlockedUntil)
@@ -1606,6 +1671,7 @@ public class SuspectCharacter : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void RequestIntroDialogueServerRpc(ServerRpcParams rpcParams = default)
     {
+        if (_verdictClosed.Value) return;
         SuspectEncounterManager.Instance?.TryStartIntroDialogue(this, rpcParams.Receive.SenderClientId);
     }
 

@@ -221,7 +221,12 @@ public class SpeakingInteraction : NetworkBehaviour
     [ClientRpc]
     private void SayClientRpc(string dialogue, bool clearHistory, bool waitForInput)
     {
-        DialogueManager.Instance.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory, waitForInput);
+        // Barks/one-off lines have no participant set: only players within overhear range
+        // of this speaker see the subtitle. Audio still plays (it is spatialized).
+        if (OverhearRange.IsLocalPlayerWithin(transform))
+            DialogueManager.Instance.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory, waitForInput);
+        else if (clearHistory)
+            DialogueManager.Instance.ClearHistory();
 
         AudioClip[] clips = VoiceAudioClips;
         if (!_isLaughing && clips != null && clips.Length > 0 && audioSource != null)
@@ -312,11 +317,7 @@ public class SpeakingInteraction : NetworkBehaviour
     /// </summary>
     private bool IsLocalPlayerWithinOverhearProximity()
     {
-        Transform localPlayer = PlayerInstance.Instance != null ? PlayerInstance.Instance.transform : null;
-        if (localPlayer == null) return false;
-
-        float maxDistance = GameSettings.Instance.OverhearSubtitleProximity;
-        return (localPlayer.position - transform.position).sqrMagnitude <= maxDistance * maxDistance;
+        return OverhearRange.IsLocalPlayerWithin(transform.position);
     }
 
     /// <summary>Hides this speaker's floating world-dialogue subtitle on every connected client.</summary>

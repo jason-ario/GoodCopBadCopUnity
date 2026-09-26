@@ -383,7 +383,6 @@ public class ShiftManager : NetworkBehaviour
         if (_timecardMachine != null)
             _timecardMachine.EnableClockOut();
 
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
         NotifyClockOutReadyClientRpc();
 
         Debug.Log("[ShiftManager] TryEnableClockOut: all tasks complete — timecard machine primed for clock-out.");
@@ -691,14 +690,42 @@ public class ShiftManager : NetworkBehaviour
         if (CurrentPhase == DayPhase.PostShift && !state.ClockedOut && !_clockOutEnabledThisCycle && _pendingDailyTasks.Count == 0)
             TryEnableClockOut();
 
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
-        Debug.Log($"[ShiftManager] Restored in-progress Day {_currentDay} ({CurrentPhase}) from save state.");
+        Debug.Log($"[ShiftManager] Restored Day {_currentDay} ({CurrentPhase}) from its day-start checkpoint.");
+    }
+
+    /// <summary>
+    /// Server-only. Saves are written exclusively at the start of a day: one frame after
+    /// <see cref="OnDayStart"/> (so day-start subscribers such as the daily pickup roll have
+    /// spawned their objects), the full day baseline — world pickables, carried inventory,
+    /// freshly scheduled tasks, cash — is captured and committed to disk together with all
+    /// progression accumulated during the previous day. Skipped when the checkpoint for this
+    /// day is already on disk (a load or retry of the same day), so a reload never overwrites
+    /// the baseline it was restored from.
+    /// </summary>
+    private void HandleDayStartCheckpoint()
+    {
+        if (!IsServer) return;
+        StartCoroutine(CommitDayStartCheckpointRoutine());
+    }
+
+    private IEnumerator CommitDayStartCheckpointRoutine()
+    {
+        yield return null;
+        yield return new WaitWhile(() => IsRestoringWorkdayState);
+
+        SaveDataManager save = SaveDataManager.Instance;
+        if (save == null || save.ActiveSlot == null) yield break;
+        if (CampaignManager.Instance != null && CampaignManager.Instance.IsCampaignComplete) yield break;
+        if (save.HasCommittedDayStart(_currentDay)) yield break;
+
+        save.CommitDayStartCheckpoint(CaptureWorkdaySaveState());
     }
 
     private void Awake()
     {
         Instance = this;
         InitializeDateSystem();
+        OnDayStart += HandleDayStartCheckpoint;
     }
 
     private void OnEnable()
@@ -810,8 +837,6 @@ public class ShiftManager : NetworkBehaviour
     /// <see cref="SetNextSuspectReady"/> (normal lineup exhaustion) and
     /// <see cref="MarkSuspectsComplete"/> (scripted bypass). This is "Dusk": fires
     /// <see cref="OnLastSuspectProcessed"/> and <see cref="OnDuskBegin"/> (on all clients),
-    /// snapshots the current coupon total and every pickable's transform to the active save
-    /// slot as a checkpoint for death-retries (see <see cref="RestartIntoPostShiftPhase"/>),
     /// triggers the active day's <see cref="DayBase.PostShiftTasks"/>, and re-evaluates
     /// clock-out readiness (which stays blocked until every post-shift task completes).
     /// </summary>
@@ -822,13 +847,8 @@ public class ShiftManager : NetworkBehaviour
         _suspectsComplete = true;
         CurrentPhase = DayPhase.PostShift;
 
-        SaveDataManager.Instance?.SaveDuskCheckpoint(
-            GlobalHostVariables.Instance != null ? GlobalHostVariables.Instance.money.Value : 0,
-            PickableObjectRegistry.Instance.CaptureAll());
-
         NotifyDuskBeginClientRpc();
         CampaignManager.Instance?.ActiveDay?.TriggerPostShiftTasks();
-        SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         TryEnableClockOut();
     }
@@ -837,60 +857,6 @@ public class ShiftManager : NetworkBehaviour
     private void NotifyDuskBeginClientRpc()
     {
         OnDuskBegin?.Invoke();
-    }
-
-    /// <summary>
-    /// Server-only. Fast-forwards a freshly-reloaded day straight to Dusk — as if the player
-    /// had just finished processing every suspect — instead of repeating the whole shift.
-    /// Restores coupons and pickable object transforms to their last Dusk checkpoint (see
-    /// <see cref="SaveDataManager.SaveDuskCheckpoint"/>) before re-resolving the shift as
-    /// complete, so any coupons collected or pickables moved during the failed post-shift
-    /// attempt are reverted. Called by <see cref="GameManager.RestartDaySequence"/> after the
-    /// normal Dawn setup for the reloaded day has finished, when the player died and clicked
-    /// Retry while already in <see cref="DayPhase.PostShift"/>.
-    /// </summary>
-    public void RestartIntoPostShiftPhase()
-    {
-        if (!IsServer || shiftStarted.Value) return;
-
-        shiftStarted.Value = true;
-
-        RestoreDuskCheckpoint();
-
-        // Populate (without spawning) the day's suspect lineup so downstream systems that read
-        // it (e.g. the end-of-shift report, ProcessResidentsTask) behave sensibly, then resolve
-        // it as fully processed immediately below.
-        OnShiftStart?.Invoke();
-        CurrentPhase = DayPhase.Shift;
-
-        StartCoroutine(PositionPlayerForPostShiftRetry());
-
-        HandleAllSuspectsProcessed();
-
-        // This path re-uses shiftStarted/OnShiftStart purely for internal bookkeeping (populating
-        // the suspect lineup, etc.) — it does NOT represent a real new shift, so it must not leave
-        // the day permanently "mid-shift". Without this, shiftStarted.Value stays true and
-        // BunkBedInteractable._shiftEndedThisCycle stays false (reset by OnShiftStart above) for
-        // the rest of the day, since the real EndShift()/OnShiftEnd that normally re-arms the bed
-        // already ran before this death retry and never runs again. Restore both flags here so the
-        // bunk bed correctly reports "ready" once every remaining post-shift task is finished.
-        shiftStarted.Value = false;
-        SignalShiftEndClientRpc();
-
-        Debug.Log("[ShiftManager] RestartIntoPostShiftPhase — resumed directly at Dusk after a death retry.");
-    }
-
-    /// <summary>
-    /// Server-only. Restores the shared coupon total and every registered pickable's
-    /// transform from the active save slot's Dusk checkpoint. No-op if no checkpoint exists.
-    /// </summary>
-    private void RestoreDuskCheckpoint()
-    {
-        SaveSlot slot = SaveDataManager.Instance?.ActiveSlot;
-        if (slot == null) return;
-
-        GlobalHostVariables.Instance?.SetMoney(slot.TotalCashEarned);
-        PickableObjectRegistry.Instance.RestoreAll(slot.PickableObjects);
     }
 
     private IEnumerator PositionPlayerForShiftResume()
@@ -2156,7 +2122,9 @@ public class ShiftManager : NetworkBehaviour
 
         if (IsServer)
         {
-            RestorePickablesFromSave();
+            // Pickables (including carried items, which are released at the booth's inventory
+            // recovery drop point) are restored from the day-start checkpoint by
+            // RestoreWorkdaySaveState, kicked off from CampaignManager.StartCampaign.
             Day_01.Instance?.ForceUnlockTutorialItems();
 
             // CampaignManager.StartCampaign() already restores the coupon total from the active
@@ -2205,22 +2173,6 @@ public class ShiftManager : NetworkBehaviour
     {
         foreach (GateStartShiftController gate in FindObjectsOfType<GateStartShiftController>(true))
             gate.ForceIntroComplete();
-    }
-
-    /// <summary>
-    /// Server-only. Restores every registered pickable's transform from the active save slot's
-    /// last saved snapshot — the same data captured at Dusk via
-    /// <see cref="SaveDataManager.SaveDuskCheckpoint"/>. No-op if no save data exists.
-    /// </summary>
-    private void RestorePickablesFromSave()
-    {
-        if (!IsServer) return;
-
-        SaveSlot slot = SaveDataManager.Instance?.ActiveSlot;
-        if (slot == null) return;
-
-        PickableObjectRegistry.Instance?.RestoreAll(slot.PickableObjects);
-        Debug.Log($"[ShiftManager] ResumeSavedDay — restored {slot.PickableObjects?.Length ?? 0} pickable(s) from save.");
     }
 
     [ClientRpc]

@@ -231,6 +231,7 @@ public class SuspectWorldDialogue : MonoBehaviour
     public void BeginConversation()
     {
         if (_inConversation || _awaitingEngagementResponse) return;
+        if (IsVerdictClosed()) return;
         if (DialogueManager.Instance != null && DialogueManager.Instance.IsSpeaking) return;
         if (speaking == null) return;
 
@@ -258,7 +259,22 @@ public class SuspectWorldDialogue : MonoBehaviour
             return;
         }
 
+        // A verdict landed while this client's join request was in flight — back straight out
+        // of the engagement instead of opening a conversation with a closed-out suspect.
+        if (IsVerdictClosed())
+        {
+            speaking?.EndEngagement();
+            return;
+        }
+
         StartConversation();
+    }
+
+    /// <summary>True when this NPC is a suspect whose verdict has already been delivered.</summary>
+    private bool IsVerdictClosed()
+    {
+        SuspectCharacter suspect = GetComponent<SuspectCharacter>();
+        return suspect != null && suspect.IsVerdictClosed;
     }
 
     private void StartConversation()

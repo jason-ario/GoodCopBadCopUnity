@@ -148,6 +148,7 @@ public class DailySuspectManager : MonoBehaviour
             InjectMutantSlots();
             InjectDoppelgangerSlots();
             InjectForcedFullMutantSlots();
+            EnsureLineupDoesNotEndWithMutant();
             InjectFullMutantSlots();
             IsLineupPopulated = true;
             Debug.Log($"[DailySuspectManager] TotalSuspectsThisShift (override) = {TotalSuspectsThisShift}.");
@@ -175,6 +176,7 @@ public class DailySuspectManager : MonoBehaviour
         InjectMutantSlots();
         InjectDoppelgangerSlots();
         InjectForcedFullMutantSlots();
+        EnsureLineupDoesNotEndWithMutant();
         InjectFullMutantSlots();
         IsLineupPopulated = true;
         Debug.Log($"[DailySuspectManager] TotalSuspectsThisShift = {TotalSuspectsThisShift} (base draw request was {suspectAmount}).");
@@ -236,13 +238,13 @@ public class DailySuspectManager : MonoBehaviour
         {
             int insertIndex = UnityEngine.Random.Range(0, shiftSuspects.Count + 1);
             shiftSuspects.Insert(insertIndex, null);
-            _mutantSlotIndices.Add(insertIndex);
 
-            // Shift any previously recorded mutant indices at or above the insertion point,
-            // excluding the one we just added.
+            // Shift previously recorded indices at or above the insertion point BEFORE
+            // registering the new slot, so the new entry itself is never shifted.
             ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
             ShiftDoppelgangerSlotsAfterInsert(insertIndex);
             ShiftReplacementSlotsAfterInsert(insertIndex);
+            _mutantSlotIndices.Add(insertIndex);
         }
 
         Debug.Log($"[DailySuspectManager] Lineup: {normalCount} suspect(s) + {mutantCount} mutant intruder(s) = {shiftSuspects.Count} total slot(s).");
@@ -309,23 +311,76 @@ public class DailySuspectManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Shifts all entries in the given HashSet that are >= insertIndex up by one,
-    /// excluding the entry at exactly insertIndex (which was just added and must not move).
+    /// Shifts all entries in the given HashSet that are >= insertIndex up by one.
+    /// Must be called BEFORE the newly inserted slot is registered in any tracking set —
+    /// an existing entry sitting exactly at insertIndex was pushed to insertIndex + 1 by the
+    /// list insert and must move with it.
     /// </summary>
     private static void ShiftHashSetIndicesAfterInsert(int insertIndex, HashSet<int> indices)
     {
         List<int> toShift = new List<int>();
         foreach (int idx in indices)
         {
-            if (idx != insertIndex && idx >= insertIndex)
+            if (idx >= insertIndex)
                 toShift.Add(idx);
         }
 
+        // Remove all first, then re-add, so consecutive indices never collide mid-shift.
         foreach (int idx in toShift)
-        {
             indices.Remove(idx);
+        foreach (int idx in toShift)
             indices.Add(idx + 1);
+    }
+
+    /// <summary>
+    /// Guarantees the lineup never ENDS with a mutant intruder slot. Mutant intruders are not
+    /// "suspects to process" (excluded from <see cref="TotalSuspectsThisShift"/>), but
+    /// <see cref="ShiftManager.SetNextSuspectReady"/> only ends the shift once the final lineup
+    /// slot resolves — so a trailing mutant would leave the shift hanging after every real suspect
+    /// was processed. Any trailing mutant slot(s) are relocated to a random position before the
+    /// last non-mutant slot, keeping every other slot-tracking index consistent.
+    /// Must run after every slot insertion and before <see cref="InjectFullMutantSlots"/>.
+    /// </summary>
+    private void EnsureLineupDoesNotEndWithMutant()
+    {
+        int relocated = 0;
+
+        while (shiftSuspects.Count > 0 && _mutantSlotIndices.Contains(shiftSuspects.Count - 1))
+        {
+            int lastNonMutant = -1;
+            for (int i = shiftSuspects.Count - 1; i >= 0; i--)
+            {
+                if (!_mutantSlotIndices.Contains(i)) { lastNonMutant = i; break; }
+            }
+
+            if (lastNonMutant < 0)
+            {
+                Debug.LogWarning("[DailySuspectManager] Lineup contains only mutant slots — cannot relocate trailing mutant.");
+                return;
+            }
+
+            // Removing the tail slot does not affect any other index.
+            int tailIndex = shiftSuspects.Count - 1;
+            shiftSuspects.RemoveAt(tailIndex);
+            _mutantSlotIndices.Remove(tailIndex);
+
+            // Inserting at lastNonMutant places the mutant immediately before (or anywhere ahead
+            // of) the final real suspect, which then shifts up and becomes the tail.
+            int insertIndex = UnityEngine.Random.Range(0, lastNonMutant + 1);
+            shiftSuspects.Insert(insertIndex, null);
+
+            ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
+            ShiftDoppelgangerSlotsAfterInsert(insertIndex);
+            ShiftReplacementSlotsAfterInsert(insertIndex);
+            ShiftHashSetIndicesAfterInsert(insertIndex, _fullMutantSlotIndices);
+            _mutantSlotIndices.Add(insertIndex);
+
+            relocated++;
+            Debug.Log($"[DailySuspectManager] Trailing mutant intruder slot relocated from index {tailIndex} to {insertIndex} so the lineup never ends with a mutant.");
         }
+
+        if (relocated > 0)
+            Debug.Log($"[DailySuspectManager] Relocated {relocated} trailing mutant slot(s); last lineup slot is now a processable suspect.");
     }
 
     /// <summary>

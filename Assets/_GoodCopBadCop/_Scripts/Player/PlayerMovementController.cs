@@ -180,6 +180,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     
     bool _canSitOrStand = true;
 
+    /// <summary>False while a scripted sequence blocks standing up (see <see cref="SetCantSitOrStand"/>).</summary>
+    public bool CanSitOrStand => _canSitOrStand;
+
     public void SetCantSitOrStand(bool value)
     {
         _canSitOrStand = value;

@@ -9,10 +9,30 @@ using UnityEngine;
 /// directly in the scene and toggle it with plain <c>SetActive</c> calls. Every enabled instance —
 /// pooled or pre-placed — self-registers in <see cref="ActiveInstances"/> so systems like
 /// <see cref="TutorialArrowScreenIndicator"/> can find all of them uniformly.
+///
+/// Design rule: anything an arrow points at that has an <see cref="Interactable"/> is highlighted
+/// (authored default profile) for exactly as long as the arrow is enabled. The marker owns this —
+/// callers never pair arrows with manual <c>SetForceHighlight</c> calls. Targets come from:
+/// <list type="number">
+/// <item>the <see cref="Interactable"/> on / above / below the Transform passed to <see cref="Show"/>;</item>
+/// <item>if that Transform is itself a pre-placed <see cref="TutorialMarker"/> (Day 1's anchors),
+/// that marker's <c>highlightTargets</c>;</item>
+/// <item>this marker's own <c>highlightTargets</c> (pre-placed arrows toggled via <c>SetActive</c>);</item>
+/// <item>runtime additions via <see cref="AddHighlightTarget"/> /
+/// <see cref="TutorialMarkerManager.AddHighlight"/> for network-spawned objects (docs, coupons).</item>
+/// </list>
+/// Claims are reference-counted across markers and use <see cref="HighlightHold.TutorialArrow"/>, so
+/// they never clobber other holds. A <see cref="PickableObject"/> stops glowing while it is held.
 /// </summary>
 public class TutorialMarker : MonoBehaviour
 {
     // ── Inspector ────────────────────────────────────────────────────────────
+    [Header("Highlight")]
+    [Tooltip("Interactables highlighted while this arrow is shown. Required for pre-placed arrows (and pre-placed " +
+             "arrow anchors passed to TutorialMarkerManager.Mark) since they are not parented to what they point at. " +
+             "Pooled arrows marking an Interactable's Transform resolve it automatically.")]
+    [SerializeField] private Interactable[] highlightTargets;
+
     [Header("Positioning")]
     [Tooltip("World-space height above the target's pivot.")]
     [SerializeField] private float hoverHeight = 1.5f;
@@ -46,6 +66,11 @@ public class TutorialMarker : MonoBehaviour
     private Vector3 _baseLocalScale; // authored scale at referenceDistance, before distance scaling
 
     private static readonly HashSet<TutorialMarker> _activeInstances = new();
+
+    // Highlight ownership (see class summary).
+    private readonly List<Interactable> _highlightSet = new();   // everything this showing wants lit
+    private readonly HashSet<Interactable> _claimed = new();      // subset currently claimed by this marker
+    private static readonly Dictionary<Interactable, int> _claimCounts = new(); // claims across all markers
 
     /// <summary>
     /// Every <see cref="TutorialMarker"/> currently enabled in the scene, whether it was shown via
@@ -90,12 +115,23 @@ public class TutorialMarker : MonoBehaviour
         // Start hidden so the marker fades in when shown (if the camera is in range).
         _alpha = 0f;
         ApplyAlpha();
+
+        RebuildHighlightSet();
+        SyncHighlights();
     }
 
-    private void OnDisable() => _activeInstances.Remove(this);
+    private void OnDisable()
+    {
+        _activeInstances.Remove(this);
+        ReleaseAllHighlights();
+        _highlightSet.Clear();
+    }
 
     private void LateUpdate()
     {
+        // Cheap per-frame re-check so held pickables stop glowing and dropped ones resume.
+        SyncHighlights();
+
         Camera cam = Camera.main;
         if (cam != null)
         {
@@ -147,6 +183,92 @@ public class TutorialMarker : MonoBehaviour
     public void Hide()
     {
         gameObject.SetActive(false);
+        _target = null;
+    }
+
+    /// <summary>
+    /// Adds a runtime <see cref="Interactable"/> (e.g. a network-spawned document or coupon) to this
+    /// arrow's highlight set for the current showing. Cleared automatically when the arrow hides.
+    /// </summary>
+    public void AddHighlightTarget(Interactable interactable)
+    {
+        if (interactable == null || _highlightSet.Contains(interactable)) return;
+
+        _highlightSet.Add(interactable);
+        if (isActiveAndEnabled) SyncHighlights();
+    }
+
+    // ── Highlight ownership ──────────────────────────────────────────────────
+
+    private void RebuildHighlightSet()
+    {
+        _highlightSet.Clear();
+        AddRange(highlightTargets);
+
+        if (_target == null) return;
+
+        // Day 1 marks pre-placed arrow anchors; their authored targets define what gets lit.
+        if (_target.TryGetComponent(out TutorialMarker anchor))
+        {
+            if (anchor != this) AddRange(anchor.highlightTargets);
+            return;
+        }
+
+        Interactable found = _target.GetComponentInParent<Interactable>();
+        if (found == null) found = _target.GetComponentInChildren<Interactable>();
+        if (found != null && !_highlightSet.Contains(found)) _highlightSet.Add(found);
+    }
+
+    private void AddRange(Interactable[] source)
+    {
+        if (source == null) return;
+        foreach (Interactable i in source)
+            if (i != null && !_highlightSet.Contains(i)) _highlightSet.Add(i);
+    }
+
+    private void SyncHighlights()
+    {
+        for (int i = 0; i < _highlightSet.Count; i++)
+        {
+            Interactable target = _highlightSet[i];
+            bool want = target != null
+                        && target.gameObject.activeInHierarchy
+                        && !(target is PickableObject pickable && pickable.IsHeld);
+            bool has = _claimed.Contains(target);
+
+            if (want && !has) Claim(target);
+            else if (!want && has) Release(target);
+        }
+    }
+
+    private void ReleaseAllHighlights()
+    {
+        foreach (Interactable target in new List<Interactable>(_claimed))
+            Release(target);
+        _claimed.Clear();
+    }
+
+    private void Claim(Interactable target)
+    {
+        _claimed.Add(target);
+        _claimCounts.TryGetValue(target, out int count);
+        _claimCounts[target] = count + 1;
+        if (count == 0) target.SetForceHighlight(true, HighlightHold.TutorialArrow);
+    }
+
+    private void Release(Interactable target)
+    {
+        _claimed.Remove(target);
+        if (!_claimCounts.TryGetValue(target, out int count)) return;
+
+        if (count > 1)
+        {
+            _claimCounts[target] = count - 1;
+            return;
+        }
+
+        _claimCounts.Remove(target);
+        if (target != null) target.SetForceHighlight(false, HighlightHold.TutorialArrow);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

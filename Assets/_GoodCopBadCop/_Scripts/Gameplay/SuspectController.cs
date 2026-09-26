@@ -1134,6 +1134,8 @@ public class SuspectController : NetworkBehaviour
     public void RespondToDialogueChoice(int choiceIndex)
     {
         if (suspectCharacter == null) return;
+        // A question asked just before the verdict must not be answered after it.
+        if (suspectCharacter.IsVerdictClosed) return;
 
         string response = suspectCharacter.GetQuestionResponse(choiceIndex);
         if (response == null) return;
@@ -2036,17 +2038,31 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Forces every client's dialogue mode closed for the suspect currently being processed by
-    /// a verdict. Fixes an edge case where one player delivers the verdict while another player
-    /// is still mid-dialogue with that same suspect: that other client's suspect cam (and
-    /// movement/look lock) would otherwise never be torn down, leaving their camera stuck on the
-    /// suspect as they walk away — and blocking whatever plays next (e.g. the Alexei cutscene).
-    /// No-op on clients whose local player is not currently in dialogue mode.
+    /// Forces every client out of any dialogue with the suspect a verdict was just delivered for:
+    /// ends the local player's question conversation with them, tears down booth dialogue mode
+    /// (suspect cam, movement/look lock, choice panel), and clears all on-screen dialogue
+    /// subtitles and voice audio. Subtitles are left alone only when an unrelated scripted
+    /// sequence (different speaker) currently owns the dialogue UI.
     /// </summary>
     [ClientRpc]
-    private void ForceExitDialogueForVerdictClientRpc()
+    private void ForceExitDialogueForVerdictClientRpc(NetworkObjectReference suspectRef)
     {
+        NetworkObject suspectNetObj = null;
+        SuspectCharacter suspect = null;
+        if (suspectRef.TryGet(out NetworkObject resolved))
+        {
+            suspectNetObj = resolved;
+            suspect = resolved.GetComponent<SuspectCharacter>();
+        }
+
+        suspect?.ForceEndDialogueForVerdictLocal();
         DialogueChoiceSystem.Instance?.ForceExitDialogueForVerdict();
+
+        ulong scriptedSpeaker = ScriptedDialogueRunner.ActiveDialogueSpeakerNetId;
+        bool unrelatedScriptedSequence = scriptedSpeaker != 0UL &&
+            (suspectNetObj == null || scriptedSpeaker != suspectNetObj.NetworkObjectId);
+        if (!unrelatedScriptedSequence)
+            DialogueManager.Instance?.ForceClearAllSubtitles();
     }
 
     /// <summary>
@@ -2110,12 +2126,14 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
-        // Edge case: another player may still be mid-dialogue with this suspect (they clicked
-        // in right as this verdict was delivered). Dialogue mode is tracked as local, per-client
-        // state, so without this broadcast that other client's suspect cam would never be
-        // deactivated and would stay locked onto the suspect as they walk away, hiding whatever
-        // plays next (e.g. the Alexei cutscene). No-op on clients not currently in dialogue.
-        ForceExitDialogueForVerdictClientRpc();
+        // A delivered verdict closes this suspect out for good: no further interaction or
+        // dialogue of any kind (networked, so it survives any later collider re-enable and
+        // reaches late joiners). Then force every client out of any dialogue with them —
+        // dialogue mode is local, per-client state, so another player who was mid-conversation
+        // (or clicked in right as the verdict landed) would otherwise stay locked in with the
+        // suspect cam latched on and the conversation's subtitles still on screen.
+        suspectCharacter.CloseForVerdictServer();
+        ForceExitDialogueForVerdictClientRpc(suspectCharacter.NetworkObject);
 
         suspectCharacter?.GetComponent<SuspectBarkController>()?.StopBarks();
 

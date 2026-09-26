@@ -3,6 +3,12 @@ using System.IO;
 using GoodCopBadCop.Population;
 using UnityEngine;
 
+/// <summary>
+/// Owns the campaign save file. Saves are day-start checkpoints only: during a day every
+/// progression setter mutates the live in-memory slot, and nothing is written to disk until the
+/// next day begins (see <see cref="CommitDayStartCheckpoint"/>). Quitting, returning to the menu,
+/// or losing the day discards every change made since that checkpoint.
+/// </summary>
 public class SaveDataManager : MonoBehaviour
 {
     public static SaveDataManager Instance { get; private set; }
@@ -10,7 +16,12 @@ public class SaveDataManager : MonoBehaviour
     private const int SlotCount = 3;
     private const string SaveFileName = "savedata.json";
 
+    /// <summary>Live state read and mutated by gameplay during the current day.</summary>
     private SaveData _saveData;
+
+    /// <summary>Mirror of what is on disk — the last day-start checkpoint of each slot.</summary>
+    private SaveData _committedData;
+
     private string _savePath;
 
     // The slot the player chose on the campaign screen. -1 = none selected.
@@ -23,8 +34,8 @@ public class SaveDataManager : MonoBehaviour
     // Legacy compat — kept so existing callers don't break while we migrate.
     // ---------------------------------------------------------------------------
 
-    /// <summary>Returns true if any slot has meaningful progress.</summary>
-    public bool HasSaveFile => Array.Exists(_saveData.Slots, s => s.IsOccupied);
+    /// <summary>Returns true if any slot has meaningful progress on disk.</summary>
+    public bool HasSaveFile => Array.Exists(_committedData.Slots, s => s.IsOccupied);
 
     /// <summary>True once the active slot's intro tutorial has been seen.</summary>
     public bool HasSeenIntroTutorial
@@ -34,7 +45,6 @@ public class SaveDataManager : MonoBehaviour
         {
             if (ActiveSlot == null) return;
             ActiveSlot.HasSeenTutorial = value;
-            Save();
         }
     }
 
@@ -51,13 +61,12 @@ public class SaveDataManager : MonoBehaviour
         {
             if (ActiveSlot == null) return;
             ActiveSlot.HasEverKilledSuspect = value;
-            Save();
         }
     }
 
     /// <summary>
-    /// Cash total as of the active slot's last Dusk checkpoint (see
-    /// <see cref="SaveDuskCheckpoint"/>). Setting this persists immediately.
+    /// Cash total as of the active slot's last day-start checkpoint. Kept in sync with the
+    /// checkpoint's <see cref="WorkdaySaveState.Cash"/> by <see cref="CommitDayStartCheckpoint"/>.
     /// </summary>
     public int CurrentCash
     {
@@ -66,29 +75,7 @@ public class SaveDataManager : MonoBehaviour
         {
             if (ActiveSlot == null) return;
             ActiveSlot.TotalCashEarned = value;
-            Save();
         }
-    }
-
-    /// <summary>
-    /// Persists the Dusk checkpoint used by a death-retry that fast-forwards back into the
-    /// post-shift phase: current coupon total and every live pickable's transform. Call once,
-    /// the instant all suspects finish processing (see <see cref="ShiftManager.HandleAllSuspectsProcessed"/>),
-    /// rather than setting <see cref="CurrentCash"/> and pickable state separately.
-    /// </summary>
-    public void SaveDuskCheckpoint(int cash, PickableObjectSaveData[] pickables)
-    {
-        if (ActiveSlot == null)
-        {
-            Debug.LogWarning("[SaveDataManager] SaveDuskCheckpoint called with no active slot.");
-            return;
-        }
-
-        ActiveSlot.TotalCashEarned = cash;
-        ActiveSlot.PickableObjects = pickables ?? new PickableObjectSaveData[0];
-        Save();
-
-        Debug.Log($"[SaveDataManager] Dusk checkpoint saved — cash: {cash}, pickables: {ActiveSlot.PickableObjects.Length}.");
     }
 
     // -------------------------------------------------------------------------
@@ -110,7 +97,7 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Marks the daily task ID as unlocked in the active slot and persists to disk.
+    /// Marks the daily task ID as unlocked in the active slot (persisted at the next day-start checkpoint).
     /// Safe to call multiple times — duplicate entries are ignored.
     /// </summary>
     public void UnlockDailyTask(string taskId)
@@ -122,7 +109,6 @@ public class SaveDataManager : MonoBehaviour
             ActiveSlot.UnlockedDailyTaskIds ?? new string[0]);
         list.Add(taskId);
         ActiveSlot.UnlockedDailyTaskIds = list.ToArray();
-        Save();
         Debug.Log($"[SaveDataManager] Daily task unlocked: '{taskId}'.");
     }
 
@@ -139,7 +125,7 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Marks the anomaly type name as unlocked in the active slot and persists to disk.
+    /// Marks the anomaly type name as unlocked in the active slot (persisted at the next day-start checkpoint).
     /// Safe to call multiple times — duplicate entries are ignored.
     /// </summary>
     public void UnlockAnomaly(string typeName)
@@ -151,7 +137,6 @@ public class SaveDataManager : MonoBehaviour
             ActiveSlot.UnlockedAnomalyTypeNames ?? new string[0]);
         list.Add(typeName);
         ActiveSlot.UnlockedAnomalyTypeNames = list.ToArray();
-        Save();
         Debug.Log($"[SaveDataManager] Anomaly unlocked: '{typeName}'.");
     }
 
@@ -162,7 +147,7 @@ public class SaveDataManager : MonoBehaviour
     public bool Day1TutorialComplete
     {
         get => ActiveSlot?.Day1TutorialComplete ?? false;
-        set { if (ActiveSlot == null) return; ActiveSlot.Day1TutorialComplete = value; Save(); }
+        set { if (ActiveSlot == null) return; ActiveSlot.Day1TutorialComplete = value; }
     }
 
     /// <summary>
@@ -173,22 +158,7 @@ public class SaveDataManager : MonoBehaviour
     public bool DocumentationExamTutorialComplete
     {
         get => ActiveSlot?.DocumentationExamTutorialComplete ?? false;
-        set { if (ActiveSlot == null) return; ActiveSlot.DocumentationExamTutorialComplete = value; Save(); }
-    }
-
-    /// <summary>
-    /// True once Vlad's scripted Day 1 tutorial appearance has been fully processed this save
-    /// (his closing dialogue played and his deferred verdict delivered — see
-    /// <see cref="Day_01.OnClosingDialogueComplete"/>). <see cref="CampaignManager.StartCampaign"/>
-    /// reads this on resume: if a Day 1 save was loaded before this became true, any mid-shift
-    /// <see cref="WorkdaySaveState"/> is discarded so the Day 1 opening sequence restarts from
-    /// the beginning with Vlad spawned correctly as the first suspect, rather than resuming with
-    /// a random suspect standing in for him.
-    /// </summary>
-    public bool Day1VladProcessed
-    {
-        get => ActiveSlot?.Day1VladProcessed ?? false;
-        set { if (ActiveSlot == null) return; ActiveSlot.Day1VladProcessed = value; Save(); }
+        set { if (ActiveSlot == null) return; ActiveSlot.DocumentationExamTutorialComplete = value; }
     }
 
     // -------------------------------------------------------------------------
@@ -216,7 +186,6 @@ public class SaveDataManager : MonoBehaviour
             ActiveSlot.UnlockedShopItems ?? new string[0]);
         list.Add(itemName);
         ActiveSlot.UnlockedShopItems = list.ToArray();
-        Save();
         Debug.Log($"[SaveDataManager] Shop item unlocked: '{itemName}'.");
     }
 
@@ -246,8 +215,7 @@ public class SaveDataManager : MonoBehaviour
             ActiveSlot.UnlockedWorldObjectIds ?? new string[0]);
         list.Add(objectId);
         ActiveSlot.UnlockedWorldObjectIds = list.ToArray();
-        Save();
-        Debug.Log($"[SaveDataManager] World object unlocked and saved: '{objectId}'.");
+        Debug.Log($"[SaveDataManager] World object unlocked: '{objectId}'.");
     }
 
     // -------------------------------------------------------------------------
@@ -267,11 +235,9 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Records the purchase/arrival state for the guard purchase point with the given ID and
-    /// persists to disk immediately, so a purchase made just before quitting is never lost —
-    /// including the "purchased but not yet arrived" state, which must resolve into an arrival at
-    /// the next day start after the save is reloaded rather than silently reverting to unpurchased.
-    /// Safe to call repeatedly; updates the existing entry in place.
+    /// Records the purchase/arrival state for the guard purchase point with the given ID. It is
+    /// persisted at the next day-start checkpoint — the same moment a "purchased but not yet
+    /// arrived" guard resolves into an arrival. Safe to call repeatedly; updates the entry in place.
     /// </summary>
     public void SaveGuardPurchasePointState(string pointId, bool purchased, bool arrived)
     {
@@ -289,8 +255,7 @@ public class SaveDataManager : MonoBehaviour
         entry.Arrived = arrived;
 
         ActiveSlot.GuardPurchasePoints = list.ToArray();
-        Save();
-        Debug.Log($"[SaveDataManager] Guard purchase point saved: '{pointId}' (purchased={purchased}, arrived={arrived}).");
+        Debug.Log($"[SaveDataManager] Guard purchase point updated: '{pointId}' (purchased={purchased}, arrived={arrived}).");
     }
 
     // -------------------------------------------------------------------------
@@ -308,7 +273,7 @@ public class SaveDataManager : MonoBehaviour
 
     /// <summary>
     /// Marks the named suspect as encountered (their intro dialogue has played) in the active
-    /// slot and persists to disk. Safe to call multiple times — duplicate entries are ignored.
+    /// slot. Safe to call multiple times — duplicate entries are ignored.
     /// </summary>
     public void MarkSuspectEncountered(string suspectName)
     {
@@ -319,7 +284,6 @@ public class SaveDataManager : MonoBehaviour
             ActiveSlot.EncounteredSuspectNames ?? new string[0]);
         list.Add(suspectName);
         ActiveSlot.EncounteredSuspectNames = list.ToArray();
-        Save();
         Debug.Log($"[SaveDataManager] Suspect encountered: '{suspectName}'.");
     }
 
@@ -330,10 +294,7 @@ public class SaveDataManager : MonoBehaviour
 
         var list = new System.Collections.Generic.List<string>(ActiveSlot.EncounteredSuspectNames ?? new string[0]);
         if (list.Remove(suspectName))
-        {
             ActiveSlot.EncounteredSuspectNames = list.ToArray();
-            Save();
-        }
     }
 
     /// <summary>Clears every suspect encounter record in the active slot. Debug use only.</summary>
@@ -341,7 +302,6 @@ public class SaveDataManager : MonoBehaviour
     {
         if (ActiveSlot == null) return;
         ActiveSlot.EncounteredSuspectNames = new string[0];
-        Save();
     }
 
     // -------------------------------------------------------------------------
@@ -357,7 +317,7 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Records a lock as permanently unlocked in the active slot and persists to disk.
+    /// Records a lock as permanently unlocked in the active slot (persisted at the next day-start checkpoint).
     /// Safe to call multiple times — duplicate entries are ignored.
     /// </summary>
     public void SaveUnlockedLock(string lockId)
@@ -369,11 +329,10 @@ public class SaveDataManager : MonoBehaviour
             ActiveSlot.UnlockedLockIds ?? new string[0]);
         list.Add(lockId);
         ActiveSlot.UnlockedLockIds = list.ToArray();
-        Save();
-        Debug.Log($"[SaveDataManager] Lock unlocked and saved: '{lockId}'.");
+        Debug.Log($"[SaveDataManager] Lock unlocked: '{lockId}'.");
     }
 
-    /// <summary>The current day number for the active slot. Persists to disk on set.</summary>
+    /// <summary>The current day number for the active slot. Persisted at the next day-start checkpoint.</summary>
     public int CurrentDay
     {
         get => ActiveSlot?.CurrentDay ?? 1;
@@ -381,7 +340,6 @@ public class SaveDataManager : MonoBehaviour
         {
             if (ActiveSlot == null) return;
             ActiveSlot.CurrentDay = value;
-            Save();
         }
     }
 
@@ -391,7 +349,7 @@ public class SaveDataManager : MonoBehaviour
 
     /// <summary>
     /// Writes the current runtime suspect state (kill flags, quarantine cooldowns, infection scores)
-    /// to the active save slot and flushes to disk.
+    /// to the active save slot (persisted at the next day-start checkpoint).
     /// Call this whenever any suspect record changes: on kill, quarantine, and after each day advance.
     /// Server-only — only the host mutates suspect records.
     /// </summary>
@@ -421,8 +379,7 @@ public class SaveDataManager : MonoBehaviour
         }
 
         ActiveSlot.SuspectRecords = entries;
-        Save();
-        Debug.Log($"[SaveDataManager] Suspect records saved ({entries.Length} entries).");
+        Debug.Log($"[SaveDataManager] Suspect records staged ({entries.Length} entries).");
     }
 
     /// <summary>
@@ -443,8 +400,7 @@ public class SaveDataManager : MonoBehaviour
         if (ActiveSlot == null) return;
 
         ActiveSlot.Population = population ?? new PopulationSaveData();
-        Save();
-        Debug.Log("[SaveDataManager] Population saved.");
+        Debug.Log("[SaveDataManager] Population staged.");
     }
 
     public PopulationSaveData GetSavedPopulation()
@@ -475,7 +431,7 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Records the booth glass damage state in the active slot and persists to disk.
+    /// Records the booth glass damage state in the active slot (persisted at the next day-start checkpoint).
     /// Server/host authoritative — clients must never call this, since the host's value is the
     /// one replicated to everyone via <see cref="GlobalHostVariables.glassHits"/>.
     /// </summary>
@@ -484,126 +440,79 @@ public class SaveDataManager : MonoBehaviour
         if (ActiveSlot == null) return;
         ActiveSlot.GlassHits = Mathf.Max(0, hits);
         ActiveSlot.IsGlassSmashed = smashed;
-        Save();
-        Debug.Log($"[SaveDataManager] Glass state saved: hits={ActiveSlot.GlassHits}, smashed={smashed}.");
+        Debug.Log($"[SaveDataManager] Glass state staged: hits={ActiveSlot.GlassHits}, smashed={smashed}.");
     }
 
     /// <summary>
-    /// Records the booth glass smashed/restored state in the active slot and persists to disk.
-    /// Only the host writes to disk; clients update in-memory state only.
+    /// Records the booth glass smashed/restored state in the active slot (persisted at the next
+    /// day-start checkpoint; only the host writes to disk).
     /// </summary>
     public void SetGlassSmashed(bool smashed)
     {
         if (ActiveSlot == null) return;
         ActiveSlot.IsGlassSmashed = smashed;
-        Save();
-        Debug.Log($"[SaveDataManager] Glass smashed state saved: {smashed}.");
+        Debug.Log($"[SaveDataManager] Glass smashed state staged: {smashed}.");
     }
 
     // -------------------------------------------------------------------------
-    // Resumable Workday State
+    // Day-Start Checkpoint
     // -------------------------------------------------------------------------
 
-    /// <summary>Returns the active slot's in-progress day snapshot, if it belongs to the requested day.</summary>
-    public WorkdaySaveState GetWorkdayState(int day)
-    {
-        WorkdaySaveState state = ActiveSlot?.WorkdayState;
-        return state != null && state.IsValid && state.Day == day ? state : null;
-    }
-
-    /// <summary>Writes the host-authoritative in-progress day snapshot to the active save slot.</summary>
-    public void SaveWorkdayState(WorkdaySaveState state)
-    {
-        if (ActiveSlot == null || state == null) return;
-        state.IsValid = true;
-        ActiveSlot.WorkdayState = state;
-        ActiveSlot.LastSaved = DateTime.UtcNow;
-        Save();
-    }
-
-    /// <summary>Captures every resumable live workday system from the authoritative host.</summary>
-    public void SaveCurrentWorkdayState()
-    {
-        if (ActiveSlot == null || !CanSave() || ShiftManager.Instance == null || ShiftManager.Instance.IsRestoringWorkdayState) return;
-
-        // A workday snapshot reads live NetworkObjects. Once the session is shutting down (or has
-        // stopped) every pickable has already despawned, so a capture would record the entire
-        // world as "no longer exists" and wipe all items on the next load. Keep the last good save.
-        var nm = Unity.Netcode.NetworkManager.Singleton;
-        if (nm == null || !nm.IsListening || !nm.IsServer || nm.ShutdownInProgress)
-        {
-            Debug.Log("[SaveDataManager] Workday save skipped — no live host session to capture.");
-            return;
-        }
-
-        SaveWorkdayState(ShiftManager.Instance.CaptureWorkdaySaveState());
-    }
-
-    /// <summary>Returns the immutable baseline captured when the requested day began.</summary>
+    /// <summary>Returns the baseline captured when the requested day began, or null.</summary>
     public WorkdaySaveState GetDayStartWorkdayState(int day)
     {
         WorkdaySaveState state = ActiveSlot?.DayStartWorkdayState;
         return state != null && state.IsValid && state.Day == day ? state : null;
     }
 
-    /// <summary>Captures the starting baseline of a newly entered day for full day-loss retries.</summary>
-    public void SaveDayStartWorkdayState(WorkdaySaveState state)
+    /// <summary>True when the checkpoint on disk for the active slot already belongs to <paramref name="day"/>.</summary>
+    public bool HasCommittedDayStart(int day)
     {
-        if (ActiveSlot == null || state == null) return;
-        ActiveSlot.DayStartWorkdayState = CloneWorkdayState(state);
-        Save();
+        if (ActiveSlotIndex < 0) return false;
+        WorkdaySaveState state = _committedData.Slots[ActiveSlotIndex]?.DayStartWorkdayState;
+        return state != null && state.IsValid && state.Day == day;
     }
 
     /// <summary>
-    /// Completes the immutable day-start baseline once the daily pickup roll has occurred.
-    /// It writes exactly once so later resumes and retries retain the original selection.
+    /// The only gameplay path that writes to disk. Stores the day-start world baseline (pickables,
+    /// carried inventory, scheduled tasks, cash) in the active slot and commits the whole slot —
+    /// including every progression change made during the previous day — as the new checkpoint.
+    /// Host-only; called by <see cref="ShiftManager"/> right after <see cref="ShiftManager.OnDayStart"/>.
     /// </summary>
-    public void SaveDayStartDailyPickupState(int day, DailyPickupSaveData[] pickups)
+    public void CommitDayStartCheckpoint(WorkdaySaveState baseline)
     {
-        WorkdaySaveState baseline = GetDayStartWorkdayState(day);
-        if (baseline == null || baseline.DailyPickupsInitialized)
-            return;
+        if (ActiveSlot == null || baseline == null || !CanSave()) return;
 
-        baseline.DailyPickupsInitialized = true;
-        baseline.DailyPickups = pickups ?? Array.Empty<DailyPickupSaveData>();
-        ActiveSlot.DayStartWorkdayState = CloneWorkdayState(baseline);
-        Save();
+        baseline.IsValid = true;
+        SaveSlot slot = ActiveSlot;
+        slot.DayStartWorkdayState = Clone(baseline);
+        slot.TotalCashEarned = baseline.Cash;
+        slot.PickableObjects = baseline.Pickables ?? Array.Empty<PickableObjectSaveData>();
+        slot.LastSaved = DateTime.UtcNow;
+
+        _committedData.Slots[ActiveSlotIndex] = Clone(slot);
+        WriteToDisk();
+        Debug.Log($"[SaveDataManager] Day {baseline.Day} start checkpoint saved — cash: {baseline.Cash}, pickables: {slot.PickableObjects.Length}, carried items: {baseline.PlayerInventoryItemIds?.Length ?? 0}.");
     }
-
 
     /// <summary>
-    /// Replaces the active snapshot with the current day's immutable baseline. Called before the
-    /// scene reload after the team loses the day, so the normal load path restores day-start state.
+    /// Discards every in-memory change made since the last checkpoint. Used when the day is lost
+    /// (retry), when leaving to the main menu, and before a slot is (re)started.
     /// </summary>
-    public void ResetCurrentWorkdayToDayStart()
+    public void RevertToLastCheckpoint()
     {
-        if (ActiveSlot == null) return;
-
-        WorkdaySaveState baseline = GetDayStartWorkdayState(CurrentDay);
-        ActiveSlot.WorkdayState = baseline != null ? CloneWorkdayState(baseline) : new WorkdaySaveState();
-        if (baseline != null)
-        {
-            // Keep legacy day-start consumers (CampaignManager and the old retry helpers) aligned
-            // with the reset snapshot rather than leaving stale Dusk money/object transforms behind.
-            ActiveSlot.TotalCashEarned = baseline.Cash;
-            ActiveSlot.PickableObjects = baseline.Pickables ?? new PickableObjectSaveData[0];
-        }
-        Save();
+        _saveData = Clone(_committedData);
+        Debug.Log("[SaveDataManager] Reverted live save data to the last day-start checkpoint.");
     }
 
-    private static WorkdaySaveState CloneWorkdayState(WorkdaySaveState state)
-    {
-        return JsonUtility.FromJson<WorkdaySaveState>(JsonUtility.ToJson(state));
-    }
-
+    /// <summary>Invalidates the live day-start baseline once the campaign advances to a new day.</summary>
     public void ClearWorkdayState()
     {
-        if (ActiveSlot == null || ActiveSlot.WorkdayState == null) return;
-        ActiveSlot.WorkdayState = new WorkdaySaveState();
+        if (ActiveSlot == null) return;
         ActiveSlot.DayStartWorkdayState = new WorkdaySaveState();
-        Save();
     }
 
+    private static T Clone<T>(T value) => JsonUtility.FromJson<T>(JsonUtility.ToJson(value));
 
     private void Awake()
     {
@@ -620,17 +529,6 @@ public class SaveDataManager : MonoBehaviour
         Load();
     }
 
-    private void OnApplicationPause(bool paused)
-    {
-        if (paused)
-            SaveCurrentWorkdayState();
-    }
-
-    private void OnApplicationQuit()
-    {
-        SaveCurrentWorkdayState();
-    }
-
     // ---------------------------------------------------------------------------
     // Slot Access
     // ---------------------------------------------------------------------------
@@ -644,9 +542,9 @@ public class SaveDataManager : MonoBehaviour
     {
         int bestIndex = -1;
         DateTime bestTime = DateTime.MinValue;
-        for (int i = 0; i < _saveData.Slots.Length; i++)
+        for (int i = 0; i < _committedData.Slots.Length; i++)
         {
-            SaveSlot slot = _saveData.Slots[i];
+            SaveSlot slot = _committedData.Slots[i];
             if (slot.IsOccupied && slot.LastSaved > bestTime)
             {
                 bestTime = slot.LastSaved;
@@ -656,7 +554,7 @@ public class SaveDataManager : MonoBehaviour
         return bestIndex;
     }
 
-    /// <summary>Returns the save slot at the given index (0-based).</summary>
+    /// <summary>Returns the saved (on-disk checkpoint) data for the slot at the given index (0-based).</summary>
     public SaveSlot GetSlot(int index)
     {
         if (index < 0 || index >= SlotCount)
@@ -665,7 +563,7 @@ public class SaveDataManager : MonoBehaviour
             return null;
         }
 
-        return _saveData.Slots[index];
+        return _committedData.Slots[index];
     }
 
     /// <summary>
@@ -700,32 +598,23 @@ public class SaveDataManager : MonoBehaviour
             return;
         }
 
+        // Every session starts from the day-start checkpoint on disk, discarding anything left
+        // in memory from an earlier session that was quit mid-day.
+        RevertToLastCheckpoint();
+
         if (!ActiveSlot.IsOccupied)
         {
             ActiveSlot.IsOccupied = true;
             ActiveSlot.SlotName = $"Save {ActiveSlotIndex + 1}";
             ActiveSlot.LastSaved = DateTime.UtcNow;
+            _committedData.Slots[ActiveSlotIndex] = Clone(ActiveSlot);
+            WriteToDisk();
             Debug.Log($"[SaveDataManager] New save created in slot {ActiveSlotIndex}.");
         }
         else
         {
-            Debug.Log($"[SaveDataManager] Resuming slot {ActiveSlotIndex} ('{ActiveSlot.SlotName}').");
+            Debug.Log($"[SaveDataManager] Resuming slot {ActiveSlotIndex} ('{ActiveSlot.SlotName}') from its Day {ActiveSlot.CurrentDay} start checkpoint.");
         }
-
-        Save();
-    }
-
-    /// <summary>Persists any in-memory changes to the active slot.</summary>
-    public void SaveActiveSlot()
-    {
-        if (ActiveSlot == null)
-        {
-            Debug.LogWarning("[SaveDataManager] SaveActiveSlot called with no active slot.");
-            return;
-        }
-
-        ActiveSlot.LastSaved = DateTime.UtcNow;
-        Save();
     }
 
     /// <summary>Deletes the slot at the given index and persists the change.</summary>
@@ -738,7 +627,8 @@ public class SaveDataManager : MonoBehaviour
         }
 
         _saveData.Slots[index] = new SaveSlot();
-        Save();
+        _committedData.Slots[index] = new SaveSlot();
+        WriteToDisk();
         SaveScreenshotManager.DeleteScreenshot(index);
         Debug.Log($"[SaveDataManager] Slot {index} deleted.");
 
@@ -760,6 +650,7 @@ public class SaveDataManager : MonoBehaviour
         }
 
         _saveData = new SaveData();
+        _committedData = new SaveData();
         ActiveSlotIndex = -1;
     }
 
@@ -779,7 +670,8 @@ public class SaveDataManager : MonoBehaviour
         return nm.IsHost || nm.IsServer;
     }
 
-    private void Save()
+    /// <summary>Writes the committed checkpoint data (never the live mid-day state) to disk.</summary>
+    private void WriteToDisk()
     {
         if (!CanSave())
         {
@@ -787,7 +679,7 @@ public class SaveDataManager : MonoBehaviour
             return;
         }
 
-        string json = JsonUtility.ToJson(_saveData, prettyPrint: true);
+        string json = JsonUtility.ToJson(_committedData, prettyPrint: true);
         File.WriteAllText(_savePath, json);
         Debug.Log($"[SaveDataManager] Saved to: {_savePath}");
     }
@@ -797,22 +689,24 @@ public class SaveDataManager : MonoBehaviour
         if (File.Exists(_savePath))
         {
             string json = File.ReadAllText(_savePath);
-            _saveData = JsonUtility.FromJson<SaveData>(json);
+            _committedData = JsonUtility.FromJson<SaveData>(json);
 
             // Guard against old single-slot save files that have no Slots array.
-            if (_saveData.Slots == null || _saveData.Slots.Length != SlotCount)
-                _saveData.Slots = new SaveSlot[SlotCount];
+            if (_committedData.Slots == null || _committedData.Slots.Length != SlotCount)
+                _committedData.Slots = new SaveSlot[SlotCount];
 
             for (int i = 0; i < SlotCount; i++)
-                _saveData.Slots[i] ??= new SaveSlot();
+                _committedData.Slots[i] ??= new SaveSlot();
 
             Debug.Log("[SaveDataManager] Save file loaded.");
         }
         else
         {
-            _saveData = new SaveData();
+            _committedData = new SaveData();
             Debug.Log("[SaveDataManager] No save file found — created new SaveData.");
         }
+
+        _saveData = Clone(_committedData);
     }
 }
 
@@ -944,16 +838,6 @@ public class SaveSlot
     public bool DocumentationExamTutorialComplete;
 
     /// <summary>
-    /// True once Vlad's scripted Day 1 tutorial appearance (index 0) has been fully processed —
-    /// his closing dialogue has played and his deferred verdict delivered. See
-    /// <see cref="SaveDataManager.Day1VladProcessed"/> for the guarded wrapper. Used by
-    /// <see cref="CampaignManager.StartCampaign"/> to detect a save reloaded mid-Day-1 before
-    /// Vlad was processed, so the Day 1 opening sequence can be restarted from the beginning
-    /// instead of resuming mid-shift with the wrong suspect standing in for Vlad.
-    /// </summary>
-    public bool Day1VladProcessed;
-
-    /// <summary>
     /// True once the player has ever killed a suspect on this save slot, across all sessions.
     /// See <see cref="SaveDataManager.HasEverKilledSuspect"/> for the guarded wrapper.
     /// </summary>
@@ -1026,22 +910,15 @@ public class SaveSlot
     public string LastSavedRaw;
 
     /// <summary>
-    /// Legacy Dusk checkpoint used by older restart helpers. Full day-loss retries now restore
-    /// <see cref="DayStartWorkdayState"/> instead, so this data is retained for compatibility
-    /// but never defines the all-players-dead restart point.
+    /// Pickable transforms as of the last day-start checkpoint. Mirrors
+    /// <see cref="DayStartWorkdayState"/>.Pickables; kept for older consumers.
     /// </summary>
     public PickableObjectSaveData[] PickableObjects = new PickableObjectSaveData[0];
 
     /// <summary>
-    /// In-progress state for the currently loaded campaign day. Unlike permanent progression this
-    /// snapshot is cleared when the campaign advances, allowing a loaded save to resume the exact
-    /// day phase, tasks, and dynamic cleanup objects instead of replaying day initialization.
-    /// </summary>
-    public WorkdaySaveState WorkdayState = new WorkdaySaveState();
-
-    /// <summary>
-    /// Immutable snapshot captured after a new day's initial setup. Used only when the whole team
-    /// loses the day, ensuring Retry restarts this day rather than restoring partial task progress.
+    /// World baseline captured right after the current day started (pickables, carried inventory,
+    /// scheduled tasks, daily pickups, cash). Every load and every day-loss retry restores this
+    /// snapshot, so a day always replays from its beginning.
     /// </summary>
     public WorkdaySaveState DayStartWorkdayState = new WorkdaySaveState();
 
