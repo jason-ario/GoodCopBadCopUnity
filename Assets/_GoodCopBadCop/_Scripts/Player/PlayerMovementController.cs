@@ -47,14 +47,25 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     [Header("Dialogue Zoom Settings")]
     [Tooltip("How far (meters) the camera dollies toward the conversation target for outside-world scripted dialogues (e.g. EnterScriptedDialogueModeOutside). Framing goal: the target's upper body/face.")]
-    [SerializeField] private float dialogueZoomDistance = 0.7f;
+    [SerializeField] private float dialogueZoomDistance = 1.0f;
     [Tooltip("Duration of the dolly-in/dolly-out tween.")]
     [SerializeField] private float dialogueZoomDuration = 0.6f;
     [Tooltip("Minimum clearance kept between the camera and any obstruction (wall, prop) discovered along the dolly path.")]
     [SerializeField] private float dialogueZoomClearance = 0.15f;
+    [Tooltip("Closest horizontal distance (meters) the camera may end up from the look target (head), so a large zoom distance never pushes the camera into the character's face.")]
+    [SerializeField] private float dialogueZoomMinStandoff = 0.6f;
 
+    // Pre-dialogue pose, restored on exit.
     private Vector3 _preDialogueZoomLocalPos;
+    private Quaternion _preDialogueCamLocalRot;
+    private Quaternion _preDialogueBodyRot;
+    private float _preDialogueCameraPitch;
     private bool _isDialogueZoomed;
+
+    // Untargeted blend tween — deliberately NOT bound to cameraTransform/transform so the
+    // DOKill() calls in SetCanControl/LookAtTarget callers can't cut it short.
+    private Tween _dialogueCamTween;
+    private bool _isDialogueCamBlendingOut;
 
     private Vector3 _recoilRotation; // Procedural offset for recoil
     private float _cameraPitch = 0f;
@@ -224,6 +235,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     private FootstepsAudio _footstepsAudio;
     private PlayerCameraController _playerCameraController;
+    private CorpseResurrectionController _corpseResurrection;
     [SerializeField] private Camera camera;
     public Camera Camera => camera;
 
@@ -242,6 +254,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         _playerAnimationController = GetComponent<PlayerAnimationController>();
         _footstepsAudio = GetComponent<FootstepsAudio>();
         _playerCameraController = GetComponent<PlayerCameraController>();
+        _corpseResurrection = GetComponent<CorpseResurrectionController>();
         
         CanMove = true;
         CanLook = true;
@@ -356,6 +369,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     private void Update()
     {
         if(IsLocalPlayer == false) return;
+
+        // A resurrected corpse is driven by the server's NavMeshAgent (MutantEnemy) — the dead
+        // owner's gravity-only CharacterController.Move must not fight it.
+        if (_corpseResurrection != null && _corpseResurrection.IsResurrected) return;
+
         if (canControl == false)
         {
             // Pausing (or any other canControl=false state) only disables player input —
@@ -610,6 +628,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     void Rotate()
     {
+        // While the dialogue camera is blending back to the pre-dialogue pose, the blend owns
+        // body yaw + camera pos/rot; mouse look resumes once it completes.
+        if (_isDialogueCamBlendingOut) return;
+
         float appliedMouseSensitivity = _baseMouseSensitivity * (_settingsMouseSensitivity / 50f);
         float verticalDirection = _invertYAxis ? -1f : 1f;
 
@@ -788,64 +810,160 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     }
 
     /// <summary>
-    /// Dollies the first-person camera closer to <paramref name="target"/> on top of the existing
-    /// look rotation, so an outside-world scripted conversation (see
-    /// <see cref="DialogueChoiceSystem.EnterScriptedDialogueModeOutside"/>) frames the target's
-    /// upper body/face instead of just rotating to face them. Movement/look are already locked
-    /// (CanControl false) for the whole conversation, so <see cref="Rotate"/> and its per-frame
-    /// camera-position logic never run and won't fight this tween. Safe to call multiple times;
-    /// only the first call caches the pre-zoom local position. <paramref name="verticalOffset"/>
-    /// raises (positive) or lowers (negative) the camera to re-tune framing per character height
-    /// — e.g. a taller suspect's head bone sits higher, so a small negative offset pulls the shot
-    /// back down toward their upper body. Call <see cref="ResetCameraZoomForDialogue"/> on exit to
-    /// restore the original position.
+    /// Frames <paramref name="target"/> (normally the NPC's head bone) for an outside-world
+    /// scripted conversation (see <see cref="DialogueChoiceSystem.EnterScriptedDialogueModeOutside"/>):
+    /// in a single blend it yaws the body to face the target, dollies the camera horizontally toward
+    /// it (clamped by obstructions and <see cref="dialogueZoomMinStandoff"/>), and pitches/aims the
+    /// camera at the head from the final dolly position. Movement/look are locked (CanControl false)
+    /// for the whole conversation so <see cref="Rotate"/> never fights the blend. Safe to call
+    /// multiple times; only the first call caches the pre-dialogue pose. <paramref name="verticalOffset"/>
+    /// raises (positive) or lowers (negative) the camera per character height. Call
+    /// <see cref="ResetCameraZoomForDialogue"/> on exit to smoothly blend back to the cached pose.
     /// </summary>
     public void ZoomCameraForDialogue(Transform target, float overrideDistance = -1f, float verticalOffset = 0f)
     {
         if (cameraTransform == null || target == null) return;
 
-        if (!_isDialogueZoomed)
+        // Cache the pre-dialogue pose once. If we re-enter while still blending out of a previous
+        // conversation, keep the original cache instead of snapshotting a mid-blend pose.
+        if (!_isDialogueZoomed && !_isDialogueCamBlendingOut)
         {
             _preDialogueZoomLocalPos = cameraTransform.localPosition;
-            _isDialogueZoomed = true;
+            _preDialogueCamLocalRot = cameraTransform.localRotation;
+            _preDialogueBodyRot = transform.rotation;
+            _preDialogueCameraPitch = _cameraPitch;
         }
+        _isDialogueZoomed = true;
+        _isDialogueCamBlendingOut = false;
 
-        float distance = overrideDistance > 0f ? overrideDistance : dialogueZoomDistance;
+        KillDialogueCameraBlend();
+        // Kill any stray LookAtTarget/DOTween rotations so they don't fight the blend.
+        cameraTransform.DOKill();
+        transform.DOKill();
 
-        Vector3 direction = target.position - cameraTransform.position;
-        direction.y = 0f; // Dolly horizontally only — pitch already aims the camera up/down at the target.
-        if (direction.sqrMagnitude < 0.0001f)
+        Vector3 headPos = target.position;
+
+        // --- Body yaw: face the target horizontally.
+        Vector3 bodyDir = headPos - transform.position;
+        bodyDir.y = 0f;
+        Quaternion endBodyRot = bodyDir.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(bodyDir.normalized, Vector3.up)
+            : transform.rotation;
+
+        // --- Dolly: horizontal move toward the target, clamped by obstructions and a min standoff.
+        Vector3 camPos = cameraTransform.position;
+        Vector3 direction = headPos - camPos;
+        direction.y = 0f;
+        float horizontalDist = direction.magnitude;
+        if (horizontalDist < 0.0001f)
+        {
             direction = cameraTransform.forward;
+            direction.y = 0f;
+            horizontalDist = 0f;
+        }
         direction.Normalize();
 
-        // Clamp against obstructions (walls, props) so the camera never dollies through geometry.
-        if (Physics.Raycast(cameraTransform.position, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
+        float distance = overrideDistance > 0f ? overrideDistance : dialogueZoomDistance;
+        distance = Mathf.Min(distance, Mathf.Max(0f, horizontalDist - dialogueZoomMinStandoff));
+
+        if (Physics.Raycast(camPos, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
             distance = Mathf.Max(0f, hit.distance - dialogueZoomClearance);
 
-        // Vertical offset lets callers re-frame the shot per character (e.g. push the camera up
-        // for a tall suspect so the shot doesn't skew too low, or down for a short one) on top
-        // of the horizontal dolly-in, without affecting the look-rotation set by LookAtTarget.
-        Vector3 worldTargetPos = cameraTransform.position + direction * distance + Vector3.up * verticalOffset;
-        Vector3 localTargetPos = cameraTransform.parent != null
-            ? cameraTransform.parent.InverseTransformPoint(worldTargetPos)
-            : worldTargetPos;
+        // Vertical offset re-frames the shot per character height.
+        Vector3 worldTargetPos = camPos + direction * distance + Vector3.up * verticalOffset;
 
-        cameraTransform.DOKill();
-        cameraTransform.DOLocalMove(localTargetPos, dialogueZoomDuration).SetEase(Ease.InOutSine);
+        // Convert to camera-parent local space as it will be AFTER the body rotates, so the
+        // dolly lands where expected even though the parent yaws during the blend.
+        Quaternion bodyDelta = endBodyRot * Quaternion.Inverse(transform.rotation);
+        Transform parent = cameraTransform.parent;
+        Vector3 endLocalPos;
+        Quaternion endParentRot;
+        if (parent != null)
+        {
+            Vector3 pivot = transform.position;
+            Matrix4x4 rotateAboutPivot = Matrix4x4.Translate(pivot) * Matrix4x4.Rotate(bodyDelta) * Matrix4x4.Translate(-pivot);
+            Matrix4x4 parentAfter = rotateAboutPivot * parent.localToWorldMatrix;
+            endLocalPos = parentAfter.inverse.MultiplyPoint3x4(worldTargetPos);
+            endParentRot = bodyDelta * parent.rotation;
+        }
+        else
+        {
+            endLocalPos = worldTargetPos;
+            endParentRot = Quaternion.identity;
+        }
+
+        // --- Camera rotation: aim straight at the head from the final dolly position.
+        Vector3 lookDir = headPos - worldTargetPos;
+        Quaternion endWorldCamRot = lookDir.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(lookDir.normalized, Vector3.up)
+            : cameraTransform.rotation;
+        Quaternion endLocalCamRot = Quaternion.Inverse(endParentRot) * endWorldCamRot;
+
+        StartDialogueCameraBlend(endBodyRot, endLocalPos, endLocalCamRot, onComplete: SyncPitch);
     }
 
     /// <summary>
-    /// Restores the camera's local position cached by <see cref="ZoomCameraForDialogue"/>. No-op if
-    /// the camera was never zoomed. Call on exiting the outside-world scripted conversation.
+    /// Smoothly blends body yaw, camera local position and camera local rotation back to the pose
+    /// cached by <see cref="ZoomCameraForDialogue"/>. Mouse look is suppressed until the blend
+    /// finishes so it doesn't snap or fight the tween. No-op if the camera was never zoomed.
     /// </summary>
     public void ResetCameraZoomForDialogue()
     {
         if (cameraTransform == null || !_isDialogueZoomed) return;
 
         _isDialogueZoomed = false;
+        _isDialogueCamBlendingOut = true;
 
+        KillDialogueCameraBlend();
         cameraTransform.DOKill();
-        cameraTransform.DOLocalMove(_preDialogueZoomLocalPos, dialogueZoomDuration).SetEase(Ease.InOutSine);
+        transform.DOKill();
+
+        // Restore look state up-front so the first Rotate() after the blend continues seamlessly.
+        _cameraPitch = _preDialogueCameraPitch;
+        _recoilRotation = Vector3.zero;
+        _smoothedMouseX = 0f;
+        _smoothedMouseY = 0f;
+        targetLookEuler = new Vector3(_cameraPitch, 0f, 0f);
+
+        StartDialogueCameraBlend(_preDialogueBodyRot, _preDialogueZoomLocalPos, _preDialogueCamLocalRot,
+            onComplete: () => _isDialogueCamBlendingOut = false);
+    }
+
+    private void StartDialogueCameraBlend(Quaternion endBodyRot, Vector3 endCamLocalPos, Quaternion endCamLocalRot, Action onComplete)
+    {
+        Quaternion startBodyRot = transform.rotation;
+        Vector3 startCamLocalPos = cameraTransform.localPosition;
+        Quaternion startCamLocalRot = cameraTransform.localRotation;
+
+        float t = 0f;
+        _dialogueCamTween = DOTween.To(() => t, v =>
+            {
+                t = v;
+                transform.rotation = Quaternion.Slerp(startBodyRot, endBodyRot, t);
+                cameraTransform.localPosition = Vector3.LerpUnclamped(startCamLocalPos, endCamLocalPos, t);
+                cameraTransform.localRotation = Quaternion.Slerp(startCamLocalRot, endCamLocalRot, t);
+            }, 1f, dialogueZoomDuration)
+            .SetEase(Ease.InOutSine)
+            .OnComplete(() =>
+            {
+                _dialogueCamTween = null;
+                onComplete?.Invoke();
+            })
+            .OnKill(() =>
+            {
+                // Never leave mouse look suppressed if the tween is killed externally.
+                if (_dialogueCamTween == null) return;
+                _dialogueCamTween = null;
+                _isDialogueCamBlendingOut = false;
+            });
+    }
+
+    private void KillDialogueCameraBlend()
+    {
+        if (_dialogueCamTween == null) return;
+        Tween tween = _dialogueCamTween;
+        _dialogueCamTween = null;
+        tween.Kill();
     }
 
     /// <summary>

@@ -83,6 +83,22 @@ public class CheckpointIntegrityService : MonoBehaviour
 
         IsEnabled = enabled;
         Instance.Recalculate();
+        OnEnabledChanged?.Invoke(enabled);
+    }
+
+    /// <summary>Fired whenever <see cref="IsEnabled"/> flips. PlayerUI uses this to show/hide the HUD bar.</summary>
+    public static event Action<bool> OnEnabledChanged;
+
+    /// <summary>
+    /// Syncs the enabled state to the campaign day being activated. The system is introduced at
+    /// the end of Day 1, so every later day (reached normally, via a save load, the Game Start
+    /// Point window, or a debug jump) starts with it already on. Day 1 starts disabled — this
+    /// also clears the static flag left over from a previous session in the same AppDomain —
+    /// and Day_01 re-enables it when the trash/graffiti tasks are assigned.
+    /// </summary>
+    public static void SyncForDay(int day)
+    {
+        SetEnabled(day > 1);
     }
 
     private static CheckpointIntegrityService _instance;

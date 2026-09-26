@@ -393,6 +393,9 @@ public class CampaignManager : NetworkBehaviour
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.SetCurrentDay(day);
 
+        // Checkpoint Integrity is introduced at the end of Day 1 — any later day starts with it on.
+        CheckpointIntegrityService.SyncForDay(day);
+
         // Inject this day's suspect pool only when a scripted override is configured.
         // Most days leave SuspectSet null and draw from the global DailySuspectManager pool,
         // which automatically respects kill and quarantine-cooldown exclusions.

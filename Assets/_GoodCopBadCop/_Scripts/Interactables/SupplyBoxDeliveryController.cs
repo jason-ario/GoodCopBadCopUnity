@@ -166,9 +166,11 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
 
             PickableObject pickable = instance.GetComponent<PickableObject>();
             // Apply this before NGO spawns the object so its contents cannot impart a physics
-            // impulse to the box during the spawn/parenting frame. The NetworkVariable carries
-            // the same state to every client as part of the spawn payload.
-            pickable?.SetSupplyBoxContainedNetworked(true);
+            // impulse to the box during the spawn/parenting frame. The NetworkVariables carry
+            // the same state — including which box slot the item is attached to — to every
+            // client as part of the spawn payload, so late joiners can rebuild the attachment
+            // that the one-shot PlaceInSlotClientRpc below never delivers to them.
+            pickable?.SetSupplyBoxContainedNetworked(new NetworkObjectReference(_activeBoxNetObj), contentsPath);
 
             netObj.Spawn(destroyWithScene: true);
 

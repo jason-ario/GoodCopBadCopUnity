@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using HighlightPlus;
+using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
@@ -154,6 +156,28 @@ public class PickableObject : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// The supply box NetworkObject this item is slotted into while <see cref="_isContainedInSupplyBox"/>
+    /// is true. <see cref="PlaceInSlotClientRpc"/> is a one-shot RPC that late-joining clients never
+    /// receive, so this (with <see cref="_supplyBoxSlotPath"/>) lets them rebuild the local
+    /// ParentConstraint on spawn instead of leaving the item frozen at its spawn-time position.
+    /// </summary>
+    private NetworkVariable<NetworkObjectReference> _supplyBoxSlotOwner = new NetworkVariable<NetworkObjectReference>(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Relative path from <see cref="_supplyBoxSlotOwner"/> to the contents transform.</summary>
+    private NetworkVariable<FixedString128Bytes> _supplyBoxSlotPath = new NetworkVariable<FixedString128Bytes>(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Max seconds a late joiner waits for the supply box NetworkObject to resolve.</summary>
+    private const float LateJoinSlotResolveTimeout = 5f;
+
+    private Coroutine _lateJoinSlotRoutine;
+
 
     /// <summary>Returns true if any player is currently holding this object.</summary>
     public bool IsHeld => _holdingClientId.Value != ulong.MaxValue;
@@ -177,6 +201,11 @@ public class PickableObject : Interactable
         // Late-joining clients need to inherit the current stowed visibility too.
         gameObject.SetActive(!_isStowed.Value);
 
+        // Late-joining clients never received PlaceInSlotClientRpc for supply-box contents,
+        // so rebuild the local slot attachment from the replicated box reference/path.
+        if (!IsServer && _isContainedInSupplyBox.Value && isActiveAndEnabled)
+            _lateJoinSlotRoutine = StartCoroutine(RestoreSupplyBoxSlotForLateJoin());
+
         PickableObjectRegistry.Instance.Register(this);
     }
 
@@ -191,6 +220,12 @@ public class PickableObject : Interactable
         // are orphaned in the scene whenever this object is despawned through any other path.
         if (IsServer)
             OnBeforeDespawnServer();
+
+        if (_lateJoinSlotRoutine != null)
+        {
+            StopCoroutine(_lateJoinSlotRoutine);
+            _lateJoinSlotRoutine = null;
+        }
 
         base.OnNetworkDespawn();
         _holdingClientId.OnValueChanged             -= OnHoldingClientChanged;
@@ -229,7 +264,71 @@ public class PickableObject : Interactable
         }
 
         _isContainedInSupplyBox.Value = contained;
+        if (!contained)
+        {
+            _supplyBoxSlotOwner.Value = default;
+            _supplyBoxSlotPath.Value = default;
+        }
         ApplySupplyBoxContainmentPhysics(contained);
+    }
+
+    /// <summary>
+    /// Server-only overload that also records which supply box slot this item is attached to,
+    /// so late-joining clients can re-establish the attachment on spawn. Safe to call before
+    /// the item is spawned (values ship with the spawn payload).
+    /// </summary>
+    public void SetSupplyBoxContainedNetworked(NetworkObjectReference boxRef, string contentsPath)
+    {
+        if (!IsServer && NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
+        {
+            Debug.LogWarning($"[PickableObject] Only the server can set supply-box containment for {name}.", this);
+            return;
+        }
+
+        _supplyBoxSlotOwner.Value = boxRef;
+        _supplyBoxSlotPath.Value = new FixedString128Bytes(contentsPath ?? string.Empty);
+        _isContainedInSupplyBox.Value = true;
+        ApplySupplyBoxContainmentPhysics(true);
+    }
+
+    /// <summary>
+    /// Late-join path: waits until the replicated supply box NetworkObject is resolvable on this
+    /// client (spawn order within the initial sync isn't guaranteed), then applies the same local
+    /// slot attachment that <see cref="PlaceInSlotClientRpc"/> performs for already-connected peers.
+    /// </summary>
+    private IEnumerator RestoreSupplyBoxSlotForLateJoin()
+    {
+        float deadline = Time.time + LateJoinSlotResolveTimeout;
+        NetworkObject slotOwner = null;
+
+        while (_isContainedInSupplyBox.Value && !_supplyBoxSlotOwner.Value.TryGet(out slotOwner))
+        {
+            if (Time.time > deadline)
+            {
+                Debug.LogWarning($"[PickableObject] Late-join: could not resolve supply box for {name} within {LateJoinSlotResolveTimeout}s.", this);
+                _lateJoinSlotRoutine = null;
+                yield break;
+            }
+            yield return null;
+        }
+
+        _lateJoinSlotRoutine = null;
+
+        // Picked up (or released) while we were waiting — normal holder flow owns it now.
+        if (!_isContainedInSupplyBox.Value || slotOwner == null) yield break;
+
+        string path = _supplyBoxSlotPath.Value.ToString();
+        Transform slot = string.IsNullOrEmpty(path) ? slotOwner.transform : slotOwner.transform.Find(path);
+        if (slot == null)
+        {
+            Debug.LogWarning($"[PickableObject] Late-join: could not find slot '{path}' on {slotOwner.name} for {name}.", this);
+            yield break;
+        }
+
+        PrepareForSlotLocal(slot.position, slot.rotation);
+        AttachToSlotLocal(slotOwner, slot);
+        ApplySupplyBoxContainmentPhysics(true);
+        ApplyNetworkInteractableState();
     }
 
     private void OnSupplyBoxContainmentChanged(bool previousValue, bool newValue)
@@ -819,6 +918,40 @@ public class PickableObject : Interactable
     {
         Debug.Log($"[PlaceInSlotClientRpc] Received on client {NetworkManager.Singleton.LocalClientId} for {name} | slotRelativePath='{slotRelativePath}' | currentParent={transform.parent?.name ?? "none"}");
 
+        // The RPC has now delivered the authoritative placement; any pending late-join restore is redundant.
+        if (_lateJoinSlotRoutine != null)
+        {
+            StopCoroutine(_lateJoinSlotRoutine);
+            _lateJoinSlotRoutine = null;
+        }
+
+        PrepareForSlotLocal(position, rotation);
+
+        if (!slotOwnerRef.TryGet(out NetworkObject slotOwner))
+        {
+            Debug.LogError($"[PlaceInSlotClientRpc] Could not resolve slotOwnerRef on client {NetworkManager.Singleton.LocalClientId} for {name}");
+            return;
+        }
+
+        Transform slot = string.IsNullOrEmpty(slotRelativePath)
+            ? slotOwner.transform
+            : slotOwner.transform.Find(slotRelativePath);
+
+        if (slot == null)
+        {
+            Debug.LogWarning($"PlaceInSlotClientRpc: could not find slot '{slotRelativePath}' on {slotOwner.name}");
+            return;
+        }
+
+        AttachToSlotLocal(slotOwner, slot);
+    }
+
+    /// <summary>
+    /// Local (per-peer) half of slot placement: detaches from any hierarchy/constraint, snaps to the
+    /// given pose, disables NetworkTransform, and makes the object kinematic with trigger colliders.
+    /// </summary>
+    private void PrepareForSlotLocal(Vector3 position, Quaternion rotation)
+    {
         RemoveParent();
 
         // Prevent NGO from re-syncing the scene-hierarchy parent and fighting the constraint.
@@ -845,23 +978,14 @@ public class PickableObject : Interactable
         // Solid colliders on a parented object fight the slot geometry and can block
         // trigger-based placement detection (e.g. PlaceObjectSlot raycasts).
         _colliderController?.SetHeld();
+    }
 
-        if (!slotOwnerRef.TryGet(out NetworkObject slotOwner))
-        {
-            Debug.LogError($"[PlaceInSlotClientRpc] Could not resolve slotOwnerRef on client {NetworkManager.Singleton.LocalClientId} for {name}");
-            return;
-        }
-
-        Transform slot = string.IsNullOrEmpty(slotRelativePath)
-            ? slotOwner.transform
-            : slotOwner.transform.Find(slotRelativePath);
-
-        if (slot == null)
-        {
-            Debug.LogWarning($"PlaceInSlotClientRpc: could not find slot '{slotRelativePath}' on {slotOwner.name}");
-            return;
-        }
-
+    /// <summary>
+    /// Local (per-peer) half of slot placement: follows the resolved slot via SocketFollow for
+    /// folder slots, or via the ParentConstraint for every other slot owner (e.g. supply boxes).
+    /// </summary>
+    private void AttachToSlotLocal(NetworkObject slotOwner, Transform slot)
+    {
         // Use SocketFollow for folder slots so documents track the slot at execution order 2,
         // after PlayerPickupController (order 1) has already moved the folder to its final
         // pitched position. ParentConstraint evaluates before LateUpdate and would lag one frame.

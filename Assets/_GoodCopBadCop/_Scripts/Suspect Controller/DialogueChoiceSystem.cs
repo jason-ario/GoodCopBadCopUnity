@@ -345,10 +345,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
         if (lookTarget != null)
         {
-            PlayerMovementController movementController = player.GetComponent<PlayerMovementController>();
-            movementController?.LookAtTarget(lookTarget);
-            // Dolly the camera closer, framing the target's upper body/face rather than just rotating to face them.
-            movementController?.ZoomCameraForDialogue(lookTarget, verticalOffset: cameraVerticalOffset);
+            // Single blend: yaw body toward the target, dolly in, and aim the camera at the head.
+            // (Don't also call LookAtTarget — its tweens would be killed/fight this blend.)
+            player.GetComponent<PlayerMovementController>()?.ZoomCameraForDialogue(lookTarget, verticalOffset: cameraVerticalOffset);
         }
 
         HidePlayerBody();

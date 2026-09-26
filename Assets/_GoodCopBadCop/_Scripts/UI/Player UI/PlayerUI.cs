@@ -37,6 +37,21 @@ public class PlayerUI : MonoBehaviour
     {
         _batteryBar?.Hide();
         TrySubscribeToPickupController();
+
+        CheckpointIntegrityService.OnEnabledChanged += OnCheckpointIntegrityEnabledChanged;
+        OnCheckpointIntegrityEnabledChanged(CheckpointIntegrityService.IsEnabled);
+    }
+
+    /// <summary>
+    /// Keeps the integrity bar's visibility in step with the service — covers Day 2+ starts
+    /// where the day is applied before (or after) this HUD initializes.
+    /// </summary>
+    private void OnCheckpointIntegrityEnabledChanged(bool enabled)
+    {
+        if (_checkpointIntegrityBar == null) return;
+
+        if (enabled) _checkpointIntegrityBar.Show();
+        else _checkpointIntegrityBar.Hide();
     }
 
     private void Update()
@@ -57,6 +72,8 @@ public class PlayerUI : MonoBehaviour
 
     private void OnDisable()
     {
+        CheckpointIntegrityService.OnEnabledChanged -= OnCheckpointIntegrityEnabledChanged;
+
         if (_pickupController != null)
         {
             _pickupController.OnHeldObjectChanged -= OnHeldObjectChanged;

@@ -101,12 +101,39 @@ public class CorpseResurrectionController : NetworkBehaviour
     [Tooltip("One entry per face mesh that needs a material swap on resurrection.")]
     [SerializeField] private FaceMaterialSwap[] faceMaterialSwaps = System.Array.Empty<FaceMaterialSwap>();
 
+    [Header("Resurrected Movement Sync")]
+    [Tooltip("How quickly non-server copies of the resurrected corpse catch up to the server's NavMeshAgent-driven position.")]
+    [SerializeField] private float remotePositionLerpSpeed = 15f;
+    [Tooltip("How quickly non-server copies of the resurrected corpse catch up to the server's facing.")]
+    [SerializeField] private float remoteRotationLerpSpeed = 15f;
+    [Tooltip("If a non-server copy is further than this from the server position (metres), it snaps instead of lerping.")]
+    [SerializeField] private float remoteSnapDistance = 4f;
+
     // ── Networked state ────────────────────────────────────────────────────────
 
     private readonly NetworkVariable<bool> _isResurrected = new(
         false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
+
+    // Server-authoritative pose of the resurrected corpse. The Player prefab's NetworkTransform is
+    // OWNER-authoritative, and this object stays owned by the dead client until ReviveManager
+    // replaces it — so the server's NavMeshAgent cannot replicate through it (the non-authority
+    // NetworkTransform on the server even snapped the agent back every frame, which read as the
+    // mutant "running in place"). The NetworkTransform is therefore left disabled for the whole
+    // resurrected lifetime and this pair replaces it.
+    private readonly NetworkVariable<Vector3> _syncedPosition = new(
+        Vector3.zero,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<float> _syncedYaw = new(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>True on every machine once the corpse has stood up as a mutant.</summary>
+    public bool IsResurrected => _isResurrected.Value;
 
     // ── Component cache ────────────────────────────────────────────────────────
 
@@ -218,6 +245,11 @@ public class CorpseResurrectionController : NetworkBehaviour
             _playerHealth.OnDeath += OnPlayerDeath;
 
         _isResurrected.OnValueChanged += OnResurrectedChanged;
+
+        // Late joiners receive _isResurrected == true as an initial value, which does not raise
+        // OnValueChanged — apply the resurrected state explicitly.
+        if (!IsServer && _isResurrected.Value)
+            OnResurrectedChanged(false, true);
 
         if (mutantEnemy != null)
             mutantEnemy.OnRemovedFromPlay += OnMutantRemovedFromPlay;
@@ -354,18 +386,25 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 3f, NavMesh.AllAreas))
             transform.position = hit.position;
 
+        // Keep the owner-authoritative NetworkTransform off everywhere — position is replicated
+        // through _syncedPosition/_syncedYaw instead (see their declaration).
+        if (_networkTransform != null)
+            _networkTransform.enabled = false;
+
+        _syncedPosition.Value = transform.position;
+        _syncedYaw.Value = transform.eulerAngles.y;
         _isResurrected.Value = true;
 
         // Trigger visual resurrection on all clients.
-        ResurrectClientRpc();
+        ResurrectClientRpc(transform.position, transform.eulerAngles.y);
 
         // Server: enable the NavMeshAgent so MutantEnemy can drive movement.
         if (_navMeshAgent != null)
+        {
             _navMeshAgent.enabled = true;
-
-        // Re-enable NetworkTransform so the server-driven position replicates to clients.
-        if (_networkTransform != null)
-            _networkTransform.enabled = true;
+            if (_navMeshAgent.isOnNavMesh)
+                _navMeshAgent.Warp(transform.position);
+        }
 
         // Grow the hittable capsule to match the taller silhouette, and turn the ragdoll's limb
         // colliders into trigger hitboxes so weapon hit-scans can register per-limb hits — not
@@ -394,8 +433,13 @@ public class CorpseResurrectionController : NetworkBehaviour
     // ── Client-side visuals ───────────────────────────────────────────────────
 
     [ClientRpc]
-    private void ResurrectClientRpc()
+    private void ResurrectClientRpc(Vector3 position, float yaw)
     {
+        // Non-server copies start exactly where the server placed the body (post NavMesh snap);
+        // Update() then follows _syncedPosition/_syncedYaw from here on.
+        if (!IsServer)
+            transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+
         // Deactivate ragdoll physics and re-enable the Animator. This also re-enables the root
         // CharacterController (the corpse's only hittable collider — every ragdoll bone collider
         // stays disabled), so weapon hit-scans can find this GameObject via
@@ -410,11 +454,10 @@ public class CorpseResurrectionController : NetworkBehaviour
         ApplyResurrectedHitboxSize();
         _ragdollController?.SetLimbHitboxesActive(true);
 
-        // Re-enable NetworkTransform locally on every client too — not just the server (see
-        // Resurrect()) — so each client actually applies the server's authoritative position/
-        // rotation updates instead of leaving the ragdoll's last transform frozen in place.
+        // NetworkTransform intentionally stays disabled on every machine (it is owner-authoritative
+        // and the dead client still owns this object) — see _syncedPosition.
         if (_networkTransform != null)
-            _networkTransform.enabled = true;
+            _networkTransform.enabled = false;
 
         if (_animator != null)
         {
@@ -466,7 +509,10 @@ public class CorpseResurrectionController : NetworkBehaviour
             _ragdollController?.SetLimbHitboxesActive(true);
 
             if (_networkTransform != null)
-                _networkTransform.enabled = true;
+                _networkTransform.enabled = false;
+
+            if (!IsServer)
+                transform.SetPositionAndRotation(_syncedPosition.Value, Quaternion.Euler(0f, _syncedYaw.Value, 0f));
 
             if (_animator != null)
             {
@@ -526,6 +572,44 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (_boneLeftLowerLeg != null)  _origLeftLowerLegLocalPos  = _boneLeftLowerLeg.localPosition;
         if (_boneRightUpperLeg != null) _origRightUpperLegLocalPos = _boneRightUpperLeg.localPosition;
         if (_boneRightLowerLeg != null) _origRightLowerLegLocalPos = _boneRightLowerLeg.localPosition;
+    }
+
+    // ── Resurrected movement sync ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Server: publishes the NavMeshAgent-driven pose. Everyone else: follows it.
+    /// Replaces the owner-authoritative NetworkTransform for the resurrected lifetime.
+    /// </summary>
+    private void Update()
+    {
+        if (!IsSpawned || !_isResurrected.Value) return;
+
+        if (IsServer)
+        {
+            Vector3 position = transform.position;
+            if ((position - _syncedPosition.Value).sqrMagnitude > 0.0001f)
+                _syncedPosition.Value = position;
+
+            float yaw = transform.eulerAngles.y;
+            if (Mathf.Abs(Mathf.DeltaAngle(yaw, _syncedYaw.Value)) > 0.1f)
+                _syncedYaw.Value = yaw;
+            return;
+        }
+
+        Vector3 targetPosition = _syncedPosition.Value;
+        Quaternion targetRotation = Quaternion.Euler(0f, _syncedYaw.Value, 0f);
+
+        if ((transform.position - targetPosition).sqrMagnitude > remoteSnapDistance * remoteSnapDistance)
+        {
+            transform.SetPositionAndRotation(targetPosition, targetRotation);
+            return;
+        }
+
+        float positionT = 1f - Mathf.Exp(-remotePositionLerpSpeed * Time.deltaTime);
+        float rotationT = 1f - Mathf.Exp(-remoteRotationLerpSpeed * Time.deltaTime);
+        transform.SetPositionAndRotation(
+            Vector3.Lerp(transform.position, targetPosition, positionT),
+            Quaternion.Slerp(transform.rotation, targetRotation, rotationT));
     }
 
     // ── LateUpdate: stretch + twist ───────────────────────────────────────────

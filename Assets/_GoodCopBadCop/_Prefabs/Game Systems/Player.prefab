@@ -7878,9 +7878,10 @@ MonoBehaviour:
   cameraLookDownPos: {fileID: 1875048912981118398}
   lookDownLerpSpeed: 20
   maxCameraOffsetForLean: 0.3
-  dialogueZoomDistance: 0.7
+  dialogueZoomDistance: 1
   dialogueZoomDuration: 0.6
   dialogueZoomClearance: 0.15
+  dialogueZoomMinStandoff: 0.6
   gravity: -30
   underwaterGravityMultiplier: 0.2
   underwaterSpeedMultiplier: 0.55
@@ -8877,6 +8878,9 @@ MonoBehaviour:
   - renderer: {fileID: 4545635767624442324}
     materialIndex: 1
     uncannyMaterial: {fileID: 2100000, guid: 5e6b46da6f50a6843b4935d0121b4d94, type: 2}
+  remotePositionLerpSpeed: 15
+  remoteRotationLerpSpeed: 15
+  remoteSnapDistance: 4
 --- !u!195 &6868248123783116879
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -8947,7 +8951,7 @@ MonoBehaviour:
   hitTriggerName: Hit
   doorDetectionRadius: 3
   doorOpenCooldownDuration: 3
-  hitParticlePrefab: {fileID: 0}
+  hitParticlePrefab: {fileID: 893913727056456344, guid: 57847ba3edbb34f4e9d1ea10ad1289a6, type: 3}
   goreCollider: {fileID: 0}
   goreDropPrefabs: []
   deathGoreBurstCountRange: {x: 4, y: 8}

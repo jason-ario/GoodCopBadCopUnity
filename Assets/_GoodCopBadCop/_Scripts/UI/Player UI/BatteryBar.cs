@@ -28,6 +28,14 @@ public class BatteryBar : MonoBehaviour
     [SerializeField] private float pulseSpeed = 6f;
     [Range(0f, 1f)] [SerializeField] private float pulseMinAlpha = 0.35f;
 
+    [Header("Empty Warning")]
+    [Tooltip("Label shown above the bar while the battery is completely empty.")]
+    [SerializeField] private TMP_Text emptyText;
+    [SerializeField] private float emptyPulseSpeed = 2f;
+    [Range(0f, 1f)] [SerializeField] private float emptyPulseMinAlpha = 0.35f;
+
+    private const float EmptyEpsilon = 0.0001f;
+
     private float _fill = 1f;
     private int _lastPercent = -1;
 
@@ -54,6 +62,21 @@ public class BatteryBar : MonoBehaviour
         if (fillImage != null) fillImage.color = color;
         if (iconImage != null) iconImage.color = new Color(color.r, color.g, color.b, 1f);
         UpdateSegments(color);
+        UpdateEmptyWarning();
+    }
+
+    private void UpdateEmptyWarning()
+    {
+        if (emptyText == null) return;
+
+        bool isEmpty = _fill <= EmptyEpsilon;
+        if (emptyText.gameObject.activeSelf != isEmpty)
+            emptyText.gameObject.SetActive(isEmpty);
+
+        if (!isEmpty) return;
+
+        float t = (Mathf.Sin(Time.unscaledTime * emptyPulseSpeed) + 1f) * 0.5f;
+        emptyText.alpha = Mathf.Lerp(emptyPulseMinAlpha, 1f, t);
     }
 
     private void UpdateSegments(Color color)
