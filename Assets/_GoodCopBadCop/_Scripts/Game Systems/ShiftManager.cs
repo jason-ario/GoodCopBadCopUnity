@@ -284,6 +284,7 @@ public class ShiftManager : NetworkBehaviour
         var pendingIds = new HashSet<string>(state.PendingDailyTaskIds);
         pendingIds.Remove("CleanGraffiti");
         pendingIds.Remove("TakeOutTrash");
+        pendingIds.Remove("CleanBlood");
         pendingIds.Remove("SortMail");
 
         // Day 1's breach gate is a non-MonoBehaviour adapter, so it cannot be found alongside
@@ -512,6 +513,7 @@ public class ShiftManager : NetworkBehaviour
             ProcessResidents = ProcessResidentsTask.Instance != null ? ProcessResidentsTask.Instance.CaptureSaveState() : new ProcessResidentsTaskSaveState(),
             Graffiti = CleanGraffitiTask.Instance != null ? CleanGraffitiTask.Instance.CaptureSaveState() : new GraffitiTaskSaveState(),
             Trash = TakeOutTrashTask.Instance != null ? TakeOutTrashTask.Instance.CaptureSaveState() : new TrashTaskSaveState(),
+            Blood = CleanBloodTask.Instance != null ? CleanBloodTask.Instance.CaptureSaveState() : new BloodTaskSaveState(),
             Mail = SortMailTask.Instance != null ? SortMailTask.Instance.CaptureSaveState() : new MailTaskSaveState(),
             FenceRepair = FenceRepairTask.Instance != null ? FenceRepairTask.Instance.CaptureSaveState() : new FenceTaskSaveState(),
             FollowTrail = FollowTrailThreat.Instance != null ? FollowTrailThreat.Instance.CaptureSaveState() : new FollowTrailTaskSaveState(),
@@ -546,6 +548,10 @@ public class ShiftManager : NetworkBehaviour
                 itemIds.Add(backpack.SaveId);
         }
 
+        if (itemIds.Count == 0)
+            return Array.Empty<string>();
+
+        itemIds.RemoveWhere(id => PickableObjectRegistry.Instance.TryGetPickable(id, out PickableObject p) && !p.IsPersistedInSave);
         if (itemIds.Count == 0)
             return Array.Empty<string>();
 
@@ -585,7 +591,7 @@ public class ShiftManager : NetworkBehaviour
         {
             if (string.IsNullOrEmpty(itemId) || !recoveredIds.Add(itemId)) continue;
             if (!PickableObjectRegistry.Instance.TryGetPickable(itemId, out PickableObject pickable) ||
-                pickable == null || !pickable.IsSpawned)
+                pickable == null || !pickable.IsSpawned || !pickable.IsPersistedInSave)
                 continue;
 
             int column = recoveredCount % 3;
@@ -642,6 +648,7 @@ public class ShiftManager : NetworkBehaviour
         ProcessResidentsTask.Instance?.RestoreSaveState(state.ProcessResidents);
         CleanGraffitiTask.Instance?.RestoreSaveState(state.Graffiti);
         TakeOutTrashTask.Instance?.RestoreSaveState(state.Trash);
+        CleanBloodTask.Instance?.RestoreSaveState(state.Blood);
         SortMailTask.Instance?.RestoreSaveState(state.Mail);
         FenceRepairTask.Instance?.RestoreSaveState(state.FenceRepair);
         CleanBoothMessTask.Instance?.RestoreSaveState(state.BoothMess);

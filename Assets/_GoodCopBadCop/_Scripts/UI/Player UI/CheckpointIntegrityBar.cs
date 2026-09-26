@@ -22,8 +22,8 @@ public class CheckpointIntegrityBar : StatBar
         // Day 1 keeps the integrity system disabled, so the bar has nothing meaningful to show
         // yet — hide immediately rather than displaying a static 100% bar. Day_01 calls
         // CheckpointIntegrityService.SetEnabled(true) and Show() together right when the
-        // "Checkpoint Integrity Score" tutorial first appears, which re-triggers this OnEnable
-        // with the system already enabled.
+        // trash/graffiti tasks are assigned, which re-triggers this OnEnable with the system
+        // already enabled.
         if (!CheckpointIntegrityService.IsEnabled)
         {
             gameObject.SetActive(false);

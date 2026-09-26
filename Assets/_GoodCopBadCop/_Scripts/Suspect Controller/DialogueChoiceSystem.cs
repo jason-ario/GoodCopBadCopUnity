@@ -414,6 +414,13 @@ public class DialogueChoiceSystem : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// True while the choice panel is visible on this client. Used to locally hide all subtitles
+    /// (including choice echoes and in-world bubbles) so they never overlap the choices.
+    /// </summary>
+    public bool IsChoicePanelVisible =>
+        dialogueChoiceContainer != null && dialogueChoiceContainer.activeInHierarchy;
+
     /// <summary>Hides the choice panel without exiting dialogue mode.</summary>
     public void HideChoicePanel()
     {

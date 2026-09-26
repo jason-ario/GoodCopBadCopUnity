@@ -1117,9 +1117,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// oriented so its forward axis faces down into the ground surface described by
     /// <paramref name="groundNormal"/>. No-op when no decal prefabs are assigned. Server-only.
     ///
-    /// Purely cosmetic — decals with a <see cref="GraffitiInteractable"/> (e.g.
-    /// "Random Blood Splatter Variant.prefab") are mop-cleanable for the visual, but not tracked
-    /// by any cleanup task and never block clock-out.
+    /// Registers the spawned decal with <see cref="CleanBloodTask"/>, which counts in-bounds
+    /// splatters (required on Day 1, and shown under graffiti in Checkpoint Integrity) and treats
+    /// out-of-bounds ones as bonus-only.
     /// </summary>
     private void SpawnBloodDecal(Vector3 position, Vector3 groundNormal)
     {
@@ -1144,13 +1144,6 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         }
 
         netObj.Spawn(destroyWithScene: true);
-
-        // Purely cosmetic — claim the scrub callback so mopping this decal doesn't fall back to
-        // crediting the graffiti task (see GraffitiInteractable.ProgressRoutine).
-        GraffitiInteractable scrubCosmetic = decalGo.GetComponent<GraffitiInteractable>();
-        if (scrubCosmetic != null)
-            scrubCosmetic.OnScrubCompleted = () => { };
-
         _spawnedDecals.Add(netObj);
         _decalPlacements[netObj] = new WorldObjectPlacementSaveData
         {
@@ -1159,6 +1152,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             RotationEuler = rotation.eulerAngles,
             LocalScale = decalGo.transform.localScale
         };
+
+        // CleanBloodTask decides by position whether this splatter is required (in-bounds) or
+        // bonus-only, and claims its scrub callback either way.
+        CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
 
         SpawnBloodParticleClientRpc(position, rotation);
     }
@@ -1223,14 +1220,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         netObj.Spawn(destroyWithScene: true);
         GraffitiInteractable scrub = go.GetComponent<GraffitiInteractable>();
         if (scrub != null)
-        {
             scrub.RestoreScrubProgress(placement.ScrubProgress);
-            // Purely cosmetic — claim the scrub callback so mopping this decal doesn't fall back
-            // to crediting the graffiti task (see GraffitiInteractable.ProgressRoutine).
-            scrub.OnScrubCompleted = () => { };
-        }
         _spawnedDecals.Add(netObj);
         _decalPlacements[netObj] = placement;
+        CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
     }
 
     private void PruneCollectedItems()
@@ -1259,6 +1252,9 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         foreach (NetworkObject netObj in _spawnedDecals)
         {
+            // Tell the mop task first so it doesn't keep requiring blood that no longer exists.
+            CleanBloodTask.Instance?.UnregisterBloodSplatter(netObj);
+
             if (netObj != null && netObj.IsSpawned)
                 netObj.Despawn(destroy: true);
         }

@@ -162,8 +162,9 @@ public class MutantEnemy : NetworkBehaviour
 
     [Tooltip("Networked blood-decal prefabs (must have a NetworkObject + GraffitiInteractable) spawned " +
              "under EVERY gore piece dropped in a death burst, whether or not it lands inside the Trash " +
-             "Task's yard. Purely cosmetic — mop-able for the visual, but not tracked by any cleanup task " +
-             "and does not block clock-out. All must be registered as Network Prefabs in the " +
+             "Task's yard. Registered with CleanBloodTask, which counts in-bounds splatters (required on " +
+             "Day 1, and shown under graffiti in Checkpoint Integrity) and treats out-of-bounds ones as " +
+             "bonus-only. All must be registered as Network Prefabs in the " +
              "NetworkManager. Leave empty to disable gore blood splatters entirely.")]
     [SerializeField] private GameObject[] yardBloodDecalPrefabs;
 
@@ -1791,8 +1792,9 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>
     /// Server-side spawn of a networked blood-decal splatter under a gore piece the instant it's
     /// dropped, raycast downward from just above <paramref name="originPosition"/> to find the
-    /// ground. Purely cosmetic — mop-able for the visual, but not tracked by any cleanup task and
-    /// never blocks clock-out, wherever it lands. Called for every gore piece in a death burst
+    /// ground. Every splatter is handed to <see cref="CleanBloodTask.RegisterBloodSplatter"/>,
+    /// which decides by position whether it is REQUIRED (inside the checkpoint) or only credited
+    /// as a bonus when mopped (outside it). Called for every gore piece in a death burst
     /// (see <see cref="SpawnGoreBurst"/>). No-op when <see cref="yardBloodDecalPrefabs"/> is empty.
     /// </summary>
     private void SpawnGoreBloodDecal(Vector3 originPosition)
@@ -1833,11 +1835,10 @@ public class MutantEnemy : NetworkBehaviour
 
         decalNetObj.Spawn(destroyWithScene: true);
 
-        // Purely cosmetic — claim the scrub callback so mopping this decal doesn't fall back to
-        // crediting the graffiti task (see GraffitiInteractable.ProgressRoutine).
-        GraffitiInteractable scrubCosmetic = decalGo.GetComponent<GraffitiInteractable>();
-        if (scrubCosmetic != null)
-            scrubCosmetic.OnScrubCompleted = () => { };
+        // Always register with the mop task, wherever it landed — CleanBloodTask makes the
+        // counted-vs-bonus decision by position itself (in-bounds blood is required on Day 1 and
+        // feeds the graffiti row of Checkpoint Integrity; out-of-bounds blood is bonus-only).
+        CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
 
         SpawnBloodParticleClientRpc(groundPoint, rotation);
     }

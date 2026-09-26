@@ -87,12 +87,36 @@ public class DialogueManager : NetworkBehaviour
     /// </summary>
     private void Update()
     {
+        UpdateSubtitlesVisibilityForChoices();
+
         if (dialogueCanvasGroup == null) return;
 
         bool isPaused = UIController.Instance != null && UIController.Instance.IsPaused;
         dialogueCanvasGroup.alpha = isPaused ? 0f : 1f;
         dialogueCanvasGroup.interactable = !isPaused;
         dialogueCanvasGroup.blocksRaycasts = !isPaused;
+    }
+
+    private CanvasGroup _subtitlesCanvasGroup;
+
+    /// <summary>
+    /// Locally hides every subtitle in <see cref="subtitlesContainer"/> (NPC lines, player lines
+    /// and the choice echo) while the dialogue choice panel is showing. Only the CanvasGroup
+    /// alpha is changed, so subtitle lifetimes, typewriter coroutines and
+    /// <see cref="HasActiveSubtitles"/> keep working exactly as before.
+    /// </summary>
+    private void UpdateSubtitlesVisibilityForChoices()
+    {
+        if (subtitlesContainer == null) return;
+
+        if (_subtitlesCanvasGroup == null)
+        {
+            if (!subtitlesContainer.TryGetComponent(out _subtitlesCanvasGroup))
+                _subtitlesCanvasGroup = subtitlesContainer.gameObject.AddComponent<CanvasGroup>();
+        }
+
+        bool choicesVisible = dialogueChoiceSystem != null && dialogueChoiceSystem.IsChoicePanelVisible;
+        _subtitlesCanvasGroup.alpha = choicesVisible ? 0f : 1f;
     }
     
 

@@ -141,8 +141,8 @@ public class TutorialOverlay : MonoBehaviour
     /// <summary>
     /// Shows the "Checkpoint Integrity Score" tutorial overlay — explains that graffiti, trash,
     /// and damaged fences all lower the score, and that a lower score reduces coupon payouts.
-    /// Triggered by Day_01 immediately after the "fix a fence with a hammer" tutorial overlay
-    /// closes, the first time the post-breach fence-repair tutorial fires.
+    /// Triggered by Day_01 right after the trash and graffiti tutorial overlays, when the
+    /// end-of-shift cleanup tasks are first assigned.
     /// </summary>
     public void ShowCheckpointIntegrityTutorial(Action onComplete = null) => ShowScreen(checkpointIntegrityTutorialScreen, onComplete);
 

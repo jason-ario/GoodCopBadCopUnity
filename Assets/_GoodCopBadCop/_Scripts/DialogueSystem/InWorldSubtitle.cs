@@ -43,11 +43,14 @@ public class InWorldSubtitle : MonoBehaviour
     {
         // Force-hide (without touching _isShown or the auto-hide timer) while the pause menu is
         // open, so the bubble doesn't float on top of it; restores automatically once unpaused.
+        // Likewise force-hide locally while the dialogue choice panel is showing.
         bool isPaused = UIController.Instance != null && UIController.Instance.IsPaused;
+        bool choicesVisible = DialogueChoiceSystem.Instance != null && DialogueChoiceSystem.Instance.IsChoicePanelVisible;
+        bool forceHidden = isPaused || choicesVisible;
         if (canvasGroup != null)
-            canvasGroup.alpha = (_isShown && !isPaused) ? 1f : 0f;
+            canvasGroup.alpha = (_isShown && !forceHidden) ? 1f : 0f;
 
-        if (!billboard || !_isShown || isPaused) return;
+        if (!billboard || !_isShown || forceHidden) return;
 
         if (_mainCamera == null) _mainCamera = Camera.main;
         if (_mainCamera == null) return;

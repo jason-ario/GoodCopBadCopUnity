@@ -66,13 +66,15 @@ public class HUDTaskList : MonoBehaviour
             if (threat is TakeOutTrashTask trashTask && trashTask.HasCustomTutorialRow) continue;
             if (threat is CleanGraffitiTask graffitiTask && graffitiTask.HasCustomTutorialRow) continue;
             if (threat is FenceRepairTask fenceTask && fenceTask.HasCustomTutorialRow) continue;
+            if (threat is CleanBloodTask bloodTask && bloodTask.HasCustomTutorialRow) continue;
 
-            // Same three tasks are skipped entirely once they become optional (every day after
+            // Same cleanup tasks are skipped entirely once they become optional (every day after
             // Day 1 — see CleanupTaskGating). They still spawn, still show compass pips, and
-            // still feed Checkpoint Integrity via CheckpointMaintenanceHUD, but no longer occupy
-            // a slot on the mandatory task list.
+            // still feed Checkpoint Integrity via CheckpointMaintenanceHUD (blood is folded into
+            // the graffiti row), but no longer occupy a slot on the mandatory task list.
             if (!CleanupTaskGating.IsMandatoryDay &&
-                (threat is TakeOutTrashTask || threat is CleanGraffitiTask || threat is FenceRepairTask))
+                (threat is TakeOutTrashTask || threat is CleanGraffitiTask || threat is FenceRepairTask ||
+                 threat is CleanBloodTask))
                 continue;
 
             TutorialObjectiveItem item = list.AddObjective(BuildLabel(threat));

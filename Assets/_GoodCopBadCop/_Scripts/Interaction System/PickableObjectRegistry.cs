@@ -58,7 +58,11 @@ public class PickableObjectRegistry : MonoBehaviour
     {
         if (pickable == null || string.IsNullOrEmpty(pickable.SaveId)) return;
         _pickables[pickable.SaveId] = pickable;
-        _knownPickableIds.Add(pickable.SaveId);
+
+        // Non-persistent items stay resolvable (disconnect rescue) but never produce save
+        // entries or tombstones.
+        if (pickable.IsPersistedInSave)
+            _knownPickableIds.Add(pickable.SaveId);
 
         // Hook the disconnect sweep here rather than in Awake: this registry self-instantiates
         // before NetworkManager.Singleton necessarily exists, whereas a pickable registering
@@ -71,6 +75,18 @@ public class PickableObjectRegistry : MonoBehaviour
     {
         if (pickable == null || string.IsNullOrEmpty(pickable.SaveId)) return;
         _pickables.Remove(pickable.SaveId);
+
+        // A despawn caused by the network session ending (quit, return to menu, NGO shutdown)
+        // is not the item being consumed. Keeping its id would turn it into an Exists=false
+        // tombstone on any later capture, wiping the item on the next load.
+        if (IsNetworkSessionEnding())
+            _knownPickableIds.Remove(pickable.SaveId);
+    }
+
+    private static bool IsNetworkSessionEnding()
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        return nm == null || !nm.IsListening || nm.ShutdownInProgress;
     }
 
     /// <summary>
@@ -85,7 +101,7 @@ public class PickableObjectRegistry : MonoBehaviour
 
         foreach (KeyValuePair<string, PickableObject> kvp in _pickables)
         {
-            if (kvp.Value == null) continue;
+            if (kvp.Value == null || !kvp.Value.IsPersistedInSave) continue;
             liveIds.Add(kvp.Key);
             result.Add(kvp.Value.CaptureSaveData());
         }
@@ -156,6 +172,9 @@ public class PickableObjectRegistry : MonoBehaviour
         {
             if (entry == null || string.IsNullOrEmpty(entry.Id)) continue;
             if (!_pickables.TryGetValue(entry.Id, out PickableObject pickable) || pickable == null) continue;
+
+            // Also guards against older saves that still contain stamp entries/tombstones.
+            if (!pickable.IsPersistedInSave) continue;
 
             pickable.ApplySaveData(entry);
             restoredCount++;

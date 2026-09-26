@@ -216,7 +216,9 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (_taskActive)
         {
             EnsureReconcileRoutine();
-            ShiftManager.Instance?.RegisterPendingDailyTask(this);
+            // See CleanupTaskGating — only mandatory (Day 1) blood blocks clock-out.
+            if (CleanupTaskGating.IsMandatoryDay)
+                ShiftManager.Instance?.RegisterPendingDailyTask(this);
         }
     }
 
@@ -306,9 +308,11 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // dropping the task from the HUD (see the equivalent fix in TakeOutTrashTask).
         RegisterInTaskRegistryClientRpc();
 
-        // Block clock-out until every splatter registered this cycle is scrubbed clean —
-        // same gating TakeOutTrashTask uses for trash.
-        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        // Block clock-out until every splatter registered this cycle is scrubbed clean — but only
+        // on a mandatory cleanup day (Day 1, see CleanupTaskGating). Day 2+ blood still counts
+        // toward Checkpoint Integrity's graffiti category, it just no longer gates the timecard.
+        if (CleanupTaskGating.IsMandatoryDay)
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
         SaveDataManager.Instance?.SaveCurrentWorkdayState();
 
         Debug.Log("[CleanBloodTask] Task triggered — awaiting blood splatter registrations.");
@@ -436,10 +440,19 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _taskActive = true;
         _isComplete = false;
 
+        // Start a fresh count for this new batch. Anything still tracked from before stays
+        // required; previously-scrubbed splatters no longer inflate the ratio that feeds the
+        // Checkpoint Integrity graffiti category.
+        _spawnedSplatters.RemoveAll(n => n == null || !n.IsSpawned);
+        _scrubbed.Value   = 0;
+        _totalCount.Value = _spawnedSplatters.Count;
+
         _isActive.Value = true;
         RegisterInTaskRegistryClientRpc();
 
-        ShiftManager.Instance?.RegisterPendingDailyTask(this);
+        // See CleanupTaskGating — only mandatory (Day 1) blood blocks clock-out.
+        if (CleanupTaskGating.IsMandatoryDay)
+            ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
         EnsureReconcileRoutine();
 

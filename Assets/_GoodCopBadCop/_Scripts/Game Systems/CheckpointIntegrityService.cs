@@ -14,7 +14,8 @@ using UnityEngine;
 /// <see cref="ISystemicThreat"/> in the game (e.g. mutants), since those three represent the
 /// physical state of the booth itself and are the task components actually placed in the scene.
 /// Each is weighted equally by default via <see cref="_graffitiWeight"/>, <see cref="_trashWeight"/>,
-/// and <see cref="_fenceWeight"/>.
+/// and <see cref="_fenceWeight"/>. The graffiti category also pools in every blood splatter counted
+/// by <see cref="CleanBloodTask"/> (in-bounds only), matching the HUD's graffiti row.
 ///
 /// Purely a read-side aggregator: it owns no networked state of its own. Every tracked
 /// threat already replicates its ThreatLevel via NetworkVariable(ReadPermission.Everyone), so
@@ -66,9 +67,9 @@ public class CheckpointIntegrityService : MonoBehaviour
     /// <summary>
     /// Whether the integrity system is actively tracking graffiti/trash/fence state and applying
     /// a payout multiplier. Starts disabled — Day 1 leaves the score pinned at
-    /// <see cref="_maxScore"/> (100%) and the HUD bar hidden until the mutant-breach epilogue
-    /// shows the "Checkpoint Integrity Score" tutorial, at which point <see cref="SetEnabled"/>
-    /// is called to turn the system on for the rest of the campaign.
+    /// <see cref="_maxScore"/> (100%) and the HUD bar hidden until the end-of-shift trash/graffiti
+    /// tasks are assigned, at which point <see cref="SetEnabled"/> is called to turn the system
+    /// on for the rest of the campaign.
     /// </summary>
     public static bool IsEnabled { get; private set; } = false;
 
@@ -141,7 +142,7 @@ public class CheckpointIntegrityService : MonoBehaviour
     public void Recalculate()
     {
         // Day 1 keeps the system disabled: pin the score at 100% (ignoring graffiti/trash/fence
-        // state entirely) until SetEnabled(true) is called at the end-of-day tutorial.
+        // state entirely) until SetEnabled(true) is called when the trash/graffiti tasks are assigned.
         if (!IsEnabled)
         {
             if (!Mathf.Approximately(IntegrityScore, _maxScore))
@@ -186,9 +187,15 @@ public class CheckpointIntegrityService : MonoBehaviour
         float weightedTotal = 0f;
         float totalWeight   = 0f;
 
-        if (CleanGraffitiTask.Instance != null && _graffitiWeight > 0f)
+        // Graffiti category = graffiti pieces + blood splatters counted by CleanBloodTask (in-bounds
+        // only), pooled by count so every mess piece weighs the same — same formula as
+        // CleanGraffitiTask.ThreatLevel, just over the combined set.
+        if ((CleanGraffitiTask.Instance != null || CleanBloodTask.Instance != null) && _graffitiWeight > 0f)
         {
-            weightedTotal += (1f - Mathf.Clamp01(CleanGraffitiTask.Instance.ThreatLevel)) * _graffitiWeight;
+            CheckpointMaintenanceHUD.GetGraffitiAndBloodCounts(out int scrubbed, out int total);
+            float graffitiCleanliness = total > 0 ? Mathf.Clamp01((float)scrubbed / total) : 1f;
+
+            weightedTotal += graffitiCleanliness * _graffitiWeight;
             totalWeight   += _graffitiWeight;
         }
 

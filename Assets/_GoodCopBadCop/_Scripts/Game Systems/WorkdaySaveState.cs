@@ -33,6 +33,7 @@ public class WorkdaySaveState
     public ProcessResidentsTaskSaveState ProcessResidents = new();
     public GraffitiTaskSaveState Graffiti = new();
     public TrashTaskSaveState Trash = new();
+    public BloodTaskSaveState Blood = new();
     public MailTaskSaveState Mail = new();
     public FenceTaskSaveState FenceRepair = new();
     public FollowTrailTaskSaveState FollowTrail = new();

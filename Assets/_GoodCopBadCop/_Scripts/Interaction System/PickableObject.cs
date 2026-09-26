@@ -290,6 +290,13 @@ public class PickableObject : Interactable
     /// </summary>
     public string SaveId => _cachedSaveId ??= BuildHierarchyPath();
 
+    /// <summary>
+    /// Whether this pickable participates in workday save/load. Non-persistent items (e.g. ink
+    /// stamps) are never captured, never tombstoned, and ignored by every restore path, so they
+    /// always keep their scene-authored placement on load.
+    /// </summary>
+    public virtual bool IsPersistedInSave => true;
+
     private string _cachedSaveId;
 
     /// <summary>Assigns the durable identity of a runtime-spawned item before NGO registers it.</summary>

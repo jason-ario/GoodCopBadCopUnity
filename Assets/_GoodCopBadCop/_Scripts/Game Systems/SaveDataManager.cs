@@ -525,6 +525,17 @@ public class SaveDataManager : MonoBehaviour
     public void SaveCurrentWorkdayState()
     {
         if (ActiveSlot == null || !CanSave() || ShiftManager.Instance == null || ShiftManager.Instance.IsRestoringWorkdayState) return;
+
+        // A workday snapshot reads live NetworkObjects. Once the session is shutting down (or has
+        // stopped) every pickable has already despawned, so a capture would record the entire
+        // world as "no longer exists" and wipe all items on the next load. Keep the last good save.
+        var nm = Unity.Netcode.NetworkManager.Singleton;
+        if (nm == null || !nm.IsListening || !nm.IsServer || nm.ShutdownInProgress)
+        {
+            Debug.Log("[SaveDataManager] Workday save skipped — no live host session to capture.");
+            return;
+        }
+
         SaveWorkdayState(ShiftManager.Instance.CaptureWorkdaySaveState());
     }
 
