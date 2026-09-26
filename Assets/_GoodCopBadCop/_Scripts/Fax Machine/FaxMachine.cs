@@ -162,6 +162,10 @@ public class FaxMachine : NetworkBehaviour
 
         pickable.UnlockInteractableNetworked();
 
+        // The eject animation is done: drop the constraint and freeze the paper in place
+        // (kinematic + trigger) so it neither falls nor fights the surface it overlaps.
+        pickable.ReleaseConstraintInPlaceNetworked();
+
         _activeFax = networkObject;
         _activeFaxPickable = pickable;
 

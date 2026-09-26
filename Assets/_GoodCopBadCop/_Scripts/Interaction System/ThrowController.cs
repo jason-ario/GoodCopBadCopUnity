@@ -17,8 +17,11 @@ using UnityEngine;
 public class ThrowController : MonoBehaviour
 {
     [Header("Throw Settings")]
-    [Tooltip("Fixed launch speed (m/s) applied to every throw. Aim by looking around while holding the throw input; there is no charge-up.")]
-    [SerializeField] private float throwForce = 22f;
+    [Tooltip("Fixed forward launch speed (m/s) applied to every throw. Aim by looking around while holding the throw input; there is no charge-up.")]
+    [SerializeField] private float forwardThrowSpeed = 14f;
+
+    [Tooltip("Additional upward launch speed (m/s), independent of camera pitch. Applied equally to the preview and actual throw.")]
+    [SerializeField] private float upwardThrowBoost = 2f;
 
     [Header("Arc Preview")]
     [Tooltip("LineRenderer used to display the throw trajectory arc. Optional.")]
@@ -92,7 +95,7 @@ public class ThrowController : MonoBehaviour
     }
 
     /// <summary>
-    /// Releases the held item as a throw at the fixed <see cref="throwForce"/> speed,
+    /// Releases the held item as a throw at the fixed <see cref="forwardThrowSpeed"/> speed,
     /// launched along the current camera look direction. Detaches the item from the
     /// player's hand and sends a server RPC to apply physics velocity and re-enable
     /// <c>NetworkTransform</c> on all clients.
@@ -106,7 +109,7 @@ public class ThrowController : MonoBehaviour
         PickableObject released = _pickupController.ReleaseHeldObjectForThrow();
         if (released == null) return;
 
-        Vector3 velocity = _cam.transform.forward * throwForce;
+        Vector3 velocity = GetInitialThrowVelocity();
         released.ThrowServerRpc(released.transform.position, velocity);
     }
 
@@ -123,12 +126,17 @@ public class ThrowController : MonoBehaviour
     // Private helpers
     // -------------------------------------------------------------------------
 
+    private Vector3 GetInitialThrowVelocity()
+    {
+        return _cam.transform.forward * forwardThrowSpeed + Vector3.up * upwardThrowBoost;
+    }
+
     private void UpdateArcPreview()
     {
         if (throwArcLine == null || _pickupController.HeldObject == null) return;
 
         Vector3 startPos = _pickupController.HeldObject.transform.position;
-        Vector3 initialVelocity = _cam.transform.forward * throwForce;
+        Vector3 initialVelocity = GetInitialThrowVelocity();
 
         throwArcLine.positionCount = arcSegments;
         for (int i = 0; i < arcSegments; i++)

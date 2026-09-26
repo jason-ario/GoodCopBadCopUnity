@@ -1040,6 +1040,20 @@ public class PickableObject : Interactable
     {
         ConstraintSource source = new ConstraintSource();
         RemoveParent();
+
+        // A constrained object must be kinematic. Otherwise, on the authority, gravity moves
+        // the Rigidbody (and its colliders) every physics step while the constraint snaps the
+        // transform back every frame, so the colliders flip between two poses. Interaction
+        // raycasts then alternate between this object and whatever is beneath it (e.g. the
+        // daily fax flickering against the mini fridge). The prefab's saved Rigidbody is
+        // non-kinematic, and NetworkRigidbody restores that on spawn, so force it here.
+        if (_rb != null && !_rb.isKinematic)
+        {
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+            _rb.isKinematic = true;
+        }
+
         source.sourceTransform = parent;
         source.weight = 1;
         _parentConstraint.AddSource(source);
@@ -1056,6 +1070,62 @@ public class PickableObject : Interactable
         {
             _parentConstraint.RemoveSource(0);
         }
+    }
+
+    /// <summary>
+    /// Server-only. Releases the ParentConstraint but leaves the object frozen exactly where it
+    /// currently is: Rigidbody kinematic (no gravity, so it doesn't fall) and physics colliders
+    /// set to triggers (so it doesn't push against, or settle into, whatever it overlaps). The
+    /// colliders remain enabled, so interaction raycasts still hit it. Replicated to every peer.
+    ///
+    /// Used once a scripted delivery animation (e.g. the fax machine ejecting a paper) finishes,
+    /// so the item no longer depends on the constraint while waiting to be picked up. The normal
+    /// pickup/drop flow restores physics afterwards (<see cref="PickableColliderController.SetReleased"/>).
+    /// </summary>
+    public void ReleaseConstraintInPlaceNetworked()
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning($"[PickableObject] ReleaseConstraintInPlaceNetworked must be called on the server ({name}).", this);
+            return;
+        }
+
+        ReleaseConstraintInPlaceLocal();
+        ReleaseConstraintInPlaceClientRpc(transform.position, transform.rotation);
+    }
+
+    [ClientRpc]
+    private void ReleaseConstraintInPlaceClientRpc(Vector3 position, Quaternion rotation)
+    {
+        if (IsServer) return;
+
+        transform.SetPositionAndRotation(position, rotation);
+        ReleaseConstraintInPlaceLocal();
+    }
+
+    private void ReleaseConstraintInPlaceLocal()
+    {
+        RemoveParent();
+
+        if (_rb != null)
+        {
+            if (!_rb.isKinematic)
+            {
+                _rb.linearVelocity = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+            }
+            _rb.isKinematic = true;
+        }
+
+        // Only the physics colliders. InteractableCollider markers are already triggers
+        // and are owned by SetInteractable.
+        foreach (Collider col in GetComponentsInChildren<Collider>(true))
+        {
+            if (col == null || col.GetComponent<InteractableCollider>() != null) continue;
+            col.isTrigger = true;
+        }
+
+        Physics.SyncTransforms();
     }
 
     /// <summary>

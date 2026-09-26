@@ -62,9 +62,19 @@ public class SuspectCharacter : Interactable
              "who are only silent during a scripted sequence (e.g. Vlad while Day 1's tutorial " +
              "sequence owns his conversation).")]
     [SerializeField] private bool _dialogueInteractionDisabled;
+    private float _dialogueInteractionBlockedUntil;
 
     /// <summary>True while direct interaction is suppressed — see <see cref="_dialogueInteractionDisabled"/>.</summary>
     public bool DialogueInteractionDisabled => _dialogueInteractionDisabled;
+
+    /// <summary>
+    /// Prevents this suspect's dialogue from being reopened immediately after the player exits
+    /// a conversation, avoiding the exit input from also opening the choice menu.
+    /// </summary>
+    public void BlockDialogueInteractionForOneSecond()
+    {
+        _dialogueInteractionBlockedUntil = Time.unscaledTime + 1f;
+    }
 
     /// <summary>
     /// Local-only toggle for whether direct interaction with this suspect starts any dialogue.
@@ -1525,6 +1535,11 @@ public class SuspectCharacter : Interactable
             _junkItem.Interact(player);
             return;
         }
+
+        // The input that ends a dialogue can also reach world interaction on the same frame.
+        // Keep this suspect's dialogue entry paths closed briefly after control is restored.
+        if (Time.unscaledTime < _dialogueInteractionBlockedUntil)
+            return;
 
         // A player who backed out of (or never joined) an active scripted dialogue with this
         // suspect can rejoin by interacting with them again — resumes wherever the dialogue

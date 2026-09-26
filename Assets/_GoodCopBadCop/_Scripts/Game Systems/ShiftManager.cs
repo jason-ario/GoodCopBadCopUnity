@@ -2167,6 +2167,11 @@ public class ShiftManager : NetworkBehaviour
         }
 
         UIController.Instance.ShowPlayerUI();
+
+        // ContinueGame fades to black before connecting so the automatic player spawn is hidden.
+        // Unlike the lobby/day-transition paths, this direct resume path has no later reveal step.
+        UIController.Instance.FadeOut();
+
         EnablePlayerControl();
         GameManager.Instance.OnGameStart?.Invoke();
         OnShiftReady?.Invoke();

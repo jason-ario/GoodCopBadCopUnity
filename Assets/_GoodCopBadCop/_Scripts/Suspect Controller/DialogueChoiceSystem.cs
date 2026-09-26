@@ -183,6 +183,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
             return;
         }
 
+        // A dialogue exit input can otherwise be processed again as a suspect interaction
+        // when player control is restored later in this same frame.
+        BlockCurrentDialogueSuspectInteraction();
+
         UIController.Instance.HideCursor();
 
         var player = PlayerInstance.Instance;
@@ -196,6 +200,28 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(false);
+    }
+
+    /// <summary>
+    /// Blocks dialogue re-entry on the suspect that just finished speaking. Scripted dialogue
+    /// keeps its speaker network ID until after the client exit callback, so prefer that exact
+    /// character and fall back to the booth's current suspect for ordinary dialogue sessions.
+    /// </summary>
+    private static void BlockCurrentDialogueSuspectInteraction(bool fallbackToCurrentSuspect = true)
+    {
+        SuspectCharacter suspect = null;
+        ScriptedDialogueRunner runner = ScriptedDialogueRunner.Instance;
+        ulong speakerNetId = runner != null ? runner.CurrentSpeakerNetId : 0UL;
+
+        if (speakerNetId != 0UL && NetworkManager.Singleton != null &&
+            NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out NetworkObject speakerObject))
+        {
+            suspect = speakerObject.GetComponent<SuspectCharacter>();
+        }
+
+        if (suspect == null && fallbackToCurrentSuspect)
+            suspect = SuspectController.Instance?.CurrentSuspect;
+        suspect?.BlockDialogueInteractionForOneSecond();
     }
 
     // -------------------------------------------------------------------------
@@ -338,6 +364,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
     public void ExitScriptedDialogueModeOutside()
     {
         if (!IsInDialogueMode) return;
+
+        // Outside scripted sequences may belong to a suspect who is not the booth's current one.
+        BlockCurrentDialogueSuspectInteraction(fallbackToCurrentSuspect: false);
 
         IsInDialogueMode = false;
         PlayerInstance.Instance?.SetIsInCutscene(false);

@@ -512,6 +512,9 @@ public class SuspectWorldDialogue : MonoBehaviour
         _inConversation = false;
         _state = ConversationState.Idle;
 
+        // This is a direct suspect conversation and may not be the booth's CurrentSuspect.
+        GetComponent<SuspectCharacter>()?.BlockDialogueInteractionForOneSecond();
+
         speaking?.EndEngagement();
 
         UIController.Instance.HideBackButton();

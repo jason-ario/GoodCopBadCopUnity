@@ -239,21 +239,18 @@ public class SuspectController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Points the current suspect's <see cref="FLookAnimator"/> at the local player's camera.
-    /// Runs independently on every machine (see <see cref="NotifySuspectArrivedClientRpc"/>) —
-    /// each client only ever assigns its own <see cref="PlayerInstance.CameraTransform"/>, the
-    /// same local look-point convention used by <see cref="SuspectWorldDialogue"/>, so host and
-    /// client each see the suspect looking at their own camera.
+    /// Points the current suspect's <see cref="FLookAnimator"/> at the main camera. Runs
+    /// independently on every machine (see <see cref="NotifySuspectArrivedClientRpc"/>).
     /// </summary>
     public void EnableLook()
     {
         if (suspectCharacter == null) return;
         if (suspectCharacter.lookAnimator == null) return;
 
-        Transform playerCameraTransform = PlayerInstance.Instance != null ? PlayerInstance.Instance.CameraTransform : null;
-        if (playerCameraTransform == null) return;
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null) return;
 
-        suspectCharacter.lookAnimator.ObjectToFollow = playerCameraTransform;
+        suspectCharacter.lookAnimator.ObjectToFollow = mainCamera.transform;
     }
 
     public void NextSuspect()

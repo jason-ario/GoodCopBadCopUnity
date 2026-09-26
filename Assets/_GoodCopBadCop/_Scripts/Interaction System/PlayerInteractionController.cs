@@ -47,10 +47,10 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool _canInteract = true;
     public bool CanInteract => _canInteract && !_suspectCamActive;
 
-    // ── Controller trigger helpers ─────────────────────────────────────────────
-    // RT  (rightTrigger)  = LMB — primary interact / item use
-    // LT  (leftTrigger)   = RMB — placement mode hold
-    // RB  (rightShoulder) = MMB — throw charge / release
+    // â”€â”€ Controller trigger helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // RT  (rightTrigger)  = LMB â€” primary interact / item use
+    // LT  (leftTrigger)   = RMB â€” placement mode hold
+    // RB  (rightShoulder) = MMB â€” throw charge / release
     // InputSystem's default press-point (0.5) converts the analog axes to the
     // wasPressedThisFrame / isPressed / wasReleasedThisFrame digital events we need.
     private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
@@ -59,7 +59,7 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool RmbUp   => RebindableInput.GetMouseButtonUp(GameAction.PlaceObject)   || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
     private bool MmbDown => RebindableInput.GetMouseButtonDown(GameAction.ThrowObject) || (Gamepad.current?.rightShoulder.wasPressedThisFrame  ?? false);
     private bool MmbUp   => RebindableInput.GetMouseButtonUp(GameAction.ThrowObject)   || (Gamepad.current?.rightShoulder.wasReleasedThisFrame ?? false);
-    // E key — world interact / alternate interact. buttonWest maps to Xbox X / PlayStation Square.
+    // E key â€” world interact / alternate interact. buttonWest maps to Xbox X / PlayStation Square.
     private bool EKeyDown => RebindableInput.GetKeyDown(GameAction.Interact) || (Gamepad.current?.buttonWest.wasPressedThisFrame ?? false);
     public Interactable onlyAllowedInteractable;
     bool reticleActive = false;
@@ -71,7 +71,7 @@ public class PlayerInteractionController : NetworkBehaviour
     /// Suppresses all interaction and hides the reticle while the suspect camera is active.
     /// This lock is independent of the base gameplay interaction permission, so UI or gameplay
     /// state changes cannot re-enable item pickup while a dialogue cutscene is still active.
-    /// Safe to call before the reticle reference is assigned — the guard in HandleReticle
+    /// Safe to call before the reticle reference is assigned â€” the guard in HandleReticle
     /// will enforce the hidden state as soon as the reference is populated.
     /// </summary>
     public void SetSuspectCamMode(bool active)
@@ -153,7 +153,7 @@ public class PlayerInteractionController : NetworkBehaviour
         // The rebindable Interact key remains reserved for alternate world interaction,
         // including while an item is being carried.
         // Exception: when the cursor is visible (e.g. notebook draw mode), LMB belongs to the
-        // ClickDetector — skip TryItemUse so it doesn't double-fire and call OnStartUse again.
+        // ClickDetector â€” skip TryItemUse so it doesn't double-fire and call OnStartUse again.
         if (LmbDown)
         {
             if (_playerPickupController.HeldObject == null)
@@ -161,7 +161,7 @@ public class PlayerInteractionController : NetworkBehaviour
             else if (TryPlaceHeldObjectAtGhost())
             {
                 // Handled: an aim-shown ghost (e.g. a mail cubby's PlacementSlot) was active
-                // and in range, so LMB committed the placement — skip TryItemUse below.
+                // and in range, so LMB committed the placement â€” skip TryItemUse below.
             }
             else if (!Cursor.visible)
                 TryItemUse();
@@ -212,7 +212,7 @@ public class PlayerInteractionController : NetworkBehaviour
     {
         if (_suspectCamActive)
         {
-            // Reticle ref may be null on first entry (early game) — hide it as soon as it's available.
+            // Reticle ref may be null on first entry (early game) â€” hide it as soon as it's available.
             reticle?.DisableReticle();
 
             // Clear any highlight that was active before the view was entered.
@@ -292,7 +292,7 @@ public class PlayerInteractionController : NetworkBehaviour
             }
             
             bool inRange = hit.distance <= interactDistance;
-            // Search children too — a PlacementSlot used purely for ghosting/snap-pose is often
+            // Search children too â€” a PlacementSlot used purely for ghosting/snap-pose is often
             // authored on a dedicated child Transform (e.g. a mail cubby's snap point) separate
             // from the GameObject that carries the trigger collider the raycast actually hits.
             PlacementBoard placementBoard = hit.collider.GetComponentInChildren<PlacementBoard>();
@@ -303,13 +303,13 @@ public class PlayerInteractionController : NetworkBehaviour
             {
                 // Aiming at a genuine Interactable (e.g. a locker door leaf) always wins over any
                 // stale placement ghost left active from aiming at a nearby PlacementSlot/board
-                // moments earlier (see FindNearbyPlacementBoard) — every other branch below
+                // moments earlier (see FindNearbyPlacementBoard) â€” every other branch below
                 // explicitly deactivates the placer when its conditions aren't met, but this one
                 // used to fall straight into its own logic and `return` without ever touching the
                 // placer. That left ObjectPlacer.Instance.IsActive/IsInRange true from the last
                 // frame the player aimed at the slot, so TryPlaceHeldObjectAtGhost() (checked
                 // before TryItemUse on LMB/E) would commit-drop the held package instead of
-                // forwarding the click to the interactable — e.g. a locker door that implements
+                // forwarding the click to the interactable â€” e.g. a locker door that implements
                 // IHeldItemPassthrough would silently never open while holding a package.
                 if (ObjectPlacer.Instance.IsActive)
                     ObjectPlacer.Instance.DeactivatePlacer();
@@ -359,7 +359,7 @@ public class PlayerInteractionController : NetworkBehaviour
             bool placerInRange = hit.distance <= placementDistance;
 
             // Boards opted into ShowGhostWhileAiming (e.g. a mail cubby's PlacementSlot) show the
-            // ghost — and put the reticle into its interact/hover state — as soon as the player
+            // ghost â€” and put the reticle into its interact/hover state â€” as soon as the player
             // aims at them while holding an item, without needing to hold RMB first.
             bool aimGhostRequested = placementBoard != null && placementBoard.ShowGhostWhileAiming && _playerPickupController.IsHoldingObject && placementBoard.AcceptsItem(_playerPickupController.HeldObject.ItemData);
 
@@ -391,7 +391,7 @@ public class PlayerInteractionController : NetworkBehaviour
             }
             else
             {
-                // Out of placement range — keep the placer visible but tint it red so the player knows they can't drop here
+                // Out of placement range â€” keep the placer visible but tint it red so the player knows they can't drop here
                 if ((aimGhostRequested || (RmbHeld && !LmbHeld && !_placerBlocked)) && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject)
                 {
                     CheckActivatePlacer(placementBoard, hit, false);
@@ -413,7 +413,7 @@ public class PlayerInteractionController : NetworkBehaviour
         }
         else if (Physics.Raycast(ray, out RaycastHit surfaceHit, placementDistance, placementLayer, QueryTriggerInteraction.Ignore))
         {
-            // No interactable hit but we did hit a placement surface — handle free placement.
+            // No interactable hit but we did hit a placement surface â€” handle free placement.
             // The surface itself usually isn't a PlacementBoard, but a tutorial hand-off
             // board may sit right on top of it, so snap to one nearby if present.
             PlacementBoard nearbyBoard = FindNearbyPlacementBoard(surfaceHit.point);
@@ -445,7 +445,7 @@ public class PlayerInteractionController : NetworkBehaviour
         }
         else
         {
-            // Nothing hit — keep the placer visible but red if it is already active
+            // Nothing hit â€” keep the placer visible but red if it is already active
             if (RmbHeld && !LmbHeld && !_placerBlocked && pickupController.CanPickUpAndPlace && _playerPickupController.IsHoldingObject && ObjectPlacer.Instance.IsActive)
             {
                 ObjectPlacer.Instance.SetInRange(false);
@@ -480,15 +480,20 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Performs the interact-layer raycast and returns the single closest collider the ray
-    /// is physically blocked by, resolving through <see cref="ResolveInteractable"/> to
+    /// Resolves the interaction target under the reticle: the natural nearest-blocking hit
+    /// (see <see cref="TryGetNearestInteractHit"/>), refined by
+    /// <see cref="TryFindThinPickableAlongRay"/> so thin pickables resting on surfaces are
+    /// selected reliably at any view angle.
+    ///
+    /// The natural hit performs the interact-layer raycast and returns the single closest collider
+    /// the ray is physically blocked by, resolving through <see cref="ResolveInteractable"/> to
     /// decide whether to keep looking.
     ///
     /// The ray always stops at the first solid (non-trigger) collider it hits, exactly like a
-    /// real raycast would be blocked by physical geometry — regardless of whether an
+    /// real raycast would be blocked by physical geometry â€” regardless of whether an
     /// Interactable is attached. It only ever continues past a hit when that collider is BOTH
     /// a trigger AND has no Interactable attached (e.g. a decorative/overlap-only trigger
-    /// volume that isn't meant to intercept interaction) — that is the sole exception allowing
+    /// volume that isn't meant to intercept interaction) â€” that is the sole exception allowing
     /// the ray to pass through to whatever is behind it.
     ///
     /// Previously this preferred a PickableObject within a "near-tie" distance window of the
@@ -496,19 +501,24 @@ public class PlayerInteractionController : NetworkBehaviour
     /// fax paper on a mini fridge lid). That broke container interactables that are themselves a
     /// PickableObject (e.g. <see cref="SupplyBox"/>): its own always-enabled interact collider
     /// sits closer along the ray than an item resting further inside/behind it, so it was
-    /// incorrectly preferred over the item every time the two weren't within the tie window —
+    /// incorrectly preferred over the item every time the two weren't within the tie window â€”
     /// e.g. you could no longer grab a second item out of an open supply box once a nearer item
     /// had already been taken out. Honoring the nearest blocking hit fixes that without needing
     /// a tie window.
     ///
     /// One deliberate exception to "solid geometry blocks the ray": the perimeter fence, which the
     /// ray may cross to reach collectible junk on the far side (see <see cref="AllowsJunkPassthrough"/>).
-    /// Mutants die wherever they're shot — frequently just outside the fence — and their corpses are
+    /// Mutants die wherever they're shot â€” frequently just outside the fence â€” and their corpses are
     /// collectible (they credit as bonus junk, see <c>TakeOutTrashTask</c>), but the fence's own
     /// collider swallowed the interaction ray, so a body a metre away through the chain-link was
     /// visibly glowing and completely untouchable.
     /// </summary>
     private bool TryGetBestInteractHit(Ray ray, out RaycastHit bestHit)
+    {
+        return TryGetNearestInteractHit(ray, out bestHit);
+    }
+
+    private bool TryGetNearestInteractHit(Ray ray, out RaycastHit bestHit)
     {
         RaycastHit[] hits = Physics.RaycastAll(ray, 10f, interactLayer);
 
@@ -529,8 +539,8 @@ public class PlayerInteractionController : NetworkBehaviour
         RaycastHit fenceHit = default;
 
         // Set once the ray has been let through an interrogation-room glass pane. Unlike the fence,
-        // crossing glass places no restriction on what may be resolved behind it — the whole point is
-        // to let the player interact with the suspect standing on the other side of the window — so
+        // crossing glass places no restriction on what may be resolved behind it â€” the whole point is
+        // to let the player interact with the suspect standing on the other side of the window â€” so
         // this only supplies a fallback hit (treating the glass as the wall) if nothing interactable
         // turns out to be back there.
         bool crossedGlass = false;
@@ -542,7 +552,7 @@ public class PlayerInteractionController : NetworkBehaviour
             Interactable candidate = ResolveInteractable(collider);
 
             // An attached Interactable always stops the ray, whether the collider is a
-            // trigger or solid — this is a legitimate interaction target either way.
+            // trigger or solid â€” this is a legitimate interaction target either way.
             if (candidate != null && candidate.IsInteractable)
             {
                 if (crossedFence && !IsPassthroughEligibleJunk(candidate))
@@ -556,7 +566,7 @@ public class PlayerInteractionController : NetworkBehaviour
             }
 
             // A solid (non-trigger) collider physically blocks the ray even with no
-            // Interactable attached (e.g. a desk surface or placement board) — the caller
+            // Interactable attached (e.g. a desk surface or placement board) â€” the caller
             // resolves no interactable for it and falls through to its own placement/aim
             // handling, but the ray must not continue past solid geometry to whatever is
             // standing behind it.
@@ -593,8 +603,8 @@ public class PlayerInteractionController : NetworkBehaviour
     ///
     /// Gated on holding a trash bag: reaching through a solid fence is a targeted concession to
     /// clean-up (junk outside the fence is collectible but unreachable), so it is only granted while
-    /// the player is actually equipped to clean up. Every other interaction — and the fence's own
-    /// hammer repair, which doesn't use this ray — keeps treating it as the solid obstacle it is.
+    /// the player is actually equipped to clean up. Every other interaction â€” and the fence's own
+    /// hammer repair, which doesn't use this ray â€” keeps treating it as the solid obstacle it is.
     /// Bag fullness is intentionally not checked; a full bag still shows the prompt, exactly as it
     /// does for junk on this side of the fence.
     /// </summary>
@@ -604,7 +614,7 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// True when <paramref name="collider"/> belongs to a <see cref="PerimiterFence"/> — checked on
+    /// True when <paramref name="collider"/> belongs to a <see cref="PerimiterFence"/> â€” checked on
     /// parents too, since damage-state meshes carry their own colliders on child objects.
     /// </summary>
     private static bool IsPerimeterFence(Collider collider)
@@ -625,7 +635,7 @@ public class PlayerInteractionController : NetworkBehaviour
     /// <summary>
     /// True when <paramref name="collider"/> belongs to a <see cref="BreakableGlassController"/> pane
     /// (checked on parents, since the glass mesh's collider(s) live on a child of the controller).
-    /// Interrogation-room windows are meant to be seen and talked through, so — unlike the fence —
+    /// Interrogation-room windows are meant to be seen and talked through, so â€” unlike the fence â€”
     /// this passthrough is unconditional and unrestricted: whatever Interactable is standing behind
     /// the glass (e.g. the suspect) resolves normally, while the glass itself still blocks movement
     /// and still shows up as the aim/tooltip target when nothing interactable is back there.
@@ -651,7 +661,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
         foreach (Collider col in nearbyColliders)
         {
-            // Search children too — see the matching comment above where placementBoard is
+            // Search children too â€” see the matching comment above where placementBoard is
             // first resolved from the raycast hit.
             PlacementBoard board = col.GetComponentInChildren<PlacementBoard>();
             if (board == null) continue;
@@ -679,7 +689,7 @@ public class PlayerInteractionController : NetworkBehaviour
     /// only ever commits on RMB release (see <see cref="PlayerPickupController"/>'s Update), which
     /// is fine there since the ghost only appears while RMB is held. Boards that opted into
     /// <see cref="PlacementBoard.ShowGhostWhileAiming"/> (e.g. a mail cubby's <see cref="PlacementSlot"/>)
-    /// show their ghost passively just from aiming — the player may never hold RMB at all — so
+    /// show their ghost passively just from aiming â€” the player may never hold RMB at all â€” so
     /// this gives them an equivalent commit path via LMB/E instead. Returns true if the placement
     /// was committed, so the caller can skip its normal held-item-use handling for this press.
     /// </summary>
@@ -709,7 +719,7 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         // Board-specific item restriction (e.g. a mail slot should only accept the Small Package
-        // item, not any pickable) — see PlacementBoard.AcceptsItem.
+        // item, not any pickable) â€” see PlacementBoard.AcceptsItem.
         if (placementBoard != null && !placementBoard.AcceptsItem(_playerPickupController.HeldObject.ItemData))
         {
             reticle.SetInteractState(false);
@@ -728,12 +738,12 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         // A PlacementSlot forces the object into an exact fixed pose (e.g. a mail bin's opening
-        // or a mail cubby slot) instead of following the raycast hit point / surface normal —
+        // or a mail cubby slot) instead of following the raycast hit point / surface normal â€”
         // this stops the ghost from appearing to stick to the side of the receptacle when the
         // player's aim lands slightly off-center.
         PlacementSlot placementSlot = placementBoard as PlacementSlot;
 
-        // Slope check — hanging boards and exact placement slots are exempt (a slot's own pose
+        // Slope check â€” hanging boards and exact placement slots are exempt (a slot's own pose
         // is authoritative regardless of what surface normal the raycast happened to hit).
         bool isHangingBoard = placementBoard != null && placementBoard.IsHanging;
         if (!isHangingBoard && placementSlot == null)
@@ -763,7 +773,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
             // Move the placer to the target pose BEFORE activating it. ActivatePlacer spawns
             // the ghost clone (SpawnClone), which snaps to its pose relative to this transform
-            // right there and then — activating first left the clone's pose baked against
+            // right there and then â€” activating first left the clone's pose baked against
             // whatever stale position/rotation the placer had left over from its previous use
             // (e.g. another mail slot, or wherever it last sat), so the ghost for a PlacementSlot
             // receptacle (no per-item PlacementAnchor, like the mail package) could appear stuck
@@ -795,7 +805,7 @@ public class PlayerInteractionController : NetworkBehaviour
     {
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
-        // Same tie-break/sticky resolution as the reticle highlight — see TryWorldInteract.
+        // Same tie-break/sticky resolution as the reticle highlight â€” see TryWorldInteract.
         if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > interactDistance)
         {
             _playerPickupController.TryUseObject();
@@ -807,7 +817,7 @@ public class PlayerInteractionController : NetworkBehaviour
         if (IsControlledByOtherPlayer(interactable)) return;
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
 
-        // No valid interactable under the cursor (e.g. hovering a placement board) —
+        // No valid interactable under the cursor (e.g. hovering a placement board) â€”
         // fall through to using the held item in place, same as when nothing is hit.
         if (interactable == null || !interactable.IsInteractable)
         {
@@ -823,7 +833,7 @@ public class PlayerInteractionController : NetworkBehaviour
         else if (interactable is IHeldItemPassthrough)
         {
             // This interactable explicitly handles LMB input itself regardless of held item.
-            // Do not call TryUseObject — the interactable manages the held-button lifecycle.
+            // Do not call TryUseObject â€” the interactable manages the held-button lifecycle.
             interactable.Interact(this);
         }
         else
@@ -835,7 +845,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
     /// <summary>
     /// Handles E key (and Left Click when empty-handed): interacts with any interactable
-    /// in range — pickups, world objects, slots, etc.
+    /// in range â€” pickups, world objects, slots, etc.
     /// When <paramref name="alternate"/> is true (E key), calls
     /// <see cref="Interactable.InteractAlternate"/>; otherwise calls
     /// <see cref="Interactable.Interact"/> (LMB).
@@ -867,7 +877,7 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Returns true when the resolved interactable is already under another player's control —
+    /// Returns true when the resolved interactable is already under another player's control â€”
     /// either because that player is holding the object itself, or because the object is a
     /// document sitting inside a folder that another player is holding. In both cases the local
     /// player's interaction controller should treat the object as invisible.
@@ -879,7 +889,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
         if (interactable is FolderItem folderItem)
         {
-            // Document inside a held folder — block regardless of who holds the folder.
+            // Document inside a held folder â€” block regardless of who holds the folder.
             if (folderItem.insideThisFolder != null && folderItem.insideThisFolder.IsHeldByOtherPlayer)
                 return true;
         }
