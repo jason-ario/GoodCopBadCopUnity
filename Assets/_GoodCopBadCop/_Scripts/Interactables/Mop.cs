@@ -54,6 +54,11 @@ public class Mop : PickableObject
     [Tooltip("Layer mask for the graffiti collider. Must include the Interactable layer.")]
     [SerializeField] private LayerMask _graffitiLayerMask;
 
+    [Header("Suspect Poke")]
+    [Tooltip("Minimum seconds between flinches while the mop stays in contact with the same suspect. " +
+             "A fresh contact (touching a different suspect, or re-touching after pulling away) flinches immediately.")]
+    [SerializeField] private float _suspectFlinchInterval = 0.8f;
+
     [Header("VFX")]
     [Tooltip("Particle system played while the mop is in use and touching any surface. " +
              "Repositioned each frame to the closest point on the contacted collider.")]
@@ -68,8 +73,39 @@ public class Mop : PickableObject
              "Set the AudioSource clip, loop = true, and Play On Awake = false in the Inspector.")]
     [SerializeField] private AudioSource _scrubAudio;
 
+    [Tooltip("Target volume of the scrub loop while the mop is touching a surface.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _scrubVolume = 1f;
+
+    [Tooltip("Distance (m) within which the scrub loop plays at full volume. The listener sits on " +
+             "the player's head ~1.5-2 m from the mop head, so this must cover that gap or the " +
+             "holder hears their own mop attenuated.")]
+    [SerializeField] private float _scrubAudioMinDistance = 3f;
+
+    [Tooltip("Distance (m) at which the scrub loop fades to silence (linear rolloff).")]
+    [SerializeField] private float _scrubAudioMaxDistance = 15f;
+
+    [Tooltip("Seconds to fade the loop in when contact starts.")]
+    [SerializeField] private float _scrubAudioFadeIn = 0.05f;
+
+    [Tooltip("Seconds to fade the loop out after contact ends. Also bridges brief contact " +
+             "flicker during strokes so the loop isn't constantly cut and restarted.")]
+    [SerializeField] private float _scrubAudioFadeOut = 0.25f;
+
+    /// <summary>Volume the scrub loop is currently fading toward (0 = silent / stopping).</summary>
+    private float _scrubAudioTargetVolume;
+
     private Coroutine _scrubRoutine;
     private GraffitiInteractable _activeGraffiti;
+
+    /// <summary>Suspect currently touched by the mop (owner only), and when it last flinched.</summary>
+    private SuspectCharacter _touchedSuspect;
+    private float _lastSuspectFlinchTime = float.NegativeInfinity;
+
+    /// <summary>Sanity bound (m) the server applies to owner-reported suspect pokes.</summary>
+    private const float MaxSuspectPokeDistance = 5f;
+
+    private static readonly Collider[] SuspectOverlapBuffer = new Collider[16];
 
     /// <summary>Cached fallback for <see cref="_scrubBounds"/> when it is not assigned.</summary>
     private BoxCollider _autoScrubBounds;
@@ -89,6 +125,47 @@ public class Mop : PickableObject
 
     /// <summary>Mirror loop run on non-owning clients while <see cref="_isScrubbing"/> is true.</summary>
     private Coroutine _remoteScrubVisualRoutine;
+
+    // ── Unity lifecycle ────────────────────────────────────────────────────────
+
+    protected override void Awake()
+    {
+        base.Awake();
+
+        if (_scrubAudio != null)
+        {
+            // Networked positional loop (mirrored on every client via _isScrubbing), so keep it
+            // short-range 3D — but with a min distance large enough that the holder hears it at
+            // full volume. Doppler off: the mop swings fast during strokes and would warble.
+            SpatialAudioUtility.ConfigureShortRange3D(_scrubAudio, _scrubAudioMinDistance, _scrubAudioMaxDistance);
+            _scrubAudio.loop        = true;
+            _scrubAudio.playOnAwake = false;
+            _scrubAudio.priority    = 64;
+            _scrubAudio.volume      = 0f;
+        }
+    }
+
+    private void Update()
+    {
+        if (_scrubAudio == null) return;
+
+        float current = _scrubAudio.volume;
+        if (Mathf.Approximately(current, _scrubAudioTargetVolume))
+        {
+            if (_scrubAudioTargetVolume <= 0f && _scrubAudio.isPlaying)
+                _scrubAudio.Pause();
+            return;
+        }
+
+        float fade = _scrubAudioTargetVolume > current ? _scrubAudioFadeIn : _scrubAudioFadeOut;
+        float step = fade > 0f ? (_scrubVolume / fade) * Time.deltaTime : 1f;
+        _scrubAudio.volume = Mathf.MoveTowards(current, _scrubAudioTargetVolume, step);
+    }
+
+    private void OnDisable()
+    {
+        StopScrubAudioImmediate();
+    }
 
     // ── Network lifecycle ───────────────────────────────────────────────────────
 
@@ -256,13 +333,84 @@ public class Mop : PickableObject
             Collider particleCollider = hitCollider ?? FindSurfaceInRange();
             UpdateScrubVisuals(particleCollider);
 
+            UpdateSuspectPoke();
+
             yield return null;
         }
 
         // Clean up after the loop exits (isUsing became false).
         StopScrubVisuals();
         NotifyStopScrubbing();
+        _touchedSuspect = null;
         _scrubRoutine = null;
+    }
+
+    // ── Suspect poke ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Owner only. If the scrub capsule touches a living suspect, asks the server to play a
+    /// cosmetic flinch — no damage, no gore. New contact flinches immediately; sustained contact
+    /// re-flinches every <see cref="_suspectFlinchInterval"/> seconds.
+    /// </summary>
+    private void UpdateSuspectPoke()
+    {
+        if (!IsOwner) return;
+
+        SuspectCharacter suspect = FindSuspectInRange();
+        if (suspect == null)
+        {
+            _touchedSuspect = null;
+            return;
+        }
+
+        bool newContact = suspect != _touchedSuspect;
+        _touchedSuspect = suspect;
+
+        if (!newContact && Time.time - _lastSuspectFlinchTime < _suspectFlinchInterval)
+            return;
+
+        if (suspect.NetworkObject == null) return;
+
+        _lastSuspectFlinchTime = Time.time;
+        FlinchSuspectServerRpc(new NetworkObjectReference(suspect.NetworkObject), transform.position);
+    }
+
+    private SuspectCharacter FindSuspectInRange()
+    {
+        if (!IsHeld) return null;
+
+        GetScrubSegment(out Vector3 pointA, out Vector3 pointB);
+
+        int count = (pointB - pointA).sqrMagnitude > 0.000001f
+            ? Physics.OverlapCapsuleNonAlloc(pointA, pointB, _scrubRadius, SuspectOverlapBuffer,
+                Physics.AllLayers, QueryTriggerInteraction.Collide)
+            : Physics.OverlapSphereNonAlloc(pointA, _scrubRadius, SuspectOverlapBuffer,
+                Physics.AllLayers, QueryTriggerInteraction.Collide);
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = SuspectOverlapBuffer[i];
+            if (col == null || col.transform.IsChildOf(transform)) continue;
+
+            SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
+            if (suspect != null && !suspect.IsDead && !suspect.HasFled)
+                return suspect;
+        }
+
+        return null;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void FlinchSuspectServerRpc(NetworkObjectReference suspectRef, Vector3 mopPosition)
+    {
+        if (!suspectRef.TryGet(out NetworkObject suspectObj) || suspectObj == null) return;
+
+        if (Vector3.Distance(suspectObj.transform.position, mopPosition) > MaxSuspectPokeDistance) return;
+
+        SuspectCharacter suspect = suspectObj.GetComponent<SuspectCharacter>();
+        if (suspect == null) suspect = suspectObj.GetComponentInChildren<SuspectCharacter>();
+        if (suspect != null)
+            suspect.PlayFlinch();
     }
 
     /// <summary>
@@ -327,19 +475,46 @@ public class Mop : PickableObject
         if (surfaceNormal != Vector3.zero)
             _scrubParticles.transform.rotation = Quaternion.FromToRotation(Vector3.up, surfaceNormal);
         if (!_scrubParticles.isPlaying)
-        {
             _scrubParticles.Play();
-            if (_scrubAudio != null && !_scrubAudio.isPlaying)
-                _scrubAudio.Play();
-        }
+
+        // Audio is driven independently of the particle state: ParticleSystem.Stop() leaves
+        // isPlaying true while live particles fade out, so gating audio on !isPlaying meant
+        // re-contacting within that window never restarted the (already stopped) loop.
+        StartScrubAudio();
     }
 
-    /// <summary>Stops <see cref="_scrubParticles"/> and <see cref="_scrubAudio"/> if playing.</summary>
+    /// <summary>Stops <see cref="_scrubParticles"/> and fades out <see cref="_scrubAudio"/>.</summary>
     private void StopScrubVisuals()
     {
         if (_scrubParticles != null && _scrubParticles.isPlaying)
             _scrubParticles.Stop();
-        _scrubAudio?.Stop();
+        _scrubAudioTargetVolume = 0f;
+    }
+
+    /// <summary>
+    /// Fades the scrub loop in. Resumes (rather than restarts) a paused loop so rapid
+    /// contact on/off during strokes stays continuous instead of re-triggering the clip's attack.
+    /// </summary>
+    private void StartScrubAudio()
+    {
+        if (_scrubAudio == null) return;
+
+        _scrubAudioTargetVolume = _scrubVolume;
+        if (_scrubAudio.isPlaying) return;
+
+        if (_scrubAudio.time > 0f)
+            _scrubAudio.UnPause();
+        else
+            _scrubAudio.Play();
+    }
+
+    /// <summary>Hard-stops the scrub loop with no fade (used when the mop is disabled).</summary>
+    private void StopScrubAudioImmediate()
+    {
+        _scrubAudioTargetVolume = 0f;
+        if (_scrubAudio == null) return;
+        _scrubAudio.Stop();
+        _scrubAudio.volume = 0f;
     }
 
     /// <summary>

@@ -159,6 +159,7 @@ public class OchoBoothEncounter : NetworkBehaviour
     {
         SuspectController.OnApplicationFormSpawned -= HandleApplicationFormSpawned;
         SuspectController.OnPaperworkSpawned -= HandlePaperworkSpawned;
+        if (_self != null) _self.ClearUncannyGlitchPresence();
         base.OnNetworkDespawn();
     }
 
@@ -179,9 +180,8 @@ public class OchoBoothEncounter : NetworkBehaviour
     /// Ocho is the only active suspect at the booth while this component is alive, so this is
     /// always his own paperwork. Swaps the ID card's real mesh for the pre-authored fake-ID mesh
     /// and kicks off the same ambient screen-glitch/film-grain beat used when a fully-mutated
-    /// suspect is presenting at the booth (see GlitchController) — it now runs for the rest of
-    /// the encounter and clears automatically once he's despawned at the end of
-    /// RedStampSequence, so no explicit "turn it off" call is needed here.
+    /// suspect is presenting at the booth (see GlitchController) — it runs until he vanishes
+    /// after the jumpscare stinger, where VerdictRejectedSequence clears it explicitly.
     /// </summary>
     private void HandlePaperworkSpawned(IDCard idCard, PickableObject appForm)
     {
@@ -246,10 +246,8 @@ public class OchoBoothEncounter : NetworkBehaviour
         SuspectController controller = SuspectController.Instance;
 
         // Note: the ambient screen-glitch/film-grain beat (GlitchController) and the fake-ID
-        // mesh swap are already kicked off back in HandlePaperworkSpawned, the moment his ID
-        // hit the desk — both carry through the reaction/vanish/reappear/jumpscare/power-outage
-        // beats below and clear automatically once he's despawned at the end of
-        // RedStampSequence, so nothing extra is needed here.
+        // mesh swap are already kicked off back in HandlePaperworkSpawned. The glitch is cleared
+        // explicitly below, the moment he vanishes after the stinger.
 
         _self.animator?.SetTrigger("Give");
         yield return new WaitForSeconds(_takeFolderDelay);
@@ -288,6 +286,11 @@ public class OchoBoothEncounter : NetworkBehaviour
         // completes once the client-local zoom-in animation finishes — wait exactly that long so
         // the power outage lands the instant he actually disappears, not some arbitrary delay later.
         yield return new WaitForSeconds(_jumpscareZoomDuration);
+
+        // He's gone now — end the screen glitch here. He isn't despawned until after the power
+        // is restored (see RedStampSequence), so waiting for the despawn event would leave the
+        // glitch running through the whole outage.
+        _self.ClearUncannyGlitchPresence();
 
         Debug.Log($"[OchoBoothEncounter] Verdict was {attemptedStamp} — running the power outage sequence.");
         RedStampSequence();

@@ -1417,10 +1417,11 @@ public class SuspectController : NetworkBehaviour
     /// The percent-based reward scales linearly from 0 to couponMaxPercentBonus depending on
     /// the fraction of active anomaly categories the player correctly identified.
     /// totalBonusAmount consolidates the perfect-identification bonus and the evidence bonus.
+    /// Returns the total coupons issued so the verdict can be itemized on the end-of-shift report.
     /// </summary>
-    private void PayOutResults()
+    private int PayOutResults()
     {
-        if (!IsServer) return;
+        if (!IsServer) return 0;
 
         // Compute percent of active anomaly categories correctly identified (0.0 – 1.0).
         // A clean suspect (no active categories) counts as 100% if no false positives were made.
@@ -1477,6 +1478,8 @@ public class SuspectController : NetworkBehaviour
             _symptomsTotal,
             perfectBonusAmount + evidenceBonus,
             totalCoupons);
+
+        return totalCoupons;
     }
 
     [ClientRpc]
@@ -1898,6 +1901,14 @@ public class SuspectController : NetworkBehaviour
         yield return new WaitForSeconds(1.5f);
 
         CleanupSpawnedFolder();
+        ShiftManager.Instance.RecordSubjectResult(new ShiftSubjectResult
+        {
+            SubjectName = GetSubjectDisplayName(fled),
+            AnomaliesCaught = ShiftSubjectResult.NotAssessed,
+            AnomaliesTotal = 0,
+            CouponsEarned = 0,
+            Verdict = ShiftSubjectVerdict.Fled
+        });
         DespawnSuspect(fled);
         ShiftManager.Instance.suspectsFled += 1;
         ShiftManager.Instance.SetNextSuspectReady();
@@ -2140,7 +2151,21 @@ public class SuspectController : NetworkBehaviour
         spawnedFolder = folder;
         accuracyOfLastSuspectFolder = CalculateCategoryScores(folder, suspectCharacter);
 
-        PayOutResults();
+        int couponsIssued = PayOutResults();
+
+        // Itemized end-of-shift report entry — exactly what this verdict paid out. The Day 1
+        // tutorial suspect is excluded, matching ShiftManager's processed/verdict tallies.
+        if (!IsScriptedDay1TutorialSuspect)
+        {
+            ShiftManager.Instance?.RecordSubjectResult(new ShiftSubjectResult
+            {
+                SubjectName = GetSubjectDisplayName(suspectCharacter),
+                AnomaliesCaught = _symptomsFound,
+                AnomaliesTotal = _symptomsTotal,
+                CouponsEarned = couponsIssued,
+                Verdict = ToSubjectVerdict(folder.StampType)
+            });
+        }
 
         switch (folder.StampType)
         {
@@ -2154,6 +2179,30 @@ public class SuspectController : NetworkBehaviour
                 Kill();
                 break;
         }
+    }
+
+    private static ShiftSubjectVerdict ToSubjectVerdict(StampContainer.StampType stampType)
+    {
+        switch (stampType)
+        {
+            case StampContainer.StampType.Quarantine: return ShiftSubjectVerdict.Quarantined;
+            case StampContainer.StampType.Kill: return ShiftSubjectVerdict.Killed;
+            default: return ShiftSubjectVerdict.Passed;
+        }
+    }
+
+    /// <summary>Player-facing subject name for the end-of-shift report.</summary>
+    private static string GetSubjectDisplayName(SuspectCharacter character)
+    {
+        SuspectData data = character != null ? character.Data : null;
+        if (data == null)
+            return "Unknown Subject";
+
+        string fullName = $"{data.FirstName} {data.LastName}".Trim();
+        if (!string.IsNullOrEmpty(fullName))
+            return fullName;
+
+        return !string.IsNullOrWhiteSpace(data.Nickname) ? data.Nickname : data.name;
     }
 
     

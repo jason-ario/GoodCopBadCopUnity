@@ -45,6 +45,10 @@ public class EndOfShiftReportRow : MonoBehaviour
     {
         if (root != null)
             root.SetActive(true);
+
+        // Subject names make labels longer than the old fixed rows; keep them on one line.
+        if (labelText != null)
+            labelText.textWrappingMode = TextWrappingModes.NoWrap;
     }
 
     public IEnumerator RevealLabel(string text, TMPWobbleProfile wobbleProfile, float timeout = 6f)

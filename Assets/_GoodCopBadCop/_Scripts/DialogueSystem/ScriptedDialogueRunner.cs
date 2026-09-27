@@ -49,11 +49,24 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     public static ScriptedDialogueRunner Instance { get; private set; }
 
     /// <summary>
-    /// True on all clients while a scripted dialogue sequence is active.
+    /// True on the local client only while it is a participant in a scripted dialogue
+    /// sequence (set by the participant-targeted Enter/LateJoin client RPCs). Never written by
+    /// server-side logic, so a non-participant host is not treated as a participant.
     /// Used by <see cref="DialogueManager.WaitForInputRoutine"/> to route E-key advances
     /// through <see cref="AdvanceScriptedLineServerRpc"/> instead of the standard advance RPC.
     /// </summary>
     public static bool IsScriptedModeActive { get; private set; }
+
+    // Server-only: true while a scripted sequence is running, independent of whether the host
+    // player is a participant. Drives proximity joins and leave/rejoin validation.
+    private bool _serverSequenceActive;
+
+    /// <summary>Server-only. True while a scripted dialogue sequence is running on the server.</summary>
+    public bool IsServerSequenceActive => IsServer && (_serverSequenceActive || _megaphoneSequenceActive);
+
+    // Server-only: true while RunMegaphoneDialogue is running. Megaphone sequences enter
+    // scripted mode for every client (broadcast), unlike participant-targeted suspect dialogue.
+    private bool _megaphoneSequenceActive;
 
     [Header("Cutscene Cameras")]
     [Tooltip("Maps camera trigger keys (set on ScriptedDialogueNode) to Cinemachine camera GameObjects. " +
@@ -139,7 +152,6 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // player, do not proximity-join the co-op partner, and let either participant back out.
     private bool _joinByInteractionOnly;
     private bool _allowParticipantExit;
-    private bool _hideNonParticipantUI;
 
     // Per-sequence proximity radius. Forced outside conversations (lockOutsidePlayers) seed and
     // late-join strictly by distance so an out-of-range co-op partner is never pulled in; they
@@ -326,19 +338,19 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         if (!IsServer) return;
         // Clear the server-side flag immediately so CheckProximityJoins stops running.
-        IsScriptedModeActive = false;
+        _serverSequenceActive = false;
         ulong speakerNetId = _currentSpeakerTransform != null
             ? _currentSpeakerTransform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0UL
             : 0UL;
-        ClientRpcParams exitRecipients = _hideNonParticipantUI
-            ? default
-            : BuildParticipantRpcParams();
+        // Only participants were put into scripted mode (and had their HUD hidden), so only
+        // they are restored — non-participants are never touched by this sequence. A running
+        // megaphone sequence is the exception: it enters scripted mode for every client.
+        ClientRpcParams exitRecipients = _megaphoneSequenceActive ? default : BuildParticipantRpcParams();
         _currentSpeakerTransform = null;
         _participants.Clear();
         _leftParticipants.Clear();
         _joinByInteractionOnly = false;
         _allowParticipantExit = false;
-        _hideNonParticipantUI = true;
         _activeJoinRadius = -1f;
         HideInWorldSubtitleClientRpc(speakerNetId);
         SetActiveDialogueSpeakerClientRpc(0);
@@ -434,7 +446,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // late-join them so they are counted in the advance / choice gates going forward.
         // For a 2-player session with a single distance check per non-participant this is
         // negligible per-frame cost, so no throttle is needed.
-        if (IsServer && IsScriptedModeActive && _currentSpeakerTransform != null)
+        if (IsServer && _serverSequenceActive && _currentSpeakerTransform != null)
             CheckProximityJoins();
 
         // _clientIsWaitingForInput is set on ALL clients via ClientRpc, so both the
@@ -527,11 +539,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // A forced conversation asset must never let the player back out via the escape/Back
         // button, even if a caller mistakenly passes allowParticipantExit: true for it.
         _allowParticipantExit = allowParticipantExit && !dialogue.isForced;
-        _hideNonParticipantUI = hideNonParticipantUI;
+        // hideNonParticipantUI is retained for API compatibility only: non-participants never
+        // lose their HUD any more (see the EnterScriptedModeClientRpc call below).
 
         // Set the server-side flag immediately so CheckProximityJoins works even if the
         // host client is not a participant (targeted RPCs won't reach a non-participant host).
-        IsScriptedModeActive = true;
+        // The client-local IsScriptedModeActive is only set by the participant-targeted RPCs.
+        _serverSequenceActive = true;
 
         // Broadcast to every client (regardless of participation) so a player who backed out,
         // or never joined, can still detect that talking to this speaker again should rejoin.
@@ -543,10 +557,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _currentSpeakerTransform = speaker.transform;
         SeedParticipants(lockOutsidePlayers, initialParticipantClientId);
 
-        // Standard cutscenes hide the HUD for everyone. Optional suspect intros leave the
-        // non-participant's HUD and controls intact while subtitle RPCs keep them informed.
-        if (_hideNonParticipantUI)
-            SetPlayerUIVisibleClientRpc(false);
+        // Only engaged participants lose their HUD (EnterScriptedModeClientRpc is participant-
+        // targeted and closes it). Non-participants — including out-of-range players who may be
+        // overhearing — keep their HUD and controls intact.
         EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers, _allowParticipantExit, BuildParticipantRpcParams());
         yield return null; // flush RPCs before the first line
 
@@ -581,21 +594,17 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // or PlayMegaphoneDialogue (which exits mode when it completes).
         if (!deferExit)
         {
-            // Optional suspect intros leave non-participants free. Capture the participant
-            // targets before clearing the server set so only actual participants have their
-            // camera, interaction state, and Back button restored on completion.
-            ClientRpcParams exitRecipients = _hideNonParticipantUI
-                ? default
-                : BuildParticipantRpcParams();
+            // Only participants were put into scripted mode (and had their HUD hidden), so
+            // capture the participant targets before clearing the server set and restore only them.
+            ClientRpcParams exitRecipients = BuildParticipantRpcParams();
 
             // Clear the server-side flag before the client RPC so CheckProximityJoins stops.
-            IsScriptedModeActive = false;
+            _serverSequenceActive = false;
             _currentSpeakerTransform = null;
             _participants.Clear();
             _leftParticipants.Clear();
             _joinByInteractionOnly = false;
             _allowParticipantExit = false;
-            _hideNonParticipantUI = true;
             _activeJoinRadius = -1f;
             HideInWorldSubtitleClientRpc(speakerNetId);
             SetActiveDialogueSpeakerClientRpc(0);
@@ -742,7 +751,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // No speaker to measure against — include everyone so the dialogue is never unblockable.
         if (_currentSpeakerTransform == null)
         {
-            _participants.UnionWith(NetworkManager.Singleton.ConnectedClientsIds);
+            _participants.UnionWith(DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton));
             Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — all {_participants.Count} clients seeded (no speaker transform).");
             return;
         }
@@ -764,7 +773,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             if (_participants.Count == 0 && TryGetNearestClient(speakerPos, out ulong nearest))
                 _participants.Add(nearest);
             if (_participants.Count == 0)
-                _participants.UnionWith(NetworkManager.Singleton.ConnectedClientsIds);
+                _participants.UnionWith(DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton));
 
             Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — forced: {_participants.Count}/{NetworkManager.Singleton.ConnectedClientsIds.Count} in range (radius={EffectiveJoinRadius}).");
             return;
@@ -781,7 +790,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         // Fallback: if no one is close, include all so the dialogue is never unblockable.
         if (_participants.Count == 0)
-            _participants.UnionWith(NetworkManager.Singleton.ConnectedClientsIds);
+            _participants.UnionWith(DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton));
 
         Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — {_participants.Count}/{NetworkManager.Singleton.ConnectedClientsIds.Count} participants seeded.");
     }
@@ -866,7 +875,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void LeaveScriptedDialogueServerRpc(ServerRpcParams rpcParams = default)
     {
-        if (!IsScriptedModeActive || !_allowParticipantExit) return;
+        if (!_serverSequenceActive || !_allowParticipantExit) return;
 
         ulong senderId = rpcParams.Receive.SenderClientId;
         if (!_participants.Contains(senderId)) return;
@@ -897,7 +906,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void RequestRejoinScriptedDialogueServerRpc(ServerRpcParams rpcParams = default)
     {
-        if (!IsScriptedModeActive) return;
+        if (!_serverSequenceActive) return;
 
         ulong senderId = rpcParams.Receive.SenderClientId;
         if (_participants.Contains(senderId)) return; // already in
@@ -1030,6 +1039,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         IsScriptedModeActive = true;
         _clientIsWaitingForInput = isWaitingForInput;
 
+        // A proximity/late join is also a forced conversation — drop the phone first.
+        Telephone.Instance?.ForceHangUpForDialogue();
+
         UIController.Instance?.ClosePlayerUI();
 
         if (PlayerInstance.Instance == null) return;
@@ -1075,7 +1087,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Skipping EnterScriptedModeClientRpc keeps movement and the first-person camera active
         // so the player can reach whatever the instruction is asking them to do.
         if (!unlocked)
+        {
+            _megaphoneSequenceActive = true;
             EnterScriptedModeClientRpc(0UL);
+        }
         else
             // Still mark the player as "in cutscene" for mutant-immunity purposes even though
             // movement and the camera stay free — ExitScriptedModeClientRpc below always clears
@@ -1093,6 +1108,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             SetSpeakerSpeakingClientRpc(false);
         }
 
+        // The broadcast exit below ends any chained (deferExit) dialogue for everyone too.
+        _megaphoneSequenceActive = false;
+        _serverSequenceActive = false;
         ExitScriptedModeClientRpc();
         yield return null;
 
@@ -1125,9 +1143,20 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             ? (useAlternateVoice ? mgr.AlternateVoiceClips : mgr.AudioClips)
             : System.Array.Empty<AudioClip>();
 
-        AudioSource source = useTelephoneAudioSource
-            ? Telephone.Instance?.VoiceAudioSource
-            : (mgr != null ? mgr.MegaphoneAudioSource : null);
+        AudioSource source;
+        if (useTelephoneAudioSource)
+        {
+            // Phone calls use the handset's own voice clips (when assigned) and play in-ear for
+            // whoever is holding the handset; everyone else hears it 3D from the phone.
+            var phone = Telephone.Instance;
+            source = phone != null ? phone.PrepareVoiceSourceForLocalListener() : null;
+            if (phone != null && phone.ScriptedCallVoiceClips.Length > 0)
+                clips = phone.ScriptedCallVoiceClips;
+        }
+        else
+        {
+            source = mgr != null ? mgr.MegaphoneAudioSource : null;
+        }
 
         if (!useTelephoneAudioSource)
             mgr?.SetSpeakerSpeaking(true);
@@ -1263,6 +1292,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // interactions, exit key) active underneath the incoming dialogue and blocking it.
         DiegeticViewController.Current?.Close();
 
+        // Hang up the phone (and close the HQ Order Screen) if this participant is holding it.
+        // Must run before ClosePlayerUI and the dialogue lock below — the instant put-down
+        // restores the HUD/control the order screen had taken, which the lock then re-takes.
+        Telephone.Instance?.ForceHangUpForDialogue();
+
         UIController.Instance?.ClosePlayerUI();
 
         // Cache the speaker ID on all clients so SuspectController can resolve per-character cameras
@@ -1345,21 +1379,6 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         DialogueChoiceSystem.Instance.ExitScriptedDialogueMode();
         UIController.Instance?.ShowPlayerUI();
         _clientSpeakerNetId = 0;
-    }
-
-    /// <summary>
-    /// Broadcasts a player-UI visibility change to ALL clients regardless of participant status.
-    /// Called at the start of every scripted dialogue sequence so the HUD never overlaps a
-    /// cutscene camera shot, even on clients who are not dialogue participants.
-    /// Restoration is handled by the existing <see cref="ExitScriptedModeClientRpc"/> broadcast.
-    /// </summary>
-    [ClientRpc]
-    private void SetPlayerUIVisibleClientRpc(bool visible)
-    {
-        if (visible)
-            UIController.Instance?.ShowPlayerUI();
-        else
-            UIController.Instance?.ClosePlayerUI();
     }
 
     // -------------------------------------------------------------------------

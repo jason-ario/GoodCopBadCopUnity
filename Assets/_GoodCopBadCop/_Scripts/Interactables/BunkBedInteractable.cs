@@ -191,21 +191,18 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     }
 
     /// <summary>
-    /// Queues Day 1's bunker directive once the shift ends. Later days use the standard
-    /// go-to-bed tutorial objective instead, so the checklist never presents both routes.
+    /// Refreshes the bed's label/objective once the shift ends. Day 1 adds no row here: its
+    /// scripted sequence (Day_01.ShowOpenBunkerTask → "Go to bed for the night") owns the
+    /// end-of-day checklist, so any extra row here would sit on top of those steps.
     /// </summary>
     private void HandleShiftEnd()
     {
-        if (IsDayOne())
-            GoToBunkerTask.CreateAndRegister();
-
         UpdateInteractText();
     }
 
-    /// <summary>Resets end-of-day state when a new shift begins and cleans up any leftover go-to-bed task.</summary>
+    /// <summary>Resets end-of-day state when a new shift begins.</summary>
     private void HandleShiftStart()
     {
-        GoToBunkerTask.CompleteAndRemove();
         interactText = InteractTextNotReady;
         _goToBedObjective = null;
         ClearEndDayConfirmed();
@@ -441,8 +438,6 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         // from a player who has some other UI open.
         if (_interactingPlayer != null)
             CloseBedView();
-
-        GoToBunkerTask.CompleteAndRemove();
 
         if (_goToBedObjective != null)
         {

@@ -27,6 +27,7 @@ public class LobbyManager : MonoBehaviour
 
     private FacepunchTransport facepunchTransport;
     private bool inviteOverlayWasOpenedByUs;
+    private ulong _rejectedFullLobbyId;
 
     // Replace with your actual Steam App ID. 480 is Valve's test app (Spacewar).
     private const uint SteamAppId = 3262820;
@@ -81,11 +82,18 @@ public class LobbyManager : MonoBehaviour
             SteamMatchmaking.OnLobbyEntered += OnLobbyEntered;
             SteamMatchmaking.OnLobbyMemberJoined += OnLobbyMemberJoined;
             SteamMatchmaking.OnLobbyMemberLeave += OnLobbyMemberLeave;
+            SteamMatchmaking.OnLobbyMemberDataChanged += OnLobbyMemberDataChanged;
             SteamFriends.OnGameLobbyJoinRequested += OnGameLobbyJoinRequested;
             SteamFriends.OnGameOverlayActivated += OnOverlayToggled;
         }
 
+        // Connection approval is enabled for every build (it is part of NGO's config hash) so the
+        // host can identify hidden developer spectators and enforce the visible-player cap.
+        NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+        NetworkManager.Singleton.ConnectionApprovalCallback = ApproveConnection;
+
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+        NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
     }
 
     private void Update()
@@ -103,11 +111,15 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+            if (NetworkManager.Singleton.ConnectionApprovalCallback == ApproveConnection)
+                NetworkManager.Singleton.ConnectionApprovalCallback = null;
         }
 
         SteamMatchmaking.OnLobbyEntered -= OnLobbyEntered;
         SteamMatchmaking.OnLobbyMemberJoined -= OnLobbyMemberJoined;
         SteamMatchmaking.OnLobbyMemberLeave -= OnLobbyMemberLeave;
+        SteamMatchmaking.OnLobbyMemberDataChanged -= OnLobbyMemberDataChanged;
         SteamFriends.OnGameLobbyJoinRequested -= OnGameLobbyJoinRequested;
         SteamFriends.OnGameOverlayActivated -= OnOverlayToggled;
 
@@ -137,7 +149,12 @@ public class LobbyManager : MonoBehaviour
         }
     }
 
-    private const int MaxLobbyMembers = 3;
+    /// <summary>Visible player cap. The Steam lobby itself gets extra hidden developer slot(s).</summary>
+    private const int MaxLobbyMembers = DevSpectatorConfig.MaxPlayers;
+    private const int SteamLobbyCapacity = DevSpectatorConfig.MaxPlayers + DevSpectatorConfig.ReservedDevSlots;
+
+    /// <summary>True while the local machine is joining/connected as a hidden developer spectator.</summary>
+    public bool IsDevSpectating => DevSpectatorRegistry.IsLocalSpectating;
 
     private const string LobbyDataKeyJoinCode = "join_code";
     private const int JoinCodeLength = 6;
@@ -172,6 +189,10 @@ public class LobbyManager : MonoBehaviour
 
         await ExitLobbyAsync();
 
+        DevSpectatorRegistry.IsLocalSpectating = false;
+        DevSpectatorRegistry.ClearServerState();
+        NetworkManager.Singleton.NetworkConfig.ConnectionData = DevSpectatorConfig.BuildConnectionPayload(false);
+
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
         Debug.Log($"[CreateLobby] Transport type: {(transport != null ? transport.GetType().Name : "null")}");
 
@@ -191,7 +212,7 @@ public class LobbyManager : MonoBehaviour
 
             for (int attempt = 1; attempt <= MaxLobbyCreateAttempts; attempt++)
             {
-                createdLobby = await SteamMatchmaking.CreateLobbyAsync(MaxLobbyMembers);
+                createdLobby = await SteamMatchmaking.CreateLobbyAsync(SteamLobbyCapacity);
                 if (createdLobby.HasValue)
                     break;
 
@@ -209,6 +230,10 @@ public class LobbyManager : MonoBehaviour
             CurrentLobby.SetPublic();
             CurrentLobby.SetJoinable(true);
             CurrentLobby.SetData("host", SteamClient.Name);
+
+            CurrentLobby.SetMemberData(DevSpectatorConfig.MemberRoleKey, DevSpectatorConfig.RolePlayer);
+            CurrentLobby.SetData(DevSpectatorConfig.LobbyDataMaxPlayers, MaxLobbyMembers.ToString());
+            PublishVisiblePlayerCount();
 
             CurrentJoinCode = GenerateJoinCode();
             CurrentLobby.SetData(LobbyDataKeyJoinCode, CurrentJoinCode);
@@ -265,7 +290,43 @@ public class LobbyManager : MonoBehaviour
 
     /// <summary>Joins a Steam lobby by ID (Facepunch transport) or connects to a LAN host at 127.0.0.1 (UnityTransport).
     /// Pass lobbyId = 0 when using UnityTransport to fall through to the LAN path.</summary>
-    public async void JoinLobby(ulong lobbyId) => await JoinLobbyInternal(lobbyId, "127.0.0.1");
+    public async void JoinLobby(ulong lobbyId)
+    {
+        // A regular join (invite, browser, code) always drops any previous spectator state.
+        DevSpectatorRegistry.IsLocalSpectating = false;
+        await JoinLobbyInternal(lobbyId, "127.0.0.1");
+    }
+
+    /// <summary>
+    /// DEVELOPER ONLY: joins a Steam lobby as a hidden spectator. The host approves the NGO
+    /// connection without spawning a player object, other players never see this member in
+    /// the lobby UI, and the reserved developer slot is used so full lobbies can be joined.
+    /// Returns false if the local user is not whitelisted or the join fails.
+    /// </summary>
+    public async Task<bool> JoinLobbyAsDevSpectator(ulong lobbyId)
+    {
+        if (!DevSpectatorConfig.IsLocalDev)
+        {
+            Debug.LogWarning("[DevSpectator] Local Steam user is not whitelisted in DevSpectatorConfig.DevSteamIds.");
+            return false;
+        }
+
+        if (!(NetworkManager.Singleton?.NetworkConfig.NetworkTransport is FacepunchTransport))
+        {
+            Debug.LogWarning("[DevSpectator] Spectating requires the Facepunch (Steam) transport.");
+            return false;
+        }
+
+        await ExitLobbyAsync();
+
+        DevSpectatorRegistry.IsLocalSpectating = true;
+        await JoinLobbyInternal(lobbyId, "127.0.0.1");
+
+        bool joined = CurrentLobby.Id.Value == lobbyId;
+        if (!joined)
+            DevSpectatorRegistry.IsLocalSpectating = false;
+        return joined;
+    }
 
     /// <summary>Joins a LAN host at the given IP address using UnityTransport.
     /// Ignored when FacepunchTransport is the active transport.</summary>
@@ -343,6 +404,27 @@ public class LobbyManager : MonoBehaviour
                 return;
             }
 
+            bool asSpectator = DevSpectatorRegistry.IsLocalSpectating;
+
+            // Publish our role immediately so every other member can filter hidden spectators.
+            lobby.SetMemberData(DevSpectatorConfig.MemberRoleKey,
+                asSpectator ? DevSpectatorConfig.RoleSpectator : DevSpectatorConfig.RolePlayer);
+
+            // The Steam lobby has hidden developer slot(s) on top of the visible player cap.
+            // Regular players must never occupy them: leave if the visible cap is already met.
+            if (!asSpectator && DevSpectatorConfig.CountVisibleMembers(lobby) > MaxLobbyMembers)
+            {
+                Debug.LogWarning($"[JoinLobby] Lobby {lobbyId} is full ({MaxLobbyMembers} players) — leaving.");
+                _rejectedFullLobbyId = lobby.Id.Value;
+                lobby.Leave();
+                if (CurrentLobby.Id == lobby.Id)
+                    CurrentLobby = default;
+                OnJoinFailed?.Invoke("LobbyFull");
+                return;
+            }
+
+            _rejectedFullLobbyId = 0;
+
             CurrentLobby = lobby;
 
             if (facepunchTransport == null)
@@ -350,6 +432,8 @@ public class LobbyManager : MonoBehaviour
                 Debug.LogError("[JoinLobby] facepunchTransport is null — cannot connect.");
                 return;
             }
+
+            NetworkManager.Singleton.NetworkConfig.ConnectionData = DevSpectatorConfig.BuildConnectionPayload(asSpectator);
 
             facepunchTransport.targetSteamId = CurrentLobby.Owner.Id;
             Debug.Log($"[JoinLobby] Steam join success. targetSteamId={facepunchTransport.targetSteamId}");
@@ -367,6 +451,7 @@ public class LobbyManager : MonoBehaviour
         else if (transport is UnityTransport unityTransport)
         {
             unityTransport.SetConnectionData(lanAddress, 7777);
+            NetworkManager.Singleton.NetworkConfig.ConnectionData = DevSpectatorConfig.BuildConnectionPayload(false);
             Debug.Log($"[JoinLobby] Connecting to LAN host at {lanAddress}:7777");
 
             if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsHost)
@@ -461,9 +546,20 @@ public class LobbyManager : MonoBehaviour
     // =========================
     private async void OnLobbyEntered(Lobby lobby)
     {
+        // Ignore the enter callback of a lobby we immediately left because it was full.
+        if (lobby.Id.Value == _rejectedFullLobbyId)
+            return;
+
         CurrentLobby = lobby;
 
         await Task.Delay(50);
+
+        if (lobby.Id.Value == _rejectedFullLobbyId)
+        {
+            if (CurrentLobby.Id == lobby.Id)
+                CurrentLobby = default;
+            return;
+        }
 
         Debug.Log($"[OnLobbyEntered] IsHost={NetworkManager.Singleton.IsHost} IsClient={NetworkManager.Singleton.IsClient} Members={CurrentLobby.Members.Count()} OwnerSteamId={lobby.Owner.Id}");
 
@@ -480,6 +576,7 @@ public class LobbyManager : MonoBehaviour
         Debug.Log($"[OnLobbyMemberJoined] {friend.Name}");
         Debug.Log($"Members now: {CurrentLobby.Members.Count()}");
 
+        PublishVisiblePlayerCount();
         OnLobbyUpdated?.Invoke();
     }
 
@@ -492,7 +589,76 @@ public class LobbyManager : MonoBehaviour
 
         Debug.Log($"[OnLobbyMemberLeave] {friend.Name}");
 
+        PublishVisiblePlayerCount();
         OnLobbyUpdated?.Invoke();
+    }
+
+    private void OnLobbyMemberDataChanged(Lobby lobby, Friend friend)
+    {
+        if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
+            return;
+
+        // Role changes (player/spectator) affect which members the UI shows.
+        PublishVisiblePlayerCount();
+        OnLobbyUpdated?.Invoke();
+    }
+
+    /// <summary>
+    /// Lobby owner only: publishes the visible (non-spectator) player count as lobby data so
+    /// lobby browsers never reveal a hidden developer spectator through MemberCount.
+    /// </summary>
+    private void PublishVisiblePlayerCount()
+    {
+        if (CurrentLobby.Id == 0 || !SteamClient.IsValid || CurrentLobby.Owner.Id != SteamClient.SteamId)
+            return;
+
+        CurrentLobby.SetData(DevSpectatorConfig.LobbyDataPlayerCount,
+            DevSpectatorConfig.CountVisibleMembers(CurrentLobby).ToString());
+    }
+
+    // =========================
+    // CONNECTION APPROVAL
+    // =========================
+
+    /// <summary>
+    /// SERVER: approves every connection without an automatic player object (PlayerSpawner owns
+    /// spawning). Whitelisted developer spectators are registered so they're never spawned;
+    /// regular players are rejected once the visible player cap is reached.
+    /// </summary>
+    private void ApproveConnection(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
+    {
+        response.CreatePlayerObject = false;
+        response.Pending = false;
+
+        if (request.ClientNetworkId == NetworkManager.ServerClientId)
+        {
+            response.Approved = true;
+            return;
+        }
+
+        if (DevSpectatorConfig.TryParseSpectatorPayload(request.Payload, out ulong devSteamId))
+        {
+            DevSpectatorRegistry.RegisterSpectator(request.ClientNetworkId);
+            response.Approved = true;
+            Debug.Log($"[DevSpectator] Approved hidden spectator clientId={request.ClientNetworkId} steamId={devSteamId}.");
+            return;
+        }
+
+        if (DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) >= MaxLobbyMembers)
+        {
+            response.Approved = false;
+            response.Reason = "LobbyFull";
+            Debug.LogWarning($"[LobbyManager] Rejected clientId={request.ClientNetworkId} — player cap ({MaxLobbyMembers}) reached.");
+            return;
+        }
+
+        response.Approved = true;
+    }
+
+    private void OnClientDisconnected(ulong clientId)
+    {
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            DevSpectatorRegistry.UnregisterSpectator(clientId);
     }
 
     private async void OnClientConnected(ulong clientId)
@@ -515,6 +681,14 @@ public class LobbyManager : MonoBehaviour
         // is only meant for OTHER clients connecting to the host's lobby, so skip self entirely.
         if (clientId == NetworkManager.Singleton.LocalClientId)
             return;
+
+        // Hidden developer spectators get no player object, no lobby/late-join bootstrap and no
+        // UI refresh — the dev client drives its own spectator setup (DevSpectatorController).
+        if (DevSpectatorRegistry.IsSpectator(clientId))
+        {
+            Debug.Log($"[Host] clientId={clientId} is a hidden dev spectator — skipping spawn/bootstrap.");
+            return;
+        }
 
         await Task.Delay(50);
 
@@ -608,7 +782,18 @@ public class LobbyManager : MonoBehaviour
     // =========================
     // HELPERS
     // =========================
+    /// <summary>Visible lobby members — hidden developer spectators are excluded.</summary>
     public Friend[] GetMembersSnapshot()
+    {
+        if (CurrentLobby.Id == 0)
+            return Array.Empty<Friend>();
+
+        Lobby lobby = CurrentLobby;
+        return lobby.Members.Where(m => !DevSpectatorConfig.IsSpectatorMember(lobby, m)).ToArray();
+    }
+
+    /// <summary>All Steam lobby members including hidden spectators (developer tooling only).</summary>
+    public Friend[] GetAllMembersSnapshot()
     {
         if (CurrentLobby.Id == 0)
             return Array.Empty<Friend>();
@@ -657,6 +842,8 @@ public class LobbyManager : MonoBehaviour
         }
         finally
         {
+            DevSpectatorRegistry.IsLocalSpectating = false;
+            DevSpectatorRegistry.ClearServerState();
             IsIntentionalDisconnect = false;
         }
     }
@@ -691,6 +878,8 @@ public class LobbyManager : MonoBehaviour
     {
         inviteOverlayWasOpenedByUs = false;
         CurrentJoinCode = null;
+        DevSpectatorRegistry.IsLocalSpectating = false;
+        DevSpectatorRegistry.ClearServerState();
 
         if (CurrentLobby.Id != 0)
         {

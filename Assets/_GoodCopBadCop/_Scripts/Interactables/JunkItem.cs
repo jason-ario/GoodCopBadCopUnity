@@ -113,6 +113,33 @@ public class JunkItem : Interactable
              "flips IsCollectible off instead, leaving cleanup/reuse to the owning script.")]
     [SerializeField] private bool _destroyOnCollect = true;
 
+    [Tooltip("When true (default), standalone physics junk (root Rigidbody + NetworkRigidbody — gore, " +
+             "Vlad pieces, gut chunks) gets a KickablePhysicsBody at runtime on every peer: players " +
+             "can kick it, and limb bones briefly ragdoll before freezing kinematic again. Ignored " +
+             "for suspect bodies, mutants and other character-driven junk.")]
+    [SerializeField] private bool _kickable = true;
+
+    [Tooltip("When true, the flamethrower can burn this junk away (organic remains: gore, body parts, " +
+             "guts). Burning it fully removes it exactly like bagging would and credits any cleanup " +
+             "task that requires it. Suspect and mutant corpses are always burnable regardless of " +
+             "this flag. Leave false for ordinary trash (tires, chairs, bags of junk).")]
+    [SerializeField] private bool _burnable;
+
+    /// <summary>
+    /// Fired on the server when a JunkItem is fully burned away by fire (see
+    /// <see cref="BurnAwayServer"/>). Separate from <see cref="OnAnyJunkItemCollected"/>, which
+    /// means "went into a trash bag" and is balanced by a later dumpster deposit.
+    /// </summary>
+    public static event Action<JunkItem> OnAnyJunkItemBurned;
+
+    /// <summary>
+    /// True when fire can consume this item: explicitly flagged organic junk, or a character body
+    /// (suspect / mutant corpse) whose JunkItem marks it as collectible remains.
+    /// </summary>
+    public bool IsBurnable => _burnable || _suspect != null || _isMutantCorpse;
+
+    private bool _isMutantCorpse;
+
     /// <summary>Server-only. Marks this body as collectible junk (or clears it). Does not touch
     /// this component's Unity 'enabled' flag — see <see cref="IsCollectible"/>.</summary>
     public void SetCollectible(bool collectible)
@@ -165,6 +192,11 @@ public class JunkItem : Interactable
         base.Awake();
 
         _suspect = GetComponent<SuspectCharacter>();
+        _isMutantCorpse = GetComponentInParent<MutantEnemy>() != null;
+
+        // Runs on every peer at instantiate time, so the component set is identical everywhere.
+        if (_kickable && _suspect == null)
+            KickablePhysicsBody.TryAttach(this);
 
         if (string.IsNullOrEmpty(interactText))
             interactText = DefaultInteractText;
@@ -324,5 +356,38 @@ public class JunkItem : Interactable
 
         OnCollected?.Invoke();
         OnAnyJunkItemCollected?.Invoke(this);
+    }
+
+    // ── Fire ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Removes this item because fire completely burned it. Mirrors
+    /// <see cref="CollectServerRpc"/> (despawn, or reset for reusable bodies, then
+    /// <see cref="OnCollected"/> so owning systems clean up), except no bag is involved: the
+    /// cleanup task is credited directly via <see cref="TakeOutTrashTask.CreditBurnedJunkItem"/>
+    /// because no dumpster deposit will ever follow. Returns false if the item can't burn.
+    /// </summary>
+    public bool BurnAwayServer()
+    {
+        if (!IsServer || !IsSpawned || !IsBurnable || !CanBeCollected)
+            return false;
+
+        NetworkObject netObj = NetworkObject;
+
+        // Credit BEFORE despawning — the task identifies the item by its live NetworkObject.
+        TakeOutTrashTask.Instance?.CreditBurnedJunkItem(netObj);
+
+        if (_destroyOnCollect)
+            netObj.Despawn(destroy: true);
+        else
+        {
+            IsTaskRequired.Value = false;
+            TutorialHighlight.Value = false;
+            IsCollectible.Value = false;
+        }
+
+        OnCollected?.Invoke();
+        OnAnyJunkItemBurned?.Invoke(this);
+        return true;
     }
 }

@@ -26,10 +26,15 @@ public class GuardPurchasePoint : Interactable
     [Tooltip("Child GameObject with the sign mesh and its interaction collider. Hidden and " +
              "non-interactable while locked, alongside the post and soldier.")]
     [SerializeField] private GameObject _guardSign;
-    [Tooltip("Placeholder world-space TextMeshPro shown on the post once a guard has been " +
-             "purchased but hasn't arrived yet (scheduled to spawn at the next day start). " +
-             "Simple text stand-in for a proper 'purchased, arriving tomorrow' visual.")]
-    [SerializeField] private TMPro.TextMeshPro _pendingArrivalText;
+
+    [Header("Status Sign")]
+    [Tooltip("World-space TextMeshPro inside the purchase post's frame. Its text is set from " +
+             "the purchase state (available vs. pending arrival).")]
+    [SerializeField] private TMPro.TextMeshPro _statusText;
+    [Tooltip("Status text shown while the post is buyable.")]
+    [TextArea] [SerializeField] private string _availableLabel = "GUARD POST\n<size=60%>FOR HIRE</size>";
+    [Tooltip("Status text shown once a guard is purchased but hasn't arrived yet (arrives next day start).")]
+    [TextArea] [SerializeField] private string _pendingLabel = "GUARD PENDING\n<size=60%>ARRIVES TOMORROW</size>";
 
     [Header("Persistence")]
     [Tooltip("Stable, unique ID for this purchase point (e.g. 'GuardPost_Checkpoint'). Used to " +
@@ -201,13 +206,14 @@ public class GuardPurchasePoint : Interactable
     }
 
     /// <summary>
-    /// Applies the correct visibility for the sign/post/soldier/pending-text children based on the
-    /// current locked/purchased/arrived state:
-    ///   - Locked: sign, post, soldier, and pending text all hidden — nothing is visible or interactable.
-    ///   - Unlocked, not purchased, not arrived: sign and post visible (buyable), soldier and pending text hidden.
-    ///   - Unlocked, purchased, not yet arrived: sign and post visible, plus the pending-arrival
-    ///     placeholder text ("purchased, arriving tomorrow"); soldier still hidden.
-    ///   - Unlocked, guard arrived: sign and soldier visible, post and pending text hidden.
+    /// Applies the correct visibility for the sign/post/soldier children and the post's status
+    /// text based on the current locked/purchased/arrived state:
+    ///   - Locked: sign, post, and soldier all hidden — nothing is visible or interactable.
+    ///   - Unlocked, not purchased, not arrived: sign and post visible (buyable) showing
+    ///     <see cref="_availableLabel"/>; soldier hidden.
+    ///   - Unlocked, purchased, not yet arrived: sign and post visible showing
+    ///     <see cref="_pendingLabel"/>; soldier still hidden.
+    ///   - Unlocked, guard arrived: sign and soldier visible, post hidden.
     /// </summary>
     private void RefreshVisualState()
     {
@@ -224,7 +230,7 @@ public class GuardPurchasePoint : Interactable
         if (_guardSign != null)
             _guardSign.SetActive(_unlocked.Value);
 
-        if (_pendingArrivalText != null)
-            _pendingArrivalText.gameObject.SetActive(showPendingArrival);
+        if (_statusText != null)
+            _statusText.text = showPendingArrival ? _pendingLabel : _availableLabel;
     }
 }

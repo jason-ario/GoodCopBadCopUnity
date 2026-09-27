@@ -55,6 +55,13 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool, if this task is ever added to it.")]
     [SerializeField] private string _dailyTaskId = "CleanBlood";
 
+    [Header("Item Success Feedback")]
+    [Tooltip("2D success cue played on every client each time a scrubbed splatter advances this task " +
+             "(same cue as a task row's sub-task progress ding). Deduplicated via TaskSuccessCue.")]
+    [SerializeField] private AudioClip _itemSuccessSfxClip;
+    [Tooltip("Volume for _itemSuccessSfxClip.")]
+    [SerializeField] private float _itemSuccessSfxVolume = 0.6f;
+
     [Header("Cleanup Region")]
     [Tooltip("Region that decides which splatters COUNT toward this task. Leave empty to use " +
              "CheckpointCleanupArea.Instance (and, failing that, TakeOutTrashTask's own test). " +
@@ -513,9 +520,12 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // a destroyed-without-scrubbing splatter and decrement the total for it a second time.
         _spawnedSplatters.Remove(netObj);
 
+        int previousScrubbed = _scrubbed.Value;
+        bool wasComplete = _isComplete;
         _scrubbed.Value = Mathf.Clamp(_scrubbed.Value + 1, 0, _totalCount.Value);
 
         TryCompleteTask();
+        PlayItemSuccessIfProgressed(previousScrubbed, wasComplete);
     }
 
     /// <summary>
@@ -534,6 +544,8 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         if (!_taskActive && !_isComplete) return;
 
+        int previousScrubbed = _scrubbed.Value;
+        bool wasComplete = _isComplete;
         _totalCount.Value++;
         _scrubbed.Value = Mathf.Clamp(_scrubbed.Value + 1, 0, _totalCount.Value);
 
@@ -541,7 +553,24 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                   $"credited as {_scrubbed.Value}/{_totalCount.Value}.");
 
         TryCompleteTask();
+        PlayItemSuccessIfProgressed(previousScrubbed, wasComplete);
     }
+
+    /// <summary>
+    /// Server-only. Broadcasts one per-splatter success cue if the scrubbed count actually rose,
+    /// flagging whether this scrub is the one that just completed the task (see
+    /// <see cref="TaskSuccessCue.PlayCleanupItemCue"/>). Purely cosmetic splatters never reach here
+    /// with progress, so they stay silent.
+    /// </summary>
+    private void PlayItemSuccessIfProgressed(int previousScrubbed, bool wasComplete)
+    {
+        if (_scrubbed.Value <= previousScrubbed) return;
+        PlayItemSuccessSfxClientRpc(!wasComplete && _isComplete);
+    }
+
+    [ClientRpc]
+    private void PlayItemSuccessSfxClientRpc(bool completesTask) =>
+        TaskSuccessCue.PlayCleanupItemCue(this, _itemSuccessSfxClip, _itemSuccessSfxVolume, completesTask);
 
     /// <summary>
     /// Completes the task if everything still required has been scrubbed. Safe to call after any

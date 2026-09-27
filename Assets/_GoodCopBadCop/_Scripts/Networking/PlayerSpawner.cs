@@ -93,6 +93,21 @@ public class PlayerSpawner : NetworkBehaviour
     }
 
     /// <summary>
+    /// Replaces a client's current player object with a newly spawned player at the booth
+    /// gameplay spawn point while keeping the previous object spawned as a corpse.
+    /// Used for mid-shift revives on Day 1 (see <see cref="ReviveManager"/>).
+    /// SERVER ONLY.
+    /// </summary>
+    public bool ReplacePlayerAtBooth(ulong clientId)
+    {
+        return SpawnPlayerAtPoint(
+            clientId,
+            GetBoothSpawnPoint(clientId),
+            isOutside: false,
+            replaceExistingPlayerObject: true) != null;
+    }
+
+    /// <summary>
     /// Spawns the player prefab for the given client at the outside bunker spawn point.
     /// Used when a dead player is revived at the start of a new day.
     /// SERVER ONLY.
@@ -133,6 +148,10 @@ public class PlayerSpawner : NetworkBehaviour
             Debug.LogWarning("[PlayerSpawner] SpawnPlayerAtPoint called on client. Ignored.");
             return null;
         }
+
+        // Hidden developer spectators never get a player object, whichever spawn path asks.
+        if (DevSpectatorRegistry.IsSpectator(clientId))
+            return null;
 
         // Normal spawns must not create a second player object. Intentional replacements are
         // supported by Netcode: SpawnAsPlayerObject demotes the previous object to a regular

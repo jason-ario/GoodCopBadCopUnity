@@ -1,16 +1,20 @@
 using UnityEngine;
 
 /// <summary>
-/// Picks a random texture from a pool and applies it to the UVReveal shader's _RevealMap
-/// property on the sibling Renderer. Because UVRevealObject only writes light-related
-/// properties (_UVLightPositions, _UVLightDirections, etc.) to its MaterialPropertyBlock,
-/// changing _RevealMap on the per-instance material does not interfere with it.
+/// Picks a random texture from a pool and applies it to the sibling Renderer's main texture
+/// slot: <c>_BaseMap</c> (GraffitiScrubDecal / blood splatter decals) or, for legacy materials,
+/// <c>_RevealMap</c> (UVReveal).
+///
+/// The texture is written through the renderer's MaterialPropertyBlock using Get → Set, so
+/// other per-renderer values in the same block (e.g. GraffitiInteractable's _ScrubProgress)
+/// are preserved and no per-instance material copy is created.
 ///
 /// Call Randomize() manually at any time to re-roll the texture.
 /// </summary>
 [RequireComponent(typeof(Renderer))]
 public class BloodTextureRandomizer : MonoBehaviour
 {
+    private static readonly int BaseMapId   = Shader.PropertyToID("_BaseMap");
     private static readonly int RevealMapId = Shader.PropertyToID("_RevealMap");
 
     [Header("Textures")]
@@ -24,12 +28,19 @@ public class BloodTextureRandomizer : MonoBehaviour
     [Tooltip("Re-randomize every N seconds. Set to 0 to disable interval re-rolling.")]
     [SerializeField, Min(0f)] private float reRandomizeInterval = 0f;
 
-    private Material _materialInstance;
+    private Renderer _renderer;
+    private MaterialPropertyBlock _block;
+    private int _textureId;
 
     private void Awake()
     {
-        // renderer.material creates a per-instance copy so we never mutate the shared asset.
-        _materialInstance = GetComponent<Renderer>().material;
+        _renderer = GetComponent<Renderer>();
+        _block = new MaterialPropertyBlock();
+
+        Material mat = _renderer.sharedMaterial;
+        _textureId = mat != null && !mat.HasTexture(BaseMapId) && mat.HasTexture(RevealMapId)
+            ? RevealMapId
+            : BaseMapId;
     }
 
     private void Start()
@@ -41,7 +52,7 @@ public class BloodTextureRandomizer : MonoBehaviour
             InvokeRepeating(nameof(Randomize), reRandomizeInterval, reRandomizeInterval);
     }
 
-    /// <summary>Sets _RevealMap to a uniformly random texture from the pool.</summary>
+    /// <summary>Sets the main texture to a uniformly random texture from the pool.</summary>
     public void Randomize()
     {
         if (textures == null || textures.Length == 0)
@@ -50,12 +61,11 @@ public class BloodTextureRandomizer : MonoBehaviour
             return;
         }
 
-        _materialInstance.SetTexture(RevealMapId, textures[Random.Range(0, textures.Length)]);
-    }
+        Texture2D tex = textures[Random.Range(0, textures.Length)];
+        if (tex == null) return;
 
-    private void OnDestroy()
-    {
-        if (_materialInstance != null)
-            Destroy(_materialInstance);
+        _renderer.GetPropertyBlock(_block);
+        _block.SetTexture(_textureId, tex);
+        _renderer.SetPropertyBlock(_block);
     }
 }

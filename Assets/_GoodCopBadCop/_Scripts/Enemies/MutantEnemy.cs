@@ -59,6 +59,13 @@ public class MutantEnemy : NetworkBehaviour
 
     [SerializeField] private MutantEnemyData data;
 
+    [Header("Navigation")]
+    [Tooltip("NavMesh agent type used while chasing a player, aggroed, or in breach mode. Its NavMesh " +
+             "is baked WITHOUT the breakable PerimiterFences, so the mutant beelines through fence lines " +
+             "and smashes whichever fence is on its route. Patrol/idle uses the agent's default type " +
+             "(the NPC NavMesh, which keeps fences as walls). Leave empty to disable the switch.")]
+    [SerializeField] private string assaultAgentTypeName = "Mutant";
+
     [Header("Animation (optional)")]
     [SerializeField] private Animator animator;
     [SerializeField] private string speedParameterName = "Speed";
@@ -335,6 +342,23 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     private float _fenceRecheckAllowedTime;
 
+    /// <summary>
+    /// Until this Time.time, ChaseLoop forces a real SetDestination every tick (bypassing
+    /// dedup). Set when a fence breaks: disabling its carving NavMeshObstacle re-links the
+    /// NavMesh a frame or two later, so a path computed right at the break is still the stale
+    /// partial one that routes around the old carve.
+    /// </summary>
+    private float _forceRepathUntilTime;
+
+    /// <summary>Agent type the NavMeshAgent was authored with (NPC NavMesh). Used for patrol/idle.</summary>
+    private int _defaultAgentTypeId;
+
+    /// <summary>
+    /// Agent type resolved from <see cref="assaultAgentTypeName"/>, or -1 if that type is missing
+    /// or has no NavMesh baked, in which case the mutant stays on the default type.
+    /// </summary>
+    private int _assaultAgentTypeId = -1;
+
     // Destination deduplication — prevents redundant SetDestination calls for stationary
     // targets, which cause a 1-frame path-recalculation stutter every retarget tick.
     private Vector3 _lastSetDestination = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
@@ -531,6 +555,9 @@ public class MutantEnemy : NetworkBehaviour
         _agent.updateRotation = true;
         _agent.isStopped = false;
 
+        _defaultAgentTypeId = _agent.agentTypeID;
+        _assaultAgentTypeId = ResolveAssaultAgentTypeId();
+
         _spawnPosition = transform.position;
         _isAggroed = canAggro && aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
 
@@ -582,6 +609,7 @@ public class MutantEnemy : NetworkBehaviour
             if (_isHeld)
             {
                 // Frozen — no targeting, no movement, no patrol. Just sit tight until released.
+                SetAgentType(_defaultAgentTypeId);
                 _agent.ResetPath();
                 yield return new WaitForSeconds(retargetInterval);
                 continue;
@@ -593,25 +621,37 @@ public class MutantEnemy : NetworkBehaviour
             if (!wasChasing && _currentTarget != null)
                 OnAnyMutantSpottedPlayer?.Invoke(this);
 
+            // Assault (chase / aggro / breach) runs on the fence-less Mutant NavMesh so the path
+            // goes straight at the target and fences get smashed. Patrol/idle stays on the NPC
+            // NavMesh, where fences are walls, so wandering mutants never clip through them.
+            bool assaulting = _currentTarget != null || (_isAggroed && aggroTarget != null);
+            SetAgentType(assaulting && _assaultAgentTypeId != -1 ? _assaultAgentTypeId : _defaultAgentTypeId);
+            if (!_agent.isOnNavMesh)
+            {
+                yield return new WaitForSeconds(retargetInterval);
+                continue;
+            }
+
             if (_currentTarget != null)
             {
                 // ── Chase ──────────────────────────────────────────────────────
 
-                // Breach charge mode: re-check for a blocking fence every tick, same as the
-                // aggro-to-booth path, so a relentless breach mutant smashes through fences in
-                // its way toward the nearest player instead of getting stuck avoiding a
-                // non-carving obstacle it can never actually route around.
-                if (_breachChargeMode)
+                // Re-check for a blocking fence every tick while chasing — in every mode, not just
+                // breach charge — so any mutant (ambient, aggroed, or breach) smashes through a
+                // fence standing between it and the player. Checks both the straight line to the
+                // player and the agent's actual path: on the Mutant NavMesh the path runs straight
+                // through fence lines, so any fence it crosses must be broken, not walked through.
                 {
                     if (_fenceTarget == null && Time.time >= _fenceRecheckAllowedTime)
-                        _fenceTarget = FindBlockingFenceTowardTarget(_currentTarget.position);
+                        _fenceTarget = FindBlockingFenceTowardTarget(_currentTarget.position)
+                                       ?? FindBlockingFenceAlongPath();
 
                     if (_fenceTarget != null && _fenceTarget.IsSpawned && !_fenceTarget.IsPassableByMutant)
                     {
                         if (_knockbackCoroutine == null)
                             _agent.isStopped = false;
                         _agent.stoppingDistance = data.fenceStopDistance;
-                        SetAgentDestination(GetClosestFencePoint(_fenceTarget), _fenceTarget);
+                        SetAgentDestination(GetFenceApproachPoint(_fenceTarget, _currentTarget.position), _fenceTarget);
 
                         if (IsFenceTargetInRange())
                             TryAttackFence();
@@ -624,11 +664,16 @@ public class MutantEnemy : NetworkBehaviour
                     // seconds to actually walk through the opening before hunting for another
                     // one, and fall through to a direct charge at the player below.
                     if (_fenceTarget != null)
+                    {
                         _fenceRecheckAllowedTime = Time.time + FenceRecheckGraceSeconds;
+                        _forceRepathUntilTime = Time.time + FenceRecheckGraceSeconds;
+                    }
                     _fenceTarget = null;
                     _agent.stoppingDistance = data.stoppingDistance;
                 }
 
+                if (Time.time < _forceRepathUntilTime)
+                    InvalidateDestination();
                 SetAgentDestination(_currentTarget.position, _currentTarget);
 
                 float distanceToTarget = Vector3.Distance(transform.position, _currentTarget.position);
@@ -640,7 +685,18 @@ public class MutantEnemy : NetworkBehaviour
                 else if (!_agent.pathPending
                          && _agent.pathStatus != NavMeshPathStatus.PathComplete)
                 {
-                    TryBangBlockingDoorTowardTarget(_currentTarget);
+                    // Carved fences cut the NavMesh, so the target is unreachable and the path
+                    // ends at the edge of the carved gap. If the straight-line sweep missed the
+                    // fence (e.g. the sweep slipped past a panel edge), attack whichever
+                    // fence is at the end of the path. Otherwise, fall back to door banging.
+                    PerimiterFence pathBlocker = Time.time >= _fenceRecheckAllowedTime
+                        ? FindFenceNearPoint(_agent.pathEndPosition)
+                        : null;
+
+                    if (pathBlocker != null)
+                        _fenceTarget = pathBlocker;
+                    else
+                        TryBangBlockingDoorTowardTarget(_currentTarget);
                 }
             }
             else
@@ -648,7 +704,13 @@ public class MutantEnemy : NetworkBehaviour
                 // Lost or never had a player target; reset patrol state so we
                 // pick a new waypoint immediately rather than waiting out a stale timer.
                 if (wasChasing)
+                {
                     _patrolWaiting = false;
+                    // Drop any fence picked toward the (now lost) player so the aggro branch
+                    // below re-evaluates the fence actually between us and the aggro target.
+                    _fenceTarget = null;
+                    _agent.stoppingDistance = data.stoppingDistance;
+                }
 
                 if (_isAggroed && aggroTarget != null)
                 {
@@ -666,7 +728,8 @@ public class MutantEnemy : NetworkBehaviour
                     // _fenceTarget is null in Update()) so a freshly-detected fence redirects the
                     // agent immediately instead of first routing the long way around via NavMesh.
                     if (_fenceTarget == null)
-                        _fenceTarget = FindBlockingFenceTowardTarget(aggroTarget.position);
+                        _fenceTarget = FindBlockingFenceTowardTarget(aggroTarget.position)
+                                       ?? FindBlockingFenceAlongPath();
 
                     if (_fenceTarget != null)
                     {
@@ -679,7 +742,7 @@ public class MutantEnemy : NetworkBehaviour
                         if (_knockbackCoroutine == null)
                             _agent.isStopped = false;
                         _agent.stoppingDistance = data.fenceStopDistance;
-                        SetAgentDestination(GetClosestFencePoint(_fenceTarget), _fenceTarget);
+                        SetAgentDestination(GetFenceApproachPoint(_fenceTarget, aggroTarget.position), _fenceTarget);
 
                         if (IsFenceTargetInRange())
                             TryAttackFence();
@@ -700,6 +763,8 @@ public class MutantEnemy : NetworkBehaviour
                         if (_knockbackCoroutine == null)
                             _agent.isStopped = false;
                         _agent.stoppingDistance = data.stoppingDistance;
+                        if (Time.time < _forceRepathUntilTime)
+                            InvalidateDestination();
                         SetAgentDestination(aggroTarget.position, aggroTarget);
 
                         // Once the agent reaches the booth wall (partial path), find the door.
@@ -765,7 +830,8 @@ public class MutantEnemy : NetworkBehaviour
         randomOffset.y = 0f;
         Vector3 candidate = _spawnPosition + randomOffset;
 
-        if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, data.patrolRadius, NavMesh.AllAreas))
+        var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = NavMesh.AllAreas };
+        if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, data.patrolRadius, filter))
             _agent.SetDestination(hit.position);
     }
 
@@ -839,12 +905,51 @@ public class MutantEnemy : NetworkBehaviour
             return null;
 
         Vector3 direction = toTarget / distance;
+        return SweepForFence(origin, direction, distance);
+    }
 
+    /// <summary>
+    /// Sweeps the agent's current path corner-by-corner (up to <paramref name="maxDistance"/>
+    /// metres ahead) and returns the first intact fence the route crosses. On the Mutant NavMesh,
+    /// fences aren't baked in, so a path that bends (e.g. around a building) can cross a fence
+    /// line that the straight-line check toward the target misses.
+    /// </summary>
+    private PerimiterFence FindBlockingFenceAlongPath(float maxDistance = 25f)
+    {
+        if (!_agent.hasPath || _agent.pathPending)
+            return null;
+
+        Vector3[] corners = _agent.path.corners;
+        Vector3 from = transform.position;
+        float travelled = 0f;
+
+        for (int i = 1; i < corners.Length && travelled < maxDistance; i++)
+        {
+            Vector3 segment = corners[i] - from;
+            segment.y = 0f;
+            float length = segment.magnitude;
+            if (length < 0.01f)
+                continue;
+
+            float castLength = Mathf.Min(length, maxDistance - travelled);
+            PerimiterFence fence = SweepForFence(from + Vector3.up * 1f, segment / length, castLength);
+            if (fence != null)
+                return fence;
+
+            travelled += length;
+            from = corners[i];
+        }
+
+        return null;
+    }
+
+    private static PerimiterFence SweepForFence(Vector3 origin, Vector3 direction, float distance)
+    {
         // Kept tight (well under half a fence panel's width) so only a fence genuinely dead
         // ahead of the mutant registers as "blocking" — a wider sweep was grazing the edge of
         // an adjacent, easily-walkable-around panel right after breaking the one actually in
         // the way, causing the mutant to smash a second fence it never needed to.
-        float radius = 0.35f;
+        const float radius = 0.35f;
 
         RaycastHit[] hits = Physics.SphereCastAll(origin, radius, direction, distance);
         if (hits.Length == 0)
@@ -862,16 +967,161 @@ public class MutantEnemy : NetworkBehaviour
         return null;
     }
 
+    // ── Agent type switching ───────────────────────────────────────────────────
+
     /// <summary>
-    /// Returns the point on <paramref name="fence"/>'s collider closest to the mutant, used as the
-    /// NavMesh destination so the mutant walks straight up to the fence segment that is actually
-    /// blocking it rather than toward the fence GameObject's pivot (which may sit on an unwalkable
-    /// carved-out point, or far along a long fence run).
+    /// Looks up <see cref="assaultAgentTypeName"/> among the project's NavMesh agent types and
+    /// verifies that a NavMesh is actually loaded for it. Returns -1 (disabling the switch) otherwise.
     /// </summary>
-    private Vector3 GetClosestFencePoint(PerimiterFence fence)
+    private int ResolveAssaultAgentTypeId()
     {
-        Collider fenceCollider = fence.GetComponentInChildren<Collider>();
-        return fenceCollider != null ? fenceCollider.ClosestPoint(transform.position) : fence.transform.position;
+        if (string.IsNullOrEmpty(assaultAgentTypeName))
+            return -1;
+
+        for (int i = 0; i < NavMesh.GetSettingsCount(); i++)
+        {
+            int id = NavMesh.GetSettingsByIndex(i).agentTypeID;
+            if (NavMesh.GetSettingsNameFromID(id) != assaultAgentTypeName)
+                continue;
+
+            var filter = new NavMeshQueryFilter { agentTypeID = id, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(transform.position, out _, 10f, filter))
+                return id;
+
+            Debug.LogWarning($"[MutantEnemy] Agent type '{assaultAgentTypeName}' has no baked NavMesh near " +
+                             $"{name}. Bake the Mutant NavMeshSurface. Falling back to the default agent type.", this);
+            return -1;
+        }
+
+        Debug.LogWarning($"[MutantEnemy] NavMesh agent type '{assaultAgentTypeName}' not found. " +
+                         "Mutants will use the default NPC NavMesh.", this);
+        return -1;
+    }
+
+    /// <summary>
+    /// Moves the agent onto the NavMesh of <paramref name="agentTypeId"/>. Re-enables the agent so
+    /// it binds to the new mesh, then warps it to the nearest point on that mesh if needed. For
+    /// example, a mutant standing in a fence gap it just broke is off the NPC mesh, where the
+    /// fence is still baked in. Clears destination dedup so the next tick re-plans on the new mesh.
+    /// </summary>
+    private void SetAgentType(int agentTypeId)
+    {
+        if (!_agent.enabled || _agent.agentTypeID == agentTypeId)
+            return;
+
+        Vector3 position = transform.position;
+        bool wasStopped = _agent.isOnNavMesh && _agent.isStopped;
+
+        _agent.enabled = false;
+        _agent.agentTypeID = agentTypeId;
+        _agent.enabled = true;
+
+        if (!_agent.isOnNavMesh)
+        {
+            var filter = new NavMeshQueryFilter { agentTypeID = agentTypeId, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(position, out NavMeshHit hit, 3f, filter))
+                _agent.Warp(hit.position);
+        }
+
+        if (_agent.isOnNavMesh)
+            _agent.isStopped = wasStopped;
+
+        InvalidateDestination();
+    }
+
+    /// <summary>
+    /// Returns a NavMesh point on the mutant's own side of <paramref name="fence"/>, just outside
+    /// its carved gap, used as the destination when attacking a fence.
+    ///
+    /// With carving on, the fence's contact point lies inside the carved hole. Sending that point to
+    /// SetDestination made NavMesh snap it to whichever side of the fence was nearest, often the far
+    /// (target) side, so the mutant routed the long way around (through a gate) or wandered along
+    /// the fence. Pushing the point back toward the mutant and verifying it stays on the mutant's
+    /// side keeps the path complete and short. The mutant walks straight up to the panel and
+    /// ends well within attackRange of its collider.
+    /// </summary>
+    private Vector3 GetFenceApproachPoint(PerimiterFence fence, Vector3 targetPosition)
+    {
+        Vector3 self = transform.position;
+        Collider fenceCollider = GetSolidFenceCollider(fence);
+        Vector3 contact = fenceCollider != null ? fenceCollider.ClosestPoint(self) : fence.transform.position;
+
+        // Direction from the fence back toward the mutant — i.e. "our" side of the fence.
+        Vector3 away = self - contact;
+        away.y = 0f;
+        if (away.sqrMagnitude < 0.0001f)
+        {
+            away = self - targetPosition;
+            away.y = 0f;
+        }
+        if (away.sqrMagnitude < 0.0001f)
+            away = -transform.forward;
+        away.Normalize();
+
+        float radius = _agent.radius;
+        var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = _agent.areaMask };
+        float[] offsets = { radius + 0.3f, radius + 0.8f, radius + 1.5f };
+        foreach (float offset in offsets)
+        {
+            Vector3 candidate = contact + away * offset;
+            if (!NavMesh.SamplePosition(candidate, out NavMeshHit hit, 1f, filter))
+                continue;
+
+            // Reject samples that snapped across the carve onto the far side of the fence.
+            Vector3 fromContact = hit.position - contact;
+            fromContact.y = 0f;
+            if (Vector3.Dot(fromContact, away) > 0.05f)
+                return hit.position;
+        }
+
+        // Nothing valid sampled (e.g. already pressed against the carve edge) — hold position;
+        // IsFenceTargetInRange will still let the attack fire.
+        return self;
+    }
+
+    /// <summary>
+    /// Prefers a non-trigger collider on the fence so approach/contact math uses the physical
+    /// panel rather than any interaction/repair trigger volume.
+    /// </summary>
+    private static Collider GetSolidFenceCollider(PerimiterFence fence)
+    {
+        Collider fallback = null;
+        foreach (Collider col in fence.GetComponentsInChildren<Collider>())
+        {
+            if (!col.enabled) continue;
+            if (!col.isTrigger) return col;
+            if (fallback == null) fallback = col;
+        }
+        return fallback;
+    }
+
+    /// <summary>
+    /// Returns the nearest intact <see cref="PerimiterFence"/> around <paramref name="point"/>.
+    /// Used with <see cref="NavMeshAgent.pathEndPosition"/> of a partial path: with carving on,
+    /// an unreachable target's path ends at the edge of the carved gap of the fence cutting the
+    /// mutant off.
+    /// </summary>
+    private PerimiterFence FindFenceNearPoint(Vector3 point)
+    {
+        Collider[] cols = Physics.OverlapSphere(point, _agent.radius + 1.5f);
+        PerimiterFence best = null;
+        float bestSqr = float.MaxValue;
+
+        foreach (Collider col in cols)
+        {
+            PerimiterFence fence = col.GetComponentInParent<PerimiterFence>();
+            if (fence == null || !fence.IsSpawned || fence.IsPassableByMutant)
+                continue;
+
+            float sqr = (col.bounds.ClosestPoint(point) - point).sqrMagnitude;
+            if (sqr < bestSqr)
+            {
+                bestSqr = sqr;
+                best = fence;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>
@@ -1009,10 +1259,10 @@ public class MutantEnemy : NetworkBehaviour
         UpdateLookAtTarget();
 
         // ── Aggro / Fence Logic ────────────────────────────────────────────────
-        // Skipped entirely in breach charge mode — ChaseLoop's Chase branch already handles
-        // fence-smashing toward the dynamic nearest-player target every retarget tick, and this
-        // legacy block would otherwise fight it by driving the agent toward the fixed aggroTarget.
-        if (!_breachChargeMode && _isAggroed && aggroTarget != null)
+        // Skipped in breach charge mode and whenever a player is being chased — ChaseLoop's Chase
+        // branch already handles fence-smashing toward the dynamic player target every retarget
+        // tick, and this block would otherwise fight it by picking fences toward the fixed aggroTarget.
+        if (!_breachChargeMode && _currentTarget == null && _isAggroed && aggroTarget != null)
         {
             if (_fenceTarget == null)
             {
@@ -1025,6 +1275,7 @@ public class MutantEnemy : NetworkBehaviour
             {
                 // Fence broken — resume navigation toward the aggro target immediately.
                 _fenceTarget = null;
+                _forceRepathUntilTime = Time.time + FenceRecheckGraceSeconds;
                 if (_knockbackCoroutine == null)
                     _agent.isStopped = false;
                 _agent.stoppingDistance = data.stoppingDistance;

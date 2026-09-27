@@ -90,6 +90,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &8529436301037073962
 MonoBehaviour:
@@ -373,9 +374,9 @@ MonoBehaviour:
     - rid: 4332404759395303821
       type: {class: DataContainer/ObjectMeshPair, ns: BrainFailProductions.PolyFew, asm: Assembly-CSharp}
       data:
-        _Buckets: 01000000ffffffff02000000
-        _HashCodes: 4ca618005ca6180040a61800
-        _Next: ffffffffffffffff00000000
+        _Buckets: 01000000ffffffff02000000i
+        _HashCodes: 4ca618005ca6180040a61800i
+        _Next: ffffffffffffffff00000000i
         _Count: 3
         _Version: 3
         _FreeList: -1
@@ -398,15 +399,16 @@ LODGroup:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2479291965930653803}
-  serializedVersion: 2
+  serializedVersion: 3
   m_LocalReferencePoint: {x: -0.004616687, y: 0.02007236, z: -0.0070665274}
-  m_Size: 0.1526396
-  m_FadeMode: 0
-  m_AnimateCrossFading: 0
+  m_Size: 0.04427498
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
   m_LastLODIsBillboard: 0
   m_LODs:
-  - screenRelativeHeight: 0.342
-    fadeTransitionWidth: 0
+  - screenRelativeHeight: 0.04
+    fadeTransitionWidth: 0.25
     renderers:
     - renderer: {fileID: 7334369640902523764}
   m_Enabled: 1
+  m_GlobalIlluminationLOD: 0

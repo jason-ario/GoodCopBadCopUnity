@@ -77,6 +77,7 @@ public class PlayerUI : MonoBehaviour
         if (_pickupController != null)
         {
             _pickupController.OnHeldObjectChanged -= OnHeldObjectChanged;
+            _pickupController.OnHeldItemStowed -= OnHeldItemStowed;
             _pickupController = null;
         }
 
@@ -99,10 +100,14 @@ public class PlayerUI : MonoBehaviour
 
         _pickupController = PlayerInstance.Instance.PlayerPickupController;
         _pickupController.OnHeldObjectChanged += OnHeldObjectChanged;
+        _pickupController.OnHeldItemStowed += OnHeldItemStowed;
 
         // Sync immediately in case an item is already held when this UI first activates.
         OnHeldObjectChanged(_pickupController.HeldObject);
     }
+
+    // Stowing empties the hand without firing OnHeldObjectChanged, so treat it as "nothing held".
+    private void OnHeldItemStowed(PickableObject stowed) => OnHeldObjectChanged(null);
 
     private void OnHeldObjectChanged(PickableObject heldObject)
     {

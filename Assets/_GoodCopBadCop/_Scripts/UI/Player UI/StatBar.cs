@@ -31,6 +31,9 @@ public class StatBar : MonoBehaviour
     private float _previousFillAmount;
     private Coroutine _glowCoroutine;
 
+    /// <summary>Optional percentage label, exposed so subclasses can style it.</summary>
+    protected TMP_Text PercentageText => percentageText;
+
     protected virtual void OnDisable()
     {
         if (_glowCoroutine != null)

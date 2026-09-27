@@ -52,6 +52,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Stable identifier used by DailyTaskScheduler and SaveDataManager. Must match the TaskId entry in DailyTaskScheduler's pool.")]
     [SerializeField] private string _dailyTaskId = "TakeOutTrash";
 
+    [Header("Item Success Feedback")]
+    [Tooltip("2D success cue played on every client each time a deposited bag advances this task " +
+             "(same cue as a task row's sub-task progress ding). Deduplicated via TaskSuccessCue.")]
+    [SerializeField] private AudioClip _itemSuccessSfxClip;
+    [Tooltip("Volume for _itemSuccessSfxClip.")]
+    [SerializeField] private float _itemSuccessSfxVolume = 0.6f;
+
     [Header("Spawning")]
     [Tooltip("Minimum number of trash items to spawn when TriggerTask is called (inclusive).")]
     [SerializeField] private int _minSpawnCount = 8;
@@ -473,10 +480,17 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// (minimum 1) when only a single player is connected — the full range is tuned for
     /// 2 players and is excessive solo.
     /// </summary>
-    private static int RollScaledSpawnCount(int min, int max)
+    private static int RollScaledSpawnCount(int min, int max, float amountScale = 1f)
     {
+        if (!Mathf.Approximately(amountScale, 1f))
+        {
+            float scale = Mathf.Max(0f, amountScale);
+            min = Mathf.Max(1, Mathf.RoundToInt(min * scale));
+            max = Mathf.Max(min, Mathf.RoundToInt(max * scale));
+        }
+
         bool isSinglePlayer = NetworkManager.Singleton == null
-            || NetworkManager.Singleton.ConnectedClients.Count <= 1;
+            || DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) <= 1;
 
         if (isSinglePlayer)
         {
@@ -487,7 +501,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         return Random.Range(min, max + 1);
     }
 
-    public void TriggerTask(bool useGorePrefabs)
+    /// <param name="amountScale">
+    /// Multiplier applied to the rolled spawn range before the solo-player halving (e.g. Day 3
+    /// passes ~0.33 to spawn a third of the gore). 1 = unchanged.
+    /// </param>
+    public void TriggerTask(bool useGorePrefabs, float amountScale = 1f)
     {
         if (!IsServer) return;
 
@@ -509,8 +527,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         GameObject[] prefabPool = useGorePrefabs ? _goreJunkPrefabs : _trashPrefabs;
 
         int spawnCount = useGorePrefabs
-            ? RollScaledSpawnCount(_minGoreSpawnCount, _maxGoreSpawnCount)
-            : RollScaledSpawnCount(_minSpawnCount, _maxSpawnCount);
+            ? RollScaledSpawnCount(_minGoreSpawnCount, _maxGoreSpawnCount, amountScale)
+            : RollScaledSpawnCount(_minSpawnCount, _maxSpawnCount, amountScale);
         for (int i = 0; i < spawnCount; i++)
             SpawnSingleItem(prefabPool, spawnBloodDecal: useGorePrefabs);
 
@@ -816,6 +834,45 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Private ────────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Credits a tracked item that was destroyed by fire instead of being bagged (see
+    /// <see cref="JunkItem.BurnAwayServer"/>). A burned item never reaches a dumpster, so it is
+    /// counted as disposed immediately: removed from tracking and +1 deposited, with the same
+    /// success cue / completion path as a bag deposit. Items not required by this run (outside
+    /// the checkpoint, or no active task) are simply ignored — burning them is allowed but never
+    /// moves the objective. Must be called BEFORE the item is despawned. Server-only.
+    /// </summary>
+    public void CreditBurnedJunkItem(NetworkObject netObj)
+    {
+        if (!IsServer || netObj == null || !_taskActive)
+            return;
+
+        // Non-short-circuiting '|' so the item is removed from BOTH tracking lists.
+        bool wasTracked = _spawnedItems.Remove(netObj) | _countedExistingItems.Remove(netObj);
+        _itemPlacements.Remove(netObj);
+        if (!wasTracked)
+            return;
+
+        if (netObj.TryGetComponent(out JunkItem junk))
+        {
+            junk.SetTaskRequired(false);
+            junk.SetTutorialHighlight(false);
+        }
+
+        int previousDeposited = _depositedCount.Value;
+        _depositedCount.Value = Mathf.Min(_depositedCount.Value + 1, _totalCount.Value);
+        UpdateThreatLevel();
+
+        Debug.Log($"[TakeOutTrashTask] Task item '{netObj.name}' burned away — " +
+                  $"{_depositedCount.Value}/{_totalCount.Value}");
+
+        if (_depositedCount.Value > previousDeposited)
+            PlayItemSuccessSfxClientRpc(_depositedCount.Value >= _totalCount.Value);
+
+        if (_depositedCount.Value >= _totalCount.Value)
+            CompleteTask();
+    }
+
+    /// <summary>
     /// Called on the server when a TrashBag is deposited in a dumpster.
     /// Increments the deposited count by the number of junk items the bag contained.
     /// When all items are deposited, fires <see cref="OnAllItemsDeposited"/> and removes
@@ -835,10 +892,15 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _pendingBonusCollected -= uncounted;
         int counted = junkCount - uncounted;
 
+        int previousDeposited = _depositedCount.Value;
         _depositedCount.Value = Mathf.Min(_depositedCount.Value + counted, _totalCount.Value);
         Debug.Log($"[TakeOutTrashTask] {junkCount} item(s) deposited ({counted} task item(s), " +
                   $"{uncounted} outside the checkpoint). Total deposited: " +
                   $"{_depositedCount.Value}/{_totalCount.Value}");
+
+        // One cue per deposit that actually advanced the task (a bag is the unit of work here).
+        if (_depositedCount.Value > previousDeposited)
+            PlayItemSuccessSfxClientRpc(_depositedCount.Value >= _totalCount.Value);
 
         if (_depositedCount.Value < _totalCount.Value) return;
 
@@ -885,6 +947,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         OnAllItemsDeposited?.Invoke();
         OnDailyTaskCompleted?.Invoke();
     }
+
+    /// <summary>Per-item success cue on every client; see <see cref="TaskSuccessCue.PlayCleanupItemCue"/>.</summary>
+    [ClientRpc]
+    private void PlayItemSuccessSfxClientRpc(bool completesTask) =>
+        TaskSuccessCue.PlayCleanupItemCue(this, _itemSuccessSfxClip, _itemSuccessSfxVolume, completesTask);
 
     /// <summary>
     /// Explicitly (re-)adds this task to <see cref="TaskRegistry"/> on every client. Called

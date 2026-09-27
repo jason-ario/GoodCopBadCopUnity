@@ -28,12 +28,12 @@ MonoBehaviour:
   dailyInfectionProgression: {x: 12, y: 28}
   alterEgoName: The Masked Lady
   basePersonalityDescriptors:
-  - "Occupation is unclear \u2014 she says accountant, or possibly mortician, depending on when you ask. She is never direct about it."
-  - Never removes the mask. Claims it is because of the scars. That is what she says.
-  - "Seductive and flirtatious in a way that feels deliberate \u2014 charm as a calculated tool, not a natural habit."
-  - Will attempt to bribe you if the questioning gets too specific. The offer is always surprisingly reasonable.
-  - No recorded family. No next of kin, no mentions, no trace. She arrived in this district fully formed.
-  normalBehaviorNotes: "In her base state Nini presents with controlled, deliberate charm. She is unhurried and seductive in a way that suggests she is used to getting what she wants through social leverage rather than direct pressure. The mask is always present; she addresses it before you can. Watch for the moment the charm tips into something cooler \u2014 particularly around questions about occupation, identity, or the scars. The bribe reflex is the clearest tell: when it surfaces, she has hit something she cannot talk around."
+  - Artist. Paints and sketches in charcoal; her hands are never clean of it.
+  - "Blunt and mysterious \u2014 short, direct answers, rarely volunteers anything about herself."
+  - Has a managed medical condition. Her caretaker Tamar checks on her every morning.
+  - Obsessed with the changing light since the dust began falling. Treats the decay as a subject to capture.
+  - Keeps her documents inside her sketchbook, separate from the charcoal pages.
+  normalBehaviorNotes: "In her base state Nini is blunt and hard to read. She answers exactly what is asked and nothing more, then drifts back to studying the light, the booth, or your face as a subject. Charcoal and paint on her hands are constant; she explains them before you can. She has a managed medical condition and a caretaker, Tamar, who checks on her in the mornings. Watch for the moment her detachment becomes obsession \u2014 when she stops answering questions and starts describing colours."
   fullMutantDialogue: {fileID: 11400000, guid: fc589bf86ac28314cb9dd57b94362e9a, type: 2}
   replacementIDPhoto: {fileID: 0}
   IDPhoto: {fileID: 2800000, guid: 0a1d83fdb3fe4574990eee09aeaac946, type: 3}
@@ -59,7 +59,7 @@ MonoBehaviour:
     midDaysReasons:
     - Returning to a studio that lost its roof in the storm.
     - Meeting a gallery owner who fled the city last month.
-    - Painting a mural on the side of a falling skyscraper.
+    - Painting a mural on the side of the collapsed water tower.
     finalDaysReasons:
     - Going home to paint the windows so the dark can't see in.
     - To find a brush made from the hair of a ghost.
@@ -137,36 +137,26 @@ MonoBehaviour:
   - {fileID: 8300000, guid: bfd7b8f10cde49945a5818767c69d3de, type: 3}
   introDialogue: {fileID: 11400000, guid: 049dc9e9130a49640a3f8a9e8eca4577, type: 2}
   questionResponses:
-  - question: Before you sat down across from me, where had you been?
-    earlyDaysAnswer: The pharmacy. I picked up my prescription.
-    midDaysAnswer: The pharmacy ran out. I went to three others.
-    finalDaysAnswer: I was trying to find somewhere quiet. It's hard lately.
-    mismatchEarlyDaysAnswer: My studio. I've been painting for three days without stopping. The light keeps changing and I can't let it get away.
-    mismatchMidDaysAnswer: The pharmacy. First one I tried, still fully stocked. Easy. Everything's fine there. No issue at all.
-    mismatchFinalDaysAnswer: My studio. I haven't left in a week. The canvas is almost done. I need to finish it before the colours stop.
+  - question: Where are you coming from?
+    earlyDaysAnswer: The pharmacy. My prescription. Then the gallery storeroom. Does it matter which first?
+    midDaysAnswer: Three pharmacies. The first two were empty. The third had half my prescription. Half will do.
+    finalDaysAnswer: The roof above my studio. The light is dying, and I seem to be the only one recording it.
+    mismatchEarlyDaysAnswer: The textile factory. Night shift on the looms. Painting never paid, so I gave it up.
+    mismatchMidDaysAnswer: The pharmacy. Aspirin for a neighbour. I have never needed a prescription in my life.
+    mismatchFinalDaysAnswer: The train station. I only arrived in this district this morning. Charming place.
     uncannyEarlyDaysAnswer: Somewhere. It is not relevant.
     uncannyMidDaysAnswer: I do not remember exactly. The walk was long.
     uncannyFinalDaysAnswer: She considers the question for too long. I do not know.
-  - question: Who's currently sharing your home?
-    earlyDaysAnswer: My caretaker, Tamar. She comes every morning.
-    midDaysAnswer: Just me now. Tamar stopped coming. I manage on my own.
-    finalDaysAnswer: No one. I'm used to it.
-    mismatchEarlyDaysAnswer: Alone. I've never had a caretaker. I don't need one. The work keeps me grounded.
-    mismatchMidDaysAnswer: Tamar and her cousin. We've got quite a full place at the moment actually. Very lively.
-    mismatchFinalDaysAnswer: Tamar. She came again this morning. Like always. Everything is exactly the same as it was.
-    uncannyEarlyDaysAnswer: No one.
-    uncannyMidDaysAnswer: No one. There is no one.
+  - question: Are you experiencing any symptoms?
+    earlyDaysAnswer: I have a condition. It's managed. Tamar sees to it in the mornings. That is all you need to know.
+    midDaysAnswer: The pills are harder to find. My hands tremble a little without them. The charcoal hides it.
+    finalDaysAnswer: I'm tired, and the colours hurt my eyes some mornings. I work through it. There isn't much time.
+    mismatchEarlyDaysAnswer: Nothing. I've never had a condition, and no one has ever needed to check on me.
+    mismatchMidDaysAnswer: None. And my hands are clean, look. I never touch charcoal. It ruins the skin.
+    mismatchFinalDaysAnswer: My eyes? Perfect. I haven't painted in years, so nothing strains them.
+    uncannyEarlyDaysAnswer: No symptoms. There is nothing left to be symptomatic of.
+    uncannyMidDaysAnswer: I used to feel cold. I do not anymore. Write that down, if you must.
     uncannyFinalDaysAnswer: She tilts her head slightly. I do not think that question applies anymore.
-  - question: What exactly do you do for work?
-    earlyDaysAnswer: I paint, mostly. I also keep the books for a small gallery downtown, when they need the extra hands.
-    midDaysAnswer: It changes by the week, if I'm honest. Painting, some accounting. Does it matter which?
-    finalDaysAnswer: Does it matter anymore? I could make this very easy for both of us, if you'd rather not ask.
-    mismatchEarlyDaysAnswer: Accounting. Strictly accounting. I've never touched a paintbrush in my life.
-    mismatchMidDaysAnswer: The mortuary, actually. Cataloguing. Very precise work, if unglamorous.
-    mismatchFinalDaysAnswer: I don't work. I've never needed to. Let's not discuss it further.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
   idleBarks:
     earlyDays:
     - The shadow your booth makes at this hour is really quite striking. I keep meaning to sketch it.

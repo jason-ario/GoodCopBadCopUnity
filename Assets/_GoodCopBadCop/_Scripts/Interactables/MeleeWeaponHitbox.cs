@@ -79,6 +79,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         Suspect     = 3,
         Player      = 4,
         Glass       = 5,
+        Prop        = 6,
     }
 
     public override void OnNetworkSpawn()
@@ -115,7 +116,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         // reads as coming from the weapon making contact, not from the target's geometry.
         Vector3 effectOrigin = _hitEffectSpawnPoint != null ? _hitEffectSpawnPoint.position : attackOrigin;
 
-        if (kind == HitKind.Environment)
+        if (kind == HitKind.Environment || kind == HitKind.Prop)
         {
             SpawnHitEffect(_environmentHitEffectPrefab, effectOrigin);
             OnEnvironmentHit?.Invoke();
@@ -124,6 +125,17 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         {
             SpawnHitEffect(_hitEffectPrefab, effectOrigin);
             OnHit?.Invoke();
+        }
+
+        if (kind == HitKind.Prop)
+        {
+            // Cosmetic prop reaction: play instantly here, then relay so other clients see it too.
+            Vector3 swingDirection = hitPoint - attackOrigin;
+            HittableProp.TryHitAt(hitPoint, swingDirection);
+
+            if (IsServer) RelayPropHit(hitPoint, swingDirection, NetworkManager.Singleton.LocalClientId);
+            else          ReportPropHitServerRpc(hitPoint, swingDirection);
+            return;
         }
 
         if (kind == HitKind.None || kind == HitKind.Environment)
@@ -163,6 +175,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
         bool anyNonSelfHit = false;
         Vector3 firstNonSelfHitPosition = attackOrigin;
+        bool propHit = false;
+        Vector3 propHitPosition = attackOrigin;
 
         for (int i = 0; i < hitCount; i++)
         {
@@ -230,6 +244,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);
             }
 
+            // Cosmetic hittable props (signs etc.) outrank plain geometry but not live targets,
+            // so they are only chosen after the loop if nothing more important was found.
+            if (!propHit && !col.isTrigger && col.GetComponentInParent<HittableProp>() != null)
+            {
+                propHit = true;
+                propHitPosition = col.ClosestPoint(attackOrigin);
+            }
+
             // Breakable glass is a plain MonoBehaviour singleton, so there is no NetworkObject to
             // send — the server resolves it through BreakableGlassController.Instance, exactly as
             // the existing visual ClientRpcs below already do.
@@ -239,6 +261,12 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 hitPoint = col.ClosestPoint(attackOrigin);
                 return HitKind.Glass;
             }
+        }
+
+        if (propHit)
+        {
+            hitPoint = propHitPosition;
+            return HitKind.Prop;
         }
 
         if (anyNonSelfHit)
@@ -340,6 +368,29 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         }
     }
 
+    /// <summary>Server-side relay of a cosmetic <see cref="HittableProp"/> hit to every other client.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ReportPropHitServerRpc(Vector3 hitPoint, Vector3 direction, ServerRpcParams rpcParams = default)
+    {
+        RelayPropHit(hitPoint, direction, rpcParams.Receive.SenderClientId);
+    }
+
+    private void RelayPropHit(Vector3 hitPoint, Vector3 direction, ulong senderClientId)
+    {
+        if (!IsServer) return;
+
+        List<ulong> targets = new List<ulong>();
+        foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
+            if (id != senderClientId) targets.Add(id);
+
+        if (targets.Count == 0) return;
+
+        PropHitClientRpc(hitPoint, direction, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = targets }
+        });
+    }
+
     /// <summary>Resolves a component on a reported target, tolerating it living on a child of the NetworkObject.</summary>
     private static T FindOn<T>(NetworkObject netObj) where T : Component
     {
@@ -368,6 +419,13 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     private void SmashGlassClientRpc()
     {
         BreakableGlassController.Instance?.ApplySmash();
+    }
+
+    /// <summary>Replays a cosmetic <see cref="HittableProp"/> reaction on non-swinging clients.</summary>
+    [ClientRpc]
+    private void PropHitClientRpc(Vector3 hitPoint, Vector3 direction, ClientRpcParams clientRpcParams = default)
+    {
+        HittableProp.TryHitAt(hitPoint, direction);
     }
 
 

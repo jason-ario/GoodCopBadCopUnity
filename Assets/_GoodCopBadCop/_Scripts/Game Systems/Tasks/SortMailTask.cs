@@ -94,6 +94,9 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
              "with a pooled TutorialMarker arrow (see TutorialMarkerManager) so players know where to go " +
              "to let the truck through. Both are cleared as soon as the gate opens (NotifyShipmentGateOpened).")]
     [SerializeField] private GateButtonInteractable _gateButtonInteractable;
+    [Tooltip("Task-list label registered in TaskRegistry while the delivery truck is waiting at the " +
+             "closed checkpoint gate. Completed (removed) as soon as the gate opens.")]
+    [SerializeField] private string _openGateTaskName = "Open the gate for a shipment";
 
     [Header("Goods Categories")]
     [Tooltip("The full pool of goods categories that can appear on packages. Every delivery, " +
@@ -120,6 +123,16 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     private readonly NetworkVariable<bool> _isActive = new(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// True while the delivery truck is stopped at the closed checkpoint gate waiting for a player
+    /// to open it. Drives the "Open the gate for a shipment" task row on every client — replicated
+    /// (rather than ClientRpc-only) so late joiners still see the pending task.
+    /// </summary>
+    private readonly NetworkVariable<bool> _shipmentWaitingAtGate = new(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private OpenGateForShipmentTask _openGateTask;
 
     /// <summary>Today's randomly-chosen prohibited goods categories, replicated to all clients so
     /// the prohibited-goods sign (and the delivery alert) can display them.</summary>
@@ -280,7 +293,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (_taskActive)
         {
             ShiftManager.Instance?.RegisterPendingDailyTask(this);
-            MailCubbyManager.Instance?.HighlightDeliveryDestinations();
         }
     }
 
@@ -338,9 +350,13 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _sortedCount.OnValueChanged += OnNetworkValueChanged;
         _totalCount.OnValueChanged  += OnNetworkValueChanged;
         _isActive.OnValueChanged    += OnIsActiveChanged;
+        _shipmentWaitingAtGate.OnValueChanged += OnShipmentWaitingAtGateChanged;
 
         if (_isActive.Value)
             TaskRegistry.Instance?.AddThreat(this);
+
+        if (_shipmentWaitingAtGate.Value)
+            TaskRegistry.Instance?.AddThreat(OpenGateTask);
     }
 
     public override void OnNetworkDespawn()
@@ -349,6 +365,21 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         _sortedCount.OnValueChanged -= OnNetworkValueChanged;
         _totalCount.OnValueChanged  -= OnNetworkValueChanged;
         _isActive.OnValueChanged    -= OnIsActiveChanged;
+        _shipmentWaitingAtGate.OnValueChanged -= OnShipmentWaitingAtGateChanged;
+
+        if (_openGateTask != null)
+            TaskRegistry.Instance?.RemoveThreat(_openGateTask);
+    }
+
+    private OpenGateForShipmentTask OpenGateTask =>
+        _openGateTask ??= new OpenGateForShipmentTask(_openGateTaskName);
+
+    private void OnShipmentWaitingAtGateChanged(bool previous, bool current)
+    {
+        if (current)
+            TaskRegistry.Instance?.AddThreat(OpenGateTask);
+        else
+            TaskRegistry.Instance?.RemoveThreat(OpenGateTask);
     }
 
     private void OnDestroy()
@@ -586,7 +617,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         ShiftManager.Instance?.RegisterPendingDailyTask(this);
 
         NotifyDeliveryAlertClientRpc();
-        MailCubbyManager.Instance?.HighlightDeliveryDestinations();
 
         OnMailDelivered?.Invoke();
 
@@ -627,12 +657,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer) return;
         if (package == null || package.IsResolved) return;
-
-        // The destination call-out has done its job as soon as any package is placed in a cubby
-        // or the confiscate mail bin, even if the package turns out to be incorrect and bounces
-        // back out. Individual unresolved packages remain highlighted until they are sorted.
-        if (binType == MailSortBinType.Delivery || binType == MailSortBinType.Confiscate)
-            MailCubbyManager.Instance?.ClearDeliveryDestinationHighlights();
 
         SuspectData slotResident = binType == MailSortBinType.Delivery
             ? MailCubbyManager.Instance?.ResolveResident(slotResidentPoolIndex)
@@ -891,6 +915,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public void NotifyShipmentWaitingAtGate()
     {
         if (!IsServer) return;
+        _shipmentWaitingAtGate.Value = true;
         NotifyShipmentWaitingAtGateClientRpc();
     }
 
@@ -911,6 +936,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public void NotifyShipmentGateOpened()
     {
         if (!IsServer) return;
+        _shipmentWaitingAtGate.Value = false;
         NotifyShipmentGateOpenedClientRpc();
     }
 
@@ -938,5 +964,22 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [ClientRpc]
     private void NotifyDeliveryAlertClientRpc()
     {
+    }
+
+    /// <summary>
+    /// Lightweight <see cref="ISystemicThreat"/> task-list entry for "Open the gate for a shipment".
+    /// Registered/removed in <see cref="TaskRegistry"/> by <see cref="OnShipmentWaitingAtGateChanged"/>
+    /// on every peer; its lifetime is owned by the replicated <see cref="_shipmentWaitingAtGate"/> flag.
+    /// </summary>
+    private sealed class OpenGateForShipmentTask : ISystemicThreat
+    {
+        public OpenGateForShipmentTask(string name) => ThreatName = name;
+
+        public string ThreatName { get; }
+        public string ThreatDescription => string.Empty;
+        public float ThreatLevel => 0f;
+        public float ScoreWeight => 0f;
+        public void BeginNightPhase() { }
+        public void EndNightPhase() { }
     }
 }

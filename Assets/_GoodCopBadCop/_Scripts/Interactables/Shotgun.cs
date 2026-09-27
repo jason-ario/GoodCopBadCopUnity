@@ -13,8 +13,8 @@ using UnityEngine;
 /// "Shoot" animation trigger. Firing is blocked when <see cref="_roundsRemaining"/> reaches
 /// zero — a dry-fire click sound plays instead.
 ///
-/// E while holding a <see cref="ShotgunAmmo"/> box refills shells to <see cref="MaxRounds"/>
-/// and consumes (despawns) the box.
+/// R (while held) reloads shells from the holder's <see cref="PlayerAmmoReserve"/>.
+/// Ammo enters the reserve by left-clicking a held <see cref="ShotgunAmmo"/> box.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
@@ -109,9 +109,6 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     {
         UpdateInteractText(current);
         OnAmmoChanged?.Invoke();
-
-        if (current > previous && _reloadSound != null)
-            SFXController.Instance.PlayAtPosition(_reloadSound, transform.position);
     }
 
     private void UpdateInteractText(int rounds)
@@ -401,187 +398,53 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         BreakableGlassController.Instance?.ApplySmash();
     }
 
-    // ── Reloading ─────────────────────────────────────────────────────────────
+    // ── Reloading (KeyCode.R, from PlayerAmmoReserve) ──────────────────────────
+
+    public AmmoType ReserveAmmoType => AmmoType.Shotgun;
 
     /// <summary>
-    /// Called when the player presses E while targeting the shotgun.
-    /// Delegates to <see cref="TryReload"/> so both E and LMB share the same path.
+    /// Called by <see cref="PlayerInventory"/> when the local player presses R with this shotgun
+    /// equipped. Skips the round-trip when the tube is full or the local reserve is empty.
     /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player)
-        => TryReload(player);
-
-    /// <summary>
-    /// Called when the player LMB-clicks the shotgun while holding a compatible item
-    /// (i.e. <see cref="ShotgunAmmo"/> is listed in <c>itemsThatCanInteractWith</c>).
-    /// Delegates to <see cref="TryReload"/> so both E and LMB share the same path.
-    /// </summary>
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
+    public void RequestReloadFromReserve()
     {
-        base.InteractWithItem(playerInteractionController, item);
-        TryReload(playerInteractionController);
-    }
-
-    /// <summary>
-    /// Validates that the player is holding a <see cref="ShotgunAmmo"/> box and the shotgun
-    /// has room for more shells, then sends <see cref="ReloadServerRpc"/>.
-    /// </summary>
-    private void TryReload(PlayerInteractionController player)
-    {
-        if (player.pickupController.HeldObject is not ShotgunAmmo) return;
         if (_roundsRemaining.Value >= MaxRounds) return;
 
-        ReloadServerRpc();
+        PlayerAmmoReserve reserve = PlayerAmmoReserve.Local;
+        if (reserve != null && reserve.Get(ReserveAmmoType) <= 0) return;
+
+        ReloadFromReserveServerRpc();
     }
 
     /// <summary>
-    /// Validates server-side that the requesting player is holding a <see cref="ShotgunAmmo"/>
-    /// box and the shotgun is not already full. On success, transfers only the shells needed
-    /// to reach <see cref="MaxRounds"/> from the box. If the box reaches zero it is despawned
-    /// via <see cref="ConsumeAmmoClientRpc"/>; otherwise it stays equipped with the updated count.
-    /// RequireOwnership = false so any client can reload the shotgun regardless of who holds it.
+    /// Server: validates the sender is holding this shotgun, then moves only the shells needed to
+    /// reach <see cref="MaxRounds"/> from their <see cref="PlayerAmmoReserve"/> into the shotgun.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void ReloadServerRpc(ServerRpcParams rpcParams = default)
+    private void ReloadFromReserveServerRpc(ServerRpcParams rpcParams = default)
     {
         ulong clientId = rpcParams.Receive.SenderClientId;
-
-        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
+        if (!PlayerAmmoReserve.TryGetForHolder(clientId, NetworkObject, out PlayerAmmoReserve reserve))
         {
-            Debug.LogWarning($"[Shotgun] ReloadServerRpc: client {clientId} not found.");
+            Debug.LogWarning($"[Shotgun] ReloadFromReserveServerRpc: client {clientId} is not holding this shotgun.");
             return;
         }
-
-        PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        if (ppc == null || !ppc.HeldObjectRef.TryGet(out NetworkObject heldNetObj)
-            || heldNetObj.GetComponent<ShotgunAmmo>() is not ShotgunAmmo ammo)
-        {
-            Debug.LogWarning($"[Shotgun] ReloadServerRpc: client {clientId} is not holding ShotgunAmmo.");
-            return;
-        }
-
-        if (_roundsRemaining.Value >= MaxRounds) return;
 
         int needed = MaxRounds - _roundsRemaining.Value;
-        int transferred = ammo.ConsumeRounds(needed);
-        _roundsRemaining.Value += transferred;
+        if (needed <= 0) return;
 
-        // Only despawn the box when it has been fully emptied.
-        if (ammo.RoundsInClip <= 0)
-        {
-            ConsumeAmmoClientRpc(new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
-            });
-        }
+        int taken = reserve.Take(ReserveAmmoType, needed);
+        if (taken <= 0) return;
+
+        _roundsRemaining.Value += taken;
+        PlayReloadSoundClientRpc();
     }
 
-    /// <summary>
-    /// Received only by the player who triggered the reload.
-    /// Calls <see cref="PlayerPickupController.DestroyEquippedItem"/> which unequips the box
-    /// from all arm containers, releases the holder, and despawns the NetworkObject.
-    /// </summary>
+    /// <summary>Plays the reload sound at the shotgun on every client after a successful reload.</summary>
     [ClientRpc]
-    private void ConsumeAmmoClientRpc(ClientRpcParams clientRpcParams = default)
+    private void PlayReloadSoundClientRpc()
     {
-        PlayerPickupController ppc = NetworkManager.Singleton.LocalClient?.PlayerObject
-            ?.GetComponent<PlayerPickupController>();
-
-        if (ppc == null)
-        {
-            Debug.LogWarning("[Shotgun] ConsumeAmmoClientRpc: could not find local PlayerPickupController.");
-            return;
-        }
-
-        ppc.DestroyEquippedItem();
-    }
-
-    // ── Reloading from inventory (KeyCode.R) ────────────────────────────────────
-
-    /// <summary>Returns true if <paramref name="candidate"/> is a <see cref="ShotgunAmmo"/> box.</summary>
-    public bool IsCompatibleAmmo(PickableObject candidate) => candidate is ShotgunAmmo;
-
-    /// <summary>
-    /// Called by <see cref="PlayerInventory"/> when the local player presses R while this shotgun
-    /// is equipped and a <see cref="ShotgunAmmo"/> box sits in the other inventory slot (not held).
-    /// </summary>
-    public void ReloadFromInventory(PickableObject ammoItem)
-    {
-        if (ammoItem is not ShotgunAmmo ammo) return;
-        if (_roundsRemaining.Value >= MaxRounds) return;
-        if (!ammo.TryGetComponent(out NetworkObject ammoNetObj)) return;
-
-        ReloadFromInventoryServerRpc(new NetworkObjectReference(ammoNetObj));
-    }
-
-    /// <summary>
-    /// Validates server-side that the requesting client owns both this shotgun (currently holds it)
-    /// and the referenced <see cref="ShotgunAmmo"/> box (it sits somewhere in their inventory),
-    /// then transfers shells exactly like <see cref="ReloadServerRpc"/> — except the box is never
-    /// brought to hand. If the box empties, <see cref="ConsumeInventoryAmmoClientRpc"/> tells the
-    /// owning client to clear its inventory slot and despawn the box.
-    /// RequireOwnership = false so any client can request this for their own shotgun/ammo.
-    /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    private void ReloadFromInventoryServerRpc(NetworkObjectReference ammoRef, ServerRpcParams rpcParams = default)
-    {
-        ulong clientId = rpcParams.Receive.SenderClientId;
-
-        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
-        {
-            Debug.LogWarning($"[Shotgun] ReloadFromInventoryServerRpc: client {clientId} not found.");
-            return;
-        }
-
-        // Only the client actually holding this shotgun may reload it.
-        PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        if (ppc == null || !ppc.HeldObjectRef.TryGet(out NetworkObject heldWeaponObj) || heldWeaponObj != NetworkObject)
-        {
-            Debug.LogWarning($"[Shotgun] ReloadFromInventoryServerRpc: client {clientId} is not holding this shotgun.");
-            return;
-        }
-
-        if (!ammoRef.TryGet(out NetworkObject ammoNetObj) || ammoNetObj.GetComponent<ShotgunAmmo>() is not ShotgunAmmo ammo)
-        {
-            Debug.LogWarning($"[Shotgun] ReloadFromInventoryServerRpc: client {clientId}'s ammo reference is invalid.");
-            return;
-        }
-
-        // The box must actually belong to the requesting client (i.e. sit in their inventory).
-        if (ammoNetObj.OwnerClientId != clientId) return;
-        if (_roundsRemaining.Value >= MaxRounds) return;
-
-        int needed = MaxRounds - _roundsRemaining.Value;
-        int transferred = ammo.ConsumeRounds(needed);
-        _roundsRemaining.Value += transferred;
-
-        // Only despawn the box when it has been fully emptied.
-        if (ammo.RoundsInClip <= 0)
-        {
-            ConsumeInventoryAmmoClientRpc(ammoRef, new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
-            });
-        }
-    }
-
-    /// <summary>
-    /// Received only by the player who triggered the inventory reload. Removes the now-empty
-    /// box from their <see cref="PlayerInventory"/> slot (so the UI clears immediately), then
-    /// asks the server to despawn it — mirroring <see cref="ConsumeAmmoClientRpc"/>'s ordering
-    /// for the held-box path.
-    /// </summary>
-    [ClientRpc]
-    private void ConsumeInventoryAmmoClientRpc(NetworkObjectReference ammoRef, ClientRpcParams clientRpcParams = default)
-    {
-        if (!ammoRef.TryGet(out NetworkObject ammoNetObj)) return;
-
-        PickableObject ammoItem = ammoNetObj.GetComponent<PickableObject>();
-        if (ammoItem == null) return;
-
-        PlayerInventory inventory = NetworkManager.Singleton.LocalClient?.PlayerObject
-            ?.GetComponent<PlayerInventory>();
-        inventory?.ClearSlotForItem(ammoItem);
-
-        ammoItem.DespawnServerRpc();
+        if (_reloadSound != null)
+            SFXController.Instance.PlayAtPosition(_reloadSound, transform.position);
     }
 }

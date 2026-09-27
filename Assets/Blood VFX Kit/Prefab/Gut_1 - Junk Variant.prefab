@@ -236,7 +236,7 @@ MonoBehaviour:
   glowMagicNumber1: 0.75
   glowMagicNumber2: 0.5
   glowAnimationSpeed: 1
-  glowVisibility: 1
+  glowVisibility: 0
   glowBlitDebug: 0
   glowBlendPasses: 1
   glowPasses:
@@ -407,6 +407,8 @@ MonoBehaviour:
   interactText: 
   highlightNameFilter: 
   _destroyOnCollect: 1
+  _kickable: 1
+  _burnable: 1
 --- !u!54 &8651684930882145798
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -415,9 +417,9 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6381761863012390672}
   serializedVersion: 5
-  m_Mass: 1
+  m_Mass: 2
   m_LinearDamping: 0
-  m_AngularDamping: 0.05
+  m_AngularDamping: 1.5
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}

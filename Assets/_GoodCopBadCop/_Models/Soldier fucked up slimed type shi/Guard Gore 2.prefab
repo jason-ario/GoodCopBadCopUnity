@@ -592,7 +592,7 @@ MonoBehaviour:
   glowMagicNumber1: 0.75
   glowMagicNumber2: 0.5
   glowAnimationSpeed: 1
-  glowVisibility: 1
+  glowVisibility: 0
   glowBlitDebug: 0
   glowBlendPasses: 1
   glowPasses:
@@ -732,10 +732,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 612391871
   InScenePlacedSourceGlobalObjectIdHash: 612391871
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -761,6 +763,8 @@ MonoBehaviour:
   interactText: 
   highlightNameFilter: 
   _destroyOnCollect: 1
+  _kickable: 1
+  _burnable: 1
 --- !u!54 &6626990666576683456
 Rigidbody:
   m_ObjectHideFlags: 0

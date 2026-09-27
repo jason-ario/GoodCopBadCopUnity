@@ -24,6 +24,7 @@ public class WorkdaySaveState
     public int SuspectsKilledCorrect;
     public int SuspectsKilledWrong;
     public int SuspectsFled;
+    public ShiftSubjectResult[] SubjectResults = Array.Empty<ShiftSubjectResult>();
     public int SuspectIndex;
     public int Cash;
     public PickableObjectSaveData[] Pickables = Array.Empty<PickableObjectSaveData>();

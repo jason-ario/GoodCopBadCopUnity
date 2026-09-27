@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 
 public class InkStampPickup : PickableObject
@@ -9,22 +8,15 @@ public class InkStampPickup : PickableObject
     public override bool IsPersistedInSave => false;
 
     /// <summary>
-    /// The stamp is only ever grabbed through its <see cref="InkStamp"/> slot. SetReleased re-enables
-    /// colliders on every holder release (including the remote NV update), which would let the pickup
-    /// steal the interaction raycast from the slot. Re-apply the networked lock whenever it is released
-    /// and manual pickup is disallowed on this machine.
+    /// The stamp itself is never a target for anyone. It is only grabbed and returned through
+    /// its <see cref="InkStamp"/> holder, which calls PlayerPickupController.PickUpObject directly.
+    /// Decided here rather than by collider state, which network holder callbacks re-enable.
     /// </summary>
-    protected override void OnHolderCollidersRefreshed(bool isHeld)
-    {
-        if (!isHeld && !CanPickUpManually)
-            ApplyNetworkInteractableState();
-    }
+    public override bool IsInteractable => false;
 
-    /// <summary>Same re-lock for the local drop path, which calls SetReleased before the NV round-trip.</summary>
-    public override void OnDropped()
-    {
-        base.OnDropped();
-        if (!CanPickUpManually)
-            ApplyNetworkInteractableState();
-    }
+    /// <summary>Lets the interaction ray pass through the stamp to reach its holder.</summary>
+    public override bool PassesInteractionRayThrough => true;
+
+    /// <summary>Hover highlighting never applies to the stamp itself.</summary>
+    public override void Highlight(bool highlight) => base.Highlight(false);
 }

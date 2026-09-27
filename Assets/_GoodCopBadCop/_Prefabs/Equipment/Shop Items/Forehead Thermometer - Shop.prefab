@@ -10,7 +10,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1550240546513982533, guid: d4e44569847d22f469779885bd0c4dd2, type: 3}
       propertyPath: rmsCount
-      value: 11
+      value: 12
       objectReference: {fileID: 0}
     - target: {fileID: 6477122283606438389, guid: d4e44569847d22f469779885bd0c4dd2, type: 3}
       propertyPath: GlobalObjectIdHash
@@ -108,12 +108,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3111877131
+  GlobalObjectIdHash: 3568171224
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 1
   SpawnWithObservers: 1
@@ -135,7 +137,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ShopItem
   name: Thermometer
   pickableItemData: {fileID: 11400000, guid: 59ad8970a01f44f448b5b74b3878a49b, type: 2}
-  price: 0
+  price: 50
   rotationOffset: {x: 0, y: 0, z: 0}
   customPurchaseAction: {fileID: 0}
   _unlockedByDefault: 1
+  _requiredAnomalyTypeName: 

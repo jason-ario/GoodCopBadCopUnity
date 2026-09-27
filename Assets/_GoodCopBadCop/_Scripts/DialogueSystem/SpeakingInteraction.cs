@@ -12,8 +12,42 @@ using UnityEngine;
 public class SpeakingInteraction : NetworkBehaviour
 {
     [Header("Speaker Identity")]
+    [Tooltip("Fallback subtitle name. Ignored when a SuspectData (on this component or on the sibling " +
+             "SuspectCharacter) provides a FirstName/LastName.")]
     [SerializeField] private string speakerName = "Character";
-    public string SpeakerName => speakerName;
+
+    /// <summary>
+    /// Subtitle / dialogue-history name for this speaker. Pulled from the assigned
+    /// <see cref="SuspectData"/> (this component's, else the sibling <see cref="SuspectCharacter.Data"/>)
+    /// as "FirstName LastName"; falls back to the serialized <see cref="speakerName"/>.
+    /// </summary>
+    public string SpeakerName
+    {
+        get
+        {
+            SuspectData data = suspectData;
+            if (data == null)
+            {
+                if (!_suspectCharacterResolved)
+                {
+                    _suspectCharacter = GetComponent<SuspectCharacter>();
+                    _suspectCharacterResolved = true;
+                }
+                if (_suspectCharacter != null) data = _suspectCharacter.Data;
+            }
+
+            if (data != null)
+            {
+                string full = $"{data.FirstName} {data.LastName}".Trim();
+                if (!string.IsNullOrEmpty(full)) return full;
+            }
+
+            return speakerName;
+        }
+    }
+
+    private SuspectCharacter _suspectCharacter;
+    private bool _suspectCharacterResolved;
 
     [Header("Voice")]
     [SerializeField] private AudioClip[] voiceAudioClips;
@@ -224,7 +258,7 @@ public class SpeakingInteraction : NetworkBehaviour
         // Barks/one-off lines have no participant set: only players within overhear range
         // of this speaker see the subtitle. Audio still plays (it is spatialized).
         if (OverhearRange.IsLocalPlayerWithin(transform))
-            DialogueManager.Instance.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory, waitForInput);
+            DialogueManager.Instance.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory, waitForInput);
         else if (clearHistory)
             DialogueManager.Instance.ClearHistory();
 
@@ -278,7 +312,7 @@ public class SpeakingInteraction : NetworkBehaviour
 
         if (isEngagedPlayer)
         {
-            DialogueManager.Instance?.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory,
+            DialogueManager.Instance?.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory,
                 waitForInput);
         }
         else
@@ -292,12 +326,12 @@ public class SpeakingInteraction : NetworkBehaviour
                 {
                     // waitForInput is intentionally ignored here: the overhearing client has no way to
                     // advance this line themselves, so let it auto-dismiss on its own timer instead.
-                    DialogueManager.Instance?.SpawnSubtitles(dialogue, speakerName, Color.white, false, clearHistory,
+                    DialogueManager.Instance?.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory,
                         waitForInput: false);
                 }
                 else
                 {
-                    GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.ShowLine(dialogue, speakerName, Color.white);
+                    GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.ShowLine(dialogue, SpeakerName, Color.white);
                 }
             }
         }

@@ -6,13 +6,17 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
-/// The end-of-shift report screen. Plays an animated reveal of the day's results and then offers a
-/// Continue button that advances the campaign to the next day.
+/// The end-of-shift report screen: an informational daily earnings report / shift summary. Lists
+/// every processed subject with the anomalies caught and the coupons that verdict paid, then the
+/// passed / quarantined / killed tallies, then the day's total. It never awards money — every
+/// coupon shown was already paid out at verdict time by <see cref="SuspectController"/>.
+///
+/// Rows are pooled: the serialized <see cref="rows"/> are used first and extra rows are cloned from
+/// the first one on demand, inside an optional <see cref="_rowScroll"/> that follows each new row.
 ///
 /// This screen is a full-screen modal that disables player control, so it is the single most
-/// dangerous place in the game to get stuck: if the Continue affordance never appears, or appears
-/// but does nothing, the player's only recourse is to quit. Everything below is therefore built so
-/// that <b>the player can always leave</b>:
+/// dangerous place in the game to get stuck. Everything below is built so that
+/// <b>the player can always leave</b>:
 ///
 /// 1. The affordance is shown by <see cref="DriveReportRoutine"/>, which is separate from and
 ///    watches over the reveal. A reveal that stalls or dies cannot suppress the button.
@@ -22,29 +26,25 @@ using UnityEngine.UI;
 /// 4. Both players get a working Continue button — not just the host.
 /// 5. Pressing Continue starts <see cref="WatchdogAfterContinue"/>: if the transition has not torn
 ///    this screen down in time, the screen dismisses itself and restores control.
-/// 6. Payout is applied before the animation, so aborting or skipping it never costs the player money.
 /// </summary>
 public class EndOfShiftReportUI : MonoBehaviour
 {
-    [System.Serializable]
-    public class ReportRowData
+    /// <summary>One rendered report line.</summary>
+    private struct ReportLine
     {
-        public string label;
-        public int amount;
-        public bool isPenalty;
-        public bool isHeader;
-        
-        public ReportRowData(string label, int amount, bool isPenalty = false, bool isHeader = false)
-        {
-            this.label = label;
-            this.amount = amount;
-            this.isPenalty = isPenalty;
-            this.isHeader = isHeader;
-        }
+        public string Label;
+        public string Value; // null = label only
     }
 
     [Header("Rows")]
+    [Tooltip("Pre-placed rows, used first. Extra rows are cloned from the first entry when needed.")]
     [SerializeField] private List<EndOfShiftReportRow> rows = new List<EndOfShiftReportRow>();
+
+    [Header("Scrolling")]
+    [Tooltip("Optional scroll view around the rows. Auto-scrolls to each row as it is revealed.")]
+    [SerializeField] private ScrollRect _rowScroll;
+    [Tooltip("Seconds to ease the scroll view down to a newly revealed row.")]
+    [SerializeField] private float _autoScrollDuration = 0.25f;
 
     [Header("Residents Who Fully Mutated")]
     [SerializeField] private GameObject residentsMutatedRoot;
@@ -109,16 +109,19 @@ public class EndOfShiftReportUI : MonoBehaviour
     [SerializeField] private GameObject banner; 
     [SerializeField] TMPTextReveal subHeaderText;
 
+    private const string SubHeaderLabel = "Checkpoint Performance Summary";
+
+    // Rows cloned beyond the serialized pool. Kept and reused across reports.
+    private readonly List<EndOfShiftReportRow> _extraRows = new List<EndOfShiftReportRow>();
+
     private Coroutine driverRoutine;
     private Coroutine revealRoutine;
+    private Coroutine scrollRoutine;
 
     // Cached payload for the current report, so the failsafe path can snap straight to the
     // final state without re-deriving anything.
-    private List<ReportRowData> _reportRows;
-    private int _residentsMutated;
-    private int _civiliansKilled;
-    private int _currentPopulation;
-    private int _netTotal;
+    private ShiftReportData _data;
+    private readonly List<ReportLine> _lines = new List<ReportLine>();
 
     private bool _revealComplete;
     private bool _skipRequested;
@@ -131,19 +134,12 @@ public class EndOfShiftReportUI : MonoBehaviour
         HideAll();
     }
 
-    public void PlayReport(
-        List<ReportRowData> reportRows,
-        int residentsFullyMutatedOvernight = 0,
-        int civiliansKilledOvernight = 0,
-        int currentPopulation = 0)
+    public void PlayReport(ShiftReportData data)
     {
         StopAllReportRoutines();
 
-        _reportRows = reportRows ?? new List<ReportRowData>();
-        _residentsMutated = residentsFullyMutatedOvernight;
-        _civiliansKilled = civiliansKilledOvernight;
-        _currentPopulation = currentPopulation;
-        _netTotal = ComputeNetTotal(_reportRows);
+        _data = data ?? new ShiftReportData(0, null, -1, 0, 0);
+        BuildLines();
 
         _revealComplete = false;
         _skipRequested = false;
@@ -152,13 +148,40 @@ public class EndOfShiftReportUI : MonoBehaviour
 
         gameObject.SetActive(true);
 
-        // Award the day's pay up front rather than partway through the reveal. The payout must not
-        // depend on an animation running to completion — a skipped, stalled, or interrupted reveal
-        // would otherwise silently rob the player of the entire day's earnings.
-        if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.IsServer)
-            GlobalHostVariables.Instance.AddMoney(_netTotal);
-
+        // Deliberately no payout here: coupons are issued per subject at verdict time.
         driverRoutine = StartCoroutine(DriveReportRoutine());
+    }
+
+    /// <summary>
+    /// Header, one line per subject (anomalies caught + coupons that verdict paid), then the verdict
+    /// tallies. Tallies carry no value — no earnings are attached to a verdict type.
+    /// </summary>
+    private void BuildLines()
+    {
+        _lines.Clear();
+
+        _lines.Add(new ReportLine { Label = $"Citizens Processed: {_data.Subjects.Count}" });
+
+        foreach (ShiftSubjectResult subject in _data.Subjects)
+        {
+            string name = string.IsNullOrWhiteSpace(subject.SubjectName) ? "Unknown Subject" : subject.SubjectName;
+            string detail = subject.AnomaliesCaught == ShiftSubjectResult.NotAssessed
+                ? "Fled"
+                : $"{subject.AnomaliesCaught}/{subject.AnomaliesTotal} Anomalies";
+
+            _lines.Add(new ReportLine
+            {
+                Label = $"{name}: {detail}",
+                Value = subject.CouponsEarned > 0 ? $"Earned {subject.CouponsEarned}" : null
+            });
+        }
+
+        _lines.Add(new ReportLine { Label = $"Passed: {_data.PassedCount}" });
+        _lines.Add(new ReportLine { Label = $"Quarantined: {_data.QuarantinedCount}" });
+        _lines.Add(new ReportLine { Label = $"Killed: {_data.KilledCount}" });
+
+        if (_data.FledCount > 0)
+            _lines.Add(new ReportLine { Label = $"Fled Wounded: {_data.FledCount}" });
     }
 
     public void HideAll()
@@ -177,6 +200,14 @@ public class EndOfShiftReportUI : MonoBehaviour
                     rows[i].Hide();
             }
         }
+
+        foreach (EndOfShiftReportRow row in _extraRows)
+        {
+            if (row != null)
+                row.Hide();
+        }
+
+        SetScrollPosition(1f);
         
         Canvas.ForceUpdateCanvases();
 
@@ -226,13 +257,9 @@ public class EndOfShiftReportUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Owns the reveal and, unconditionally, the appearance of the Continue affordance.
-    ///
-    /// The affordance used to be the last statement of the reveal coroutine itself, which meant any
-    /// stall anywhere in that long chain of nested animation waits left the player on a modal
-    /// screen with no button. Here the reveal is a supervised child: whether it completes, is
-    /// skipped, or hangs past <see cref="_maxTotalRevealDuration"/>, control returns to this method
-    /// and the button appears.
+    /// Owns the reveal and, unconditionally, the appearance of the Continue affordance. Whether the
+    /// reveal completes, is skipped, or hangs past <see cref="_maxTotalRevealDuration"/>, control
+    /// returns to this method and the button appears.
     /// </summary>
     private IEnumerator DriveReportRoutine()
     {
@@ -315,50 +342,45 @@ public class EndOfShiftReportUI : MonoBehaviour
         _contentContainer?.SetActive(true);
 
         if (subHeaderText != null)
-            yield return subHeaderText.RevealTextBounded("Checkpoint Performance Summary", _maxSingleRevealDuration);
+            yield return subHeaderText.RevealTextBounded(SubHeaderLabel, _maxSingleRevealDuration);
 
-        int count = Mathf.Min(_reportRows.Count, rows.Count);
-
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < _lines.Count; i++)
         {
             if (_skipRequested)
                 break;
 
-            ReportRowData data = _reportRows[i];
-            EndOfShiftReportRow row = rows[i];
+            ReportLine line = _lines[i];
+            EndOfShiftReportRow row = GetRow(i);
 
             if (row == null)
                 continue;
 
             row.Show(); 
             row.Clear();
+            FollowNewestRow();
             
-            yield return row.RevealLabel(data.label, normalLabelProfile, _maxSingleRevealDuration);
+            yield return row.RevealLabel(line.Label, normalLabelProfile, _maxSingleRevealDuration);
 
             yield return WaitUnscaled(rewardRevealDelay);
 
-            if (!data.isHeader && data.amount != 0)
+            if (line.Value != null)
             {
-                yield return row.RevealValue(
-                    FormatValue(data.amount, data.isPenalty),
-                    data.isPenalty ? penaltyColor : rewardColor,
-                    data.isPenalty ? penaltyValueProfile : rewardValueProfile,
-                    _maxSingleRevealDuration);
+                yield return row.RevealValue(line.Value, rewardColor, rewardValueProfile, _maxSingleRevealDuration);
             }
 
             yield return WaitUnscaled(lineRevealDelay);
         }
 
-        yield return RevealNetTotal(_netTotal);
+        yield return RevealNetTotal(_data.TotalCouponsEarned);
 
         // Reveal residents who fully mutated overnight and went on to kill civilians.
-        yield return RevealResidentsMutated(_residentsMutated);
+        yield return RevealResidentsMutated(_data.ResidentsMutatedOvernight);
 
         // Reveal overnight civilians killed panel (purely informational — no monetary impact).
-        yield return RevealCiviliansKilled(_civiliansKilled);
+        yield return RevealCiviliansKilled(_data.CiviliansKilledOvernight);
 
         // Reveal the updated current population, accounting for any overnight civilian deaths.
-        yield return RevealCurrentPopulation(_currentPopulation);
+        yield return RevealCurrentPopulation(_data.PopulationAlive);
 
         yield return WaitUnscaled(finalDelayBeforeContinue);
 
@@ -378,33 +400,33 @@ public class EndOfShiftReportUI : MonoBehaviour
         _contentContainer?.SetActive(true);
 
         if (subHeaderText != null)
-            subHeaderText.SetTextInstant("Checkpoint Performance Summary");
+            subHeaderText.SetTextInstant(SubHeaderLabel);
 
-        int count = Mathf.Min(_reportRows.Count, rows.Count);
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < _lines.Count; i++)
         {
-            ReportRowData data = _reportRows[i];
-            if (rows[i] == null)
+            EndOfShiftReportRow row = GetRow(i);
+            if (row == null)
                 continue;
 
-            rows[i].SetInstant(
-                data.label,
-                FormatValue(data.amount, data.isPenalty),
-                data.isPenalty ? penaltyColor : rewardColor,
-                showValue: !data.isHeader && data.amount != 0);
+            ReportLine line = _lines[i];
+            row.SetInstant(line.Label, line.Value, rewardColor, showValue: line.Value != null);
         }
 
+        StopScrollRoutine();
+        RebuildRowLayout();
+        SetScrollPosition(0f);
+
         SnapPanel(netEarningsRoot, netEarningsReveal, netEarningsText,
-            $"Net Daily Earnings: {FormatSignedNumber(_netTotal)}");
+            $"Net Daily Earnings: {FormatSignedNumber(_data.TotalCouponsEarned)}");
         if (netEarningsText != null)
-            netEarningsText.color = _netTotal < 0 ? penaltyColor : rewardColor;
+            netEarningsText.color = _data.TotalCouponsEarned < 0 ? penaltyColor : rewardColor;
 
         SnapPanel(residentsMutatedRoot, residentsMutatedReveal, residentsMutatedText,
-            $"Residents Who Fully Mutated: {_residentsMutated}");
+            $"Residents Who Fully Mutated: {_data.ResidentsMutatedOvernight}");
         SnapPanel(civiliansKilledRoot, civiliansKilledReveal, civiliansKilledText,
-            $"Civilians Killed: {_civiliansKilled}");
+            $"Civilians Killed: {_data.CiviliansKilledOvernight}");
         SnapPanel(currentPopulationRoot, currentPopulationReveal, currentPopulationText,
-            $"Current Population: {_currentPopulation}");
+            $"Current Population: {_data.PopulationAlive}");
     }
 
     private static void SnapPanel(GameObject root, TMPTextReveal reveal, TextMeshProUGUI text, string label)
@@ -419,14 +441,96 @@ public class EndOfShiftReportUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Reveals the Continue button to <b>every</b> player.
-    ///
-    /// Previously the button was host-only and clients got a passive "waiting for host" label. That
-    /// is a dead end by construction: a client whose transition never arrives — because the host's
-    /// coroutine stalled, or the RPC landed while this client was mid-reveal — has no affordance at
-    /// all and cannot leave the screen. Letting either player continue is safe because
-    /// <see cref="ShiftManager.StartInBetweenShiftSequence"/> is latched server-side, so duplicate
-    /// or simultaneous presses collapse into a single transition.
+    /// Returns the row for line <paramref name="index"/>: a serialized row first, otherwise a clone
+    /// of the first serialized row, created on demand and pooled for later reports.
+    /// </summary>
+    private EndOfShiftReportRow GetRow(int index)
+    {
+        if (rows == null || rows.Count == 0 || rows[0] == null)
+            return null;
+
+        if (index < rows.Count)
+            return rows[index];
+
+        int extraIndex = index - rows.Count;
+        while (_extraRows.Count <= extraIndex)
+        {
+            EndOfShiftReportRow template = rows[0];
+            EndOfShiftReportRow clone = Instantiate(template, template.transform.parent);
+            clone.name = $"{template.name} (Extra {_extraRows.Count + 1})";
+            clone.Hide();
+            _extraRows.Add(clone);
+        }
+
+        return _extraRows[extraIndex];
+    }
+
+    /// <summary>Eases the scroll view to the bottom so the newest row stays in view.</summary>
+    private void FollowNewestRow()
+    {
+        if (_rowScroll == null)
+            return;
+
+        RebuildRowLayout();
+        StopScrollRoutine();
+
+        // Owned by this component (never a child), so it cannot strand the reveal if it dies.
+        scrollRoutine = StartCoroutine(ScrollToBottomRoutine());
+    }
+
+    private IEnumerator ScrollToBottomRoutine()
+    {
+        _rowScroll.StopMovement();
+        float start = _rowScroll.verticalNormalizedPosition;
+
+        float elapsed = 0f;
+        while (elapsed < _autoScrollDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / _autoScrollDuration);
+            float eased = 1f - (1f - t) * (1f - t);
+            _rowScroll.verticalNormalizedPosition = Mathf.Lerp(start, 0f, eased);
+            yield return null;
+        }
+
+        _rowScroll.verticalNormalizedPosition = 0f;
+        scrollRoutine = null;
+    }
+
+    private void StopScrollRoutine()
+    {
+        if (scrollRoutine != null)
+        {
+            StopCoroutine(scrollRoutine);
+            scrollRoutine = null;
+        }
+    }
+
+    private void RebuildRowLayout()
+    {
+        if (_rowScroll == null)
+            return;
+
+        if (_rowScroll.content != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_rowScroll.content);
+        if (_rowScroll.viewport != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_rowScroll.viewport);
+    }
+
+    /// <summary>1 = top, 0 = bottom.</summary>
+    private void SetScrollPosition(float normalized)
+    {
+        if (_rowScroll == null)
+            return;
+
+        _rowScroll.StopMovement();
+        _rowScroll.verticalNormalizedPosition = normalized;
+    }
+
+    /// <summary>
+    /// Reveals the Continue button to <b>every</b> player. Letting either player continue is safe
+    /// because <see cref="ShiftManager.StartInBetweenShiftSequence"/> is latched server-side, so
+    /// duplicate or simultaneous presses collapse into a single transition.
     /// </summary>
     private void ShowContinueAffordance()
     {
@@ -553,17 +657,6 @@ public class EndOfShiftReportUI : MonoBehaviour
             netEarningsText.text = totalString;
     }
 
-    private static int ComputeNetTotal(List<ReportRowData> reportRows)
-    {
-        int total = 0;
-        for (int i = 0; i < reportRows.Count; i++)
-        {
-            ReportRowData data = reportRows[i];
-            total += data.isPenalty ? -Mathf.Abs(data.amount) : Mathf.Abs(data.amount);
-        }
-        return total;
-    }
-
     /// <summary>Unscaled wait so the report always progresses, even if something zeroed timeScale.</summary>
     private static IEnumerator WaitUnscaled(float seconds)
     {
@@ -576,16 +669,6 @@ public class EndOfShiftReportUI : MonoBehaviour
             elapsed += Time.unscaledDeltaTime;
             yield return null;
         }
-    }
-
-    private string FormatValue(int amount, bool isPenalty)
-    {
-        int absAmount = Mathf.Abs(amount);
-        if (amount == 0)
-        {
-            return "0";
-        }
-        return isPenalty ? $"Penalty {absAmount}" : $"Rewards {absAmount}";
     }
 
     private string FormatSignedNumber(int value)
@@ -632,13 +715,8 @@ public class EndOfShiftReportUI : MonoBehaviour
     /// <summary>
     /// The final safety net. Pressing Continue is supposed to end with the shift transition
     /// deactivating this screen; if that has not happened within <see cref="_continueWatchdogTimeout"/>
-    /// seconds, the press effectively did nothing and the player is stuck behind a modal overlay with
-    /// no remaining input. That is the exact "buttons do nothing" trap this guards against — most
-    /// often hit when the other player already advanced the shift, so the server had already consumed
-    /// the transition and this peer's own request was dropped as a duplicate.
-    ///
-    /// Note this coroutine lives on the report root, so the success case cancels it automatically:
-    /// deactivating the screen destroys the coroutine before it can ever fire.
+    /// seconds, the screen dismisses itself so the player is never trapped behind a dead overlay.
+    /// Lives on the report root, so the success case cancels it automatically on deactivation.
     /// </summary>
     private IEnumerator WatchdogAfterContinue()
     {
@@ -659,6 +737,8 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     private void StopAllReportRoutines()
     {
+        StopScrollRoutine();
+
         if (driverRoutine != null)
         {
             StopCoroutine(driverRoutine);

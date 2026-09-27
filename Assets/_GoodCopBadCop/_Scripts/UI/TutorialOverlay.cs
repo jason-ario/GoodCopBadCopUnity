@@ -31,6 +31,8 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject sortingMailTutorialScreen;
     [SerializeField] private GameObject killCriteriaTutorialScreen;
     [SerializeField] private GameObject fixPowerTutorialScreen;
+    [Tooltip("Day 3 power-station fuse-box puzzle screen ('Fix Fuse Tutorial').")]
+    [SerializeField] private GameObject fixFuseTutorialScreen;
     [SerializeField] private GameObject fixFenceTutorialScreen;
     [SerializeField] private GameObject mutantBreachTutorialScreen;
     [SerializeField] private GameObject checkpointIntegrityTutorialScreen;
@@ -124,6 +126,21 @@ public class TutorialOverlay : MonoBehaviour
     /// switch button will let them summon the next suspect (e.g. Day 2's Ocho encounter).
     /// </summary>
     public void ShowElectricalPanelTutorial(Action onComplete = null) => ShowScreen(fixPowerTutorialScreen, onComplete);
+
+    /// <summary>
+    /// Shows the "Fixing The Power" fuse-box tutorial overlay (find fuses, insert them, pull the
+    /// power switch). Triggered by <see cref="Day_03"/> the first time the local player arrives
+    /// at the power station during the post-shift power outage.
+    /// </summary>
+    public void ShowFixFuseTutorial(Action onComplete = null)
+    {
+        if (fixFuseTutorialScreen == null && screensContainer != null)
+        {
+            Transform found = screensContainer.Find("Fix Fuse Tutorial");
+            if (found != null) fixFuseTutorialScreen = found.gameObject;
+        }
+        ShowScreen(fixFuseTutorialScreen, onComplete);
+    }
 
     /// <summary>
     /// Shows the "fix a fence with a hammer" tutorial overlay. Triggered the first time the

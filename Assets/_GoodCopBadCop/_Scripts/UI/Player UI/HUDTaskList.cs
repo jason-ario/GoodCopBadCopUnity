@@ -26,21 +26,50 @@ public class HUDTaskList : MonoBehaviour
     /// </summary>
     public void ForceRebuild() => Rebuild();
 
-    private void OnEnable()
+    /// <summary>
+    /// Guards against re-entrant rebuilds. This component lives on the same GameObject that
+    /// <see cref="TutorialObjectiveList"/> toggles as its <c>objectiveListRoot</c>, so the first
+    /// <see cref="TutorialObjectiveList.AddObjective"/> after the list was hidden re-activates this
+    /// object mid-Rebuild and fires <see cref="OnEnable"/> — which would otherwise add a duplicate
+    /// row for the threat currently being added.
+    /// </summary>
+    private bool _isRebuilding;
+
+    // Registry subscriptions live for the component's whole lifetime, NOT just while enabled.
+    // TutorialObjectiveList deactivates this very GameObject (Task Sidebar/Tasks Panel) whenever
+    // its last row is removed. Subscribing in OnEnable/OnDisable made the bridge go deaf the
+    // moment the list emptied, so any task registered while the list was hidden (e.g. Day 2's
+    // "Follow the trail" right after "Meet Vlad" cleared, then "Kill the mutants") never got a row.
+    private void Awake()
     {
         TaskRegistry.OnTaskListChanged += Rebuild;
         TaskRegistry.OnTaskStateChanged += RefreshLabels;
-        Rebuild();
     }
 
-    private void OnDisable()
+    private void OnDestroy()
     {
         TaskRegistry.OnTaskListChanged -= Rebuild;
         TaskRegistry.OnTaskStateChanged -= RefreshLabels;
     }
 
+    private void OnEnable() => Rebuild();
+
     /// <summary>Syncs objective-list rows with the current registry state: adds new, removes stale.</summary>
     private void Rebuild()
+    {
+        if (_isRebuilding) return;
+        _isRebuilding = true;
+        try
+        {
+            RebuildInternal();
+        }
+        finally
+        {
+            _isRebuilding = false;
+        }
+    }
+
+    private void RebuildInternal()
     {
         TutorialObjectiveList list = TutorialObjectiveList.Instance;
         if (list == null) return;
@@ -52,7 +81,14 @@ public class HUDTaskList : MonoBehaviour
         // Add a row for every newly-active threat.
         foreach (ISystemicThreat threat in active)
         {
-            if (_rows.ContainsKey(threat)) continue;
+            // A row whose item was destroyed out from under us (e.g. a day script's
+            // TutorialObjectiveList.HideAndClear tearing down every row) no longer exists on
+            // screen — drop the dead handle so the threat gets a fresh row below.
+            if (_rows.TryGetValue(threat, out TutorialObjectiveItem existing))
+            {
+                if (existing != null) continue;
+                _rows.Remove(threat);
+            }
 
             // ProcessResidentsTask mirrors the exact same requirement DayBase already shows as
             // its own hand-scripted "Process N subjects X/Y" row (see DayBase.ShowAutomaticSubjectCounterTask).
@@ -118,7 +154,11 @@ public class HUDTaskList : MonoBehaviour
         if (list == null) return;
 
         foreach (KeyValuePair<ISystemicThreat, TutorialObjectiveItem> kvp in _rows)
-            list.UpdateObjective(kvp.Value, BuildLabel(kvp.Key));
+        {
+            // Unity-null check: '?.' inside UpdateObjective doesn't catch a destroyed row.
+            if (kvp.Value != null)
+                list.UpdateObjective(kvp.Value, BuildLabel(kvp.Key));
+        }
     }
 
     private static string BuildLabel(ISystemicThreat threat)

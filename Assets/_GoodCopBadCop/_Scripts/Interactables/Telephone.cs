@@ -34,6 +34,9 @@ public class Telephone : Interactable
     [SerializeField] private AudioSource phoneSound;
     [SerializeField] private AudioClip phoneGrabSound;
     [SerializeField] private AudioClip phonePlaceSound;
+    [Tooltip("Forward nudge (metres, camera-parent local Z) applied to the player's camera while the handset is held " +
+             "and the HQ Order Screen is open, so the player can't see into their own body.")]
+    [SerializeField] private float _holdingCameraForwardOffset = 0.08f;
 
     [Header("Phone Call")]
     [Tooltip("All tasks HQ can deliver. Picked by TriggerCall(index) or TriggerRandomCall().")]
@@ -53,6 +56,32 @@ public class Telephone : Interactable
     /// of the world megaphone.
     /// </summary>
     public AudioSource VoiceAudioSource => _voiceAudioSource;
+
+    [Header("Phone Voice (In-Ear)")]
+    [Tooltip("Voice clips cycled for scripted calls (e.g. Day 3's HQ power-outage call) played through " +
+             "the handset. Falls back to the caller's own clips when empty.")]
+    [SerializeField] private AudioClip[] _scriptedCallVoiceClips;
+    [Tooltip("When true, the phone filter settings below are applied to the voice AudioSource's filter " +
+             "chain on Awake (filters are added if missing).")]
+    [SerializeField] private bool _applyPhoneFilterPreset = true;
+    [SerializeField] private float _phoneHighPassCutoff = 750f;
+    [SerializeField] private float _phoneHighPassResonance = 1.8f;
+    [SerializeField] private float _phoneLowPassCutoff = 2600f;
+    [SerializeField] private float _phoneLowPassResonance = 2.2f;
+    [SerializeField, Range(0f, 1f)] private float _phoneDistortionLevel = 0.5f;
+    [Tooltip("Volume of the voice while the local player holds the handset (played 2D, in-ear).")]
+    [SerializeField, Range(0f, 1f)] private float _inEarVolume = 1f;
+    [Tooltip("Stereo pan while in-ear. Negative = left ear (the handset is held in the left hand).")]
+    [SerializeField, Range(-1f, 1f)] private float _inEarStereoPan = -0.25f;
+
+    /// <summary>Voice clips for scripted calls; empty when none are assigned.</summary>
+    public AudioClip[] ScriptedCallVoiceClips => _scriptedCallVoiceClips ?? Array.Empty<AudioClip>();
+
+    // Original 3D settings of the voice source, restored for players not holding the handset.
+    private float _voiceDefaultSpatialBlend;
+    private int _voiceDefaultPriority;
+    private float _voiceDefaultVolume;
+    private bool _voiceDefaultBypassReverb;
 
     [Tooltip("Speaker name displayed in the subtitle bar during the voice line.")]
     [SerializeField] private string _hqSpeakerName = "HQ";
@@ -108,12 +137,93 @@ public class Telephone : Interactable
     // Client-only: drives the ring cycle (animation + one-shot audio).
     private Coroutine _ringCycleCoroutine;
 
+    // Client-only: why the LOCAL player is holding the handset (None when not holding it).
+    // Used by ForceHangUpForDialogue to tear the phone down instantly when a forced
+    // conversation starts. Scripted calls are exempt — their own dialogue drives the hang-up.
+    private enum LocalHoldMode { None, OrderScreen, Call, ScriptedCall }
+    private LocalHoldMode _localHoldMode = LocalHoldMode.None;
+    private bool _localOrderScreenOpen;
+    private Coroutine _localSequenceCoroutine;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()
     {
         base.Awake();
         Instance = this;
+        InitVoiceSource();
+    }
+
+    // ── Phone voice ──────────────────────────────────────────────────────────
+
+    private void InitVoiceSource()
+    {
+        if (_voiceAudioSource == null) return;
+
+        _voiceDefaultSpatialBlend = _voiceAudioSource.spatialBlend;
+        _voiceDefaultPriority = _voiceAudioSource.priority;
+        _voiceDefaultVolume = _voiceAudioSource.volume;
+        _voiceDefaultBypassReverb = _voiceAudioSource.bypassReverbZones;
+
+        if (!_applyPhoneFilterPreset) return;
+
+        GameObject go = _voiceAudioSource.gameObject;
+
+        var highPass = GetOrAdd<AudioHighPassFilter>(go);
+        highPass.enabled = true;
+        highPass.cutoffFrequency = _phoneHighPassCutoff;
+        highPass.highpassResonanceQ = _phoneHighPassResonance;
+
+        var lowPass = GetOrAdd<AudioLowPassFilter>(go);
+        lowPass.enabled = true;
+        // The custom curve overrides cutoffFrequency, so flatten it to the target cutoff.
+        lowPass.customCutoffCurve = AnimationCurve.Constant(0f, 1f, Mathf.Clamp01(_phoneLowPassCutoff / 22000f));
+        lowPass.cutoffFrequency = _phoneLowPassCutoff;
+        lowPass.lowpassResonanceQ = _phoneLowPassResonance;
+
+        var distortion = GetOrAdd<AudioDistortionFilter>(go);
+        distortion.enabled = true;
+        distortion.distortionLevel = _phoneDistortionLevel;
+    }
+
+    private static T GetOrAdd<T>(GameObject go) where T : Component
+    {
+        return go.TryGetComponent(out T existing) ? existing : go.AddComponent<T>();
+    }
+
+    /// <summary>
+    /// Local, per client. Configures <see cref="VoiceAudioSource"/> for the local listener and
+    /// returns it: when the local player is holding the handset the voice plays 2D at top
+    /// priority, full volume, bypassing reverb (right in the player's ear); everyone else hears
+    /// it with the source's original 3D settings from the phone's position.
+    /// </summary>
+    public AudioSource PrepareVoiceSourceForLocalListener()
+    {
+        if (_voiceAudioSource == null) return null;
+
+        var nm = NetworkManager.Singleton;
+        bool localHolding = _localHoldMode != LocalHoldMode.None ||
+                            (nm != null && _isGrabbed.Value && _grabbingClientId.Value == nm.LocalClientId);
+
+        if (localHolding)
+        {
+            _voiceAudioSource.spatialBlend = 0f;
+            _voiceAudioSource.priority = 0;
+            _voiceAudioSource.volume = _inEarVolume;
+            _voiceAudioSource.panStereo = _inEarStereoPan;
+            _voiceAudioSource.bypassReverbZones = true;
+            _voiceAudioSource.dopplerLevel = 0f;
+        }
+        else
+        {
+            _voiceAudioSource.spatialBlend = _voiceDefaultSpatialBlend;
+            _voiceAudioSource.priority = _voiceDefaultPriority;
+            _voiceAudioSource.volume = _voiceDefaultVolume;
+            _voiceAudioSource.panStereo = 0f;
+            _voiceAudioSource.bypassReverbZones = _voiceDefaultBypassReverb;
+        }
+
+        return _voiceAudioSource;
     }
 
     // ── Interaction ──────────────────────────────────────────────────────────
@@ -395,7 +505,9 @@ public class Telephone : Interactable
 
         if (isLocalPlayer)
         {
-            StartCoroutine(AnswerCallSequence(player, taskIndex));
+            StopLocalSequence();
+            _localHoldMode = taskIndex == -2 ? LocalHoldMode.ScriptedCall : LocalHoldMode.Call;
+            _localSequenceCoroutine = StartCoroutine(AnswerCallSequence(player, taskIndex));
         }
         else
         {
@@ -464,7 +576,7 @@ public class Telephone : Interactable
 
             if (_voiceAudioSource != null && data.VoiceAudioClips != null && data.VoiceAudioClips.Length > 0)
             {
-                DialogueManager.Instance.PlayDialogueAudio(data.VoiceLine, data.VoiceAudioClips, _voiceAudioSource);
+                DialogueManager.Instance.PlayDialogueAudio(data.VoiceLine, data.VoiceAudioClips, PrepareVoiceSourceForLocalListener());
             }
         }
         else if (taskIndex == -1)
@@ -475,7 +587,7 @@ public class Telephone : Interactable
             if (_voiceAudioSource != null && _debugVoiceAudioClips != null && _debugVoiceAudioClips.Length > 0)
             {
                 DialogueManager.Instance.PlayDialogueAudio(
-                    _debugVoiceLine, _debugVoiceAudioClips, _voiceAudioSource);
+                    _debugVoiceLine, _debugVoiceAudioClips, PrepareVoiceSourceForLocalListener());
             }
         }
         // taskIndex == -2: scripted call — voice/subtitles are handled externally by the
@@ -570,6 +682,22 @@ public class Telephone : Interactable
         ExecutePutDownSequenceClientRpc(clientId);
     }
 
+    /// <summary>
+    /// Server-side forced hang-up requested by the holding client when a forced conversation
+    /// starts. Bypasses <see cref="_hangUpLocked"/> — the client only sends this for non-scripted
+    /// holds (see <see cref="ForceHangUpForDialogue"/>).
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ForceHangUpServerRpc(ulong clientId)
+    {
+        if (!_isGrabbed.Value || _grabbingClientId.Value != clientId) return;
+
+        _isGrabbed.Value = false;
+        _grabbingClientId.Value = ulong.MaxValue;
+
+        ExecutePutDownSequenceClientRpc(clientId, forced: true);
+    }
+
     [ClientRpc]
     private void ExecuteGrabSequenceClientRpc(ulong clientId)
     {
@@ -581,25 +709,114 @@ public class Telephone : Interactable
         if (player == null) return;
 
         if (isLocalPlayer)
-            StartCoroutine(GrabPhoneSequence(player));
+        {
+            StopLocalSequence();
+            _localHoldMode = LocalHoldMode.OrderScreen;
+            _localSequenceCoroutine = StartCoroutine(GrabPhoneSequence(player));
+        }
         else
             StartCoroutine(ObserverGrabConstraintSequence(player));
     }
 
     [ClientRpc]
-    private void ExecutePutDownSequenceClientRpc(ulong clientId)
+    private void ExecutePutDownSequenceClientRpc(ulong clientId, bool forced = false)
     {
         bool isLocalPlayer = NetworkManager.Singleton.LocalClientId == clientId;
         PlayerInteractionController player = isLocalPlayer
             ? NetworkManager.Singleton.LocalClient?.PlayerObject?.GetComponent<PlayerInteractionController>()
             : FindPlayerByClientId(clientId);
 
-        if (player == null) return;
-
         if (isLocalPlayer)
-            StartCoroutine(PutPhoneDownSequence(player));
+        {
+            // A forced hang-up was already torn down locally in ForceHangUpForDialogue; this
+            // only catches the case where local state is still live (e.g. mismatched timing).
+            if (forced)
+            {
+                if (_localHoldMode != LocalHoldMode.None)
+                    InstantLocalPutDown(player);
+                return;
+            }
+
+            if (player == null) return;
+            StopLocalSequence();
+            _localHoldMode = LocalHoldMode.None;
+            _localSequenceCoroutine = StartCoroutine(PutPhoneDownSequence(player));
+        }
         else
+        {
+            if (player == null) return;
             StartCoroutine(ObserverPutDownConstraintSequence());
+        }
+    }
+
+    // ── Forced hang-up (dialogue takeover) ────────────────────────────────────
+
+    /// <summary>
+    /// Client-side. Instantly hangs up the phone if the LOCAL player is holding it, closing the
+    /// HQ Order Screen and dropping the handset without the usual put-down camera/control
+    /// sequence (which would otherwise fight the incoming dialogue's camera and movement lock).
+    /// Call this at the start of any forced conversation, BEFORE the dialogue locks the player.
+    /// No-op when not holding the phone, or during a scripted call (its own dialogue is the call).
+    /// </summary>
+    public void ForceHangUpForDialogue()
+    {
+        if (_localHoldMode == LocalHoldMode.None || _localHoldMode == LocalHoldMode.ScriptedCall)
+            return;
+
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null) return;
+
+        PlayerInteractionController player = nm.LocalClient?.PlayerObject?.GetComponent<PlayerInteractionController>();
+        InstantLocalPutDown(player);
+
+        Debug.Log("[Telephone] Forced hang-up — local player entered a forced conversation while holding the phone.");
+        ForceHangUpServerRpc(nm.LocalClientId);
+    }
+
+    private void StopLocalSequence()
+    {
+        if (_localSequenceCoroutine != null)
+        {
+            StopCoroutine(_localSequenceCoroutine);
+            _localSequenceCoroutine = null;
+        }
+    }
+
+    /// <summary>
+    /// Local-only immediate teardown: stops any in-flight grab/answer sequence, silences the HQ
+    /// voice line, resets the handset, clears the arm IK/anim state, snaps the camera back to
+    /// its rest pose, and closes the HQ Order Screen if it was opened. Does not restore
+    /// movement beyond what closing the order screen does — the dialogue takes over control.
+    /// </summary>
+    private void InstantLocalPutDown(PlayerInteractionController player)
+    {
+        StopLocalSequence();
+        bool closeOrderScreen = _localOrderScreenOpen;
+        _localHoldMode = LocalHoldMode.None;
+        _localOrderScreenOpen = false;
+
+        _voiceAudioSource?.Stop();
+        if (phoneSound != null && phonePlaceSound != null)
+            phoneSound.PlayOneShot(phonePlaceSound);
+
+        handSet.enabled = false;
+        handSet.transform.position = _handsetPos.position;
+        handSet.transform.rotation = _handsetPos.rotation;
+
+        if (player != null)
+        {
+            player.playerAnimationController.SetAnimBool("HoldingPhone", false);
+            player.playerAnimationController.DisableLeftArmMask();
+            player.playerAnimationController.CamLeftArmRigIKTarget = null;
+            player.playerAnimationController.LeftArmIKTarget = null;
+
+            player.playerMovementController.CameraTransform.DOKill();
+            player.playerMovementController.ResetCameraPos(instant: true);
+        }
+
+        if (closeOrderScreen)
+            UIController.Instance?.CloseHQOrderScreen();
+        UIController.Instance?.HideBackButton();
     }
 
     // ── Observer sequences ────────────────────────────────────────────────────
@@ -651,7 +868,7 @@ public class Telephone : Interactable
 
         yield return new WaitForSeconds(.25f);
 
-        player.playerMovementController.ResetCameraPos(false, .25f);
+        player.playerMovementController.ResetCameraPos(false, .25f, null, Vector3.forward * _holdingCameraForwardOffset);
 
         yield return new WaitForSeconds(.25f);
         player.playerAnimationController.CamLeftArmRigIKTarget = null;
@@ -659,6 +876,8 @@ public class Telephone : Interactable
         player.playerMovementController.SetCanControl(true);
 
         UIController.Instance.OpenHQOrderScreen();
+        _localOrderScreenOpen = true;
+        _localSequenceCoroutine = null;
     }
 
     private IEnumerator PutPhoneDownSequence(PlayerInteractionController player)
@@ -686,6 +905,7 @@ public class Telephone : Interactable
         yield return new WaitForSeconds(.25f);
 
         UIController.Instance.CloseHQOrderScreen();
+        _localOrderScreenOpen = false;
         // Always hide the back button — it may have been shown for a scripted call hang-up.
         UIController.Instance?.HideBackButton();
         player.playerMovementController.ResetCameraPos(false, .25f);

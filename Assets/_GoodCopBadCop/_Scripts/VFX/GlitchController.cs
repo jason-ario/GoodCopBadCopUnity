@@ -157,6 +157,7 @@ public class GlitchController : MonoBehaviour
     {
         SuspectCharacter.OnSuspectPresentingUncanny += OnBoothMutantArrived;
         SuspectController.OnCurrentSuspectDespawned  += OnBoothMutantDespawned;
+        SuspectCharacter.OnSuspectUncannyPresenceCleared += OnBoothMutantPresenceCleared;
         StartCoroutine(GlitchBurstLoop());
     }
 
@@ -164,6 +165,7 @@ public class GlitchController : MonoBehaviour
     {
         SuspectCharacter.OnSuspectPresentingUncanny -= OnBoothMutantArrived;
         SuspectController.OnCurrentSuspectDespawned  -= OnBoothMutantDespawned;
+        SuspectCharacter.OnSuspectUncannyPresenceCleared -= OnBoothMutantPresenceCleared;
 
         _boothMutantActive = false;
         _boothMutant       = null;
@@ -274,6 +276,13 @@ public class GlitchController : MonoBehaviour
 
     private void OnBoothMutantDespawned()
     {
+        _boothMutantActive = false;
+        _boothMutant       = null;
+    }
+
+    private void OnBoothMutantPresenceCleared(SuspectCharacter suspect)
+    {
+        if (_boothMutant != null && _boothMutant != suspect) return;
         _boothMutantActive = false;
         _boothMutant       = null;
     }

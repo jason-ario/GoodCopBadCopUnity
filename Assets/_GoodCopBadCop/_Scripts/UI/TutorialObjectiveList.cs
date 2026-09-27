@@ -150,7 +150,9 @@ public class TutorialObjectiveList : MonoBehaviour
             ClearAllItems();
         }
 
-        if (!_isShowing)
+        // Also re-show when the flag says "showing" but the root was deactivated out from under
+        // us — otherwise the new row is created inside a hidden panel and never appears.
+        if (!_isShowing || (objectiveListRoot != null && !objectiveListRoot.activeSelf))
             Show();
 
         var go = Instantiate(taskItemPrefab, taskListContainer);

@@ -28,6 +28,20 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         _NoiseScale     ("Noise Scale",           Range(1, 30))                  = 10.0
         _NoiseSpeed     ("Noise Speed",           Range(0, 2))                   = 0.25
         _WarpStrength   ("Warp Strength",         Range(0, 0.3))                 = 0.08
+
+        // --- Tint ---
+        // 0 = texture colors as-is (multiplied by Base Tint). 1 = texture reduced to its
+        // brightness (max channel) first, so Base Tint fully defines the hue (e.g. green blood).
+        _Desaturate     ("Desaturate Texture",    Range(0, 1))                   = 0.0
+
+        // --- UV Light Glow ---
+        // Fluorescent emission added wherever an active UVLight cone overlaps the decal.
+        // Light data comes from global arrays pushed by UVLight (see UVLight.PushShaderGlobals).
+        // Intensity 0 disables the effect (default, so wall graffiti is unaffected).
+        [HDR] _UVGlowColor        ("UV Glow Color",         Color)               = (0.35, 1, 0.1, 1)
+        _UVGlowIntensity          ("UV Glow Intensity",     Range(0, 10))        = 0.0
+        _UVGlowEdgeSoftness       ("UV Glow Edge Softness", Range(0, 1))         = 0.5
+        _UVGlowFalloff            ("UV Glow Falloff",       Range(0.5, 4))       = 1.0
     }
 
     SubShader
@@ -115,7 +129,24 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half   _WarpStrength;
                 half   _NormalScale;
                 half   _Smoothness;
+                half   _Desaturate;
+                half4  _UVGlowColor;
+                half   _UVGlowIntensity;
+                half   _UVGlowEdgeSoftness;
+                half   _UVGlowFalloff;
             CBUFFER_END
+
+            // UV light cone data — GLOBAL shader properties set by UVLight.PushShaderGlobals.
+            // Deliberately uses distinct names from the per-renderer _UVLight* arrays used by
+            // UVReveal / Character Shader so setting these globally can't affect those shaders.
+            //   _UVGlowLightPositions  : xyz = world position, w = range
+            //   _UVGlowLightDirections : xyz = normalized forward direction
+            //   _UVGlowLightParams     : x   = cos(halfAngle)
+            #define UV_GLOW_MAX_LIGHTS 4
+            float4 _UVGlowLightPositions[UV_GLOW_MAX_LIGHTS];
+            float4 _UVGlowLightDirections[UV_GLOW_MAX_LIGHTS];
+            float4 _UVGlowLightParams[UV_GLOW_MAX_LIGHTS];
+            float  _UVGlowLightCount;
 
             // ----------------------------------------------------------------
             // Structs
@@ -173,6 +204,42 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                     amp  *= 0.5;
                 }
                 return v;
+            }
+
+            // ----------------------------------------------------------------
+            // UV light cone mask (same cone model as UVReveal.shader)
+            // Returns 0..1: how strongly any active UVLight cone covers positionWS.
+            // ----------------------------------------------------------------
+            float UVGlowMask(float3 positionWS)
+            {
+                float combined = 0.0;
+                int count = (int)_UVGlowLightCount;
+                for (int i = 0; i < min(count, UV_GLOW_MAX_LIGHTS); i++)
+                {
+                    float3 lightPos   = _UVGlowLightPositions[i].xyz;
+                    float  lightRange = _UVGlowLightPositions[i].w;
+                    float3 lightDir   = _UVGlowLightDirections[i].xyz;
+                    float  cosOuter   = _UVGlowLightParams[i].x;
+
+                    float3 toFrag     = positionWS - lightPos;
+                    float  depthAlong = dot(toFrag, lightDir);
+                    float  validMask  = step(0.001, depthAlong) * step(depthAlong, lightRange);
+
+                    float perpDist     = length(toFrag - depthAlong * lightDir);
+                    float tanHalfAngle = sqrt(max(1.0 - cosOuter * cosOuter, 0.0)) / max(cosOuter, 0.001);
+                    float coneRadius   = depthAlong * tanHalfAngle;
+
+                    float ndLat   = saturate(perpDist   / max(coneRadius, 0.001));
+                    float ndDepth = saturate(depthAlong / max(lightRange, 0.001));
+                    float nd      = saturate(length(float2(ndLat, ndDepth)) * 0.7071);
+
+                    float softBand    = max(_UVGlowEdgeSoftness, 0.001);
+                    float edgeMask    = 1.0 - smoothstep(1.0 - softBand, 1.0, ndLat);
+                    float falloffMask = pow(1.0 - smoothstep(0.0, 1.0, nd), max(_UVGlowFalloff, 0.5));
+
+                    combined = max(combined, edgeMask * falloffMask * validMask);
+                }
+                return combined;
             }
 
             // ----------------------------------------------------------------
@@ -243,7 +310,10 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 float  noise   = MorphFractal(noiseUV, nt);
 
                 // --- Base texture ---
-                half4 texColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv) * _BaseColor;
+                half4 texSample = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
+                half  texBright = max(texSample.r, max(texSample.g, texSample.b));
+                texSample.rgb   = lerp(texSample.rgb, texBright.xxx, _Desaturate);
+                half4 texColor  = texSample * _BaseColor;
 
                 // --- Scrub threshold ---
                 float threshold = noise - _ScrubProgress;
@@ -312,6 +382,13 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 float4 reconstructedCS = TransformWorldToHClip(positionWS);
                 float  fogFactor       = ComputeFogFactor(reconstructedCS.z);
                 finalRGB = MixFog(finalRGB, fogFactor);
+
+                // --- UV light fluorescent glow (added after fog so it reads through it) ---
+                if (_UVGlowIntensity > 0.0)
+                {
+                    half glowMask = UVGlowMask(positionWS) * (1.0 - foamMask);
+                    finalRGB += _UVGlowColor.rgb * (_UVGlowIntensity * glowMask);
+                }
 
                 return half4(finalRGB, alpha);
             }

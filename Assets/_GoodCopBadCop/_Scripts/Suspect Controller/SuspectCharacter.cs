@@ -1151,14 +1151,29 @@ public class SuspectCharacter : Interactable
     /// what drives <see cref="GlitchController"/>'s screen glitch/film-grain effect. Use this for
     /// scripted encounters that need that same glitch beat without touching InfectionScore or
     /// spawning an actual mutant form (e.g. Ocho's booth jumpscare in <c>OchoBoothEncounter</c>).
-    /// The effect clears automatically the next time <see cref="SuspectController.OnCurrentSuspectDespawned"/>
-    /// fires, so callers don't need to turn it off manually as long as the suspect eventually despawns.
+    /// The effect clears on <see cref="ClearUncannyGlitchPresence"/> or the next time
+    /// <see cref="SuspectController.OnCurrentSuspectDespawned"/> fires, whichever comes first.
     /// Server-only, matching every other call site of this event.
     /// </summary>
     public void TriggerUncannyGlitchPresence()
     {
         if (!IsServer) return;
         OnSuspectPresentingUncanny?.Invoke(this, 100);
+    }
+
+    /// <summary>Fired on the server when a suspect's scripted uncanny presence should end before it despawns.</summary>
+    public static event Action<SuspectCharacter> OnSuspectUncannyPresenceCleared;
+
+    /// <summary>
+    /// Counterpart to <see cref="TriggerUncannyGlitchPresence"/> for scripted encounters where the
+    /// suspect "leaves" (vanishes) well before it actually despawns — e.g. Ocho stays alive but
+    /// invisible through the power-outage beat. Ends the glitch immediately instead of waiting for
+    /// <see cref="SuspectController.OnCurrentSuspectDespawned"/>. Server-only.
+    /// </summary>
+    public void ClearUncannyGlitchPresence()
+    {
+        if (!IsServer) return;
+        OnSuspectUncannyPresenceCleared?.Invoke(this);
     }
 
     /// <summary>
@@ -1176,8 +1191,10 @@ public class SuspectCharacter : Interactable
             return;
         }
 
-        anomalyController.InitializeByInfectionScore(record.infectionScore);
+        // Mark shown BEFORE rolling anomalies so the never-seen tiered starting score
+        // (applied on first appearance) actually drives this spawn's anomaly budget.
         MarkSuspectShown(record);
+        anomalyController.InitializeByInfectionScore(record.infectionScore);
         suspectRecordViewer.SetRecord(record);
 
         ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);
@@ -1335,11 +1352,13 @@ public class SuspectCharacter : Interactable
     {
         SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
 
+        if (record != null)
+            MarkSuspectShown(record);
+
         int score = record?.infectionScore ?? 0;
         anomalyController.InitializeByInfectionScore(score);
         if (record != null)
         {
-            MarkSuspectShown(record);
             suspectRecordViewer.SetRecord(record);
         }
         else
@@ -1905,6 +1924,26 @@ public class SuspectCharacter : Interactable
                 fx.AddComponent<AutoDestroy>();
         }
 
+        if (animator != null && !string.IsNullOrEmpty(hitAnimTrigger))
+            animator.SetTrigger(hitAnimTrigger);
+    }
+
+    /// <summary>
+    /// Purely cosmetic flinch: plays <see cref="hitAnimTrigger"/> on all clients with no damage,
+    /// no hit particle / gore, and no <see cref="OnHit"/>. Used by non-violent contact such as
+    /// poking a suspect with the <see cref="Mop"/>. Server-only.
+    /// </summary>
+    public void PlayFlinch()
+    {
+        if (!IsServer || _isDead || _hasFled)
+            return;
+
+        PlayFlinchClientRpc();
+    }
+
+    [ClientRpc]
+    private void PlayFlinchClientRpc()
+    {
         if (animator != null && !string.IsNullOrEmpty(hitAnimTrigger))
             animator.SetTrigger(hitAnimTrigger);
     }

@@ -53,8 +53,11 @@ public class SupplyBox : PickableObject
     /// from <see cref="_networkIsEmpty"/> which the server keeps in sync.
     /// </summary>
     public bool IsEmpty => IsServer
-        ? (_hasHadItems && _registeredItems.Count == 0)
+        ? (_hasHadItems && !_registeredItems.Exists(IsStillInBox))
         : _networkIsEmpty.Value;
+
+    private static bool IsStillInBox(PickableObject item) =>
+        item != null && item.IsSpawned && !item.IsHeld && item.IsContainedInSupplyBox;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -120,16 +123,26 @@ public class SupplyBox : PickableObject
         _hasHadItems = true;
         if (IsServer) _networkIsEmpty.Value = false;
 
-        // Use OnPickedUpNetworked (driven by the server-authoritative _holdingClientId
-        // NetworkVariable) so the server's instance is notified when any client picks up
-        // the item. OnEquip only fires on the local picking client — silent no-op on server
-        // in multiplayer, which would leave _networkIsEmpty permanently false.
-        item.OnPickedUpNetworked += () =>
-        {
-            if (!IsServer) return;
-            _registeredItems.Remove(item);
+        // OnPickedUpNetworked is skipped on the server while the item's interactable lock is
+        // set, which a remote client's grab can race past (host/client lock state differs for a
+        // moment). The server always clears the item's supply-box containment when any player
+        // claims it, independent of that lock, so listen to both and refresh from authoritative state.
+        item.OnPickedUpNetworked += RefreshEmptyStateOnServer;
+        item.OnSupplyBoxContainmentChangedNetworked += _ => RefreshEmptyStateOnServer();
+    }
+
+    /// <summary>
+    /// Server-only: drops any registered item that has left the box (held by any player,
+    /// no longer contained, or despawned) and republishes <see cref="_networkIsEmpty"/>.
+    /// </summary>
+    private void RefreshEmptyStateOnServer()
+    {
+        if (!IsServer) return;
+
+        _registeredItems.RemoveAll(item => !IsStillInBox(item));
+
+        if (IsSpawned)
             _networkIsEmpty.Value = _hasHadItems && _registeredItems.Count == 0;
-        };
     }
 
     /// <summary>Clears all registered items, e.g. when the box is despawned for a new delivery.</summary>

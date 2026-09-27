@@ -10,7 +10,8 @@ using UnityEngine;
 /// Fuel is a networked float [0, <see cref="MaxFuel"/>]. As fuel depletes the
 /// WFX_FlameThrower Looped particle stream shortens and thins via velocity-Z and
 /// emission-rate multipliers. When fuel reaches zero the fire is forced off.
-/// Refuel by using a <see cref="FlamethrowerCannister"/> on the world pickup.
+/// Refuel with R from the holder's <see cref="PlayerAmmoReserve"/> (fuel enters the reserve by
+/// left-clicking a held <see cref="FlamethrowerCannister"/>).
 ///
 /// Prefab requirements:
 ///   - NetworkObject
@@ -20,11 +21,10 @@ using UnityEngine;
 ///   - Collider on the Interactable layer
 ///   - "Item Data" field     → Flamethrower.asset
 ///   - "_flameVFX"           → child WFX_FlameThrower Looped ParticleSystem
-///   - "itemsThatCanInteractWith" → FlamethrowerCannister.asset
 /// Must be registered as a Network Prefab in the NetworkManager.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class Flamethrower : PickableObject, IAmmoProvider
+public class Flamethrower : PickableObject, IAmmoProvider, IInventoryReloadable
 {
     /// <summary>Maximum fuel the tank can hold.</summary>
     public const float MaxFuel = 100f;
@@ -51,9 +51,35 @@ public class Flamethrower : PickableObject, IAmmoProvider
     [Tooltip("Damage dealt to a fellow player per hit-check tick (every HitCheckInterval seconds) while they stand in the flame.")]
     [SerializeField] private float _playerDamagePerTick = 5f;
 
+    [Header("Flamethrower — Burning Remains")]
+    [Tooltip("Seconds of sustained flame contact needed to completely burn a corpse (dead player, dead " +
+             "mutant, dead suspect) or a burnable gore JunkItem, after which it is removed from the world. " +
+             "Burning a piece of cleanup-task gore credits the task as if it had been bagged and dumped.")]
+    [Min(0.1f)]
+    [SerializeField] private float _remainsBurnSeconds = 3f;
+
+    [Tooltip("If remains go this many seconds without being hit by the flame, their partial burn progress resets.")]
+    [Min(0.1f)]
+    [SerializeField] private float _remainsBurnResetSeconds = 6f;
+
+    [Tooltip("Fire VFX attached to burning remains that have no SetOnFire component (gore chunks), and " +
+             "spawned as a short burst where remains burn away. Local-only, never networked.")]
+    [SerializeField] private GameObject _burnFireVfxPrefab;
+
+    [Tooltip("Uniform world scale applied to _burnFireVfxPrefab instances attached to small gore pieces.")]
+    [Min(0.01f)]
+    [SerializeField] private float _goreFireVfxScale = 0.6f;
+
+    [Tooltip("Seconds the burn-away fire burst lingers after remains are removed.")]
+    [Min(0f)]
+    [SerializeField] private float _burnAwayVfxLifetime = 2.5f;
+
     [Header("Flamethrower — Audio")]
     [Tooltip("Looping AudioSource for the flame sound. Starts and stops with firing.")]
     [SerializeField] private AudioSource _flameAudioSource;
+
+    [Tooltip("Sound played on every client when the flamethrower is refuelled from the reserve (R).")]
+    [SerializeField] private AudioClip _reloadSound;
 
     // ── Networked state ────────────────────────────────────────────────────────
 
@@ -106,6 +132,12 @@ public class Flamethrower : PickableObject, IAmmoProvider
     /// the moment the RPC lands on the server. This is a sanity bound, NOT a hit test.
     /// </summary>
     private const float FlameDistanceMargin = 2f;
+
+    /// <summary>Server-only: time of the last accepted hit report, used to cap burn exposure per report.</summary>
+    private float _lastBurnReportTime = float.NegativeInfinity;
+
+    /// <summary>Name given to the local fire VFX attached to burning gore, so it's only attached once.</summary>
+    private const string GoreFireVfxName = "Flamethrower_BurnFire";
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -160,7 +192,12 @@ public class Flamethrower : PickableObject, IAmmoProvider
 
     private void Update()
     {
-        if (!IsOwner || !isUsing || _fuel.Value <= 0f) return;
+        // Server safety net: a flame can never keep burning on a flamethrower nobody holds
+        // (e.g. holder disconnected or dropped it before their stop RPC arrived).
+        if (IsServer && _isFiring.Value && !IsHeld)
+            _isFiring.Value = false;
+
+        if (!isUsing || !IsLocalHolder || _fuel.Value <= 0f) return;
 
         // Drain fuel every frame.
         DrainFuelServerRpc(_fuelDrainRate * Time.deltaTime);
@@ -199,7 +236,7 @@ public class Flamethrower : PickableObject, IAmmoProvider
         // The owner drives VFX directly in OnStartUse/OnStopUse for instant,
         // lag-free feedback. Applying the NetworkVariable echo here would create
         // a race: a delayed StopFlame() could kill a flame the owner just restarted.
-        if (IsOwner) return;
+        if (IsLocalHolder) return;
 
         if (current)
             StartFlame();
@@ -283,8 +320,20 @@ public class Flamethrower : PickableObject, IAmmoProvider
     [ServerRpc(RequireOwnership = false)]
     private void SetFiringServerRpc(bool firing, ServerRpcParams rpcParams = default)
     {
-        if (!TryGetHolder(rpcParams.Receive.SenderClientId, out _)) return;
-        if (firing && _fuel.Value <= 0f) return;
+        ulong senderId = rpcParams.Receive.SenderClientId;
+
+        if (firing)
+        {
+            if (!TryGetHolder(senderId, out _)) return;
+            if (_fuel.Value <= 0f) return;
+        }
+        else
+        {
+            // Stopping is always safe. Accept it from the holder, or when nobody else holds the
+            // item — a stop sent right as the player drops it would otherwise be rejected
+            // (HeldObjectRef already cleared) and leave the flame stuck on for everyone else.
+            if (IsHeldByOtherPlayerOnServer(senderId)) return;
+        }
 
         _isFiring.Value = firing;
     }
@@ -311,15 +360,17 @@ public class Flamethrower : PickableObject, IAmmoProvider
     /// </summary>
     private void ResolveAndReportFlameHits(Vector3 origin, Vector3 direction)
     {
-        ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
-
         float fuelRatio       = Mathf.Clamp01(_fuel.Value / MaxFuel);
         float effectiveRange  = Mathf.Lerp(_minVelocityRatio * _maxFlameRange, _maxFlameRange, fuelRatio);
 
         List<NetworkObjectReference> firePitsToIgnite = new();
-        List<NetworkObjectReference> enemiesToIgnite  = new();
+        List<NetworkObjectReference> flammables       = new();
         List<NetworkObjectReference> corpsesToBurn    = new();
         List<NetworkObjectReference> playersToDamage  = new();
+
+        // A ragdoll/corpse has many colliders — report each NetworkObject only once per tick so
+        // burn progress and ignition aren't multiplied by the collider count.
+        HashSet<ulong> reported = new();
 
         RaycastHit[] hits = Physics.SphereCastAll(origin, _flameWidth, direction, effectiveRange, ~0, QueryTriggerInteraction.Collide);
         foreach (RaycastHit hit in hits)
@@ -328,29 +379,31 @@ public class Flamethrower : PickableObject, IAmmoProvider
             FirePit firePit = hit.collider.GetComponentInParent<FirePit>();
             if (firePit != null)
             {
-                if (!firePit.IsLit && firePit.NetworkObject != null)
+                if (!firePit.IsLit && firePit.NetworkObject != null && reported.Add(firePit.NetworkObjectId))
                     firePitsToIgnite.Add(new NetworkObjectReference(firePit.NetworkObject));
                 continue;
             }
 
             // ── Dead player corpses / resurrected mutants / living fellow players ──
-            // Must be checked BEFORE the generic MutantEnemy branch below: once a
-            // CorpseResurrectionController's dormant MutantEnemy is added to the Player
-            // prefab, GetComponentInParent<MutantEnemy>() would otherwise match every
-            // player (dead or alive) and never reach this branch.
+            // Must be checked BEFORE the generic MutantEnemy branch below: the Player prefab
+            // carries a dormant MutantEnemy, so GetComponentInParent<MutantEnemy>() would
+            // otherwise match every player (dead or alive) and never reach this branch.
             CorpseResurrectionController corpse = hit.collider.GetComponentInParent<CorpseResurrectionController>();
             if (corpse != null)
             {
-                // Never report hits against the shooter's own player.
-                NetworkObject corpseNetObj = corpse.GetComponent<NetworkObject>();
-                if (corpseNetObj == null || corpseNetObj.OwnerClientId == localClientId)
+                // Never report hits against the shooter's own player. IsLocalPlayer (not an
+                // OwnerClientId comparison) so the host can still burn a corpse after its former
+                // owner revived and the body was handed to server ownership.
+                NetworkObject corpseNetObj = corpse.NetworkObject;
+                if (corpseNetObj == null || corpseNetObj.IsLocalPlayer || !reported.Add(corpseNetObj.NetworkObjectId))
                     continue;
 
                 PlayerHealth corpsePlayerHealth = corpse.GetComponent<PlayerHealth>();
                 if (corpsePlayerHealth != null && corpsePlayerHealth.IsDead)
                 {
-                    SetOnFire corpseSetOnFire = corpse.GetComponent<SetOnFire>();
-                    if (corpseSetOnFire != null && !corpseSetOnFire.IsAtMaxFire)
+                    // Always report — the server tracks burn progress even once the fire VFX
+                    // is at its emitter cap.
+                    if (!corpse.IsBurnedAway)
                         corpsesToBurn.Add(new NetworkObjectReference(corpseNetObj));
                 }
                 else if (corpsePlayerHealth != null)
@@ -363,23 +416,32 @@ public class Flamethrower : PickableObject, IAmmoProvider
                 continue;
             }
 
-            // ── Mutant enemies ────────────────────────────────────────────────
+            // ── Mutants (living or dead) and burnable junk remains ────────────
+            // Death state (MutantEnemy.IsDead / DiedPermanently) is server-only, so the client
+            // can't tell a living mutant from its corpse — report both and let the server decide
+            // whether to ignite it or burn it away. Burnable junk (gore, suspect bodies) is
+            // reported whenever it is collectible.
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            if (enemy != null && !enemy.IsDead && enemy.NetworkObject != null)
+            if (enemy != null && enemy.NetworkObject != null)
             {
-                // Skip enemies already at max flames — SetOnFire handles re-ignition
-                // automatically once emitters burn out and the count drops below the cap.
-                SetOnFire setOnFire = enemy.GetComponent<SetOnFire>();
-                if (setOnFire != null && !setOnFire.IsAtMaxFire)
-                    enemiesToIgnite.Add(new NetworkObjectReference(enemy.NetworkObject));
+                if (reported.Add(enemy.NetworkObjectId))
+                    flammables.Add(new NetworkObjectReference(enemy.NetworkObject));
+                continue;
+            }
+
+            JunkItem junk = hit.collider.GetComponentInParent<JunkItem>();
+            if (junk != null && junk.NetworkObject != null && junk.IsBurnable && junk.CanBeCollected &&
+                reported.Add(junk.NetworkObjectId))
+            {
+                flammables.Add(new NetworkObjectReference(junk.NetworkObject));
             }
         }
 
-        if (firePitsToIgnite.Count == 0 && enemiesToIgnite.Count == 0 &&
+        if (firePitsToIgnite.Count == 0 && flammables.Count == 0 &&
             corpsesToBurn.Count == 0 && playersToDamage.Count == 0)
             return;
 
-        FireHitCheckServerRpc(origin, firePitsToIgnite.ToArray(), enemiesToIgnite.ToArray(),
+        FireHitCheckServerRpc(origin, firePitsToIgnite.ToArray(), flammables.ToArray(),
             corpsesToBurn.ToArray(), playersToDamage.ToArray());
     }
 
@@ -394,7 +456,7 @@ public class Flamethrower : PickableObject, IAmmoProvider
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     private void FireHitCheckServerRpc(Vector3 origin,
-        NetworkObjectReference[] firePitsToIgnite, NetworkObjectReference[] enemiesToIgnite,
+        NetworkObjectReference[] firePitsToIgnite, NetworkObjectReference[] flammables,
         NetworkObjectReference[] corpsesToBurn, NetworkObjectReference[] playersToDamage,
         ServerRpcParams rpcParams = default)
     {
@@ -402,6 +464,7 @@ public class Flamethrower : PickableObject, IAmmoProvider
 
         ulong shooterClientId = rpcParams.Receive.SenderClientId;
         float maxReportedDistance = _maxFlameRange + _flameWidth + FlameDistanceMargin;
+        float burnExposure = ConsumeBurnExposure();
 
         foreach (NetworkObjectReference r in firePitsToIgnite)
         {
@@ -413,12 +476,25 @@ public class Flamethrower : PickableObject, IAmmoProvider
                 firePit.Ignite();
         }
 
-        foreach (NetworkObjectReference r in enemiesToIgnite)
+        // ── Mutants (living → ignite) and remains (dead mutants, dead suspects, gore → burn away) ──
+        foreach (NetworkObjectReference r in flammables)
         {
             if (!r.TryGet(out NetworkObject obj)) continue;
-            if (Vector3.Distance(origin, obj.transform.position) > maxReportedDistance) continue;
+            if (!IsWithinReportedRange(origin, obj, maxReportedDistance)) continue;
 
             MutantEnemy enemy = obj.GetComponent<MutantEnemy>();
+            JunkItem junk     = obj.GetComponent<JunkItem>();
+
+            bool isDeadMutant    = enemy != null && enemy.IsDead && enemy.DiedPermanently;
+            bool isBurnableJunk  = junk != null && junk.IsBurnable && junk.CanBeCollected;
+
+            if (isDeadMutant || isBurnableJunk)
+            {
+                ApplyRemainsBurn(obj, burnExposure, () => BurnAwayRemains(obj, junk, isDeadMutant));
+                continue;
+            }
+
+            // Living (or dormant) mutant — ignite; SetOnFire's damage-over-time kills it.
             if (enemy == null || enemy.IsDead) continue;
 
             SetOnFire setOnFire = enemy.GetComponent<SetOnFire>();
@@ -426,38 +502,146 @@ public class Flamethrower : PickableObject, IAmmoProvider
                 IgniteEnemyClientRpc(new NetworkObjectReference(obj));
         }
 
+        // ── Dead player corpses ───────────────────────────────────────────────
         foreach (NetworkObjectReference r in corpsesToBurn)
         {
             if (!r.TryGet(out NetworkObject obj)) continue;
-            if (obj.OwnerClientId == shooterClientId) continue; // never let a report burn the shooter
-            if (Vector3.Distance(origin, obj.transform.position) > maxReportedDistance) continue;
+            if (IsShootersOwnPlayer(obj, shooterClientId)) continue; // never let a report burn the shooter
+            if (!IsWithinReportedRange(origin, obj, maxReportedDistance)) continue;
 
             CorpseResurrectionController corpse = obj.GetComponent<CorpseResurrectionController>();
             PlayerHealth corpsePlayerHealth      = obj.GetComponent<PlayerHealth>();
             if (corpse == null || corpsePlayerHealth == null || !corpsePlayerHealth.IsDead) continue;
+            if (corpse.IsBurnedAway) continue;
 
             // Cancel any pending resurrection (no-op once already resurrected).
             corpse.BurnCorpse();
 
-            // Ignite fire VFX + damage-over-time on all clients. SetOnFire ticks damage into the
-            // same MutantEnemy component that drives the resurrected corpse, permanently
-            // destroying it regardless of resurrection state — fire is the only thing that can
-            // finish it off for good.
-            SetOnFire corpseSetOnFire = corpse.GetComponent<SetOnFire>();
-            if (corpseSetOnFire != null && !corpseSetOnFire.IsAtMaxFire)
-                IgniteEnemyClientRpc(new NetworkObjectReference(obj));
+            if (corpse.IsLivingMutant)
+            {
+                // A resurrected corpse must be killed first: SetOnFire ticks damage into the same
+                // MutantEnemy that drives it — fire is the only thing that finishes it for good.
+                SetOnFire mutantFire = corpse.GetComponent<SetOnFire>();
+                if (mutantFire != null && !mutantFire.IsAtMaxFire)
+                    IgniteEnemyClientRpc(new NetworkObjectReference(obj));
+                continue;
+            }
+
+            ApplyRemainsBurn(obj, burnExposure, () =>
+            {
+                BurnAwayVfxClientRpc(GetVisualCenter(obj));
+                corpse.BurnAwayServer();
+            });
         }
 
         foreach (NetworkObjectReference r in playersToDamage)
         {
             if (!r.TryGet(out NetworkObject obj)) continue;
-            if (obj.OwnerClientId == shooterClientId) continue; // never let a report hurt the shooter
+            if (IsShootersOwnPlayer(obj, shooterClientId)) continue; // never let a report hurt the shooter
             if (Vector3.Distance(origin, obj.transform.position) > maxReportedDistance) continue;
 
             PlayerHealth playerHealth = obj.GetComponent<PlayerHealth>();
             if (playerHealth != null && !playerHealth.IsDead)
                 playerHealth.TakeDamage(_playerDamagePerTick, EffectKeys.FriendlyFlamethrowerDamage);
         }
+    }
+
+    // ── Burning remains (server) ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Seconds of burn exposure this report is worth. Normally one <see cref="HitCheckInterval"/>;
+    /// reports arriving much faster than the client's throttle (bunched packets or a modified
+    /// client) only earn the time actually elapsed, so spamming can't burn things instantly.
+    /// </summary>
+    private float ConsumeBurnExposure()
+    {
+        float now = Time.time;
+        float elapsed = now - _lastBurnReportTime;
+        _lastBurnReportTime = now;
+        return elapsed >= HitCheckInterval * 0.5f ? HitCheckInterval : Mathf.Max(0f, elapsed);
+    }
+
+    /// <summary>
+    /// Shows fire on <paramref name="obj"/> and adds burn exposure; runs
+    /// <paramref name="onBurnedAway"/> once it has been in the flame for <see cref="_remainsBurnSeconds"/>.
+    /// </summary>
+    private void ApplyRemainsBurn(NetworkObject obj, float exposure, Action onBurnedAway)
+    {
+        bool completed = FlameBurnTracker.AddExposure(obj, exposure, _remainsBurnSeconds,
+            _remainsBurnResetSeconds, out bool isFirstHit);
+
+        if (completed)
+        {
+            onBurnedAway?.Invoke();
+            return;
+        }
+
+        SetOnFire setOnFire = obj.GetComponent<SetOnFire>();
+        if (setOnFire != null)
+        {
+            if (!setOnFire.IsAtMaxFire)
+                IgniteEnemyClientRpc(new NetworkObjectReference(obj));
+        }
+        else if (isFirstHit)
+        {
+            // Gore has no bones for SetOnFire — attach a single local fire effect instead.
+            IgniteRemainsClientRpc(new NetworkObjectReference(obj));
+        }
+    }
+
+    /// <summary>
+    /// Removes a completely burned dead mutant / suspect body / gore piece. Junk goes through
+    /// <see cref="JunkItem.BurnAwayServer"/> (which credits the cleanup task and respects reusable
+    /// bodies). A dead mutant whose corpse pickup isn't enabled yet (still settling) is despawned
+    /// directly — it hasn't been registered with any task at that point.
+    /// </summary>
+    private void BurnAwayRemains(NetworkObject obj, JunkItem junk, bool isDeadMutant)
+    {
+        if (obj == null || !obj.IsSpawned) return;
+
+        BurnAwayVfxClientRpc(GetVisualCenter(obj));
+
+        if (junk != null && junk.BurnAwayServer())
+            return;
+
+        if (isDeadMutant)
+        {
+            TakeOutTrashTask.Instance?.CreditBurnedJunkItem(obj);
+            obj.Despawn(destroy: true);
+        }
+    }
+
+    /// <summary>
+    /// Distance sanity bound for remains. Ragdolls can slide their visible body away from the
+    /// root transform, so the closer of the root and the rendered centre is used.
+    /// </summary>
+    private static bool IsWithinReportedRange(Vector3 origin, NetworkObject obj, float maxDistance)
+    {
+        if (Vector3.Distance(origin, obj.transform.position) <= maxDistance) return true;
+        return Vector3.Distance(origin, GetVisualCenter(obj)) <= maxDistance;
+    }
+
+    /// <summary>
+    /// True when <paramref name="obj"/> is the shooter's own current PlayerObject. A detached
+    /// corpse owned by the server is NOT the host's player, even though its owner id matches.
+    /// </summary>
+    private static bool IsShootersOwnPlayer(NetworkObject obj, ulong shooterClientId)
+        => obj.IsPlayerObject && obj.OwnerClientId == shooterClientId;
+
+    /// <summary>World-space centre of the object's enabled renderers (falls back to its root position).</summary>
+    private static Vector3 GetVisualCenter(NetworkObject obj)
+    {
+        bool hasBounds = false;
+        Bounds bounds = default;
+
+        foreach (Renderer r in obj.GetComponentsInChildren<Renderer>())
+        {
+            if (!r.enabled || r is ParticleSystemRenderer) continue;
+            if (!hasBounds) { bounds = r.bounds; hasBounds = true; }
+            else bounds.Encapsulate(r.bounds);
+        }
+
+        return hasBounds ? bounds.center : obj.transform.position;
     }
 
     /// <summary>
@@ -471,86 +655,87 @@ public class Flamethrower : PickableObject, IAmmoProvider
         enemyObj.GetComponent<SetOnFire>()?.Ignite();
     }
 
-    // ── Refuelling ─────────────────────────────────────────────────────────────
-
     /// <summary>
-    /// Called when the player presses E while targeting the flamethrower while
-    /// holding a <see cref="FlamethrowerCannister"/>. Delegates to
-    /// <see cref="TryRefuel"/>.
-    /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player)
-        => TryRefuel(player);
-
-    /// <summary>
-    /// Called when LMB is pressed with a compatible item in hand
-    /// (<see cref="FlamethrowerCannister"/> listed in <c>itemsThatCanInteractWith</c>).
-    /// Delegates to <see cref="TryRefuel"/>.
-    /// </summary>
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
-    {
-        base.InteractWithItem(playerInteractionController, item);
-        TryRefuel(playerInteractionController);
-    }
-
-    private void TryRefuel(PlayerInteractionController player)
-    {
-        if (player.pickupController.HeldObject is not FlamethrowerCannister) return;
-        if (_fuel.Value >= MaxFuel) return;
-
-        RefuelServerRpc();
-    }
-
-    /// <summary>
-    /// Server-side: validates the sender is holding a <see cref="FlamethrowerCannister"/>
-    /// and the tank is not full, then fills the tank to <see cref="MaxFuel"/> and
-    /// instructs the sender's client to despawn the cannister.
-    /// RequireOwnership = false so any client can refuel regardless of who holds the gun.
-    /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    private void RefuelServerRpc(ServerRpcParams rpcParams = default)
-    {
-        ulong clientId = rpcParams.Receive.SenderClientId;
-
-        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
-        {
-            Debug.LogWarning($"[Flamethrower] RefuelServerRpc: client {clientId} not found.");
-            return;
-        }
-
-        PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        if (ppc == null || ppc.HeldObject is not FlamethrowerCannister)
-        {
-            Debug.LogWarning($"[Flamethrower] RefuelServerRpc: client {clientId} is not holding a FlamethrowerCannister.");
-            return;
-        }
-
-        if (_fuel.Value >= MaxFuel) return;
-
-        _fuel.Value = MaxFuel;
-
-        ConsumeCanisterClientRpc(new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
-        });
-    }
-
-    /// <summary>
-    /// Received only by the player who triggered the refuel. Despawns the equipped
-    /// cannister via <see cref="PlayerPickupController.DestroyEquippedItem"/>.
+    /// Received on all clients. Attaches one local <see cref="_burnFireVfxPrefab"/> to burning
+    /// remains that have no <see cref="SetOnFire"/> (gore). It is destroyed with the piece when it
+    /// burns away, so it needs no networking of its own.
     /// </summary>
     [ClientRpc]
-    private void ConsumeCanisterClientRpc(ClientRpcParams clientRpcParams = default)
+    private void IgniteRemainsClientRpc(NetworkObjectReference remainsRef)
     {
-        PlayerPickupController ppc = NetworkManager.Singleton.LocalClient?.PlayerObject
-            ?.GetComponent<PlayerPickupController>();
+        if (_burnFireVfxPrefab == null || !remainsRef.TryGet(out NetworkObject obj)) return;
+        if (obj.transform.Find(GoreFireVfxName) != null) return;
 
-        if (ppc == null)
+        GameObject fire = Instantiate(_burnFireVfxPrefab, GetVisualCenter(obj), Quaternion.identity, obj.transform);
+        fire.name = GoreFireVfxName;
+
+        // Keep a consistent world size regardless of the piece's own scale.
+        Vector3 lossy = obj.transform.lossyScale;
+        float s = _goreFireVfxScale;
+        fire.transform.localScale = new Vector3(
+            lossy.x != 0f ? s / lossy.x : s,
+            lossy.y != 0f ? s / lossy.y : s,
+            lossy.z != 0f ? s / lossy.z : s);
+    }
+
+    /// <summary>Received on all clients. Short local fire burst where remains just burned away.</summary>
+    [ClientRpc]
+    private void BurnAwayVfxClientRpc(Vector3 position)
+    {
+        if (_burnFireVfxPrefab == null) return;
+
+        GameObject burst = Instantiate(_burnFireVfxPrefab, position, Quaternion.identity);
+        Destroy(burst, _burnAwayVfxLifetime);
+    }
+
+    // ── Refuelling (KeyCode.R, from PlayerAmmoReserve) ─────────────────────────
+
+    public AmmoType ReserveAmmoType => AmmoType.Fuel;
+
+    /// <summary>
+    /// Called by <see cref="PlayerInventory"/> when the local player presses R with this
+    /// flamethrower equipped. Skips the round-trip when the tank is full or the reserve is empty.
+    /// </summary>
+    public void RequestReloadFromReserve()
+    {
+        if (_fuel.Value >= MaxFuel) return;
+
+        PlayerAmmoReserve reserve = PlayerAmmoReserve.Local;
+        if (reserve != null && reserve.Get(ReserveAmmoType) <= 0) return;
+
+        RefuelFromReserveServerRpc();
+    }
+
+    /// <summary>
+    /// Server: validates the sender is holding this flamethrower, then tops the tank up to
+    /// <see cref="MaxFuel"/> using fuel from their <see cref="PlayerAmmoReserve"/>.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void RefuelFromReserveServerRpc(ServerRpcParams rpcParams = default)
+    {
+        ulong clientId = rpcParams.Receive.SenderClientId;
+        if (!PlayerAmmoReserve.TryGetForHolder(clientId, NetworkObject, out PlayerAmmoReserve reserve))
         {
-            Debug.LogWarning("[Flamethrower] ConsumeCanisterClientRpc: could not find local PlayerPickupController.");
+            Debug.LogWarning($"[Flamethrower] RefuelFromReserveServerRpc: client {clientId} is not holding this flamethrower.");
             return;
         }
 
-        ppc.DestroyEquippedItem();
+        int needed = Mathf.CeilToInt(MaxFuel - _fuel.Value);
+        if (needed <= 0) return;
+
+        int taken = reserve.Take(ReserveAmmoType, needed);
+        if (taken <= 0) return;
+
+        _fuel.Value = Mathf.Min(MaxFuel, _fuel.Value + taken);
+        PlayReloadSoundClientRpc();
+    }
+
+    /// <summary>Plays the refuel sound at the flamethrower on every client after a successful refuel.</summary>
+    [ClientRpc]
+    private void PlayReloadSoundClientRpc()
+    {
+        if (_reloadSound != null)
+            SFXController.Instance.PlayAtPosition(_reloadSound, transform.position);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -559,6 +744,12 @@ public class Flamethrower : PickableObject, IAmmoProvider
     /// Returns <see langword="true"/> and outputs the <see cref="PlayerPickupController"/>
     /// when <paramref name="clientId"/> is connected and currently holding this flamethrower.
     /// </summary>
+    /// <remarks>
+    /// Uses the replicated <see cref="PlayerPickupController.HeldObjectRef"/> rather than
+    /// <see cref="PlayerPickupController.HeldObject"/>: the latter is a plain field only ever set on
+    /// the holder's own machine, so on the server it reads null for every non-host client and would
+    /// silently reject all of their firing/drain/hit RPCs (same fix as <c>Pistol.FireServerRpc</c>).
+    /// </remarks>
     private bool TryGetHolder(ulong clientId, out PlayerPickupController ppc)
     {
         ppc = null;
@@ -567,6 +758,24 @@ public class Flamethrower : PickableObject, IAmmoProvider
             return false;
 
         ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        return ppc?.HeldObject == this;
+        if (ppc == null) return false;
+
+        return ppc.HeldObjectRef.TryGet(out NetworkObject heldNetObj) && heldNetObj == NetworkObject;
     }
+
+    /// <summary>
+    /// Server-only: true when some player OTHER than <paramref name="clientId"/> is holding this item.
+    /// </summary>
+    private bool IsHeldByOtherPlayerOnServer(ulong clientId)
+        => IsHeld && !TryGetHolder(clientId, out _);
+
+    /// <summary>
+    /// True on the machine of the player currently holding and driving this flamethrower.
+    /// Deliberately independent of NetworkObject ownership (which may still be in flight right
+    /// after pickup), mirroring how <c>Pistol</c> fires purely from the local holder's input.
+    /// </summary>
+    private bool IsLocalHolder =>
+        playerPickupController != null &&
+        playerPickupController.IsOwner &&
+        playerPickupController.HeldObject == this;
 }

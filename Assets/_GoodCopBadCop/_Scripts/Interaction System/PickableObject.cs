@@ -79,6 +79,17 @@ public class PickableObject : Interactable
     /// <see cref="OnStowed"/>, which only runs on the local owner performing the stow.
     /// </summary>
     public event Action<bool> OnStowedNetworked;
+
+    /// <summary>
+    /// Fired on ALL instances (clients AND server) whenever the authoritative
+    /// <see cref="_isContainedInSupplyBox"/> state changes. Unlike <see cref="OnPickedUpNetworked"/>,
+    /// this is never suppressed by the interactable lock, so <see cref="SupplyBox"/> can reliably
+    /// detect removal regardless of which player took the item.
+    /// </summary>
+    public event Action<bool> OnSupplyBoxContainmentChangedNetworked;
+
+    /// <summary>True while this item is authoritatively contained by a supply box.</summary>
+    public bool IsContainedInSupplyBox => _isContainedInSupplyBox.Value;
     protected bool isUsing;
 
     /// <summary>
@@ -197,6 +208,9 @@ public class PickableObject : Interactable
         // Apply tutorial override first; fall back to holder-based logic if unset.
         ApplyNetworkInteractableState();
         ApplySupplyBoxContainmentPhysics(_isContainedInSupplyBox.Value);
+
+        // Late joiners must not see a held item glowing (task/tutorial holds are hidden while carried).
+        SetHoldHighlightSuppressed(IsHeld);
 
         // Late-joining clients need to inherit the current stowed visibility too.
         gameObject.SetActive(!_isStowed.Value);
@@ -332,7 +346,10 @@ public class PickableObject : Interactable
     }
 
     private void OnSupplyBoxContainmentChanged(bool previousValue, bool newValue)
-        => ApplySupplyBoxContainmentPhysics(newValue);
+    {
+        ApplySupplyBoxContainmentPhysics(newValue);
+        OnSupplyBoxContainmentChangedNetworked?.Invoke(newValue);
+    }
 
     private void ApplySupplyBoxContainmentPhysics(bool contained)
     {
@@ -532,6 +549,11 @@ public class PickableObject : Interactable
         if (current != ulong.MaxValue && _isContainedInSupplyBox.Value && IsServer)
             _isContainedInSupplyBox.Value = false;
 
+        // Persistent highlight holds (mail delivery, tutorial, junk affordance, arrows) are hidden
+        // on every machine while any player carries this item, and re-shown on release if any hold
+        // is still claimed. Runs before the interactable-lock early-out so it is never skipped.
+        SetHoldHighlightSuppressed(current != ulong.MaxValue);
+
         // Update trigger state on all clients, independent of the interactable lock — except
         // for a filed FolderItem (ID card, Application, exam page), whose root collider is
         // solely owned and driven by FolderController/FolderItem.RefreshFolderState based on
@@ -547,10 +569,6 @@ public class PickableObject : Interactable
             else
                 _colliderController?.SetReleased();
         }
-
-        // Runs regardless of the interactable lock so subclasses can re-assert state that
-        // SetHeld/SetReleased above may have clobbered (e.g. slot-owned pickups).
-        OnHolderCollidersRefreshed(current != ulong.MaxValue);
 
         if (_interactableLocked) return;
         // Only apply holder-based logic when no tutorial override is active.
@@ -583,13 +601,6 @@ public class PickableObject : Interactable
     /// ReleaseHolderServerRpc round-trip has necessarily completed.
     /// </summary>
     protected virtual void OnHeldStateChanged(bool isHeld) { }
-
-    /// <summary>
-    /// Called on every machine right after held/released collider state is refreshed in
-    /// OnHoldingClientChanged, before the interactable-lock early-out. Override to re-assert
-    /// interactable state that PickableColliderController.SetReleased may have clobbered.
-    /// </summary>
-    protected virtual void OnHolderCollidersRefreshed(bool isHeld) { }
 
     private void OnNetworkInteractableOverrideChanged(int previous, int current)
         => ApplyNetworkInteractableState();
@@ -1087,13 +1098,46 @@ public class PickableObject : Interactable
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = true;
 
+        EnsureThrowCollidersSolid();
+
         if (_rb != null)
         {
+            // Small/thin items (e.g. the flashlight) travel farther than their own thickness per
+            // physics step at throw speed and tunnel through floors under Discrete detection.
+            // Speculative CCD also stays valid once the body is made kinematic again on pickup.
+            _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             _rb.isKinematic = false;
             _rb.linearVelocity = velocity;
         }
 
         ThrowBroadcastClientRpc(position, velocity);
+    }
+
+    /// <summary>
+    /// Server-side guarantee that the thrown item has solid, enabled physics colliders before
+    /// it becomes non-kinematic. Items whose only collider doubles as an
+    /// <see cref="InteractableCollider"/> (e.g. the flashlight) rely on
+    /// <see cref="SetInteractable"/> to re-enable it, which is skipped while the item is
+    /// interactable-locked or under a tutorial override — leaving a simulated body with no
+    /// collider that falls straight through the ground. Only the physics <see cref="Collider"/>
+    /// is enabled here; the <see cref="InteractableCollider"/> MonoBehaviour is left untouched,
+    /// so interactability gating (see PlayerInteractionController.ResolveInteractable) is unchanged.
+    /// </summary>
+    private void EnsureThrowCollidersSolid()
+    {
+        _colliderController?.SetReleased();
+
+        foreach (Collider col in GetComponents<Collider>())
+        {
+            if (col != null && !col.isTrigger) col.enabled = true;
+        }
+
+        foreach (InteractableCollider interactableCollider in interactableColliders)
+        {
+            if (interactableCollider == null) continue;
+            Collider col = interactableCollider.GetComponent<Collider>();
+            if (col != null && !col.isTrigger) col.enabled = true;
+        }
     }
 
     /// <summary>
@@ -1147,6 +1191,10 @@ public class PickableObject : Interactable
     {
         OnPickedUpEvent?.Invoke();
 
+        // Local prediction: hide the hold glow immediately for the picking-up player; the
+        // _holdingClientId change then applies the same state authoritatively on every machine.
+        SetHoldHighlightSuppressed(true);
+
         // Being picked up ends any active throw-impact window; colliders are disabled while
         // held anyway, but this also prevents a stale window from carrying into the next throw.
         _throwImpactWindowEndTime = -1f;
@@ -1164,6 +1212,10 @@ public class PickableObject : Interactable
         // propagates back from the server (avoids a brief window where the thrown/dropped
         // object is still a trigger on the local client).
         _colliderController?.SetReleased();
+
+        // Fall back to the authoritative held state (so a rejected/aborted pickup never stays
+        // suppressed); the glow returns once the release replicates via OnHoldingClientChanged.
+        SetHoldHighlightSuppressed(IsHeld);
 
         OnDroppedEvent?.Invoke();
 

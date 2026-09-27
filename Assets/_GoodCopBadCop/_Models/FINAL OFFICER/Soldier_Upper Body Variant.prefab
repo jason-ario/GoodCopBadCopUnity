@@ -377,6 +377,8 @@ MonoBehaviour:
   headTransform: {fileID: 0}
   bodyArmsMesh: {fileID: 0}
   firstPersonArms: {fileID: 0}
+  underwaterLinearDamping: 4
+  underwaterAngularDamping: 4
 --- !u!114 &939336448903954203
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -662,10 +664,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 1148668144
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -690,6 +694,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   interactText: 
   highlightNameFilter: 
+  _destroyOnCollect: 1
+  _kickable: 1
+  _burnable: 1
 --- !u!1 &5803973768667123598 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2423973702754212895, guid: bdd9977ad470583498ad06c1867c84c6, type: 3}

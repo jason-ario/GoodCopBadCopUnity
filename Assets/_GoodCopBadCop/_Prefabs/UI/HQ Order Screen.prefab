@@ -34,10 +34,10 @@ RectTransform:
   - {fileID: 752329362521048684}
   m_Father: {fileID: 2361436379044992593}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 656.5, y: 239.2}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &6431233464742478661
 MonoBehaviour:
@@ -206,6 +206,8 @@ MonoBehaviour:
   _loopingAudio: {fileID: 9082889598770701983}
   _respawnButton: {fileID: 7700614589666524749}
   _respawnButtonText: {fileID: 0}
+  _statusText: {fileID: 0}
+  _fundsText: {fileID: 0}
 --- !u!82 &9082889598770701983
 AudioSource:
   m_ObjectHideFlags: 0
@@ -315,12 +317,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2812323952
+  GlobalObjectIdHash: 1041508562
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -746,7 +750,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8685277088926598193, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 163.56
+      value: 525.5427
       objectReference: {fileID: 0}
     - target: {fileID: 8685277088926598193, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
       propertyPath: m_SizeDelta.y

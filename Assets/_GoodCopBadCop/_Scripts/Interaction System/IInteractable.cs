@@ -94,6 +94,16 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public bool IsForceHighlighted => _highlightHolds != HighlightHold.None;
 
     /// <summary>
+    /// While true, every hold is kept (not cleared) but not rendered — e.g. a
+    /// <see cref="PickableObject"/> being carried by any player. Clearing it re-shows the glow if
+    /// any hold is still claimed, so "still required by the task" is decided by the hold owners.
+    /// </summary>
+    private bool _holdHighlightSuppressed;
+
+    /// <summary>True while a hold is claimed AND not suppressed, i.e. the persistent glow is visible.</summary>
+    private bool IsHoldHighlightVisible => _highlightHolds != HighlightHold.None && !_holdHighlightSuppressed;
+
+    /// <summary>
     /// Whether this object can be interacted with RIGHT NOW. <see cref="PlayerInteractionController"/>
     /// tests this instead of the raw <c>enabled</c> flag when deciding whether the reticle may target
     /// it, so a subclass whose availability depends on runtime state can express that without having
@@ -106,6 +116,15 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// item can never glow while refusing to be picked up, or vice versa.
     /// </summary>
     public virtual bool IsInteractable => enabled;
+
+    /// <summary>
+    /// When true, <see cref="PlayerInteractionController"/>'s interaction ray ignores every collider
+    /// belonging to this object (solid or trigger) and continues to whatever is behind it. Use for
+    /// objects that must never be targeted or highlighted themselves and that sit inside another
+    /// interactable (e.g. <see cref="InkStampPickup"/> resting in its <see cref="InkStamp"/> holder).
+    /// Independent of collider enabled state, so network collider toggles cannot re-expose it.
+    /// </summary>
+    public virtual bool PassesInteractionRayThrough => false;
 
     public virtual void Interact(PlayerInteractionController player)
     {
@@ -146,7 +165,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     {
         // While any hold is active (tutorial call-out, pickup affordance), ignore hover-driven
         // attempts to turn the highlight off — it should only clear via SetForceHighlight(false).
-        if (_highlightHolds != HighlightHold.None && !highlight)
+        if (IsHoldHighlightVisible && !highlight)
             return;
 
         // Some subclasses (e.g. WorldPurchaseActionInteractable / WorldShopItemInteractable)
@@ -191,16 +210,37 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// </summary>
     public void SetForceHighlight(bool force, HighlightHold source)
     {
-        HighlightHold previous = _highlightHolds;
+        bool wasVisible = IsHoldHighlightVisible;
 
         if (force)
             _highlightHolds |= source;
         else
             _highlightHolds &= ~source;
 
-        if (_highlightHolds == previous) return;
+        if (IsHoldHighlightVisible == wasVisible) return;
+        ApplyHoldHighlightVisual();
+    }
 
-        bool anyHold = _highlightHolds != HighlightHold.None;
+    /// <summary>
+    /// Hides (or re-shows) the persistent hold glow without releasing any hold. Used by
+    /// <see cref="PickableObject"/> while it is carried: picking it up un-highlights it for every
+    /// player, and dropping it re-highlights it only if some system still holds the highlight
+    /// (e.g. a mail package that is still unsorted).
+    /// </summary>
+    protected void SetHoldHighlightSuppressed(bool suppressed)
+    {
+        if (_holdHighlightSuppressed == suppressed) return;
+
+        bool wasVisible = IsHoldHighlightVisible;
+        _holdHighlightSuppressed = suppressed;
+
+        if (IsHoldHighlightVisible == wasVisible) return;
+        ApplyHoldHighlightVisual();
+    }
+
+    private void ApplyHoldHighlightVisual()
+    {
+        bool anyHold = IsHoldHighlightVisible;
 
         // Awake may not have run yet if something registers this object extremely early.
         if (highlightEffect == null)

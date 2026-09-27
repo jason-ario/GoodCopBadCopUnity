@@ -33,6 +33,13 @@ public class TaskRegistry : MonoBehaviour
 
     private static TaskRegistry _instance;
 
+    /// <summary>
+    /// Whether <paramref name="threat"/> is currently in the HUD task list. Does NOT self-create the
+    /// registry (safe to poll every frame from UI, e.g. <see cref="CompassController"/>).
+    /// </summary>
+    public static bool IsRegistered(ISystemicThreat threat) =>
+        threat != null && _instance != null && _instance._threats.Contains(threat);
+
     private static TaskRegistry GetOrCreate()
     {
         if (_instance != null) return _instance;

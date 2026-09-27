@@ -31,6 +31,10 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
     [SerializeField] private AudioClip doorOpenClip;
     [SerializeField] private AudioClip doorCloseClip;
     [SerializeField] private AudioClip lockedSound;
+    [Tooltip("Distance (m) within which gate sounds play at full volume.")]
+    [SerializeField, Min(0f)] private float audioMinDistance = 1f;
+    [Tooltip("Distance (m) at which gate sounds fade to silence (linear rolloff).")]
+    [SerializeField, Min(0.1f)] private float audioMaxDistance = 12f;
     [SerializeField] private Transform forwardMarker;
 
     [Tooltip("The LockController padlock on this gate. Animated alongside the gate when locked.")]
@@ -52,6 +56,14 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
     [SerializeField] private float _suspectNavApproachRadius = 4f;
 
     private static readonly Collider[] _suspectOverlapBuffer = new Collider[4];
+
+    protected override void Awake()
+    {
+        base.Awake();
+        // Gate sounds are replicated to every client; keep them positional and short-range
+        // so players far from the gate don't hear it.
+        SpatialAudioUtility.ConfigureShortRange3D(audioSource, audioMinDistance, audioMaxDistance);
+    }
 
     public override void OnNetworkSpawn()
     {

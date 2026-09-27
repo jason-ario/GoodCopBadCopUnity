@@ -7749,6 +7749,8 @@ GameObject:
   - component: {fileID: 5670273224402455206}
   - component: {fileID: 5327476275012579649}
   - component: {fileID: 4250293090294189748}
+  - component: {fileID: 6358437273817695973}
+  - component: {fileID: 2732058897910838061}
   m_Layer: 14
   m_Name: Player
   m_TagString: Player
@@ -8753,6 +8755,11 @@ MonoBehaviour:
   kickForce: 6
   upwardKickFactor: 0.25
   kickCooldown: 0.25
+  bodyKickMinSpeed: 1.2
+  bodyKickProbeHeight: 0.3
+  bodyKickProbeRadius: 0.2
+  bodyKickCooldown: 0.35
+  bodyKickMaxServerDistance: 4
 --- !u!114 &4764846097613497096
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8934,6 +8941,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MutantEnemy
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 11400000, guid: f37331f4608ee104a981b6b4ef440f95, type: 2}
+  assaultAgentTypeName: Mutant
   animator: {fileID: 0}
   speedParameterName: Speed
   groundedParameterName: Grounded
@@ -9566,6 +9574,40 @@ MonoBehaviour:
   LegsAnimatorBlend: 1
   _Editor_DefaultModuleOnStart: {fileID: 11400000, guid: 7d9bd86d54a7a594cb1793f9533e2e00, type: 2}
   _Editor_LegHelperModule: {fileID: 11400000, guid: 0645fbea8059aec47aa6ae9d2c93c1d4, type: 2}
+--- !u!114 &6358437273817695973
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47896547466ac8d4bb21a5d14b1eb3a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SetOnFire
+  animator: {fileID: 0}
+  firePrefab: {fileID: 100000, guid: a817de05addd7b64faa73b34c74013ce, type: 3}
+  spawnInterval: 0.3
+  maxFireInstances: 8
+  burnDuration: 5
+  fireDamagePerTick: 5
+--- !u!114 &2732058897910838061
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953290070593623070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23fbec02e65ec854383667549ba1693d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerAmmoReserve
+  ShowTopMostFoldoutHeaderGroup: 1
+  _maxPistolRounds: 90
+  _maxShotgunShells: 30
+  _maxFuel: 200
 --- !u!1 &3028353245222770677
 GameObject:
   m_ObjectHideFlags: 0

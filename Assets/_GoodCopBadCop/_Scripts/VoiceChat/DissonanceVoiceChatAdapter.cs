@@ -165,7 +165,7 @@ namespace GoodCopBadCop.VoiceChat
 
             if (networkManager.IsHost || networkManager.IsServer)
             {
-                return networkManager.ConnectedClientsIds.Count > 1;
+                return DevSpectatorRegistry.PlayerClientCount(networkManager) > 1;
             }
 
             return networkManager.IsClient && networkManager.IsConnectedClient;

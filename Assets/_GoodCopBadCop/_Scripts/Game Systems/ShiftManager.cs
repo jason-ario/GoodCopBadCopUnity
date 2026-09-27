@@ -84,19 +84,15 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     public int suspectsFled = 0;
 
-    [Header("End of Shift Rewards")]
-    [Tooltip("Coupons earned for each citizen correctly passed (non-infected).")]
-    [SerializeField] private int rewardPerCorrectPass = 10;
-    [Tooltip("Coupons deducted for each infected citizen incorrectly passed (Non-Effected).")]
-    [SerializeField] private int penaltyPerWrongPass = 15;
-    [Tooltip("Coupons earned for correctly eliminating an infected suspect. (Unused — kills are now always penalised.)")]
-    [SerializeField] private int rewardPerCorrectKill = 10;
-    [Tooltip("Coupons deducted for incorrectly eliminating a non-infected citizen. (Unused — replaced by penaltyPerKill.)")]
-    [SerializeField] private int penaltyPerWrongKill = 20;
-    [Tooltip("Coupons earned for each citizen successfully quarantined.")]
-    [SerializeField] private int rewardPerQuarantine = 8;
-    [Tooltip("Coupons deducted per kill, regardless of whether the target was infected. Killing is always penalised.")]
-    [SerializeField] private int penaltyPerKill = 12;
+    /// <summary>
+    /// Server-side, per-subject outcomes for the current shift (name, anomalies caught, verdict,
+    /// coupons issued), in processing order. Feeds the itemized end-of-shift report. Recorded by
+    /// <see cref="SuspectController"/> at payout time; persisted in the workday save.
+    /// </summary>
+    private readonly List<ShiftSubjectResult> _subjectResults = new List<ShiftSubjectResult>();
+
+    /// <summary>Read-only view of this shift's recorded subject outcomes (server authoritative).</summary>
+    public IReadOnlyList<ShiftSubjectResult> SubjectResults => _subjectResults;
 
     private int _taskCompletedCount = 0;
     private bool _campaignAdvancedForCurrentReport;
@@ -501,6 +497,7 @@ public class ShiftManager : NetworkBehaviour
             SuspectsKilledCorrect = suspectsKilledCorrect,
             SuspectsKilledWrong = suspectsKilledWrong,
             SuspectsFled = suspectsFled,
+            SubjectResults = _subjectResults.ToArray(),
             SuspectIndex = SuspectController.Instance != null ? SuspectController.Instance.SuspectIndex : -1,
             Cash = GlobalHostVariables.Instance != null ? GlobalHostVariables.Instance.money.Value : 0,
             Pickables = PickableObjectRegistry.Instance.CaptureAll(),
@@ -636,6 +633,9 @@ public class ShiftManager : NetworkBehaviour
         suspectsKilledCorrect = state.SuspectsKilledCorrect;
         suspectsKilledWrong = state.SuspectsKilledWrong;
         suspectsFled = state.SuspectsFled;
+        _subjectResults.Clear();
+        if (state.SubjectResults != null)
+            _subjectResults.AddRange(state.SubjectResults);
         _suspectsComplete = state.SuspectsComplete;
         _clockOutEnabledThisCycle = state.ClockOutEnabled;
         CurrentPhase = (DayPhase)Mathf.Clamp(state.Phase, (int)DayPhase.PreShift, (int)DayPhase.PostShift);
@@ -1113,45 +1113,13 @@ public class ShiftManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// Builds the <see cref="EndOfShiftReportUI.ReportRowData"/> list for the current shift
-    /// using all tracked suspect stats and the configured reward / penalty values.
-    /// Call this before <see cref="StartInBetweenShiftSequence"/> resets the counters.
+    /// Records one processed subject's outcome for the itemized end-of-shift report. Server only —
+    /// the list is broadcast to every client when the report is shown.
     /// </summary>
-    public List<EndOfShiftReportUI.ReportRowData> BuildEndOfShiftReport()
+    public void RecordSubjectResult(ShiftSubjectResult result)
     {
-        var reportData = new List<EndOfShiftReportUI.ReportRowData>
-        {
-            new EndOfShiftReportUI.ReportRowData(
-                $"Citizens Processed: {suspectsProcessed}", 0, false, isHeader: true),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Correctly Passed: {suspectsPassedCorrect}",
-                suspectsPassedCorrect * rewardPerCorrectPass),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Incorrectly Passed: {suspectsPassedWrong}",
-                suspectsPassedWrong * penaltyPerWrongPass, isPenalty: true),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Quarantined: {suspectsQuarantined}", 0),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Correctly Eliminated: {suspectsKilledCorrect}",
-                suspectsKilledCorrect * rewardPerCorrectKill),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Wrongly Eliminated: {suspectsKilledWrong}",
-                suspectsKilledWrong * penaltyPerWrongKill, isPenalty: true),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Fled Wounded (returns as mutant): {suspectsFled}", 0),
-        };
-
-        AppendPopulationRows(reportData,
-            populationModel.PopulationAlive.CurrentValue,
-            populationModel.DeadOvernight.CurrentValue);
-
-        return reportData;
+        if (!IsServer) return;
+        _subjectResults.Add(result);
     }
 
     /// <summary>
@@ -1289,24 +1257,14 @@ public class ShiftManager : NetworkBehaviour
         // A fresh report means a fresh transition is allowed again.
         _inBetweenShiftStarted = false;
 
-        ShowEndOfShiftReportClientRpc(
-            suspectsProcessed,
-            suspectsPassedCorrect,
-            suspectsPassedWrong,
-            suspectsQuarantined,
-            suspectsKilledCorrect,
-            suspectsKilledWrong,
-            suspectsFled,
-            populationModel.PopulationAlive.CurrentValue,
-            populationModel.DeadOvernight.CurrentValue,
-            populationModel.MutatedOvernight.CurrentValue);
+        BroadcastEndOfShiftReport(_currentDay);
     }
 
     /// <summary>
     /// Called by any client when a player confirms going to bed.
     /// Broadcasts the end-of-shift report to all clients so both players see it simultaneously.
-    /// The tracked counters are passed as ints (NGO-serializable); each client rebuilds
-    /// the report rows using its own reward config and server-authored population values.
+    /// The server-recorded subject results and population values are sent as-is; the report is
+    /// informational only and applies no payout of its own.
     ///
     /// Idempotent per report: <see cref="_endOfShiftReportBroadcast"/> drops a second request, so
     /// two players confirming end-of-day at the same moment cannot stack two reports (or advance
@@ -1327,80 +1285,36 @@ public class ShiftManager : NetworkBehaviour
         // press Continue, and the first press through wins.
         _inBetweenShiftStarted = false;
 
+        // Capture the day being summarised before the campaign advances past it.
+        int completedDay = _currentDay;
+
         if (!_campaignAdvancedForCurrentReport && CampaignManager.Instance != null)
         {
             CampaignManager.Instance.AdvanceDay();
             _campaignAdvancedForCurrentReport = true;
         }
 
+        BroadcastEndOfShiftReport(completedDay);
+    }
+
+    private void BroadcastEndOfShiftReport(int day)
+    {
         ShowEndOfShiftReportClientRpc(
-            suspectsProcessed,
-            suspectsPassedCorrect,
-            suspectsPassedWrong,
-            suspectsQuarantined,
-            suspectsKilledCorrect,
-            suspectsKilledWrong,
-            suspectsFled,
+            day,
+            _subjectResults.ToArray(),
             populationModel.PopulationAlive.CurrentValue,
             populationModel.DeadOvernight.CurrentValue,
             populationModel.MutatedOvernight.CurrentValue);
     }
 
-    /// <summary>
-    /// Runs on all clients to display the end-of-shift report UI built from the provided counters.
-    /// </summary>
+    /// <summary>Runs on all clients to display the itemized end-of-shift report.</summary>
     [ClientRpc]
     private void ShowEndOfShiftReportClientRpc(
-        int processed, int passedCorrect, int passedWrong,
-        int quarantined, int killedCorrect, int killedWrong, int fled,
+        int day, ShiftSubjectResult[] subjects,
         int populationAlive, int deadOvernight, int mutatedOvernight)
     {
-        int totalKilled = killedCorrect + killedWrong;
-
-        var reportData = new List<EndOfShiftReportUI.ReportRowData>
-        {
-            // Header — informational only, no reward.
-            new EndOfShiftReportUI.ReportRowData(
-                $"Citizens Processed: {processed}", 0, false, isHeader: true),
-
-            // Green rows — positive outcomes that earn money.
-            new EndOfShiftReportUI.ReportRowData(
-                $"Passed: {passedCorrect}",
-                passedCorrect * rewardPerCorrectPass),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Quarantined: {quarantined}",
-                quarantined * rewardPerQuarantine),
-
-            // Red rows — negative outcomes that cost money.
-            new EndOfShiftReportUI.ReportRowData(
-                $"Killed: {totalKilled}",
-                totalKilled * penaltyPerKill, isPenalty: true),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Non-Effected: {passedWrong}",
-                passedWrong * penaltyPerWrongPass, isPenalty: true),
-
-            new EndOfShiftReportUI.ReportRowData(
-                $"Fled Wounded (returns as mutant): {fled}", 0),
-        };
-
-        UIController.Instance.ShowEndShiftReport(reportData, mutatedOvernight, deadOvernight, populationAlive);
-    }
-
-    private static void AppendPopulationRows(
-        List<EndOfShiftReportUI.ReportRowData> reportData,
-        int populationAlive,
-        int deadOvernight)
-    {
-        if (reportData == null || populationAlive < 0)
-            return;
-
-        reportData.Add(new EndOfShiftReportUI.ReportRowData(
-            $"Population Alive: {populationAlive}", 0, false, isHeader: true));
-
-        reportData.Add(new EndOfShiftReportUI.ReportRowData(
-            $"Dead Overnight: {Mathf.Max(0, deadOvernight)}", 0));
+        var reportData = new ShiftReportData(day, subjects, populationAlive, deadOvernight, mutatedOvernight);
+        UIController.Instance.ShowEndShiftReport(reportData);
     }
 
     private IEnumerator InBetweenShiftSequence()
@@ -1634,6 +1548,7 @@ public class ShiftManager : NetworkBehaviour
         suspectsKilledCorrect = 0;
         suspectsKilledWrong = 0;
         suspectsFled = 0;
+        _subjectResults.Clear();
 
         _suspectsComplete = false;
         _clockOutEnabledThisCycle = false;
@@ -1779,8 +1694,8 @@ public class ShiftManager : NetworkBehaviour
     private void ForceExitSoldierDialogueBeforeCutscene()
     {
         if (!IsServer) return;
-        if (ScriptedDialogueRunner.IsScriptedModeActive)
-            ScriptedDialogueRunner.Instance?.ExitScriptedMode();
+        if (ScriptedDialogueRunner.Instance != null && ScriptedDialogueRunner.Instance.IsServerSequenceActive)
+            ScriptedDialogueRunner.Instance.ExitScriptedMode();
     }
 
     [ClientRpc]
