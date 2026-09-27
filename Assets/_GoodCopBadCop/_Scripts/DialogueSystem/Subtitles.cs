@@ -18,30 +18,19 @@ public class Subtitles : MonoBehaviour
     [Tooltip("Vertical idle bob distance in canvas units.")]
     [SerializeField] private float promptBobAmount = 3f;
 
-    [Header("Speaker Name Label")]
-    [Tooltip("When false the name tag is never shown, regardless of the speaker name passed to SetText. " +
-             "Disabled on Player Subtitles (player lines and choice echoes).")]
-    [SerializeField] private bool showNameTag = true;
-    [Tooltip("Root of the name tag pinned to the subtitle's top-left corner. Hidden when there is no speaker name.")]
+    [Header("Speaker Name Tag Template")]
+    [Tooltip("Visual template for the conversation name tag. Always hidden on the subtitle itself; " +
+             "ConversationNameTag clones it once and owns the on-screen tag for the whole conversation.")]
     [SerializeField] private CanvasGroup nameTag;
-    [SerializeField] private TMP_Text nameLabel;
-    [Tooltip("Show only the first word of the speaker name (e.g. 'Vlad' from 'Vlad Petrov').")]
-    [SerializeField] private bool firstNameOnly = true;
-    [Tooltip("Label color used when the speaker color is white/unset.")]
-    [SerializeField] private Color defaultNameColor = new Color(1f, 0.8f, 0.35f, 1f);
-    [SerializeField] private float nameTagFadeInDuration = 0.2f;
-    [Tooltip("When true the name tag is detached from the subtitle bar at runtime and pinned to the top-center " +
-             "of the root canvas. The tag is still owned by (and destroyed with) this subtitle.")]
-    [SerializeField] private bool nameTagAtScreenTop = true;
-    [Tooltip("Distance in canvas units from the top edge of the screen to the top of the name tag.")]
-    [SerializeField] private float nameTagScreenTopOffset = 40f;
+
+    /// <summary>Template used by <see cref="ConversationNameTag"/> to build its standalone tag.</summary>
+    public CanvasGroup NameTagTemplate => nameTag;
 
     [Header("Wobble Effect")]
     [Tooltip("TMPWobbleText component on the subtitle TMP object. Assign in the prefab.")]
     [SerializeField] private TMPWobbleText _wobbleText;
 
     private string originalText;
-    private string lastDisplayName;
     private Color lastDisplayColor;
 
     public bool IsPromptActive { get; private set; }
@@ -116,9 +105,6 @@ public class Subtitles : MonoBehaviour
     private RectTransform _promptRect;
     private Vector2 _promptBasePos;
     private float _promptActiveTime;
-    private Coroutine _nameTagFade;
-    private bool _nameTagDetached;
-    private bool _nameTagHasName;
 
     private void Awake()
     {
@@ -128,50 +114,9 @@ public class Subtitles : MonoBehaviour
             if (_promptRect != null) _promptBasePos = _promptRect.anchoredPosition;
         }
 
-        if (Application.isPlaying && showNameTag && nameTagAtScreenTop)
-            DetachNameTagToScreenTop();
-    }
-
-    /// <summary>
-    /// Re-parents the name tag onto the root canvas, anchored at the top-center of the screen.
-    /// Stays under the dialogue canvas so its CanvasGroup (pause hiding) still applies.
-    /// </summary>
-    private void DetachNameTagToScreenTop()
-    {
-        if (nameTag == null) return;
-
-        var parentCanvas = GetComponentInParent<Canvas>();
-        if (parentCanvas == null) return;
-        var rootCanvas = parentCanvas.rootCanvas;
-
-        var tagRect = nameTag.transform as RectTransform;
-        if (tagRect == null) return;
-
-        tagRect.SetParent(rootCanvas.transform, false);
-        tagRect.anchorMin = new Vector2(0.5f, 1f);
-        tagRect.anchorMax = new Vector2(0.5f, 1f);
-        tagRect.pivot = new Vector2(0.5f, 1f);
-        tagRect.anchoredPosition = new Vector2(0f, -nameTagScreenTopOffset);
-        tagRect.SetAsLastSibling();
-        _nameTagDetached = true;
-    }
-
-    private void OnEnable()
-    {
-        if (_nameTagDetached && nameTag != null)
-            nameTag.gameObject.SetActive(_nameTagHasName);
-    }
-
-    private void OnDisable()
-    {
-        if (_nameTagDetached && nameTag != null)
+        // The speaker name is shown by the standalone ConversationNameTag, never on the subtitle bar.
+        if (nameTag != null)
             nameTag.gameObject.SetActive(false);
-    }
-
-    private void OnDestroy()
-    {
-        if (_nameTagDetached && nameTag != null)
-            Destroy(nameTag.gameObject);
     }
 
     private void Update()
@@ -188,63 +133,16 @@ public class Subtitles : MonoBehaviour
             _promptRect.anchoredPosition = _promptBasePos + Vector2.up * (Mathf.Sin(_promptActiveTime * promptPulseSpeed) * promptBobAmount);
     }
 
-    private void UpdateNameLabel()
-    {
-        if (nameTag == null || nameLabel == null) return;
-
-        string display = showNameTag ? FormatName(lastDisplayName) : null;
-        bool hasName = !string.IsNullOrEmpty(display);
-        _nameTagHasName = hasName;
-        nameTag.gameObject.SetActive(hasName && (!_nameTagDetached || isActiveAndEnabled));
-        if (!hasName) return;
-
-        nameLabel.text = display;
-        bool useSpeakerColor = lastDisplayColor.a > 0f && lastDisplayColor != Color.white;
-        nameLabel.color = useSpeakerColor ? lastDisplayColor : defaultNameColor;
-
-        if (Application.isPlaying && nameTagFadeInDuration > 0f && isActiveAndEnabled)
-        {
-            if (_nameTagFade != null) StopCoroutine(_nameTagFade);
-            _nameTagFade = StartCoroutine(FadeInNameTag());
-        }
-        else
-        {
-            nameTag.alpha = 1f;
-        }
-    }
-
-    private IEnumerator FadeInNameTag()
-    {
-        float t = 0f;
-        nameTag.alpha = 0f;
-        while (t < nameTagFadeInDuration)
-        {
-            t += Time.unscaledDeltaTime;
-            nameTag.alpha = Mathf.Clamp01(t / nameTagFadeInDuration);
-            yield return null;
-        }
-        nameTag.alpha = 1f;
-        _nameTagFade = null;
-    }
-
-    private string FormatName(string rawName)
-    {
-        if (string.IsNullOrWhiteSpace(rawName)) return null;
-        string trimmed = rawName.Trim();
-        if (!firstNameOnly) return trimmed;
-        int space = trimmed.IndexOf(' ');
-        return space > 0 ? trimmed.Substring(0, space) : trimmed;
-    }
-
-    /// <summary>Sets the subtitle text and starts the typewriter reveal.</summary>
+    /// <summary>
+    /// Sets the subtitle text and starts the typewriter reveal. <paramref name="name"/> is kept for
+    /// call-site compatibility; the speaker name is displayed by <see cref="ConversationNameTag"/>.
+    /// </summary>
     public void SetText(string text, string name = null, Color nameColor = default)
     {
         originalText = text;
-        lastDisplayName = name;
         lastDisplayColor = nameColor;
 
         UpdateVisuals();
-        UpdateNameLabel();
     }
 
     private void UpdateVisuals()

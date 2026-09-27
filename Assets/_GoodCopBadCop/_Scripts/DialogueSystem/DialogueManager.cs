@@ -457,6 +457,9 @@ public class DialogueManager : NetworkBehaviour
 
         Subtitles subtitles = Instantiate(isPlayer ? playerSubtitlesPrefab : NPCSubtitlesPrefab, subtitlesContainer);
 
+        if (!isPlayer)
+            ConversationNameTag.ReportSpeaker(characterName, nameColor);
+
         subtitles.SetText(text, characterName, nameColor);
 
         // Apply wobble effect and font override to NPC lines. Each is consumed once per subtitle spawn.

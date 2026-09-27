@@ -23,8 +23,14 @@ public class ReticleController : MonoBehaviour
     [Tooltip("Holding a weapon and aiming at a living enemy that is out of the weapon's attack range.")]
     public Color enemyOutOfRangeColor = new Color(1f, 0f, 0f, 0.4f);
 
+    [Header("Scale")]
+    [Tooltip("Reticle scale in every state except ready-to-interact.")]
     public float normalScale = 1f;
+
+    [Tooltip("Reticle scale while aiming at an interactable within range (ready to interact).")]
     public float interactScale = 1.3f;
+
+    [Tooltip("How fast color and scale blend toward their target values.")]
     public float lerpSpeed = 10f;
 
     [Header("Extract Hint")]
@@ -70,17 +76,16 @@ public class ReticleController : MonoBehaviour
         if (isEnemyTarget)
         {
             targetColor = isEnemyInRange ? enemyColor : enemyOutOfRangeColor;
-            targetScale = interactScale;
         }
         else if (canInteract)
         {
+            // Only the "ready to interact" state (in range) scales the reticle up.
             targetColor = interactColor;
             targetScale = interactScale;
         }
         else if (isTooFar)
         {
             targetColor = interactOutOfRangeColor;
-            targetScale = interactScale;
         }
 
         reticle.color = Color.Lerp(reticle.color, targetColor, Time.deltaTime * lerpSpeed);

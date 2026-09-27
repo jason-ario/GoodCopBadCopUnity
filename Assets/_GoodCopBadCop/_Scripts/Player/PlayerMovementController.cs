@@ -52,6 +52,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private float dialogueZoomDuration = 0.6f;
     [Tooltip("Minimum clearance kept between the camera and any obstruction (wall, prop) discovered along the dolly path.")]
     [SerializeField] private float dialogueZoomClearance = 0.15f;
+    [Tooltip("How far (meters) below the look target (head) the camera aims during dialogue zoom. ~0.35 aims at the chest, softening the upward pitch and framing more of the character. 0 = aim at the head.")]
+    [SerializeField] private float dialogueAimDropBelowHead = 0.35f;
 
     // Pre-dialogue pose, restored on exit.
     private Vector3 _preDialogueZoomLocalPos;
@@ -813,7 +815,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     /// in a single blend it yaws the body to face the target, dollies the camera horizontally to a
     /// fixed <see cref="dialogueZoomDistance"/> standoff from it (no dolly if already closer; clamped
     /// by obstructions), and pitches/aims the
-    /// camera at the head from the final dolly position. Movement/look are locked (CanControl false)
+    /// camera at the chest (<see cref="dialogueAimDropBelowHead"/> below the head) from the final dolly position. Movement/look are locked (CanControl false)
     /// for the whole conversation so <see cref="Rotate"/> never fights the blend. Safe to call
     /// multiple times; only the first call caches the pre-dialogue pose. <paramref name="verticalOffset"/>
     /// raises (positive) or lowers (negative) the camera per character height. Call
@@ -892,8 +894,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             endParentRot = Quaternion.identity;
         }
 
-        // --- Camera rotation: aim straight at the head from the final dolly position.
-        Vector3 lookDir = headPos - worldTargetPos;
+        // --- Camera rotation: aim at the chest (below the head) from the final dolly position,
+        // which softens the upward pitch and frames more of the character.
+        Vector3 aimPos = headPos + Vector3.down * dialogueAimDropBelowHead;
+        Vector3 lookDir = aimPos - worldTargetPos;
         Quaternion endWorldCamRot = lookDir.sqrMagnitude > 0.0001f
             ? Quaternion.LookRotation(lookDir.normalized, Vector3.up)
             : cameraTransform.rotation;
