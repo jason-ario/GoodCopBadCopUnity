@@ -35,6 +35,12 @@ public class MutantIntruderData : ScriptableObject
     [Min(0.1f)]
     public float attackAnimDurationSeconds = 1f;
 
+    [Tooltip("Seconds from the start of each bang animation to the moment the fist visually lands. " +
+             "The shutter/glass hit sound, shake, and glass damage fire at this point so they line up with the animation. " +
+             "Must be shorter than attackAnimDurationSeconds. 'Bang on window' impacts at ~0.48s.")]
+    [Min(0f)]
+    public float attackImpactDelaySeconds = 0.48f;
+
     [Tooltip("Seconds between the start of one attack and the start of the next.")]
     [Min(0.1f)]
     public float bangIntervalSeconds = 1.5f;

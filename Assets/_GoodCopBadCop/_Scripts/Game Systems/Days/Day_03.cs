@@ -66,6 +66,48 @@ public class Day_03 : DayBase, IDailyTask
     {
         CutPowerServer();
         StartCoroutine(RingPowerOutageCallAfterDelay());
+        StartFuseTutorialProximityWatch();
+    }
+
+    /// <summary>
+    /// Local, every client. Starts polling the local player's distance to the power station's
+    /// fuse box; the first time they come within <see cref="_fuseTutorialTriggerRadius"/> while
+    /// the outage is still active, shows the "Fix Fuse" tutorial overlay once. Stopped by
+    /// <see cref="StopFuseTutorialProximityWatch"/> when power is restored.
+    /// </summary>
+    private void StartFuseTutorialProximityWatch()
+    {
+        if (_fuseTutorialShown || _fuseBoxController == null) return;
+        StopFuseTutorialProximityWatch();
+        _fuseTutorialWatchCoroutine = StartCoroutine(WatchForPowerStationArrival());
+    }
+
+    private void StopFuseTutorialProximityWatch()
+    {
+        if (_fuseTutorialWatchCoroutine == null) return;
+        StopCoroutine(_fuseTutorialWatchCoroutine);
+        _fuseTutorialWatchCoroutine = null;
+    }
+
+    private System.Collections.IEnumerator WatchForPowerStationArrival()
+    {
+        var wait = new WaitForSeconds(0.25f);
+        float sqrRadius = _fuseTutorialTriggerRadius * _fuseTutorialTriggerRadius;
+
+        while (!_fuseTutorialShown && _fuseBoxController != null)
+        {
+            var player = PlayerInstance.Instance;
+            if (player != null &&
+                (player.transform.position - _fuseBoxController.transform.position).sqrMagnitude <= sqrRadius)
+            {
+                _fuseTutorialShown = true;
+                TutorialOverlay.Instance?.ShowFixFuseTutorial();
+                break;
+            }
+            yield return wait;
+        }
+
+        _fuseTutorialWatchCoroutine = null;
     }
 
     /// <summary>
@@ -149,8 +191,10 @@ public class Day_03 : DayBase, IDailyTask
             onComplete: OnPowerOutageDialogueComplete,
             unlocked: true,
             speakerNameOverride: "HQ",
-            speakerColorOverride: _powerOutageCallSpeakerColor,
-            useAlternateVoice: true,
+            // White subtitle text (the name tag falls back to the prefab's default colour).
+            // Voice clips and in-ear filtering come from Telephone (useTelephoneAudioSource).
+            speakerColorOverride: Color.white,
+            useAlternateVoice: false,
             useTelephoneAudioSource: true);
     }
 
@@ -234,9 +278,6 @@ public class Day_03 : DayBase, IDailyTask
              "dialogue, and cannot hang up until it finishes. Assign 'Day03PowerOutageCallDialogue'.")]
     [SerializeField] private ScriptedDialogue _powerOutageCallDialogue;
 
-    [Tooltip("Subtitle name colour for the HQ power-outage call, matching the alternate-voice " +
-             "convention used by Day 4's new voice announcement.")]
-    [SerializeField] private Color _powerOutageCallSpeakerColor = new Color(0.85f, 0.05f, 0.05f);
 
     [Tooltip("The power station's fuse box. Force-highlighted and pointed at with a pooled " +
              "TutorialMarker arrow (see TutorialMarkerManager) the instant the 'Restore Power' " +
@@ -246,6 +287,13 @@ public class Day_03 : DayBase, IDailyTask
              "highlights itself automatically once every fuse slot is filled — see " +
              "PowerSwitch.OnFuseCountChanged — so no separate wiring is needed for that step.")]
     [SerializeField] private FuseBoxPuzzleController _fuseBoxController;
+
+    [Tooltip("Distance (m) from the fuse box at which the local player counts as having arrived " +
+             "at the power station, showing the one-shot 'Fix Fuse' tutorial overlay.")]
+    [SerializeField] private float _fuseTutorialTriggerRadius = 12f;
+
+    private bool _fuseTutorialShown;
+    private Coroutine _fuseTutorialWatchCoroutine;
 
     /// <summary>Runtime "Restore Power" guidebook task, created only while the outage is active.</summary>
     private RepairPowerThreat _powerOutageThreat;
@@ -263,6 +311,13 @@ public class Day_03 : DayBase, IDailyTask
     // automatically via the shared TaskRegistry the moment each is triggered below in
     // DayActivated. Hand-scripting the same rows here (previously gated behind the bunker
     // door opening) just duplicated every row.
+
+    [Header("Yard Cleanup Amount")]
+    [Tooltip("Multiplier on the amount of start-of-day mess Day 3 triggers: gore/body-part junk " +
+             "(and the blood decal each one drops) and the number of fence segments freshly broken. " +
+             "1 = the task's full default roll. Fences already broken by an earlier breach still count.")]
+    [Range(0.05f, 1f)]
+    [SerializeField] private float _cleanupAmountScale = 0.33f;
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -284,12 +339,12 @@ public class Day_03 : DayBase, IDailyTask
         {
             // Blood decals are purely cosmetic (see MutantEnemy/TakeOutTrashTask) and need no
             // arming — only the trash/gore task and the fences require an explicit trigger.
-            TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true);
+            TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true, amountScale: _cleanupAmountScale);
 
             // Randomly breaks a batch of perimeter fence segments so the yard has repair work
             // waiting alongside the gore, mirroring the post-breach fence damage from Day 1
             // (see FenceRepairTask.TriggerTask doc comment). Self-guards to server-only.
-            FenceRepairTask.Instance?.TriggerTask();
+            FenceRepairTask.Instance?.TriggerTask(_cleanupAmountScale);
         }
 
         // Arms the Mutant Ocho / Vlad-corpse roof cutscene right as the player exits the
@@ -488,6 +543,7 @@ public class Day_03 : DayBase, IDailyTask
         // restored via some other path (e.g. a debug cheat) without ever progressing through
         // the normal open-box / insert-fuses steps above.
         ClearFuseBoxTutorialState();
+        StopFuseTutorialProximityWatch();
 
         if (_powerOutageThreat != null)
         {

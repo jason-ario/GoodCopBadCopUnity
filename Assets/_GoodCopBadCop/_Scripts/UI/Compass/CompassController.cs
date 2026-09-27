@@ -127,7 +127,8 @@ public class CompassController : MonoBehaviour
 
         foreach (KeyValuePair<Transform, CompassMarkerCategory> kvp in CompassMarkerRegistry.Markers)
         {
-            if (kvp.Key != null && !_wantedTargets.ContainsKey(kvp.Key) && IsCategoryTaskActive(kvp.Value))
+            if (kvp.Key != null && !_wantedTargets.ContainsKey(kvp.Key) && IsCategoryTaskActive(kvp.Value)
+                && PassesCleanupAreaGate(kvp.Key, kvp.Value))
                 _wantedTargets[kvp.Key] = kvp.Value;
         }
 
@@ -213,11 +214,51 @@ public class CompassController : MonoBehaviour
                 // task existed, reading as enemy markers.
                 return CleanBloodTask.Instance != null && CleanBloodTask.Instance.IsActive;
             case CompassMarkerCategory.Enemy:
-                // Enemy pips only exist while there is a task to kill them.
-                return KillMutantTask.Current != null;
+                // Enemy pips only exist while a kill task is actually on the HUD task list.
+                return KillMutantTask.IsActiveTask;
             default:
                 return true;
         }
+    }
+
+    /// <summary>
+    /// Checkpoint-cleanup markers (blood splatters, trash-task junk) only get a pip while they sit
+    /// inside the <see cref="CheckpointCleanupArea"/>, the same region that decides whether they
+    /// COUNT toward <see cref="CleanBloodTask"/> / <see cref="TakeOutTrashTask"/>. Anything outside
+    /// is optional bonus work and must not be advertised on the compass. Evaluated per frame, so a
+    /// carried item's pip follows it in and out of the region. Booth-mess junk is exempt while
+    /// <see cref="CleanBoothMessTask"/> is active, since that task isn't scoped to the region.
+    /// </summary>
+    private static bool PassesCleanupAreaGate(Transform target, CompassMarkerCategory category)
+    {
+        switch (category)
+        {
+            case CompassMarkerCategory.Blood:
+                return IsInsideCleanupArea(target.position);
+            case CompassMarkerCategory.Junk:
+                if (CleanBoothMessTask.Instance != null && CleanBoothMessTask.Instance.IsActive)
+                    return true;
+                return IsInsideCleanupArea(target.position);
+            default:
+                return true;
+        }
+    }
+
+    /// <summary>
+    /// Mirrors <c>CleanBloodTask.CountsTowardCleanup</c>: prefer the scene's
+    /// <see cref="CheckpointCleanupArea"/>, then <see cref="TakeOutTrashTask.CountsTowardCleanup"/>,
+    /// and fail open when neither exists so a scene without a region still shows pips.
+    /// </summary>
+    private static bool IsInsideCleanupArea(Vector3 worldPosition)
+    {
+        CheckpointCleanupArea area = CheckpointCleanupArea.Instance;
+        if (area != null && area.HasRegions)
+            return area.Contains(worldPosition);
+
+        if (TakeOutTrashTask.Instance != null)
+            return TakeOutTrashTask.Instance.CountsTowardCleanup(worldPosition);
+
+        return true;
     }
 
     private RectTransform GetIconFromPool()

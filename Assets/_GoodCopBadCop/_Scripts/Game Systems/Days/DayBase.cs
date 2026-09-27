@@ -173,102 +173,87 @@ public abstract class DayBase : MonoBehaviour
     protected virtual bool UseAutomaticSubjectCounterTask => true;
 
     private TutorialObjectiveItem _autoSubjectCounterTask;
-    private int _autoSubjectCounterProcessedCount;
+    private bool _autoSubjectCounterMirroring;
 
-    /// <summary>
-    /// Actual quota shown in the "Process N subjects" objective text. Always read from
-    /// <see cref="DailySuspectManager.TotalSuspectsThisShift"/> — the single source of truth for
-    /// "how many suspects this shift", also used by <see cref="ProcessResidentsTask"/>'s Task Page
-    /// total. That property deliberately EXCLUDES injected mutant intruder slots — mutants are a
-    /// random combat threat, never a "suspect to process", and must never affect this count (they
-    /// still occupy a lineup slot and still gate the actual end-of-shift, just via a separate,
-    /// mutant-inclusive count in <see cref="ShiftManager"/>). This class does NOT fall back to
-    /// <see cref="SuspectsToProcess"/> here: that field is only the pre-injection draw request, and
-    /// using it as a stand-in total is exactly what let this objective's displayed quota drift from
-    /// the real end-of-shift count. Days that need a different displayed total than the actual
-    /// lineup size (e.g. Day 1) must not use this automatic counter at all — see
-    /// <see cref="UseAutomaticSubjectCounterTask"/> and <see cref="SubjectsToProcessOverrideForDisplay"/>.
-    /// </summary>
-    private int _effectiveSuspectsToProcess;
+    // MULTIPLAYER: this counter is a purely local HUD row (TutorialObjectiveList is not networked),
+    // so it must NEVER compute its own total or processed count. Every peer runs
+    // DailySuspectManager.PopulateShiftCharacters with its own local RNG (mutant/doppelganger/
+    // full-mutant injection), so DailySuspectManager.TotalSuspectsThisShift differs per player on
+    // clients — only the server's roll drives spawning. Likewise ShiftManager.OnSuspectProcessed is
+    // not raised on clients for kills. Instead this row mirrors ProcessResidentsTask's
+    // server-authoritative NetworkVariables, which are identical on every peer (including late
+    // joiners and workday save restores).
 
     private void OnShiftStartShowSubjectCounter()
     {
-        if (UseAutomaticSubjectCounterTask)
-            StartCoroutine(ShowAutomaticSubjectCounterTaskAfterLineupPopulated());
-    }
-
-    /// <summary>
-    /// Waits until <see cref="DailySuspectManager"/> reports the day's lineup as fully populated
-    /// (including any injected mutant/doppelganger slots) before reading its true size, then shows
-    /// the counter task with that corrected total. Polls rather than waiting a single fixed frame
-    /// so this stays correct even if population ever takes longer than one frame.
-    /// </summary>
-    private IEnumerator ShowAutomaticSubjectCounterTaskAfterLineupPopulated()
-    {
-        float timeout = Time.unscaledTime + 5f;
-        while ((DailySuspectManager.Instance == null || !DailySuspectManager.Instance.IsLineupPopulated)
-               && Time.unscaledTime < timeout)
-        {
-            yield return null;
-        }
-
-        if (DailySuspectManager.Instance == null || !DailySuspectManager.Instance.IsLineupPopulated)
-            Debug.LogWarning("[DayBase] Subject counter: lineup never reported populated — showing counter anyway with best-known total.");
-
+        if (!UseAutomaticSubjectCounterTask) return;
         ShowAutomaticSubjectCounterTask();
     }
 
     /// <summary>
-    /// Shows the "Process N subjects" counter task and starts tracking resolutions via
-    /// <see cref="ShiftManager.OnSuspectProcessed"/> — which fires for every way a suspect can
-    /// be resolved (folder hand-off/pass, kill, or quarantine), not just folder hand-offs. This
-    /// keeps the counter in sync with the actual populated lineup size even when some slots are
-    /// resolved by combat (e.g. mutant intruders, doppelgangers) rather than a folder hand-off.
-    /// Safe to call multiple times — a no-op if the task is already showing or the quota has
-    /// already been met.
+    /// Starts mirroring <see cref="ProcessResidentsTask"/>'s replicated progress into the
+    /// "Process N subjects X/Y" objective row. The row appears once the server has published a
+    /// non-zero total for the shift, updates live, and is removed when the server marks the task
+    /// complete. Safe to call multiple times.
     /// </summary>
     protected void ShowAutomaticSubjectCounterTask()
     {
-        if (_autoSubjectCounterTask != null) return;
-
-        _effectiveSuspectsToProcess = DailySuspectManager.Instance != null
-            ? DailySuspectManager.Instance.TotalSuspectsThisShift
-            : 0;
-
-        if (_effectiveSuspectsToProcess <= 0) return;
-
-        if (_autoSubjectCounterProcessedCount >= _effectiveSuspectsToProcess) return;
-
-        _autoSubjectCounterTask = TutorialObjectiveList.Instance?.AddObjective(GetAutomaticSubjectCounterText());
-        ShiftManager.OnSuspectProcessed += OnAutomaticSubjectCounterProcessed;
-    }
-
-    private void OnAutomaticSubjectCounterProcessed()
-    {
-        _autoSubjectCounterProcessedCount++;
-        _autoSubjectCounterTask?.SetText(GetAutomaticSubjectCounterText());
-
-        if (_autoSubjectCounterProcessedCount >= _effectiveSuspectsToProcess)
-            HideAutomaticSubjectCounterTask();
-    }
-
-    /// <summary>
-    /// Stops tracking hand-offs and removes the counter task's row from
-    /// TutorialObjectiveList, if it is currently showing. Safe to call at any time.
-    /// </summary>
-    protected void HideAutomaticSubjectCounterTask()
-    {
-        ShiftManager.OnSuspectProcessed -= OnAutomaticSubjectCounterProcessed;
-
-        if (_autoSubjectCounterTask != null)
+        if (!_autoSubjectCounterMirroring)
         {
-            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_autoSubjectCounterTask, preHideDelay: 1.5f);
-            _autoSubjectCounterTask = null;
+            ProcessResidentsTask.ProgressChanged += RefreshAutomaticSubjectCounterTask;
+            _autoSubjectCounterMirroring = true;
+        }
+
+        RefreshAutomaticSubjectCounterTask();
+    }
+
+    private void RefreshAutomaticSubjectCounterTask()
+    {
+        ProcessResidentsTask task = ProcessResidentsTask.Instance;
+        int total = task != null ? task.TotalCount : 0;
+        int processed = task != null ? task.ProcessedCount : 0;
+        bool active = task != null && task.IsActive && total > 0 && processed < total;
+
+        if (active)
+        {
+            string text = GetAutomaticSubjectCounterText(processed, total);
+            if (_autoSubjectCounterTask == null)
+                _autoSubjectCounterTask = TutorialObjectiveList.Instance?.AddObjective(text);
+            else
+                _autoSubjectCounterTask.SetText(text);
+        }
+        else if (_autoSubjectCounterTask != null)
+        {
+            if (total > 0)
+                _autoSubjectCounterTask.SetText(GetAutomaticSubjectCounterText(processed, total));
+            RemoveAutomaticSubjectCounterRow();
         }
     }
 
-    private string GetAutomaticSubjectCounterText() =>
-        $"Process {_effectiveSuspectsToProcess} subjects {Mathf.Min(_autoSubjectCounterProcessedCount, _effectiveSuspectsToProcess)}/{_effectiveSuspectsToProcess}";
+    /// <summary>
+    /// Stops mirroring and removes the counter task's row from TutorialObjectiveList, if it is
+    /// currently showing. Safe to call at any time.
+    /// </summary>
+    protected void HideAutomaticSubjectCounterTask()
+    {
+        if (_autoSubjectCounterMirroring)
+        {
+            ProcessResidentsTask.ProgressChanged -= RefreshAutomaticSubjectCounterTask;
+            _autoSubjectCounterMirroring = false;
+        }
+
+        RemoveAutomaticSubjectCounterRow();
+    }
+
+    private void RemoveAutomaticSubjectCounterRow()
+    {
+        if (_autoSubjectCounterTask == null) return;
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_autoSubjectCounterTask, preHideDelay: 1.5f);
+        _autoSubjectCounterTask = null;
+    }
+
+    private static string GetAutomaticSubjectCounterText(int processed, int total) =>
+        $"Process {total} subjects {Mathf.Min(processed, total)}/{total}";
 
     // -------------------------------------------------------------------------
     // C# Events — subscribe from external systems or day subclasses

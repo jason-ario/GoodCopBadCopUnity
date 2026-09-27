@@ -1,28 +1,15 @@
-using Unity.Netcode;
-using UnityEngine;
-
 /// <summary>
-/// A refuel cannister for the <see cref="Flamethrower"/>.
-///
-/// Pick this up and use it (LMB) on a Flamethrower in the world to fully refill
-/// its fuel tank. The cannister is despawned once consumed.
-///
-/// Prefab requirements:
-///   - NetworkObject
-///   - NetworkTransform
-///   - HighlightEffect   (required by Interactable)
-///   - ParentConstraint  (required by PickableObject)
-///   - Collider on the Interactable layer
-///   - "Item Data" field → Flamethrower Cannister.asset
-/// The Flamethrower's "itemsThatCanInteractWith" must include Flamethrower Cannister.asset.
-/// Must be registered as a Network Prefab in the NetworkManager.
+/// A fuel cannister for the <see cref="Flamethrower"/>. Hold it and left-click to pour its fuel
+/// into the player's <see cref="PlayerAmmoReserve"/>; any fuel that doesn't fit stays in the
+/// cannister. See <see cref="AmmoPickup"/> for the shared behaviour and prefab requirements
+/// ("Item Data" → Flamethrower Cannister.asset).
 /// </summary>
-[RequireComponent(typeof(NetworkObject))]
-public class FlamethrowerCannister : PickableObject
+public class FlamethrowerCannister : AmmoPickup
 {
-    protected override void Awake()
-    {
-        base.Awake();
-        interactText = "Flamethrower Cannister";
-    }
+    /// <summary>Fuel units in a full cannister (one full flamethrower tank).</summary>
+    public const int FuelPerCannister = (int)Flamethrower.MaxFuel;
+
+    public override AmmoType AmmoType => AmmoType.Fuel;
+    public override int Capacity => FuelPerCannister;
+    protected override string DisplayName => "Flamethrower Fuel";
 }

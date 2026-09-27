@@ -91,6 +91,12 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     /// Returns false — suppressing the BangOnShutters trigger — when the shutter is open
     /// AND the glass pane is already smashed, meaning nothing is left to hit.
     /// </summary>
+    /// <summary>Seconds from bang start to the fist landing (clamped inside the attack window).</summary>
+    private float ImpactDelay => Mathf.Clamp(_data.attackImpactDelaySeconds, 0f, _data.attackAnimDurationSeconds);
+
+    /// <summary>Remaining attack-bool hold time after the impact point.</summary>
+    private float PostImpactAnimRemainder => Mathf.Max(0f, _data.attackAnimDurationSeconds - ImpactDelay);
+
     private bool HasBarrierToBangOn()
     {
         bool shutterOpen = _shutterController != null && _shutterController.IsOpen;
@@ -464,8 +470,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             while (!_isDone && Time.time < endTime)
             {
                 if (HasBarrierToBangOn()) SetAttackClientRpc(true);
+                yield return new WaitForSeconds(ImpactDelay);
+                if (_isDone) yield break;
                 HitShutterClientRpc();
-                yield return new WaitForSeconds(_data.attackAnimDurationSeconds);
+                yield return new WaitForSeconds(PostImpactAnimRemainder);
                 SetAttackClientRpc(false);
                 yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
             }
@@ -505,8 +513,15 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             }
 
             if (HasBarrierToBangOn()) SetAttackClientRpc(true);
-            HitShutterClientRpc();
-            yield return new WaitForSeconds(_data.attackAnimDurationSeconds);
+            yield return new WaitForSeconds(ImpactDelay);
+            if (_isDone) yield break;
+
+            // Shutter opened during the wind-up — the blow lands on the glass behind it (or on
+            // nothing), not the shutter. Skip the shutter impact; the next iteration hands off.
+            if (_shutterController == null || !_shutterController.IsOpen)
+                HitShutterClientRpc();
+
+            yield return new WaitForSeconds(PostImpactAnimRemainder);
             SetAttackClientRpc(false);
             yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
         }
@@ -557,7 +572,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             SetAttackClientRpc(true);
 
             // Wait for the animation to reach the impact point, then register the hit.
-            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForSeconds(ImpactDelay);
+            if (_isDone) yield break;
 
             // Player closed the shutter during the wind-up — the shutter starts moving (and
             // ShutterController.IsOpen flips) the instant the switch is hit, well before the
@@ -578,7 +594,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
                 {
                     // Final blow — transition to broken glass on all clients, then climb through.
                     SmashGlassClientRpc();
-                    yield return new WaitForSeconds(Mathf.Max(0f, _data.attackAnimDurationSeconds - 0.5f));
+                    yield return new WaitForSeconds(PostImpactAnimRemainder);
                     SetAttackClientRpc(false);
                     yield return StartCoroutine(ClimbThroughSequence());
                     yield break;
@@ -590,7 +606,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
                 }
             }
 
-            yield return new WaitForSeconds(Mathf.Max(0f, _data.attackAnimDurationSeconds - 0.5f));
+            yield return new WaitForSeconds(PostImpactAnimRemainder);
             SetAttackClientRpc(false);
             yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
         }

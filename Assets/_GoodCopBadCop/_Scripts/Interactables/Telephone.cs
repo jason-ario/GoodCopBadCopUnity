@@ -57,6 +57,32 @@ public class Telephone : Interactable
     /// </summary>
     public AudioSource VoiceAudioSource => _voiceAudioSource;
 
+    [Header("Phone Voice (In-Ear)")]
+    [Tooltip("Voice clips cycled for scripted calls (e.g. Day 3's HQ power-outage call) played through " +
+             "the handset. Falls back to the caller's own clips when empty.")]
+    [SerializeField] private AudioClip[] _scriptedCallVoiceClips;
+    [Tooltip("When true, the phone filter settings below are applied to the voice AudioSource's filter " +
+             "chain on Awake (filters are added if missing).")]
+    [SerializeField] private bool _applyPhoneFilterPreset = true;
+    [SerializeField] private float _phoneHighPassCutoff = 750f;
+    [SerializeField] private float _phoneHighPassResonance = 1.8f;
+    [SerializeField] private float _phoneLowPassCutoff = 2600f;
+    [SerializeField] private float _phoneLowPassResonance = 2.2f;
+    [SerializeField, Range(0f, 1f)] private float _phoneDistortionLevel = 0.5f;
+    [Tooltip("Volume of the voice while the local player holds the handset (played 2D, in-ear).")]
+    [SerializeField, Range(0f, 1f)] private float _inEarVolume = 1f;
+    [Tooltip("Stereo pan while in-ear. Negative = left ear (the handset is held in the left hand).")]
+    [SerializeField, Range(-1f, 1f)] private float _inEarStereoPan = -0.25f;
+
+    /// <summary>Voice clips for scripted calls; empty when none are assigned.</summary>
+    public AudioClip[] ScriptedCallVoiceClips => _scriptedCallVoiceClips ?? Array.Empty<AudioClip>();
+
+    // Original 3D settings of the voice source, restored for players not holding the handset.
+    private float _voiceDefaultSpatialBlend;
+    private int _voiceDefaultPriority;
+    private float _voiceDefaultVolume;
+    private bool _voiceDefaultBypassReverb;
+
     [Tooltip("Speaker name displayed in the subtitle bar during the voice line.")]
     [SerializeField] private string _hqSpeakerName = "HQ";
     [Tooltip("Animator driving the phone ringing animation. Optional.")]
@@ -125,6 +151,79 @@ public class Telephone : Interactable
     {
         base.Awake();
         Instance = this;
+        InitVoiceSource();
+    }
+
+    // ── Phone voice ──────────────────────────────────────────────────────────
+
+    private void InitVoiceSource()
+    {
+        if (_voiceAudioSource == null) return;
+
+        _voiceDefaultSpatialBlend = _voiceAudioSource.spatialBlend;
+        _voiceDefaultPriority = _voiceAudioSource.priority;
+        _voiceDefaultVolume = _voiceAudioSource.volume;
+        _voiceDefaultBypassReverb = _voiceAudioSource.bypassReverbZones;
+
+        if (!_applyPhoneFilterPreset) return;
+
+        GameObject go = _voiceAudioSource.gameObject;
+
+        var highPass = GetOrAdd<AudioHighPassFilter>(go);
+        highPass.enabled = true;
+        highPass.cutoffFrequency = _phoneHighPassCutoff;
+        highPass.highpassResonanceQ = _phoneHighPassResonance;
+
+        var lowPass = GetOrAdd<AudioLowPassFilter>(go);
+        lowPass.enabled = true;
+        // The custom curve overrides cutoffFrequency, so flatten it to the target cutoff.
+        lowPass.customCutoffCurve = AnimationCurve.Constant(0f, 1f, Mathf.Clamp01(_phoneLowPassCutoff / 22000f));
+        lowPass.cutoffFrequency = _phoneLowPassCutoff;
+        lowPass.lowpassResonanceQ = _phoneLowPassResonance;
+
+        var distortion = GetOrAdd<AudioDistortionFilter>(go);
+        distortion.enabled = true;
+        distortion.distortionLevel = _phoneDistortionLevel;
+    }
+
+    private static T GetOrAdd<T>(GameObject go) where T : Component
+    {
+        return go.TryGetComponent(out T existing) ? existing : go.AddComponent<T>();
+    }
+
+    /// <summary>
+    /// Local, per client. Configures <see cref="VoiceAudioSource"/> for the local listener and
+    /// returns it: when the local player is holding the handset the voice plays 2D at top
+    /// priority, full volume, bypassing reverb (right in the player's ear); everyone else hears
+    /// it with the source's original 3D settings from the phone's position.
+    /// </summary>
+    public AudioSource PrepareVoiceSourceForLocalListener()
+    {
+        if (_voiceAudioSource == null) return null;
+
+        var nm = NetworkManager.Singleton;
+        bool localHolding = _localHoldMode != LocalHoldMode.None ||
+                            (nm != null && _isGrabbed.Value && _grabbingClientId.Value == nm.LocalClientId);
+
+        if (localHolding)
+        {
+            _voiceAudioSource.spatialBlend = 0f;
+            _voiceAudioSource.priority = 0;
+            _voiceAudioSource.volume = _inEarVolume;
+            _voiceAudioSource.panStereo = _inEarStereoPan;
+            _voiceAudioSource.bypassReverbZones = true;
+            _voiceAudioSource.dopplerLevel = 0f;
+        }
+        else
+        {
+            _voiceAudioSource.spatialBlend = _voiceDefaultSpatialBlend;
+            _voiceAudioSource.priority = _voiceDefaultPriority;
+            _voiceAudioSource.volume = _voiceDefaultVolume;
+            _voiceAudioSource.panStereo = 0f;
+            _voiceAudioSource.bypassReverbZones = _voiceDefaultBypassReverb;
+        }
+
+        return _voiceAudioSource;
     }
 
     // ── Interaction ──────────────────────────────────────────────────────────
@@ -477,7 +576,7 @@ public class Telephone : Interactable
 
             if (_voiceAudioSource != null && data.VoiceAudioClips != null && data.VoiceAudioClips.Length > 0)
             {
-                DialogueManager.Instance.PlayDialogueAudio(data.VoiceLine, data.VoiceAudioClips, _voiceAudioSource);
+                DialogueManager.Instance.PlayDialogueAudio(data.VoiceLine, data.VoiceAudioClips, PrepareVoiceSourceForLocalListener());
             }
         }
         else if (taskIndex == -1)
@@ -488,7 +587,7 @@ public class Telephone : Interactable
             if (_voiceAudioSource != null && _debugVoiceAudioClips != null && _debugVoiceAudioClips.Length > 0)
             {
                 DialogueManager.Instance.PlayDialogueAudio(
-                    _debugVoiceLine, _debugVoiceAudioClips, _voiceAudioSource);
+                    _debugVoiceLine, _debugVoiceAudioClips, PrepareVoiceSourceForLocalListener());
             }
         }
         // taskIndex == -2: scripted call — voice/subtitles are handled externally by the

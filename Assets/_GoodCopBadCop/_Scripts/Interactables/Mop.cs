@@ -54,6 +54,11 @@ public class Mop : PickableObject
     [Tooltip("Layer mask for the graffiti collider. Must include the Interactable layer.")]
     [SerializeField] private LayerMask _graffitiLayerMask;
 
+    [Header("Suspect Poke")]
+    [Tooltip("Minimum seconds between flinches while the mop stays in contact with the same suspect. " +
+             "A fresh contact (touching a different suspect, or re-touching after pulling away) flinches immediately.")]
+    [SerializeField] private float _suspectFlinchInterval = 0.8f;
+
     [Header("VFX")]
     [Tooltip("Particle system played while the mop is in use and touching any surface. " +
              "Repositioned each frame to the closest point on the contacted collider.")]
@@ -92,6 +97,15 @@ public class Mop : PickableObject
 
     private Coroutine _scrubRoutine;
     private GraffitiInteractable _activeGraffiti;
+
+    /// <summary>Suspect currently touched by the mop (owner only), and when it last flinched.</summary>
+    private SuspectCharacter _touchedSuspect;
+    private float _lastSuspectFlinchTime = float.NegativeInfinity;
+
+    /// <summary>Sanity bound (m) the server applies to owner-reported suspect pokes.</summary>
+    private const float MaxSuspectPokeDistance = 5f;
+
+    private static readonly Collider[] SuspectOverlapBuffer = new Collider[16];
 
     /// <summary>Cached fallback for <see cref="_scrubBounds"/> when it is not assigned.</summary>
     private BoxCollider _autoScrubBounds;
@@ -319,13 +333,84 @@ public class Mop : PickableObject
             Collider particleCollider = hitCollider ?? FindSurfaceInRange();
             UpdateScrubVisuals(particleCollider);
 
+            UpdateSuspectPoke();
+
             yield return null;
         }
 
         // Clean up after the loop exits (isUsing became false).
         StopScrubVisuals();
         NotifyStopScrubbing();
+        _touchedSuspect = null;
         _scrubRoutine = null;
+    }
+
+    // ── Suspect poke ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Owner only. If the scrub capsule touches a living suspect, asks the server to play a
+    /// cosmetic flinch — no damage, no gore. New contact flinches immediately; sustained contact
+    /// re-flinches every <see cref="_suspectFlinchInterval"/> seconds.
+    /// </summary>
+    private void UpdateSuspectPoke()
+    {
+        if (!IsOwner) return;
+
+        SuspectCharacter suspect = FindSuspectInRange();
+        if (suspect == null)
+        {
+            _touchedSuspect = null;
+            return;
+        }
+
+        bool newContact = suspect != _touchedSuspect;
+        _touchedSuspect = suspect;
+
+        if (!newContact && Time.time - _lastSuspectFlinchTime < _suspectFlinchInterval)
+            return;
+
+        if (suspect.NetworkObject == null) return;
+
+        _lastSuspectFlinchTime = Time.time;
+        FlinchSuspectServerRpc(new NetworkObjectReference(suspect.NetworkObject), transform.position);
+    }
+
+    private SuspectCharacter FindSuspectInRange()
+    {
+        if (!IsHeld) return null;
+
+        GetScrubSegment(out Vector3 pointA, out Vector3 pointB);
+
+        int count = (pointB - pointA).sqrMagnitude > 0.000001f
+            ? Physics.OverlapCapsuleNonAlloc(pointA, pointB, _scrubRadius, SuspectOverlapBuffer,
+                Physics.AllLayers, QueryTriggerInteraction.Collide)
+            : Physics.OverlapSphereNonAlloc(pointA, _scrubRadius, SuspectOverlapBuffer,
+                Physics.AllLayers, QueryTriggerInteraction.Collide);
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = SuspectOverlapBuffer[i];
+            if (col == null || col.transform.IsChildOf(transform)) continue;
+
+            SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
+            if (suspect != null && !suspect.IsDead && !suspect.HasFled)
+                return suspect;
+        }
+
+        return null;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void FlinchSuspectServerRpc(NetworkObjectReference suspectRef, Vector3 mopPosition)
+    {
+        if (!suspectRef.TryGet(out NetworkObject suspectObj) || suspectObj == null) return;
+
+        if (Vector3.Distance(suspectObj.transform.position, mopPosition) > MaxSuspectPokeDistance) return;
+
+        SuspectCharacter suspect = suspectObj.GetComponent<SuspectCharacter>();
+        if (suspect == null) suspect = suspectObj.GetComponentInChildren<SuspectCharacter>();
+        if (suspect != null)
+            suspect.PlayFlinch();
     }
 
     /// <summary>

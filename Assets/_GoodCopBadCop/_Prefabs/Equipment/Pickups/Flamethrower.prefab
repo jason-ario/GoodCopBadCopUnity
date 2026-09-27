@@ -153,6 +153,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
       insertIndex: -1
       addedObject: {fileID: 172595018366344269}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2242020417184382167}
   m_SourcePrefab: {fileID: 100100000, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
 --- !u!4 &5175747636520950949 stripped
 Transform:
@@ -470,10 +473,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 4000246964
   InScenePlacedSourceGlobalObjectIdHash: 4000246964
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -494,17 +499,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Flamethrower
   ShowTopMostFoldoutHeaderGroup: 1
-  itemsThatCanInteractWith:
-  - {fileID: 11400000, guid: f76cbb63dda9cfc41a320b213076ffd3, type: 2}
+  itemsThatCanInteractWith: []
   interactText: Flamethrower
   highlightNameFilter: 
   itemData: {fileID: 11400000, guid: 96a6eaea0ddc1f5408f3aa8767a4b445, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
   _flameVFX: {fileID: 4864926771133373500}
   _fuelDrainRate: 1
   _minVelocityRatio: 0.05
   _maxFlameRange: 4
   _flameWidth: 0.5
+  _playerDamagePerTick: 5
+  _remainsBurnSeconds: 3
+  _remainsBurnResetSeconds: 6
+  _burnFireVfxPrefab: {fileID: 100000, guid: a817de05addd7b64faa73b34c74013ce, type: 3}
+  _goreFireVfxScale: 0.6
+  _burnAwayVfxLifetime: 2.5
   _flameAudioSource: {fileID: 6719636838967982140}
+  _reloadSound: {fileID: 8300000, guid: dd7a1f81e159ed24a8da9c6bb92bc32d, type: 3}
 --- !u!82 &6719636838967982140
 AudioSource:
   m_ObjectHideFlags: 0
@@ -715,6 +728,18 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 0
   AutoSetKinematicOnDespawn: 1
+--- !u!114 &2242020417184382167
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5519200517795235359}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
 --- !u!1001 &4864926771115410430
 PrefabInstance:
   m_ObjectHideFlags: 0

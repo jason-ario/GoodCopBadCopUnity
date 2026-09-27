@@ -26,6 +26,16 @@ public class KillMutantTask : ISystemicThreat
     public static KillMutantTask Current { get; private set; }
 
     /// <summary>
+    /// True only while "Kill the mutants" is genuinely a current task: an instance exists, it still
+    /// has mutants left, AND its row is actually in <see cref="TaskRegistry"/>. <see cref="Current"/>
+    /// alone is not enough — it is a static that survives <see cref="TaskRegistry.SetThreats"/> /
+    /// <see cref="TaskRegistry.ClearThreats"/> (between-shift task list rebuilds), which used to leave
+    /// Enemy compass pips on leftover pack mutants with no kill task on the HUD.
+    /// </summary>
+    public static bool IsActiveTask =>
+        Current != null && Current._killsRemaining > 0 && TaskRegistry.IsRegistered(Current);
+
+    /// <summary>
     /// Fired on the server when all enemies in the pack are killed.
     /// Day scripts (e.g. Day_02) subscribe to this to advance the night phase.
     /// </summary>

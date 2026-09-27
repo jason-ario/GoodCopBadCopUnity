@@ -13,8 +13,8 @@ using UnityEngine;
 /// "Shoot" animation trigger. Firing is blocked when <see cref="_roundsRemaining"/> reaches
 /// zero — a dry-fire click sound plays instead.
 ///
-/// E while holding a <see cref="PistolAmmo"/> clip refills rounds to <see cref="MaxRounds"/>
-/// and consumes (despawns) the clip.
+/// R (while held) reloads the magazine from the holder's <see cref="PlayerAmmoReserve"/>.
+/// Ammo enters the reserve by left-clicking a held <see cref="PistolAmmo"/> clip.
 ///
 /// Prefab requirements:
 ///   - NetworkObject
@@ -135,9 +135,6 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     {
         UpdateInteractText(current);
         OnAmmoChanged?.Invoke();
-
-        if (current > previous && _reloadSound != null)
-            SFXController.Instance.PlayAtPosition(_reloadSound, transform.position);
     }
 
     private void UpdateInteractText(int rounds)
@@ -175,6 +172,11 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         // origin, which meant a shot at a moving mutant was tested against a position the target had
         // already left — the shot looked like a hit locally and did nothing. See FireServerRpc.
         FireHit hit = ResolveShot(cam.transform.position, cam.transform.forward);
+
+        // Cosmetic prop reaction plays instantly for the shooter; the server relays it to others.
+        if (hit.Kind == ShotKind.Prop)
+            HittableProp.TryHitAt(hit.Point, cam.transform.forward);
+
         FireServerRpc(cam.transform.forward, (byte)hit.Kind, hit.TargetRef, hit.Point);
     }
 
@@ -185,6 +187,7 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         Mutant  = 1,
         Player  = 2,
         Glass   = 3,
+        Prop    = 4,
     }
 
     private readonly struct FireHit
@@ -257,6 +260,9 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             BreakableGlassController glass = hit.collider.GetComponentInParent<BreakableGlassController>();
             if (glass != null && !glass.IsSmashed)
                 return new FireHit(ShotKind.Glass, default, hit.point);
+
+            if (hit.collider.GetComponentInParent<HittableProp>() != null)
+                return new FireHit(ShotKind.Prop, default, hit.point);
 
             // Solid geometry that isn't anything special — this blocks the shot.
             return new FireHit(ShotKind.None, default, hit.point);
@@ -377,6 +383,21 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             return;
         }
 
+        if (kind == ShotKind.Prop)
+        {
+            // Cosmetic only — replay on every client except the shooter (who already played it).
+            List<ulong> propTargets = new List<ulong>();
+            foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
+                if (id != shooterClientId) propTargets.Add(id);
+
+            if (propTargets.Count > 0)
+                PropHitClientRpc(hitPoint, rayDirection, new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams { TargetClientIds = propTargets }
+                });
+            return;
+        }
+
         if (!targetRef.TryGet(out NetworkObject targetObj) || targetObj == null)
             return; // Target despawned between the shot and this message.
 
@@ -431,6 +452,13 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         BreakableGlassController.Instance?.ApplySmash();
     }
 
+    /// <summary>Replays a cosmetic <see cref="HittableProp"/> reaction on non-shooting clients.</summary>
+    [ClientRpc]
+    private void PropHitClientRpc(Vector3 hitPoint, Vector3 direction, ClientRpcParams clientRpcParams = default)
+    {
+        HittableProp.TryHitAt(hitPoint, direction);
+    }
+
     /// <summary>
     /// Received by all clients except the shooter. Plays VFX on the world pickup Pistol
     /// (the active, networked object) so the effect always originates from the correct instance.
@@ -442,187 +470,53 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         _cinemachineImpulseSource?.GenerateImpulse();
     }
 
-    // ── Reloading ─────────────────────────────────────────────────────────────
+    // ── Reloading (KeyCode.R, from PlayerAmmoReserve) ──────────────────────────
+
+    public AmmoType ReserveAmmoType => AmmoType.Pistol;
 
     /// <summary>
-    /// Called when the player presses E while targeting the pistol.
-    /// Delegates to <see cref="TryReload"/> so both E and LMB share the same path.
+    /// Called by <see cref="PlayerInventory"/> when the local player presses R with this pistol
+    /// equipped. Skips the round-trip when the magazine is full or the local reserve is empty.
     /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player)
-        => TryReload(player);
-
-    /// <summary>
-    /// Called when the player LMB-clicks the pistol while holding a compatible item
-    /// (i.e. <see cref="PistolAmmo"/> is listed in <c>itemsThatCanInteractWith</c>).
-    /// Delegates to <see cref="TryReload"/> so both E and LMB share the same path.
-    /// </summary>
-    public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
+    public void RequestReloadFromReserve()
     {
-        base.InteractWithItem(playerInteractionController, item);
-        TryReload(playerInteractionController);
-    }
-
-    /// <summary>
-    /// Validates that the player is holding a <see cref="PistolAmmo"/> clip and the pistol
-    /// has room for more rounds, then sends <see cref="ReloadServerRpc"/>.
-    /// </summary>
-    private void TryReload(PlayerInteractionController player)
-    {
-        if (player.pickupController.HeldObject is not PistolAmmo) return;
         if (_roundsRemaining.Value >= MaxRounds) return;
 
-        ReloadServerRpc();
+        PlayerAmmoReserve reserve = PlayerAmmoReserve.Local;
+        if (reserve != null && reserve.Get(ReserveAmmoType) <= 0) return;
+
+        ReloadFromReserveServerRpc();
     }
 
     /// <summary>
-    /// Validates server-side that the requesting player is holding a <see cref="PistolAmmo"/>
-    /// clip and the pistol is not already full. On success, transfers only the rounds needed
-    /// to reach <see cref="MaxRounds"/> from the clip. If the clip reaches zero it is despawned
-    /// via <see cref="ConsumeAmmoClientRpc"/>; otherwise it stays equipped with the updated count.
-    /// RequireOwnership = false so any client can reload the pistol regardless of who holds it.
+    /// Server: validates the sender is holding this pistol, then moves only the rounds needed to
+    /// reach <see cref="MaxRounds"/> from their <see cref="PlayerAmmoReserve"/> into the magazine.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void ReloadServerRpc(ServerRpcParams rpcParams = default)
+    private void ReloadFromReserveServerRpc(ServerRpcParams rpcParams = default)
     {
         ulong clientId = rpcParams.Receive.SenderClientId;
-
-        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
+        if (!PlayerAmmoReserve.TryGetForHolder(clientId, NetworkObject, out PlayerAmmoReserve reserve))
         {
-            Debug.LogWarning($"[Pistol] ReloadServerRpc: client {clientId} not found.");
+            Debug.LogWarning($"[Pistol] ReloadFromReserveServerRpc: client {clientId} is not holding this pistol.");
             return;
         }
-
-        PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        if (ppc == null || !ppc.HeldObjectRef.TryGet(out NetworkObject heldNetObj)
-            || heldNetObj.GetComponent<PistolAmmo>() is not PistolAmmo ammo)
-        {
-            Debug.LogWarning($"[Pistol] ReloadServerRpc: client {clientId} is not holding PistolAmmo.");
-            return;
-        }
-
-        if (_roundsRemaining.Value >= MaxRounds) return;
 
         int needed = MaxRounds - _roundsRemaining.Value;
-        int transferred = ammo.ConsumeRounds(needed);
-        _roundsRemaining.Value += transferred;
+        if (needed <= 0) return;
 
-        // Only despawn the clip when it has been fully emptied.
-        if (ammo.RoundsInClip <= 0)
-        {
-            ConsumeAmmoClientRpc(new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
-            });
-        }
+        int taken = reserve.Take(ReserveAmmoType, needed);
+        if (taken <= 0) return;
+
+        _roundsRemaining.Value += taken;
+        PlayReloadSoundClientRpc();
     }
 
-    /// <summary>
-    /// Received only by the player who triggered the reload.
-    /// Calls <see cref="PlayerPickupController.DestroyEquippedItem"/> which unequips the clip
-    /// from all arm containers, releases the holder, and despawns the NetworkObject.
-    /// </summary>
+    /// <summary>Plays the reload sound at the pistol on every client after a successful reload.</summary>
     [ClientRpc]
-    private void ConsumeAmmoClientRpc(ClientRpcParams clientRpcParams = default)
+    private void PlayReloadSoundClientRpc()
     {
-        PlayerPickupController ppc = NetworkManager.Singleton.LocalClient?.PlayerObject
-            ?.GetComponent<PlayerPickupController>();
-
-        if (ppc == null)
-        {
-            Debug.LogWarning("[Pistol] ConsumeAmmoClientRpc: could not find local PlayerPickupController.");
-            return;
-        }
-
-        ppc.DestroyEquippedItem();
-    }
-
-    // ── Reloading from inventory (KeyCode.R) ────────────────────────────────────
-
-    /// <summary>Returns true if <paramref name="candidate"/> is a <see cref="PistolAmmo"/> clip.</summary>
-    public bool IsCompatibleAmmo(PickableObject candidate) => candidate is PistolAmmo;
-
-    /// <summary>
-    /// Called by <see cref="PlayerInventory"/> when the local player presses R while this pistol
-    /// is equipped and a <see cref="PistolAmmo"/> clip sits in the other inventory slot (not held).
-    /// </summary>
-    public void ReloadFromInventory(PickableObject ammoItem)
-    {
-        if (ammoItem is not PistolAmmo ammo) return;
-        if (_roundsRemaining.Value >= MaxRounds) return;
-        if (!ammo.TryGetComponent(out NetworkObject ammoNetObj)) return;
-
-        ReloadFromInventoryServerRpc(new NetworkObjectReference(ammoNetObj));
-    }
-
-    /// <summary>
-    /// Validates server-side that the requesting client owns both this pistol (currently holds it)
-    /// and the referenced <see cref="PistolAmmo"/> clip (it sits somewhere in their inventory),
-    /// then transfers rounds exactly like <see cref="ReloadServerRpc"/> — except the clip is never
-    /// brought to hand. If the clip empties, <see cref="ConsumeInventoryAmmoClientRpc"/> tells the
-    /// owning client to clear its inventory slot and despawn the clip.
-    /// RequireOwnership = false so any client can request this for their own pistol/ammo.
-    /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    private void ReloadFromInventoryServerRpc(NetworkObjectReference ammoRef, ServerRpcParams rpcParams = default)
-    {
-        ulong clientId = rpcParams.Receive.SenderClientId;
-
-        if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
-        {
-            Debug.LogWarning($"[Pistol] ReloadFromInventoryServerRpc: client {clientId} not found.");
-            return;
-        }
-
-        // Only the client actually holding this pistol may reload it.
-        PlayerPickupController ppc = client.PlayerObject?.GetComponent<PlayerPickupController>();
-        if (ppc == null || !ppc.HeldObjectRef.TryGet(out NetworkObject heldWeaponObj) || heldWeaponObj != NetworkObject)
-        {
-            Debug.LogWarning($"[Pistol] ReloadFromInventoryServerRpc: client {clientId} is not holding this pistol.");
-            return;
-        }
-
-        if (!ammoRef.TryGet(out NetworkObject ammoNetObj) || ammoNetObj.GetComponent<PistolAmmo>() is not PistolAmmo ammo)
-        {
-            Debug.LogWarning($"[Pistol] ReloadFromInventoryServerRpc: client {clientId}'s ammo reference is invalid.");
-            return;
-        }
-
-        // The clip must actually belong to the requesting client (i.e. sit in their inventory).
-        if (ammoNetObj.OwnerClientId != clientId) return;
-        if (_roundsRemaining.Value >= MaxRounds) return;
-
-        int needed = MaxRounds - _roundsRemaining.Value;
-        int transferred = ammo.ConsumeRounds(needed);
-        _roundsRemaining.Value += transferred;
-
-        // Only despawn the clip when it has been fully emptied.
-        if (ammo.RoundsInClip <= 0)
-        {
-            ConsumeInventoryAmmoClientRpc(ammoRef, new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
-            });
-        }
-    }
-
-    /// <summary>
-    /// Received only by the player who triggered the inventory reload. Removes the now-empty
-    /// clip from their <see cref="PlayerInventory"/> slot (so the UI clears immediately), then
-    /// asks the server to despawn it — mirroring <see cref="ConsumeAmmoClientRpc"/>'s ordering
-    /// for the held-clip path.
-    /// </summary>
-    [ClientRpc]
-    private void ConsumeInventoryAmmoClientRpc(NetworkObjectReference ammoRef, ClientRpcParams clientRpcParams = default)
-    {
-        if (!ammoRef.TryGet(out NetworkObject ammoNetObj)) return;
-
-        PickableObject ammoItem = ammoNetObj.GetComponent<PickableObject>();
-        if (ammoItem == null) return;
-
-        PlayerInventory inventory = NetworkManager.Singleton.LocalClient?.PlayerObject
-            ?.GetComponent<PlayerInventory>();
-        inventory?.ClearSlotForItem(ammoItem);
-
-        ammoItem.DespawnServerRpc();
+        if (_reloadSound != null)
+            SFXController.Instance.PlayAtPosition(_reloadSound, transform.position);
     }
 }

@@ -79,6 +79,17 @@ public class PickableObject : Interactable
     /// <see cref="OnStowed"/>, which only runs on the local owner performing the stow.
     /// </summary>
     public event Action<bool> OnStowedNetworked;
+
+    /// <summary>
+    /// Fired on ALL instances (clients AND server) whenever the authoritative
+    /// <see cref="_isContainedInSupplyBox"/> state changes. Unlike <see cref="OnPickedUpNetworked"/>,
+    /// this is never suppressed by the interactable lock, so <see cref="SupplyBox"/> can reliably
+    /// detect removal regardless of which player took the item.
+    /// </summary>
+    public event Action<bool> OnSupplyBoxContainmentChangedNetworked;
+
+    /// <summary>True while this item is authoritatively contained by a supply box.</summary>
+    public bool IsContainedInSupplyBox => _isContainedInSupplyBox.Value;
     protected bool isUsing;
 
     /// <summary>
@@ -335,7 +346,10 @@ public class PickableObject : Interactable
     }
 
     private void OnSupplyBoxContainmentChanged(bool previousValue, bool newValue)
-        => ApplySupplyBoxContainmentPhysics(newValue);
+    {
+        ApplySupplyBoxContainmentPhysics(newValue);
+        OnSupplyBoxContainmentChangedNetworked?.Invoke(newValue);
+    }
 
     private void ApplySupplyBoxContainmentPhysics(bool contained)
     {

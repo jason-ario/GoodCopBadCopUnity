@@ -1143,9 +1143,20 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             ? (useAlternateVoice ? mgr.AlternateVoiceClips : mgr.AudioClips)
             : System.Array.Empty<AudioClip>();
 
-        AudioSource source = useTelephoneAudioSource
-            ? Telephone.Instance?.VoiceAudioSource
-            : (mgr != null ? mgr.MegaphoneAudioSource : null);
+        AudioSource source;
+        if (useTelephoneAudioSource)
+        {
+            // Phone calls use the handset's own voice clips (when assigned) and play in-ear for
+            // whoever is holding the handset; everyone else hears it 3D from the phone.
+            var phone = Telephone.Instance;
+            source = phone != null ? phone.PrepareVoiceSourceForLocalListener() : null;
+            if (phone != null && phone.ScriptedCallVoiceClips.Length > 0)
+                clips = phone.ScriptedCallVoiceClips;
+        }
+        else
+        {
+            source = mgr != null ? mgr.MegaphoneAudioSource : null;
+        }
 
         if (!useTelephoneAudioSource)
             mgr?.SetSpeakerSpeaking(true);

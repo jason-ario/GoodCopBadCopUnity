@@ -1254,7 +1254,6 @@ GameObject:
   - component: {fileID: 9001321478230009472}
   - component: {fileID: 7898964378376482607}
   - component: {fileID: 7359080964268064940}
-  - component: {fileID: 7451305348209144038}
   m_Layer: 0
   m_Name: Optional List
   m_TagString: Untagged
@@ -1343,21 +1342,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
   m_HorizontalFit: 0
   m_VerticalFit: 2
---- !u!114 &7451305348209144038
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4114669930624009279}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0cbb7ac238d754952a3223a6a2753c44, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OptionalTaskSection
-  sectionRoot: {fileID: 4114669930624009279}
-  taskListContainer: {fileID: 8047975809630461288}
-  taskItemPrefab: {fileID: 9067406155056625126, guid: 6ef093f915eb4f442a209ca39eb742f6, type: 3}
 --- !u!1 &4248973477591589246
 GameObject:
   m_ObjectHideFlags: 0
@@ -1451,6 +1435,7 @@ MonoBehaviour:
   _fenceRow: {fileID: 5980782350229399998}
   _trashRow: {fileID: 0}
   _graffitiRow: {fileID: 0}
+  _pollInterval: 0.25
 --- !u!114 &6765481414741130977
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1683,7 +1668,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7144561912224227412}
-  - component: {fileID: 8787628273106892566}
   m_Layer: 0
   m_Name: Task Sidebar
   m_TagString: Untagged
@@ -1713,27 +1697,6 @@ RectTransform:
   m_AnchoredPosition: {x: -24, y: -112}
   m_SizeDelta: {x: 300, y: 720}
   m_Pivot: {x: 1, y: 1}
---- !u!114 &8787628273106892566
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5815963572085590111}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a9f6783b51c2946e0a393bed8be5148e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HUDSidebarController
-  toggleKey: 9
-  startExpanded: 0
-  tasksPanelRoot: {fileID: 3084768373127107071}
-  collapsedHintRoot: {fileID: 6773007039267379893}
-  badgeRoot: {fileID: 2620269529593316577}
-  badgeCountText: {fileID: 5641064385685277243}
-  currentOrders: {fileID: 0}
-  maintenance: {fileID: 1405992963709943900}
-  optionalTasks: {fileID: 7451305348209144038}
 --- !u!1 &5996260038459154669
 GameObject:
   m_ObjectHideFlags: 0
@@ -2813,6 +2776,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6743967394345020771}
   - component: {fileID: 5831858754849032974}
+  - component: {fileID: 2368015296401432457}
   m_Layer: 0
   m_Name: Checkpoint Integrity Bar
   m_TagString: Untagged
@@ -2872,8 +2836,30 @@ MonoBehaviour:
   - {fileID: 2745711245406712937}
   - {fileID: 3037276099665009620}
   - {fileID: 4926482938165743301}
-  filledSquareColor: {r: 0.75, g: 0.82, b: 0.25, a: 1}
   emptySquareColor: {r: 0.18, g: 0.19, b: 0.08, a: 1}
+  goodColor: {r: 1, g: 1, b: 1, a: 1}
+  warningColor: {r: 1, g: 0.85, b: 0.1, a: 1}
+  criticalColor: {r: 0.9, g: 0.12, b: 0.1, a: 1}
+  warningThreshold: 0.7
+  criticalThreshold: 0.6
+  lowIntegrityWobble: {fileID: 0}
+  shakeThreshold: 0.6
+  minShakeIntensity: 0.4
+  maxShakeIntensity: 1
+--- !u!114 &2368015296401432457
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7997507875154820640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ee00d2cb17e9547bb841a6e8028edc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIWobble
+  wobbleProfile: {fileID: 11400000, guid: efea384733390d4499a9e6615c0ac752, type: 2}
+  intensity: 0
 --- !u!1 &8677961406038450343
 GameObject:
   m_ObjectHideFlags: 0

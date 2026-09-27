@@ -189,9 +189,14 @@ public class PlayerInstance : NetworkBehaviour
                 if (!ownCamera.gameObject.activeSelf)
                     ownCamera.gameObject.SetActive(true);
 
+                // While spectating, the single active listener is the spectated teammate's
+                // (see SpectateManager.IsAudioListenerOnTarget), so keep our own one off.
+                bool listenerHandedOff = SpectateManager.Instance != null
+                    && SpectateManager.Instance.IsAudioListenerOnTarget;
+
                 AudioListener ownListener = ownCamera.GetComponent<AudioListener>();
-                if (ownListener != null && !ownListener.enabled)
-                    ownListener.enabled = true;
+                if (ownListener != null && ownListener.enabled == listenerHandedOff)
+                    ownListener.enabled = !listenerHandedOff;
             }
 
             yield return wait;
@@ -290,6 +295,11 @@ public class PlayerInstance : NetworkBehaviour
 
         if (Instance != this)
             return;
+
+        // This object is about to become a corpse; the replacement player object's camera owns
+        // the listener from its spawn onwards. If spectating, the teammate's listener stays live
+        // until the replacement spawns and SpectateManager.StopSpectating hands it back.
+        SetOwnAudioListenerEnabled(false);
 
         DialogueChoiceSystem.Instance?.AbortForPlayerObjectReplacement();
 
@@ -449,9 +459,22 @@ public class PlayerInstance : NetworkBehaviour
     /// </summary>
     private void ForceDisableAsRemoteCamera()
     {
+        // The vcam of the teammate currently being spectated is intentionally active (enabled by
+        // SpectateManager via SetSpectatedByCamera). The local player's audio-listener enforcement
+        // routine keeps running while dead, so without this guard it would switch the spectated
+        // vcam off within a second, leaving the brain with no live vcam and a frozen view.
+        bool isSpectatedTarget = SpectateManager.Instance != null
+            && SpectateManager.Instance.IsSpectating
+            && SpectateManager.Instance.CurrentTarget == this;
+
         Transform cameraTransform = _playerMovementController?.CameraTransform;
-        if (cameraTransform != null)
+        if (cameraTransform != null && !isSpectatedTarget)
             cameraTransform.gameObject.SetActive(false);
+
+        // The spectated teammate's Camera rig runs in listener-only mode (Camera and
+        // CinemachineBrain disabled, AudioListener enabled) and must be left alone.
+        if (_spectatorListenerActive)
+            return;
 
         Camera camera = _playerMovementController?.Camera;
         if (camera != null)
@@ -595,6 +618,90 @@ public class PlayerInstance : NetworkBehaviour
         }
 
         GetComponent<PlayerPickupController>()?.SetSpectatedView(spectated);
+    }
+
+    private bool _spectatorListenerActive;
+    private Vector3 _spectatorListenerRestoreLocalPos;
+    private Quaternion _spectatorListenerRestoreLocalRot;
+
+    /// <summary>True while this remote player's AudioListener is the live one for a spectating client.</summary>
+    public bool IsSpectatorListenerActive => _spectatorListenerActive;
+
+    /// <summary>
+    /// Switches this remote player's physical Camera rig into listener-only mode for a dead
+    /// local player who is spectating them. The GameObject is on, the <see cref="Camera"/> and
+    /// <see cref="Unity.Cinemachine.CinemachineBrain"/> are off so nothing extra renders, and the
+    /// <see cref="AudioListener"/> is on and follows this player's vcam pose every LateUpdate.
+    /// Passing false restores the default remote state (rig inactive, listener off).
+    /// </summary>
+    public void SetSpectatorAudioListener(bool active)
+    {
+        if (IsLocalPlayer) return;
+
+        Camera cam = _playerMovementController?.Camera;
+        if (cam == null)
+        {
+            _spectatorListenerActive = false;
+            return;
+        }
+
+        var brain = cam.GetComponent<Unity.Cinemachine.CinemachineBrain>();
+        var listener = cam.GetComponent<AudioListener>();
+
+        if (active)
+        {
+            if (listener == null || _spectatorListenerActive) return;
+
+            // Disable renderers before activating the GameObject so their OnEnable never runs.
+            cam.enabled = false;
+            if (brain != null) brain.enabled = false;
+            listener.enabled = true;
+
+            _spectatorListenerRestoreLocalPos = cam.transform.localPosition;
+            _spectatorListenerRestoreLocalRot = cam.transform.localRotation;
+            cam.gameObject.SetActive(true);
+
+            _spectatorListenerActive = true;
+            SyncSpectatorListenerPose();
+        }
+        else
+        {
+            if (!_spectatorListenerActive) return;
+            _spectatorListenerActive = false;
+
+            if (listener != null) listener.enabled = false;
+            cam.gameObject.SetActive(false);
+            cam.transform.localPosition = _spectatorListenerRestoreLocalPos;
+            cam.transform.localRotation = _spectatorListenerRestoreLocalRot;
+            cam.enabled = true;
+            if (brain != null) brain.enabled = true;
+        }
+    }
+
+    /// <summary>Enables or disables the AudioListener on this player's own physical Camera.</summary>
+    public void SetOwnAudioListenerEnabled(bool enabled)
+    {
+        Camera ownCamera = _playerMovementController?.Camera;
+        if (ownCamera == null) return;
+
+        AudioListener listener = ownCamera.GetComponent<AudioListener>();
+        if (listener != null && listener.enabled != enabled)
+            listener.enabled = enabled;
+    }
+
+    private void LateUpdate()
+    {
+        if (_spectatorListenerActive)
+            SyncSpectatorListenerPose();
+    }
+
+    private void SyncSpectatorListenerPose()
+    {
+        Transform camTransform = _playerMovementController?.CameraTransform;
+        Camera cam = _playerMovementController?.Camera;
+        if (camTransform == null || cam == null) return;
+
+        cam.transform.SetPositionAndRotation(camTransform.position, camTransform.rotation);
     }
 
     private void Update()

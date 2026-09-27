@@ -1,18 +1,16 @@
 /// <summary>
-/// Implemented by weapons (e.g. <see cref="Pistol"/>, <see cref="Shotgun"/>) that can be reloaded
-/// from a compatible ammo item sitting in the player's <see cref="PlayerInventory"/> — i.e. without
-/// requiring the ammo to be physically held in hand first. Driven by <see cref="PlayerInventory"/>'s
-/// KeyCode.R handling.
+/// Implemented by weapons (<see cref="Pistol"/>, <see cref="Shotgun"/>, <see cref="Flamethrower"/>)
+/// that reload from the holder's <see cref="PlayerAmmoReserve"/>. Driven by
+/// <see cref="PlayerInventory"/>'s KeyCode.R handling while the weapon is equipped.
 /// </summary>
 public interface IInventoryReloadable
 {
-    /// <summary>Returns true if <paramref name="candidate"/> is an ammo item this weapon can reload from.</summary>
-    bool IsCompatibleAmmo(PickableObject candidate);
+    /// <summary>The reserve ammo type this weapon consumes.</summary>
+    AmmoType ReserveAmmoType { get; }
 
     /// <summary>
-    /// Requests a reload using <paramref name="ammoItem"/>, which is not currently held in hand
-    /// (it lives in the other inventory slot). No-ops if the weapon is already full or the item
-    /// is not compatible ammo.
+    /// Owner-side. Requests a reload from the local player's reserve. No-ops if the weapon is
+    /// already full or the reserve has none of <see cref="ReserveAmmoType"/>.
     /// </summary>
-    void ReloadFromInventory(PickableObject ammoItem);
+    void RequestReloadFromReserve();
 }

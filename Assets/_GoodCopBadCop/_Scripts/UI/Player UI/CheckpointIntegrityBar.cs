@@ -9,13 +9,42 @@ using UnityEngine.UI;
 ///
 /// Each square represents an equal portion of the full payout multiplier. The indicator is
 /// rounded to the nearest square while the percentage label preserves the exact score.
+///
+/// Filled squares and the percentage label are tinted by score: white at full integrity,
+/// lerping to yellow at <see cref="warningThreshold"/>, then to red at
+/// <see cref="criticalThreshold"/> and below. Below <see cref="shakeThreshold"/> the
+/// optional <see cref="lowIntegrityWobble"/> shakes the readout, harder the lower it goes.
 /// </summary>
 public class CheckpointIntegrityBar : StatBar
 {
     [Header("Integrity Squares")]
     [SerializeField] private Image[] integritySquares;
-    [SerializeField] private Color filledSquareColor = new(0.75f, 0.82f, 0.25f, 1f);
     [SerializeField] private Color emptySquareColor = new(0.18f, 0.19f, 0.08f, 1f);
+
+    [Header("Integrity Colors")]
+    [SerializeField] private Color goodColor = Color.white;
+    [SerializeField] private Color warningColor = new(1f, 0.85f, 0.1f, 1f);
+    [SerializeField] private Color criticalColor = new(0.9f, 0.12f, 0.1f, 1f);
+    [Tooltip("Normalized score (0-1) at which the readout is fully the warning color.")]
+    [SerializeField, Range(0f, 1f)] private float warningThreshold = 0.7f;
+    [Tooltip("Normalized score (0-1) at and below which the readout is fully the critical color.")]
+    [SerializeField, Range(0f, 1f)] private float criticalThreshold = 0.6f;
+
+    [Header("Low Integrity Shake")]
+    [Tooltip("UIWobble on the readout root. Its intensity is driven by the score.")]
+    [SerializeField] private UIWobble lowIntegrityWobble;
+    [Tooltip("Normalized score (0-1) below which the readout starts shaking.")]
+    [SerializeField, Range(0f, 1f)] private float shakeThreshold = 0.6f;
+    [Tooltip("Shake intensity just below the threshold; ramps to Max Shake Intensity at 0%.")]
+    [SerializeField, Min(0f)] private float minShakeIntensity = 0.4f;
+    [SerializeField, Min(0f)] private float maxShakeIntensity = 1f;
+
+    private void Awake()
+    {
+        // Fall back to the readout's UIWobble child if the reference wasn't wired in the inspector.
+        if (lowIntegrityWobble == null)
+            lowIntegrityWobble = GetComponentInChildren<UIWobble>(true);
+    }
 
     private void OnEnable()
     {
@@ -55,10 +84,17 @@ public class CheckpointIntegrityBar : StatBar
     {
         UpdateBar(current, max);
 
+        float normalizedScore = max > 0f ? Mathf.Clamp01(current / max) : 0f;
+        Color integrityColor = EvaluateIntegrityColor(normalizedScore);
+
+        if (PercentageText != null)
+            PercentageText.color = integrityColor;
+
+        UpdateShake(normalizedScore);
+
         if (integritySquares == null || integritySquares.Length == 0)
             return;
 
-        float normalizedScore = max > 0f ? Mathf.Clamp01(current / max) : 0f;
         int filledSquareCount = Mathf.Clamp(
             Mathf.RoundToInt(normalizedScore * integritySquares.Length),
             0,
@@ -67,7 +103,38 @@ public class CheckpointIntegrityBar : StatBar
         for (int i = 0; i < integritySquares.Length; i++)
         {
             if (integritySquares[i] != null)
-                integritySquares[i].color = i < filledSquareCount ? filledSquareColor : emptySquareColor;
+                integritySquares[i].color = i < filledSquareCount ? integrityColor : emptySquareColor;
         }
+    }
+
+    /// <summary>
+    /// White at 100% → yellow at the warning threshold → red at the critical threshold and below.
+    /// </summary>
+    private Color EvaluateIntegrityColor(float normalizedScore)
+    {
+        if (normalizedScore >= warningThreshold)
+        {
+            float t = Mathf.InverseLerp(warningThreshold, 1f, normalizedScore);
+            return Color.Lerp(warningColor, goodColor, t);
+        }
+
+        float criticalT = Mathf.InverseLerp(criticalThreshold, warningThreshold, normalizedScore);
+        return Color.Lerp(criticalColor, warningColor, criticalT);
+    }
+
+    private void UpdateShake(float normalizedScore)
+    {
+        if (lowIntegrityWobble == null)
+            return;
+
+        if (normalizedScore >= shakeThreshold || shakeThreshold <= 0f)
+        {
+            lowIntegrityWobble.SetIntensity(0f);
+            return;
+        }
+
+        // 0 just under the threshold, 1 at empty.
+        float severity = 1f - normalizedScore / shakeThreshold;
+        lowIntegrityWobble.SetIntensity(Mathf.Lerp(minShakeIntensity, maxShakeIntensity, severity));
     }
 }

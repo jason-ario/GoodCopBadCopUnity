@@ -49,6 +49,28 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
     private readonly NetworkVariable<bool> _isActive = new(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // ── Replicated read-only state ───────────────────────────────────────────
+
+    /// <summary>
+    /// Server-authoritative "subjects to process" total for the current shift, replicated to every
+    /// peer. This is the ONLY value any per-client HUD should display — each peer's local
+    /// <see cref="DailySuspectManager"/> rolls its own random lineup (mutant/doppelganger/full-mutant
+    /// injection), so reading <see cref="DailySuspectManager.TotalSuspectsThisShift"/> on a client
+    /// gives a different number per player. Only the server's roll drives actual spawning.
+    /// </summary>
+    public int TotalCount => _totalCount.Value;
+
+    /// <summary>Server-authoritative processed count for the current shift, replicated to every peer.</summary>
+    public int ProcessedCount => _processedCount.Value;
+
+    /// <summary>True while the current shift still has subjects left to process (replicated).</summary>
+    public bool IsActive => _isActive.Value;
+
+    /// <summary>
+    /// Raised locally on every peer (host and clients) whenever any replicated counter value changes.
+    /// </summary>
+    public static event Action ProgressChanged;
+
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
     public string ThreatName  => _taskName;
@@ -139,6 +161,7 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
     private void OnNetworkValueChanged<T>(T previous, T current)
     {
         TaskRegistry.Instance?.NotifyTaskStateChanged();
+        ProgressChanged?.Invoke();
     }
 
     /// <summary>
@@ -152,6 +175,8 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
             TaskRegistry.Instance?.AddThreat(this);
         else
             TaskRegistry.Instance?.RemoveThreat(this);
+
+        ProgressChanged?.Invoke();
     }
 
     // ── Server-side progress tracking ───────────────────────────────────────

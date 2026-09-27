@@ -63,6 +63,9 @@ namespace GoodCopBadCop.EnvironmentSystem
         private Volume _volume;
         private BoxCollider _collider;
         private AudioLowPassFilter _lowPassFilter;
+        private AudioListener _listener;
+        private float _listenerSearchTimer;
+        private const float ListenerSearchInterval = 0.25f;
         private bool _isUnderwater;
         private bool _isPlayerBodyUnderwater;
 
@@ -79,7 +82,7 @@ namespace GoodCopBadCop.EnvironmentSystem
             if (targetCamera == null)
                 targetCamera = Camera.main;
 
-            TryInitAudioFilter();
+            RefreshAudioFilterTarget();
         }
 
         private void Update()
@@ -115,9 +118,8 @@ namespace GoodCopBadCop.EnvironmentSystem
                 }
             }
 
-            // Transition audio filter
-            if (_lowPassFilter == null)
-                TryInitAudioFilter();
+            // Transition audio filter (re-targets if the live listener moved, e.g. spectate/revive)
+            RefreshAudioFilterTarget();
 
             if (_lowPassFilter != null)
             {
@@ -161,16 +163,50 @@ namespace GoodCopBadCop.EnvironmentSystem
                 AudioSource.PlayClipAtPoint(splashSoundClip, splashPos, splashVolume);
         }
 
-        private void TryInitAudioFilter()
+        /// <summary>
+        /// Keeps the low-pass filter on whichever AudioListener is currently live. The live
+        /// listener moves at runtime: to the spectated teammate's camera while dead
+        /// (SpectateManager), back to the local player on revive, or to the dev spectator rig.
+        /// Only searches again once the cached listener stops being active and enabled, and at most
+        /// every <see cref="ListenerSearchInterval"/> seconds. The current cutoff is carried over
+        /// so a handoff doesn't pop.
+        /// </summary>
+        private void RefreshAudioFilterTarget()
         {
-            AudioListener listener = FindFirstObjectByType<AudioListener>();
-            if (listener == null) return;
+            if (_listener != null && _listener.isActiveAndEnabled && _lowPassFilter != null)
+                return;
 
-            _lowPassFilter = listener.GetComponent<AudioLowPassFilter>();
+            _listenerSearchTimer -= Time.unscaledDeltaTime;
+            if (_listenerSearchTimer > 0f) return;
+            _listenerSearchTimer = ListenerSearchInterval;
+
+            AudioListener live = FindLiveAudioListener();
+            if (live == null) return;
+
+            float cutoff = _lowPassFilter != null
+                ? _lowPassFilter.cutoffFrequency
+                : (_isUnderwater ? underwaterCutoffHz : normalCutoffHz);
+
+            // Leave the previous (now inactive) listener dry in case it becomes live again later.
+            if (_lowPassFilter != null && _lowPassFilter.gameObject != live.gameObject)
+                _lowPassFilter.cutoffFrequency = normalCutoffHz;
+
+            _listener = live;
+            _lowPassFilter = live.GetComponent<AudioLowPassFilter>();
             if (_lowPassFilter == null)
-                _lowPassFilter = listener.gameObject.AddComponent<AudioLowPassFilter>();
+                _lowPassFilter = live.gameObject.AddComponent<AudioLowPassFilter>();
 
-            _lowPassFilter.cutoffFrequency = normalCutoffHz;
+            _lowPassFilter.cutoffFrequency = cutoff;
+        }
+
+        private static AudioListener FindLiveAudioListener()
+        {
+            foreach (var listener in FindObjectsByType<AudioListener>(FindObjectsSortMode.None))
+            {
+                if (listener.isActiveAndEnabled)
+                    return listener;
+            }
+            return null;
         }
 
 #if UNITY_EDITOR

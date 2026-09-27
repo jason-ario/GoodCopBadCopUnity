@@ -325,7 +325,11 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// Server-only — safe to call from any client, but only the server performs the
     /// authoritative break logic (replicated to clients via the NetworkVariables above).
     /// </summary>
-    public void TriggerTask()
+    /// <param name="amountScale">
+    /// Multiplier applied to the rolled number of fences to break (e.g. Day 3 passes ~0.33 to
+    /// break a third as many). 1 = unchanged. Always breaks at least one fence if any exist.
+    /// </param>
+    public void TriggerTask(float amountScale = 1f)
     {
         if (!IsServer) return;
 
@@ -336,6 +340,8 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         _fencesRepaired.Value = 0;
 
         int count = PickBrokenFenceCount();
+        if (count > 0 && !Mathf.Approximately(amountScale, 1f))
+            count = Mathf.Max(1, Mathf.RoundToInt(count * Mathf.Max(0f, amountScale)));
         PerimiterFence[] shuffled = ShuffleCopy(_allFences);
 
         for (int i = 0; i < count && i < shuffled.Length; i++)

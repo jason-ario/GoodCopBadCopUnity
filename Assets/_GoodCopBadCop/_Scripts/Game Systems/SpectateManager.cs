@@ -20,6 +20,14 @@ public class SpectateManager : MonoBehaviour
     public bool IsSpectating => _isSpectating;
     public PlayerInstance CurrentTarget => _currentTarget;
 
+    /// <summary>
+    /// True while the watched teammate's AudioListener is the live one (dead local player
+    /// spectating). The hidden dev spectator has no local PlayerInstance and uses its own rig listener.
+    /// </summary>
+    public bool IsAudioListenerOnTarget => _isSpectating
+        && _currentTarget != null
+        && _currentTarget.IsSpectatorListenerActive;
+
     /// <summary>Number of players that can currently be spectated.</summary>
     public int SpectatableCount
     {
@@ -60,6 +68,9 @@ public class SpectateManager : MonoBehaviour
             _retargetTimer = RetargetInterval;
             if (!IsValidTarget(_currentTarget))
                 SpectateNext();
+
+            // Covers a target destroyed between ticks: hand audio back to the local player.
+            RefreshLocalAudioListener();
         }
     }
 
@@ -123,6 +134,11 @@ public class SpectateManager : MonoBehaviour
         if (_currentTarget.PlayerAnimationController != null)
             _currentTarget.PlayerAnimationController.SetSpectatorMode(true);
 
+        // A dead local player hears the world from the watched teammate's position.
+        if (PlayerInstance.Instance != null)
+            _currentTarget.SetSpectatorAudioListener(true);
+        RefreshLocalAudioListener();
+
         Debug.Log($"[SpectateManager] Now spectating {_currentTarget.name}.");
     }
 
@@ -131,9 +147,23 @@ public class SpectateManager : MonoBehaviour
         // Unity-null check (not ?.) so a destroyed target is skipped safely.
         if (_currentTarget == null) return;
 
+        _currentTarget.SetSpectatorAudioListener(false);
         if (_currentTarget.PlayerAnimationController != null)
             _currentTarget.PlayerAnimationController.SetSpectatorMode(false);
         _currentTarget.SetSpectatedByCamera(false);
+    }
+
+    /// <summary>
+    /// Keeps exactly one listener live for a local player: their own camera's, unless the
+    /// watched teammate's listener has taken over. After a revive, PlayerInstance.Instance is
+    /// already the replacement player, so this hands audio to the newly spawned player.
+    /// </summary>
+    private void RefreshLocalAudioListener()
+    {
+        var local = PlayerInstance.Instance;
+        if (local == null) return;
+
+        local.SetOwnAudioListenerEnabled(!IsAudioListenerOnTarget);
     }
 
     /// <summary>Clears spectator-mode visuals and resets the tracked target.</summary>
@@ -143,6 +173,7 @@ public class SpectateManager : MonoBehaviour
 
         RestoreCurrentTarget();
         _currentTarget = null;
+        RefreshLocalAudioListener();
         Debug.Log("[SpectateManager] No spectatable teammates available.");
     }
 
@@ -151,6 +182,7 @@ public class SpectateManager : MonoBehaviour
     {
         _isSpectating = false;
         ClearCurrentTarget();
+        RefreshLocalAudioListener();
 
         if (spectatorUI != null)
             spectatorUI.Hide();

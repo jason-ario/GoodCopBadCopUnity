@@ -135,6 +135,26 @@ public class CorpseResurrectionController : NetworkBehaviour
     /// <summary>True on every machine once the corpse has stood up as a mutant.</summary>
     public bool IsResurrected => _isResurrected.Value;
 
+    /// <summary>
+    /// Server-write "completely burned by fire" flag. Only used while this corpse is still its
+    /// owner's PlayerObject (the dead client is spectating from it, so it can't be despawned
+    /// yet): the body is hidden on every peer — including late joiners — instead. Once the
+    /// corpse is no longer a PlayerObject, <see cref="BurnAwayServer"/> despawns it outright.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isBurnedAway = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>True on every machine once the corpse has been completely burned away.</summary>
+    public bool IsBurnedAway => _isBurnedAway.Value;
+
+    /// <summary>
+    /// True while the corpse is a resurrected mutant that is still alive. Fire must kill it
+    /// (through <see cref="SetOnFire"/> damage) before it can be burned away as remains.
+    /// </summary>
+    public bool IsLivingMutant => _isResurrected.Value && mutantEnemy != null && !mutantEnemy.IsDead;
+
     // ── Component cache ────────────────────────────────────────────────────────
 
     private PlayerHealth _playerHealth;
@@ -245,11 +265,15 @@ public class CorpseResurrectionController : NetworkBehaviour
             _playerHealth.OnDeath += OnPlayerDeath;
 
         _isResurrected.OnValueChanged += OnResurrectedChanged;
+        _isBurnedAway.OnValueChanged += OnBurnedAwayChanged;
 
         // Late joiners receive _isResurrected == true as an initial value, which does not raise
         // OnValueChanged — apply the resurrected state explicitly.
         if (!IsServer && _isResurrected.Value)
             OnResurrectedChanged(false, true);
+
+        if (_isBurnedAway.Value)
+            ApplyBurnedAwayVisuals();
 
         if (mutantEnemy != null)
             mutantEnemy.OnRemovedFromPlay += OnMutantRemovedFromPlay;
@@ -263,6 +287,7 @@ public class CorpseResurrectionController : NetworkBehaviour
             _playerHealth.OnDeath -= OnPlayerDeath;
 
         _isResurrected.OnValueChanged -= OnResurrectedChanged;
+        _isBurnedAway.OnValueChanged -= OnBurnedAwayChanged;
 
         if (mutantEnemy != null)
             mutantEnemy.OnRemovedFromPlay -= OnMutantRemovedFromPlay;
@@ -343,6 +368,63 @@ public class CorpseResurrectionController : NetworkBehaviour
         }
 
         Debug.Log($"[CorpseResurrection] Corpse of {gameObject.name} burned — resurrection cancelled.");
+    }
+
+    /// <summary>
+    /// Server-only. Called by <see cref="Flamethrower"/> once this corpse has been completely
+    /// burned. Cancels resurrection and releases the corpse from <see cref="ReviveManager"/>'s
+    /// keep-alive (<see cref="HasActiveCorpse"/>), then removes it from the world:
+    ///  - detached corpse (owner already revived): despawned immediately;
+    ///  - still its owner's PlayerObject (owner dead/spectating): hidden on every peer via
+    ///    <see cref="_isBurnedAway"/>; ReviveManager then despawns it normally on revive.
+    /// A living resurrected mutant is ignored — fire has to kill it first.
+    /// </summary>
+    public void BurnAwayServer()
+    {
+        if (!IsServer || !IsSpawned || _isBurnedAway.Value || IsLivingMutant)
+            return;
+
+        if (_playerHealth == null || !_playerHealth.IsDead)
+            return;
+
+        BurnCorpse();
+        _hasActiveCorpse = false;
+
+        if (!NetworkObject.IsPlayerObject)
+        {
+            Debug.Log($"[CorpseResurrection] Detached corpse {gameObject.name} burned away — despawning.");
+            NetworkObject.Despawn(destroy: true);
+            return;
+        }
+
+        Debug.Log($"[CorpseResurrection] Corpse {gameObject.name} burned away — hidden until its owner revives.");
+        _isBurnedAway.Value = true;
+    }
+
+    private void OnBurnedAwayChanged(bool previous, bool current)
+    {
+        if (current)
+            ApplyBurnedAwayVisuals();
+    }
+
+    /// <summary>
+    /// Local-only: hides the burned corpse (renderers + colliders) and puts out its fire so it
+    /// can no longer be seen, hit, or burned. Runs on every peer.
+    /// </summary>
+    private void ApplyBurnedAwayVisuals()
+    {
+        GetComponent<SetOnFire>()?.Extinguish();
+
+        foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
+            r.enabled = false;
+
+        // The root CharacterController is left alone: the dead owner's PlayerMovementController
+        // still runs gravity-only Move() calls on it, which log errors on a disabled controller.
+        foreach (Collider c in GetComponentsInChildren<Collider>(true))
+        {
+            if (c is CharacterController) continue;
+            c.enabled = false;
+        }
     }
 
     // ── Resurrected hitbox sizing ─────────────────────────────────────────────

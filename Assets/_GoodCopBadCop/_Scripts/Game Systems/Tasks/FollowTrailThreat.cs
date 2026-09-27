@@ -359,7 +359,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// </summary>
     private void SyncEnemyCompassMarkers()
     {
-        bool showEnemies = KillMutantTask.Current != null && _packMutantIds.Count > 0;
+        bool showEnemies = KillMutantTask.IsActiveTask && _packMutantIds.Count > 0;
         if (!showEnemies && _enemyCompassMarkers.Count == 0) return;
 
         _enemyMarkerScratch.Clear();

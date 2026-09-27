@@ -30,6 +30,11 @@ public class Subtitles : MonoBehaviour
     [Tooltip("Label color used when the speaker color is white/unset.")]
     [SerializeField] private Color defaultNameColor = new Color(1f, 0.8f, 0.35f, 1f);
     [SerializeField] private float nameTagFadeInDuration = 0.2f;
+    [Tooltip("When true the name tag is detached from the subtitle bar at runtime and pinned to the top-center " +
+             "of the root canvas. The tag is still owned by (and destroyed with) this subtitle.")]
+    [SerializeField] private bool nameTagAtScreenTop = true;
+    [Tooltip("Distance in canvas units from the top edge of the screen to the top of the name tag.")]
+    [SerializeField] private float nameTagScreenTopOffset = 40f;
 
     [Header("Wobble Effect")]
     [Tooltip("TMPWobbleText component on the subtitle TMP object. Assign in the prefab.")]
@@ -112,6 +117,8 @@ public class Subtitles : MonoBehaviour
     private Vector2 _promptBasePos;
     private float _promptActiveTime;
     private Coroutine _nameTagFade;
+    private bool _nameTagDetached;
+    private bool _nameTagHasName;
 
     private void Awake()
     {
@@ -120,6 +127,51 @@ public class Subtitles : MonoBehaviour
             _promptRect = continuePrompt.transform as RectTransform;
             if (_promptRect != null) _promptBasePos = _promptRect.anchoredPosition;
         }
+
+        if (Application.isPlaying && showNameTag && nameTagAtScreenTop)
+            DetachNameTagToScreenTop();
+    }
+
+    /// <summary>
+    /// Re-parents the name tag onto the root canvas, anchored at the top-center of the screen.
+    /// Stays under the dialogue canvas so its CanvasGroup (pause hiding) still applies.
+    /// </summary>
+    private void DetachNameTagToScreenTop()
+    {
+        if (nameTag == null) return;
+
+        var parentCanvas = GetComponentInParent<Canvas>();
+        if (parentCanvas == null) return;
+        var rootCanvas = parentCanvas.rootCanvas;
+
+        var tagRect = nameTag.transform as RectTransform;
+        if (tagRect == null) return;
+
+        tagRect.SetParent(rootCanvas.transform, false);
+        tagRect.anchorMin = new Vector2(0.5f, 1f);
+        tagRect.anchorMax = new Vector2(0.5f, 1f);
+        tagRect.pivot = new Vector2(0.5f, 1f);
+        tagRect.anchoredPosition = new Vector2(0f, -nameTagScreenTopOffset);
+        tagRect.SetAsLastSibling();
+        _nameTagDetached = true;
+    }
+
+    private void OnEnable()
+    {
+        if (_nameTagDetached && nameTag != null)
+            nameTag.gameObject.SetActive(_nameTagHasName);
+    }
+
+    private void OnDisable()
+    {
+        if (_nameTagDetached && nameTag != null)
+            nameTag.gameObject.SetActive(false);
+    }
+
+    private void OnDestroy()
+    {
+        if (_nameTagDetached && nameTag != null)
+            Destroy(nameTag.gameObject);
     }
 
     private void Update()
@@ -142,7 +194,8 @@ public class Subtitles : MonoBehaviour
 
         string display = showNameTag ? FormatName(lastDisplayName) : null;
         bool hasName = !string.IsNullOrEmpty(display);
-        nameTag.gameObject.SetActive(hasName);
+        _nameTagHasName = hasName;
+        nameTag.gameObject.SetActive(hasName && (!_nameTagDetached || isActiveAndEnabled));
         if (!hasName) return;
 
         nameLabel.text = display;

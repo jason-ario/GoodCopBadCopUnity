@@ -27,6 +27,10 @@ public class DailySuspectManager : MonoBehaviour
     /// displayed X/Y count. Doppelganger and full-mutant slots DO count — both stand in for a real
     /// suspect and are resolved through the normal folder verdict flow.
     /// Returns 0 before the lineup has been populated for the day.
+    ///
+    /// MULTIPLAYER: only authoritative ON THE SERVER. Every peer runs PopulateShiftCharacters with its
+    /// own local RNG, so this value differs per client. Client-facing UI must read the replicated
+    /// <see cref="ProcessResidentsTask.TotalCount"/> instead (which the server fills from this).
     /// </summary>
     public int TotalSuspectsThisShift => shiftSuspects.Count - _mutantSlotIndices.Count;
 
