@@ -27,14 +27,16 @@ public class GuardPurchasePoint : Interactable
              "non-interactable while locked, alongside the post and soldier.")]
     [SerializeField] private GameObject _guardSign;
 
-    [Header("Status Sign")]
-    [Tooltip("World-space TextMeshPro inside the purchase post's frame. Its text is set from " +
-             "the purchase state (available vs. pending arrival).")]
-    [SerializeField] private TMPro.TextMeshPro _statusText;
-    [Tooltip("Status text shown while the post is buyable.")]
-    [TextArea] [SerializeField] private string _availableLabel = "GUARD POST\n<size=60%>FOR HIRE</size>";
-    [Tooltip("Status text shown once a guard is purchased but hasn't arrived yet (arrives next day start).")]
-    [TextArea] [SerializeField] private string _pendingLabel = "GUARD PENDING\n<size=60%>ARRIVES TOMORROW</size>";
+    [Header("Pending Arrival Visual")]
+    [Tooltip("Renderer of the purchase post sign whose material is swapped while a purchased " +
+             "guard is pending arrival. Defaults to the Renderer on the purchase post if left empty.")]
+    [SerializeField] private Renderer _postRenderer;
+    [Tooltip("Material shown on the purchase post once a guard has been purchased but hasn't " +
+             "arrived yet (e.g. a 'GUARD PENDING' sign). The post's original material is restored " +
+             "when the slot becomes purchasable again.")]
+    [SerializeField] private Material _pendingArrivalMaterial;
+
+    private Material _defaultPostMaterial;
 
     [Header("Persistence")]
     [Tooltip("Stable, unique ID for this purchase point (e.g. 'GuardPost_Checkpoint'). Used to " +
@@ -56,6 +58,15 @@ public class GuardPurchasePoint : Interactable
     /// </summary>
     private readonly NetworkVariable<bool> _unlocked = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private void Awake()
+    {
+        if (_postRenderer == null && _guardPurchasePost != null)
+            _postRenderer = _guardPurchasePost.GetComponent<Renderer>();
+
+        if (_postRenderer != null)
+            _defaultPostMaterial = _postRenderer.sharedMaterial;
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -206,13 +217,13 @@ public class GuardPurchasePoint : Interactable
     }
 
     /// <summary>
-    /// Applies the correct visibility for the sign/post/soldier children and the post's status
-    /// text based on the current locked/purchased/arrived state:
+    /// Applies the correct visibility for the sign/post/soldier children and the post's material
+    /// based on the current locked/purchased/arrived state:
     ///   - Locked: sign, post, and soldier all hidden — nothing is visible or interactable.
-    ///   - Unlocked, not purchased, not arrived: sign and post visible (buyable) showing
-    ///     <see cref="_availableLabel"/>; soldier hidden.
-    ///   - Unlocked, purchased, not yet arrived: sign and post visible showing
-    ///     <see cref="_pendingLabel"/>; soldier still hidden.
+    ///   - Unlocked, not purchased, not arrived: sign and post visible (buyable) with the default
+    ///     post material; soldier hidden.
+    ///   - Unlocked, purchased, not yet arrived: sign and post visible, post swapped to the
+    ///     pending-arrival material; soldier still hidden.
     ///   - Unlocked, guard arrived: sign and soldier visible, post hidden.
     /// </summary>
     private void RefreshVisualState()
@@ -230,7 +241,7 @@ public class GuardPurchasePoint : Interactable
         if (_guardSign != null)
             _guardSign.SetActive(_unlocked.Value);
 
-        if (_statusText != null)
-            _statusText.text = showPendingArrival ? _pendingLabel : _availableLabel;
+        if (_postRenderer != null && _pendingArrivalMaterial != null)
+            _postRenderer.sharedMaterial = showPendingArrival ? _pendingArrivalMaterial : _defaultPostMaterial;
     }
 }

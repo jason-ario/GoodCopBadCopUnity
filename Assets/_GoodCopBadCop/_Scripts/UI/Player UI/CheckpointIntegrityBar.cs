@@ -19,9 +19,8 @@ public class CheckpointIntegrityBar : StatBar
 {
     [Header("Integrity Squares")]
     [SerializeField] private Image[] integritySquares;
-    [SerializeField] private Color emptySquareColor = new(0.18f, 0.19f, 0.08f, 1f);
 
-    [Header("Integrity Colors")]
+    [Header("Integrity Colors (Fill + Percent Text)")]
     [SerializeField] private Color goodColor = Color.white;
     [SerializeField] private Color warningColor = new(1f, 0.85f, 0.1f, 1f);
     [SerializeField] private Color criticalColor = new(0.9f, 0.12f, 0.1f, 1f);
@@ -29,6 +28,27 @@ public class CheckpointIntegrityBar : StatBar
     [SerializeField, Range(0f, 1f)] private float warningThreshold = 0.7f;
     [Tooltip("Normalized score (0-1) at and below which the readout is fully the critical color.")]
     [SerializeField, Range(0f, 1f)] private float criticalThreshold = 0.6f;
+
+    [Header("Empty Square Colors")]
+    [SerializeField] private Color emptyGoodColor = new(0.18f, 0.19f, 0.08f, 1f);
+    [SerializeField] private Color emptyWarningColor = new(0.24f, 0.19f, 0.04f, 1f);
+    [SerializeField] private Color emptyCriticalColor = new(0.26f, 0.05f, 0.04f, 1f);
+
+    [Header("Square Outlines")]
+    [Tooltip("How far filled-square outlines are pushed toward white (0 = same as fill, 1 = pure white).")]
+    [SerializeField, Range(0f, 1f)] private float filledOutlineWhiteBlend = 0.55f;
+    [SerializeField, Range(0f, 1f)] private float filledOutlineAlpha = 0.9f;
+    [SerializeField] private Color emptyOutlineGoodColor = new(0.55f, 0.59f, 0.17f, 0.8f);
+    [SerializeField] private Color emptyOutlineWarningColor = new(0.62f, 0.5f, 0.12f, 0.8f);
+    [SerializeField] private Color emptyOutlineCriticalColor = new(0.6f, 0.16f, 0.12f, 0.8f);
+
+    [Header("Panel Background")]
+    [Tooltip("Panel background image. Defaults to the Image on this GameObject.")]
+    [SerializeField] private Image panelBackground;
+    [Tooltip("Tints multiplied onto the panel's authored color.")]
+    [SerializeField] private Color panelGoodTint = Color.white;
+    [SerializeField] private Color panelWarningTint = new(1f, 0.88f, 0.6f, 1f);
+    [SerializeField] private Color panelCriticalTint = new(0.85f, 0.38f, 0.34f, 1f);
 
     [Header("Low Integrity Shake")]
     [Tooltip("UIWobble on the readout root. Its intensity is driven by the score.")]
@@ -39,11 +59,33 @@ public class CheckpointIntegrityBar : StatBar
     [SerializeField, Min(0f)] private float minShakeIntensity = 0.4f;
     [SerializeField, Min(0f)] private float maxShakeIntensity = 1f;
 
-    private void Awake()
+    private Outline[] _squareOutlines;
+    private Color _panelAuthoredColor = Color.white;
+    private bool _isInitialized;
+
+    private void Awake() => Initialize();
+
+    private void Initialize()
     {
+        if (_isInitialized) return;
+        _isInitialized = true;
+
         // Fall back to the readout's UIWobble child if the reference wasn't wired in the inspector.
         if (lowIntegrityWobble == null)
             lowIntegrityWobble = GetComponentInChildren<UIWobble>(true);
+
+        if (panelBackground == null)
+            panelBackground = GetComponent<Image>();
+        if (panelBackground != null)
+            _panelAuthoredColor = panelBackground.color;
+
+        int squareCount = integritySquares != null ? integritySquares.Length : 0;
+        _squareOutlines = new Outline[squareCount];
+        for (int i = 0; i < squareCount; i++)
+        {
+            if (integritySquares[i] != null)
+                _squareOutlines[i] = integritySquares[i].GetComponent<Outline>();
+        }
     }
 
     private void OnEnable()
@@ -82,18 +124,30 @@ public class CheckpointIntegrityBar : StatBar
 
     private void UpdateIntegrityDisplay(float current, float max)
     {
+        Initialize();
         UpdateBar(current, max);
 
         float normalizedScore = max > 0f ? Mathf.Clamp01(current / max) : 0f;
-        Color integrityColor = EvaluateIntegrityColor(normalizedScore);
+        Color integrityColor = EvaluateThreeStop(normalizedScore, goodColor, warningColor, criticalColor);
 
         if (PercentageText != null)
             PercentageText.color = integrityColor;
+
+        if (panelBackground != null)
+        {
+            Color tint = EvaluateThreeStop(normalizedScore, panelGoodTint, panelWarningTint, panelCriticalTint);
+            panelBackground.color = _panelAuthoredColor * tint;
+        }
 
         UpdateShake(normalizedScore);
 
         if (integritySquares == null || integritySquares.Length == 0)
             return;
+
+        Color emptyColor = EvaluateThreeStop(normalizedScore, emptyGoodColor, emptyWarningColor, emptyCriticalColor);
+        Color emptyOutline = EvaluateThreeStop(normalizedScore, emptyOutlineGoodColor, emptyOutlineWarningColor, emptyOutlineCriticalColor);
+        Color filledOutline = Color.Lerp(integrityColor, Color.white, filledOutlineWhiteBlend);
+        filledOutline.a = filledOutlineAlpha;
 
         int filledSquareCount = Mathf.Clamp(
             Mathf.RoundToInt(normalizedScore * integritySquares.Length),
@@ -102,24 +156,29 @@ public class CheckpointIntegrityBar : StatBar
 
         for (int i = 0; i < integritySquares.Length; i++)
         {
+            bool isFilled = i < filledSquareCount;
+
             if (integritySquares[i] != null)
-                integritySquares[i].color = i < filledSquareCount ? integrityColor : emptySquareColor;
+                integritySquares[i].color = isFilled ? integrityColor : emptyColor;
+
+            if (_squareOutlines[i] != null)
+                _squareOutlines[i].effectColor = isFilled ? filledOutline : emptyOutline;
         }
     }
 
     /// <summary>
-    /// White at 100% → yellow at the warning threshold → red at the critical threshold and below.
+    /// Good at 100% → warning at the warning threshold → critical at the critical threshold and below.
     /// </summary>
-    private Color EvaluateIntegrityColor(float normalizedScore)
+    private Color EvaluateThreeStop(float normalizedScore, Color good, Color warning, Color critical)
     {
         if (normalizedScore >= warningThreshold)
         {
             float t = Mathf.InverseLerp(warningThreshold, 1f, normalizedScore);
-            return Color.Lerp(warningColor, goodColor, t);
+            return Color.Lerp(warning, good, t);
         }
 
         float criticalT = Mathf.InverseLerp(criticalThreshold, warningThreshold, normalizedScore);
-        return Color.Lerp(criticalColor, warningColor, criticalT);
+        return Color.Lerp(critical, warning, criticalT);
     }
 
     private void UpdateShake(float normalizedScore)
