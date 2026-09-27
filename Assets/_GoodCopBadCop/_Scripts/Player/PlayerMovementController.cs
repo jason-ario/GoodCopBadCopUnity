@@ -46,14 +46,12 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private float maxCameraOffsetForLean = 0.3f;
 
     [Header("Dialogue Zoom Settings")]
-    [Tooltip("How far (meters) the camera dollies toward the conversation target for outside-world scripted dialogues (e.g. EnterScriptedDialogueModeOutside). Framing goal: the target's upper body/face.")]
+    [Tooltip("Fixed horizontal distance (meters) from the conversation target (head) the camera dollies to for outside-world scripted dialogues (e.g. EnterScriptedDialogueModeOutside). If the camera is already closer than this, it does not dolly at all.")]
     [SerializeField] private float dialogueZoomDistance = 1.0f;
     [Tooltip("Duration of the dolly-in/dolly-out tween.")]
     [SerializeField] private float dialogueZoomDuration = 0.6f;
     [Tooltip("Minimum clearance kept between the camera and any obstruction (wall, prop) discovered along the dolly path.")]
     [SerializeField] private float dialogueZoomClearance = 0.15f;
-    [Tooltip("Closest horizontal distance (meters) the camera may end up from the look target (head), so a large zoom distance never pushes the camera into the character's face.")]
-    [SerializeField] private float dialogueZoomMinStandoff = 0.6f;
 
     // Pre-dialogue pose, restored on exit.
     private Vector3 _preDialogueZoomLocalPos;
@@ -812,8 +810,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     /// <summary>
     /// Frames <paramref name="target"/> (normally the NPC's head bone) for an outside-world
     /// scripted conversation (see <see cref="DialogueChoiceSystem.EnterScriptedDialogueModeOutside"/>):
-    /// in a single blend it yaws the body to face the target, dollies the camera horizontally toward
-    /// it (clamped by obstructions and <see cref="dialogueZoomMinStandoff"/>), and pitches/aims the
+    /// in a single blend it yaws the body to face the target, dollies the camera horizontally to a
+    /// fixed <see cref="dialogueZoomDistance"/> standoff from it (no dolly if already closer; clamped
+    /// by obstructions), and pitches/aims the
     /// camera at the head from the final dolly position. Movement/look are locked (CanControl false)
     /// for the whole conversation so <see cref="Rotate"/> never fights the blend. Safe to call
     /// multiple times; only the first call caches the pre-dialogue pose. <paramref name="verticalOffset"/>
@@ -863,10 +862,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         }
         direction.Normalize();
 
-        float distance = overrideDistance > 0f ? overrideDistance : dialogueZoomDistance;
-        distance = Mathf.Min(distance, Mathf.Max(0f, horizontalDist - dialogueZoomMinStandoff));
+        // Dolly to a fixed standoff from the target; if already closer, don't move at all.
+        float standoff = overrideDistance > 0f ? overrideDistance : dialogueZoomDistance;
+        float distance = Mathf.Max(0f, horizontalDist - standoff);
 
-        if (Physics.Raycast(camPos, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
+        if (distance > 0f && Physics.Raycast(camPos, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
             distance = Mathf.Max(0f, hit.distance - dialogueZoomClearance);
 
         // Vertical offset re-frames the shot per character height.
