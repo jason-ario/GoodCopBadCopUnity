@@ -56,9 +56,23 @@ public class PlayerUI : MonoBehaviour
 
     private void Update()
     {
-        // Poll until PlayerInstance is available (it sets itself in OnNetworkSpawn).
-        if (_pickupController == null)
+        // While spectating, mirror the watched teammate. Their HeldObject/pickup events are
+        // owner-only, so poll the replicated ProxyHeldObject and mask state instead.
+        if (SpectateManager.IsHudMirroringTarget)
         {
+            UpdateMirroredTarget(SpectateManager.HudSubject);
+            return;
+        }
+
+        if (_mirroredTarget != null || _wasMirroring)
+            EndMirroring();
+
+        // Poll until PlayerInstance is available (it sets itself in OnNetworkSpawn), and rebind
+        // if the local player respawned as a new object.
+        PlayerPickupController localPickup = PlayerInstance.Instance != null ? PlayerInstance.Instance.PlayerPickupController : null;
+        if (_pickupController == null || _pickupController != localPickup)
+        {
+            UnsubscribeFromPickupController();
             TrySubscribeToPickupController();
             return;
         }
@@ -70,16 +84,75 @@ public class PlayerUI : MonoBehaviour
         }
     }
 
+    // ── Spectator mirroring ──────────────────────────────────────────────────
+
+    private PlayerInstance _mirroredTarget;
+    private bool _wasMirroring;
+    private PickableObject _mirroredHeld;
+
+    private void UpdateMirroredTarget(PlayerInstance target)
+    {
+        if (!_wasMirroring)
+        {
+            // Local pickup events must not overwrite the mirrored battery bar while spectating.
+            UnsubscribeFromPickupController();
+            _wasMirroring = true;
+        }
+
+        if (target != _mirroredTarget)
+        {
+            _mirroredTarget = target;
+            _mirroredHeld = null;
+            OnHeldObjectChanged(null);
+        }
+
+        PlayerPickupController pickup = target != null ? target.PlayerPickupController : null;
+        PickableObject held = pickup != null ? pickup.ProxyHeldObject : null;
+        if (held != _mirroredHeld)
+        {
+            _mirroredHeld = held;
+            OnHeldObjectChanged(held);
+        }
+        else if (_currentBattery != null)
+        {
+            _batteryBar?.UpdateBar(_currentBattery);
+        }
+
+        PlayerEquipmentController equipment = target != null ? target.GetComponent<PlayerEquipmentController>() : null;
+        SetMaskHelperIconVisible(equipment != null && equipment.IsMaskEquipped);
+    }
+
+    private void EndMirroring()
+    {
+        _mirroredTarget = null;
+        _mirroredHeld = null;
+        _wasMirroring = false;
+        OnHeldObjectChanged(null);
+
+        // Restore the local player's own mask icon state.
+        PlayerEquipmentController localEquipment = PlayerInstance.Instance != null
+            ? PlayerInstance.Instance.GetComponent<PlayerEquipmentController>()
+            : null;
+        SetMaskHelperIconVisible(localEquipment != null && localEquipment.IsMaskEquipped);
+    }
+
+    private void UnsubscribeFromPickupController()
+    {
+        if (_pickupController == null) return;
+
+        _pickupController.OnHeldObjectChanged -= OnHeldObjectChanged;
+        _pickupController.OnHeldItemStowed -= OnHeldItemStowed;
+        _pickupController = null;
+    }
+
     private void OnDisable()
     {
         CheckpointIntegrityService.OnEnabledChanged -= OnCheckpointIntegrityEnabledChanged;
 
-        if (_pickupController != null)
-        {
-            _pickupController.OnHeldObjectChanged -= OnHeldObjectChanged;
-            _pickupController.OnHeldItemStowed -= OnHeldItemStowed;
-            _pickupController = null;
-        }
+        UnsubscribeFromPickupController();
+        _mirroredTarget = null;
+        _mirroredHeld = null;
+        _wasMirroring = false;
 
         _currentBattery = null;
         _batteryBar?.Hide();

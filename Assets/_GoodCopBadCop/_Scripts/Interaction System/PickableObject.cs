@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using DG.Tweening;
 using HighlightPlus;
 using Unity.Collections;
 using Unity.Netcode;
@@ -695,6 +696,48 @@ public class PickableObject : Interactable
         _rb = GetComponent<Rigidbody>();
         if (_rb != null) _rb.isKinematic = true;
         _colliderController = GetComponent<PickableColliderController>();
+        _restScale = transform.localScale;
+    }
+
+    // -------------------------------------------------------------------------
+    // Scale punch (placement feedback)
+    // -------------------------------------------------------------------------
+
+    private Vector3 _restScale;
+    private Tween _scalePunchTween;
+
+    /// <summary>The object's authored localScale, captured in Awake. Scale punches always
+    /// start from and return to this value so rapid pickup/drop can never compound the scale.</summary>
+    public Vector3 RestScale => _restScale;
+
+    /// <summary>
+    /// Plays a DOPunchScale relative to <see cref="RestScale"/>. Any in-flight punch is stopped
+    /// and the scale is snapped back to rest first, so the punch never starts from an inflated scale.
+    /// </summary>
+    public void PlayScalePunch(Vector3 strengthMultiplier, float duration, int vibrato, float elasticity)
+    {
+        StopScalePunch();
+        _scalePunchTween = transform
+            .DOPunchScale(Vector3.Scale(_restScale, strengthMultiplier), duration, vibrato, elasticity)
+            .SetLink(gameObject)
+            .OnComplete(() => transform.localScale = _restScale);
+    }
+
+    /// <summary>Kills any active scale punch and restores <see cref="RestScale"/>.</summary>
+    public void StopScalePunch()
+    {
+        if (_scalePunchTween != null && _scalePunchTween.IsActive())
+            _scalePunchTween.Kill();
+        _scalePunchTween = null;
+        EnsureRestScaleCaptured();
+        transform.localScale = _restScale;
+    }
+
+    private void EnsureRestScaleCaptured()
+    {
+        // Safety net for subclasses that override Awake without calling base.Awake().
+        if (_restScale == Vector3.zero)
+            _restScale = transform.localScale;
     }
 
     /// <summary>Registers the caller as the player holding this object on the server.</summary>
@@ -796,6 +839,69 @@ public class PickableObject : Interactable
         // Reuses the normal free-drop broadcast so clients position the object before NT
         // re-enables, exactly as they would for a player-initiated drop.
         DropBroadcastClientRpc(position, rotation);
+    }
+
+    /// <summary>
+    /// Server-only forced release that lets the item fall with real physics — the same end state
+    /// as <see cref="ThrowServerRpc"/> (server simulates, NetworkTransform replicates, every peer
+    /// drops its constraint/socket follow), but launched with <paramref name="velocity"/> (pass
+    /// <see cref="Vector3.zero"/> for a plain drop). Also un-stows hidden inventory items and frees
+    /// the holder, so it works for items the holder can no longer release themselves (e.g. a
+    /// player who just died). Items without a Rigidbody are snapped to the ground below instead
+    /// of being left hanging in mid-air.
+    /// </summary>
+    public void ForceDropWithPhysicsServer(Vector3 position, Vector3 velocity)
+    {
+        if (!IsServer)
+        {
+            Debug.LogWarning($"[PickableObject] ForceDropWithPhysicsServer called on non-server for {name}; ignoring.");
+            return;
+        }
+
+        if (_isStowed.Value) _isStowed.Value = false;
+        gameObject.SetActive(true);
+
+        _holdingClientId.Value = ulong.MaxValue;
+
+        RemoveParent();
+        ClearSocketFollow();
+
+        if (NetworkObject.OwnerClientId != NetworkManager.ServerClientId)
+            NetworkObject.RemoveOwnership();
+
+        NetworkObject.AutoObjectParentSync = true;
+
+        if (_rb == null)
+        {
+            // No physics body to fall with: place it on whatever is below instead of floating.
+            Vector3 groundPos = position;
+            if (Physics.Raycast(position + Vector3.up * 0.25f, Vector3.down, out RaycastHit hit, 25f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                groundPos = hit.point;
+
+            transform.position = groundPos;
+
+            NetworkTransform placeNt = GetComponent<NetworkTransform>();
+            if (placeNt != null) placeNt.enabled = true;
+
+            DropBroadcastClientRpc(groundPos, transform.rotation);
+            return;
+        }
+
+        transform.position = position;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        EnsureThrowCollidersSolid();
+
+        _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        _rb.isKinematic = false;
+        _rb.linearVelocity = velocity;
+        _rb.angularVelocity = Vector3.zero;
+        _rb.WakeUp();
+
+        ThrowBroadcastClientRpc(position, velocity);
     }
 
     /// <summary>

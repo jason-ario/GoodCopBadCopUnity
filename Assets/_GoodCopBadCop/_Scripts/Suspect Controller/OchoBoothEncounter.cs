@@ -17,8 +17,8 @@ using UnityEngine;
 ///   2. He vanishes and reappears standing behind the player inside the booth.
 ///   3. The encounter waits for a player to actually turn around and spot him there (or times
 ///      out); the moment he's spotted a stinger plays and he vanishes again.
-///   - Every verdict: once he vanishes after the stinger, the booth's power cuts out and he
-///     cackles from the dark, leaving the player to go fix the breaker at
+///   - Every verdict: once he vanishes after the stinger he is despawned outright, the booth's
+///     power cuts out and he cackles from the dark, leaving the player to go fix the breaker at
 ///     <see cref="ElectricPanelController"/> before the switch button will let them summon the
 ///     next suspect (already gated by <see cref="SwitchButton"/>'s powerOn check). Once power is
 ///     restored the megaphone plays a couple of dismissive barks and the next suspect can be
@@ -128,14 +128,6 @@ public class OchoBoothEncounter : NetworkBehaviour
     private bool _spotted;
     private Coroutine _monitorCoroutine;
     private ApplicationLetter _spawnedApplicationLetter;
-
-    /// <summary>
-    /// "Restore Power" guidebook task, registered the instant Ocho cuts the power in
-    /// <see cref="RedStampSequence"/> and resolved once the player fixes the panel in
-    /// <see cref="OnPowerRestored"/>. Mirrors the pattern <see cref="Day_03"/> uses for its own
-    /// power-outage task.
-    /// </summary>
-    private RepairPowerThreat _powerOutageThreat;
 
     private void Awake()
     {
@@ -287,13 +279,16 @@ public class OchoBoothEncounter : NetworkBehaviour
         // the power outage lands the instant he actually disappears, not some arbitrary delay later.
         yield return new WaitForSeconds(_jumpscareZoomDuration);
 
-        // He's gone now — end the screen glitch here. He isn't despawned until after the power
-        // is restored (see RedStampSequence), so waiting for the despawn event would leave the
-        // glitch running through the whole outage.
+        // He's gone now — end the screen glitch here.
         _self.ClearUncannyGlitchPresence();
 
         Debug.Log($"[OchoBoothEncounter] Verdict was {attemptedStamp} — running the power outage sequence.");
         RedStampSequence();
+
+        // Actually despawn him now rather than leaving an invisible Ocho (with a live collider)
+        // standing in the booth for the whole outage. The outage follow-up no longer lives on
+        // this component — see PowerOutageAftermath — so it survives the despawn.
+        SuspectController.Instance?.DespawnSuspectWithoutVerdict(_self);
     }
 
     private string GetReactionLine(StampContainer.StampType stamp)
@@ -345,75 +340,102 @@ public class OchoBoothEncounter : NetworkBehaviour
 
         // Cut the power — the switch button (SwitchButton.PowerOff, already wired to this
         // ElectricObject in the scene) can't be readied again until the panel puzzle is solved.
-        ElectricityController.Instance?.PowerOff();
+        // Panel-restorable variant: clears any stray fuse-box requirement (e.g. left over from a
+        // debug cheat) so the electrical panel can never silently refuse to restore power.
+        ElectricityController.Instance?.PowerOffPanelRestorable();
         PlayDemonicLaughInDarkClientRpc();
 
-        // Register the "Restore Power" guidebook task so the player has an explicit objective
-        // to go with the tutorial arrow — mirrors Day_03's own power-outage task registration.
-        _powerOutageThreat = new RepairPowerThreat();
-        TaskRegistry.Instance?.AddThreat(_powerOutageThreat);
-
-        if (ElectricityController.Instance != null)
-            ElectricityController.Instance.OnPowerRestoredAllClients += OnPowerRestored;
-
+        // The server (host included) sets up its own local "Fix the Power" task, tutorial
+        // arrow/highlight and aftermath directly; remote clients do the same from the RPC.
+        BeginLocalPowerOutageTask(runServerSide: true);
         ShowElectricalPanelTutorialClientRpc();
-
-        // NOTE: Ocho is NOT despawned here even though he's already invisible (vanished after
-        // the stinger). Despawning immediately would destroy this GameObject/component right
-        // now — but OnPowerRestored (below) and the PowerRestoredBarkSequence coroutine it
-        // kicks off (which is what actually calls ShiftManager.SetNextSuspectReady() to re-arm
-        // the Call Suspect Button) run on THIS component later, whenever the player eventually
-        // fixes the panel. An immediate despawn destroys the GameObject the instant power cuts,
-        // so that later StartCoroutine call silently fails on the destroyed object and the
-        // switch never re-arms. Despawning is deferred to the end of PowerRestoredBarkSequence
-        // instead, once SetNextSuspectReady() has actually run.
     }
 
     /// <summary>
-    /// Fired locally on every client (host and clients alike) via
-    /// <see cref="ElectricityController.OnPowerRestoredAllClients"/>. Server-only side effects
-    /// (megaphone barks, advancing the shift) are guarded; local UI cleanup runs everywhere.
+    /// Handles everything that has to happen once the player restores power after Ocho's
+    /// outage. Deliberately a plain C# object (not tied to Ocho's GameObject) so Ocho can be
+    /// despawned the moment he vanishes: all needed values are copied in up front, and the
+    /// server-side bark sequence runs as a coroutine on the persistent <see cref="ShiftManager"/>.
+    /// One instance per peer: the server's (runServerSide) also covers the host's local UI;
+    /// remote clients arm their own UI-only instance from the tutorial ClientRpc.
     /// </summary>
-    private void OnPowerRestored()
+    private sealed class PowerOutageAftermath
     {
-        if (ElectricityController.Instance != null)
-            ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerRestored;
+        private readonly FixElectricalPanelThreat _threat;
+        private readonly Transform _marker;
+        private readonly Interactable _panelInteractable;
+        private readonly bool _runServerSide;
+        private readonly string _bark1;
+        private readonly string _bark2;
+        private readonly float _barkGap;
+        private readonly float _finalDelay;
 
-        if (_powerOutageThreat != null)
+        public PowerOutageAftermath(OchoBoothEncounter source, FixElectricalPanelThreat threat, bool runServerSide)
         {
-            _powerOutageThreat.Resolve();
-            TaskRegistry.Instance?.RemoveThreat(_powerOutageThreat);
-            _powerOutageThreat = null;
+            _threat = threat;
+            _runServerSide = runServerSide;
+            _marker = source._electricalPanelMarker;
+            _panelInteractable = source._electricalPanelInteractable;
+            _bark1 = source._powerRestoredBark1;
+            _bark2 = source._powerRestoredBark2;
+            _barkGap = source._barkGap;
+            _finalDelay = source._finalDelayBeforeNextSuspect;
         }
 
-        if (TutorialMarkerManager.Instance != null && _electricalPanelMarker != null)
-            TutorialMarkerManager.Instance.Unmark(_electricalPanelMarker);
+        public void Arm()
+        {
+            if (ElectricityController.Instance == null)
+            {
+                Debug.LogWarning("[OchoBoothEncounter] No ElectricityController — power-restored follow-up can't be armed.");
+                return;
+            }
 
-        _electricalPanelInteractable?.SetForceHighlight(false);
+            ElectricityController.Instance.OnPowerRestoredAllClients += OnPowerRestored;
+        }
 
-        TutorialOverlay.Instance?.Close();
+        /// <summary>
+        /// Fired locally on every peer via <see cref="ElectricityController.OnPowerRestoredAllClients"/>.
+        /// </summary>
+        private void OnPowerRestored()
+        {
+            if (ElectricityController.Instance != null)
+                ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerRestored;
 
-        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+            if (_threat != null)
+            {
+                _threat.Resolve();
+                TaskRegistry.Instance?.RemoveThreat(_threat);
+            }
 
-        StartCoroutine(PowerRestoredBarkSequence());
-    }
+            if (TutorialMarkerManager.Instance != null && _marker != null)
+                TutorialMarkerManager.Instance.Unmark(_marker);
 
-    private IEnumerator PowerRestoredBarkSequence()
-    {
-        MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_powerRestoredBark1);
-        yield return new WaitForSeconds(_barkGap);
+            if (_panelInteractable != null) _panelInteractable.SetForceHighlight(false);
 
-        MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_powerRestoredBark2);
-        yield return new WaitForSeconds(_finalDelayBeforeNextSuspect);
+            TutorialOverlay.Instance?.Close();
 
-        ShiftManager.Instance.SetNextSuspectReady();
+            if (!_runServerSide) return;
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
-        // Ocho has been invisible since the stinger/vanish beat — now that the button has been
-        // re-armed, it's safe to actually despawn him and clean up his booth visit. Doing this
-        // here (rather than immediately when the power cut out) keeps this component alive long
-        // enough for OnPowerRestored/PowerRestoredBarkSequence to actually run when the player
-        // eventually restores power — see RedStampSequence for the full explanation.
-        SuspectController.Instance?.DespawnSuspectWithoutVerdict(_self);
+            if (ShiftManager.Instance == null)
+            {
+                Debug.LogError("[OchoBoothEncounter] ShiftManager missing — can't re-arm the next suspect after the outage.");
+                return;
+            }
+
+            ShiftManager.Instance.StartCoroutine(PowerRestoredBarkSequence());
+        }
+
+        private IEnumerator PowerRestoredBarkSequence()
+        {
+            MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_bark1);
+            yield return new WaitForSeconds(_barkGap);
+
+            MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_bark2);
+            yield return new WaitForSeconds(_finalDelay);
+
+            ShiftManager.Instance?.SetNextSuspectReady();
+        }
     }
 
     // ── Client-visible effects ──────────────────────────────────────────────
@@ -530,12 +552,38 @@ public class OchoBoothEncounter : NetworkBehaviour
     [ClientRpc]
     private void PlayDemonicLaughInDarkClientRpc()
     {
-        if (_audioSource != null && _demonicLaughClip != null)
+        if (_demonicLaughClip == null) return;
+
+        // Played through a standalone spatial emitter (not Ocho's own AudioSource) so the cackle
+        // keeps going after Ocho is despawned a moment later.
+        if (SFXController.Instance != null)
+        {
+            float maxDistance = _audioSource != null ? _audioSource.maxDistance : 0f;
+            float volume = _audioSource != null ? _audioSource.volume : 1f;
+            SFXController.Instance.PlayAtPosition(_demonicLaughClip, transform.position, volume, 1f, maxDistance);
+        }
+        else if (_audioSource != null)
+        {
             _audioSource.PlayOneShot(_demonicLaughClip);
+        }
     }
 
     [ClientRpc]
     private void ShowElectricalPanelTutorialClientRpc()
+    {
+        // The server already set itself up directly in RedStampSequence (it must not depend on
+        // this RPC landing before Ocho is despawned).
+        if (IsServer) return;
+        BeginLocalPowerOutageTask(runServerSide: false);
+    }
+
+    /// <summary>
+    /// Local, per peer: tutorial arrow + panel highlight + overlay, plus this peer's own
+    /// "Fix the Power" guidebook task (TaskRegistry is local per peer) and the aftermath
+    /// handler that clears it all once power is back. The server's aftermath additionally runs
+    /// the bark sequence and re-arms the next suspect.
+    /// </summary>
+    private void BeginLocalPowerOutageTask(bool runServerSide)
     {
         if (TutorialMarkerManager.Instance != null && _electricalPanelMarker != null)
             TutorialMarkerManager.Instance.Mark(_electricalPanelMarker);
@@ -543,6 +591,10 @@ public class OchoBoothEncounter : NetworkBehaviour
         _electricalPanelInteractable?.SetForceHighlight(true);
 
         TutorialOverlay.Instance?.ShowElectricalPanelTutorial();
+
+        FixElectricalPanelThreat threat = new FixElectricalPanelThreat();
+        TaskRegistry.Instance?.AddThreat(threat);
+        new PowerOutageAftermath(this, threat, runServerSide).Arm();
     }
 
     private void SetVisible(bool visible)

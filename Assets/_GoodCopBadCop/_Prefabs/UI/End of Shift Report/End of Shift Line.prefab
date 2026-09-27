@@ -163,7 +163,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -198,7 +198,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
-  playOnEnable: 1
+  playOnEnable: 0
 --- !u!114 &3828699290040401055
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -290,13 +290,32 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ReportRowUI
   root: {fileID: 3917978751681960526}
+  canvasGroup: {fileID: 5560027464965386690}
+  barImage: {fileID: 2191435461507890263}
   labelText: {fileID: 7471806455186334000}
   labelReveal: {fileID: 6800591769319210200}
   labelWobble: {fileID: 195383482188116350}
   valueText: {fileID: 5591789040790392417}
   valueReveal: {fileID: 3828699290040401055}
   valueWobble: {fileID: 1056720020386991718}
-  couponIcon: {fileID: 0}
+  couponIcon: {fileID: 5630210081525796547}
+  couponImage: {fileID: 3613607681638584613}
+  neutralStyle:
+    barSprite: {fileID: 21300000, guid: 3823e91759be5ea42993703e8783802e, type: 3}
+    tokenSprite: {fileID: 21300000, guid: 65440ae2384fa7f43aa9e7fa00a1f2f4, type: 3}
+    labelColor: {r: 0.36, g: 0.22, b: 0.04, a: 1}
+    valueColor: {r: 0.36, g: 0.22, b: 0.04, a: 1}
+  positiveStyle:
+    barSprite: {fileID: 21300000, guid: dd7e192f0f564804cb5a73da791fd47b, type: 3}
+    tokenSprite: {fileID: 21300000, guid: 5f2e8907234060b4098642da95df0a13, type: 3}
+    labelColor: {r: 0.2, g: 0.45, b: 0.1, a: 1}
+    valueColor: {r: 0.2, g: 0.45, b: 0.1, a: 1}
+  negativeStyle:
+    barSprite: {fileID: 21300000, guid: 3381b02808fd5f049a9b5dc97b5dd320, type: 3}
+    tokenSprite: {fileID: 21300000, guid: 207fd10e07e6b8d4aabe789e18e724f0, type: 3}
+    labelColor: {r: 0.72, g: 0.3, b: 0.06, a: 1}
+    valueColor: {r: 0.72, g: 0.3, b: 0.06, a: 1}
+  fadeStartScale: 0.96
 --- !u!114 &2191435461507890263
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -519,7 +538,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -554,7 +573,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
-  playOnEnable: 1
+  playOnEnable: 0
 --- !u!114 &6800591769319210200
 MonoBehaviour:
   m_ObjectHideFlags: 0

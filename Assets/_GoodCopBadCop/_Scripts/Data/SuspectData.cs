@@ -127,6 +127,12 @@ public class SuspectData : ScriptableObject
         [TextArea(2, 6)] public string uncannyEarlyDaysAnswer;
         [TextArea(2, 6)] public string uncannyMidDaysAnswer;
         [TextArea(2, 6)] public string uncannyFinalDaysAnswer;
+
+        [Header("Camera")]
+        [Tooltip("Optional camera cut while this answer plays. Same keys as ScriptedDialogueNode.cameraTrigger: " +
+                 "'SuspectCam', 'SuspectFaceCam' / 'suspect face', or a ScriptedDialogueRunner registry key. " +
+                 "Leave empty for the default dialogue camera.")]
+        public string cameraTrigger;
     }
 
     public QuestionResponseSet[] questionResponses;

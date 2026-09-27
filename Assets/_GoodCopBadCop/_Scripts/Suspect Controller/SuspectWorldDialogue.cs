@@ -33,6 +33,11 @@ public class SuspectWorldDialogue : MonoBehaviour
 
         [Tooltip("Optional Animator trigger fired on the NPC when this response plays. Leave empty for no animation.")]
         public string animationTrigger;
+
+        [Tooltip("Optional camera cut while this response plays. Same keys as ScriptedDialogueNode.cameraTrigger: " +
+                 "'SuspectCam', 'SuspectFaceCam' / 'suspect face', or a ScriptedDialogueRunner registry key. " +
+                 "Leave empty for the default dialogue camera.")]
+        public string cameraTrigger;
     }
 
     [System.Serializable]
@@ -45,6 +50,9 @@ public class SuspectWorldDialogue : MonoBehaviour
         [Tooltip("Line the NPC delivers the moment the conversation opens on this day. Leave empty to skip.")]
         [TextArea(2, 6)]
         public string greetingLine;
+
+        [Tooltip("Optional camera trigger key for the greeting line (see DialogueOption.cameraTrigger).")]
+        public string greetingCameraTrigger;
 
         public DialogueOption[] options;
     }
@@ -100,11 +108,20 @@ public class SuspectWorldDialogue : MonoBehaviour
 
     private DialogueOption[] _options;
     private string _greetingLineForCurrentConversation;
+    private string _greetingCameraKeyForCurrentConversation;
     private bool _inConversation;
     private ConversationState _state = ConversationState.Idle;
     private Transform _previousObjectToFollow;
     private bool _restoreObjectToFollow;
     private bool _awaitingEngagementResponse;
+
+    // Local presentation: true when this conversation entered booth dialogue mode (the local
+    // player is inside and this is the booth's current suspect), which activates the booth
+    // suspect cam via SuspectController. False = outside mode (player camera dolly-in).
+    private bool _boothCameraMode;
+
+    // Local presentation: the per-line override camera currently active for this client.
+    private GameObject _activeLineCam;
 
     // Server-only: guards against starting the authoritative conversation loop twice.
     private bool _serverConversationRunning;
@@ -130,6 +147,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         speaking.OnWorldChoicesShown += HandleWorldChoicesShown;
         speaking.OnWorldChoiceFinalized += HandleWorldChoiceFinalized;
         speaking.OnWorldAdvanceGateChanged += HandleWorldAdvanceGateChanged;
+        speaking.OnWorldLineCamera += HandleWorldLineCamera;
     }
 
     private void UnsubscribeFromSpeaking()
@@ -138,6 +156,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         speaking.OnWorldChoicesShown -= HandleWorldChoicesShown;
         speaking.OnWorldChoiceFinalized -= HandleWorldChoiceFinalized;
         speaking.OnWorldAdvanceGateChanged -= HandleWorldAdvanceGateChanged;
+        speaking.OnWorldLineCamera -= HandleWorldLineCamera;
     }
 
     /// <summary>
@@ -187,6 +206,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         {
             _options = set.options;
             _greetingLineForCurrentConversation = set.greetingLine;
+            _greetingCameraKeyForCurrentConversation = set.greetingCameraTrigger;
             return;
         }
 
@@ -207,7 +227,8 @@ public class SuspectWorldDialogue : MonoBehaviour
                 resolved[i] = new DialogueOption
                 {
                     playerLine = qr.question,
-                    npcResponse = !string.IsNullOrEmpty(response) ? response : qr.earlyDaysAnswer
+                    npcResponse = !string.IsNullOrEmpty(response) ? response : qr.earlyDaysAnswer,
+                    cameraTrigger = qr.cameraTrigger
                 };
             }
             _options = resolved;
@@ -218,6 +239,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         }
 
         _greetingLineForCurrentConversation = greetingLine;
+        _greetingCameraKeyForCurrentConversation = string.Empty;
     }
 
     /// <summary>
@@ -286,7 +308,19 @@ public class SuspectWorldDialogue : MonoBehaviour
         Transform headBone = lookAnimator != null && lookAnimator.LeadBone != null ? lookAnimator.LeadBone : null;
         Transform lookTarget = headBone != null ? headBone
             : (speaking != null && speaking.LookTarget != null ? speaking.LookTarget : transform);
-        DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(lookTarget, dialogueCameraVerticalOffset);
+
+        // Booth suspects talked to from inside the booth use the booth dialogue mode, which
+        // activates the suspect cam (SuspectController.SetSuspectCamActive). Everyone else —
+        // scene-placed NPCs and outside players — keeps the player-camera dolly-in.
+        _boothCameraMode = IsBoothConversationForLocalPlayer();
+        if (_boothCameraMode)
+            DialogueChoiceSystem.Instance.EnterScriptedDialogueMode(transform);
+        else
+            DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(lookTarget, dialogueCameraVerticalOffset);
+
+        // Cut to the default dialogue camera immediately; per-line triggers follow via
+        // HandleWorldLineCamera as the server plays each line.
+        ApplyLineCamera(string.Empty);
 
         if (lookAnimator != null)
         {
@@ -343,7 +377,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         }
 
         if (!string.IsNullOrEmpty(_greetingLineForCurrentConversation))
-            yield return StartCoroutine(ServerSayLineAndWaitForAdvance(_greetingLineForCurrentConversation));
+            yield return StartCoroutine(ServerSayLineAndWaitForAdvance(_greetingLineForCurrentConversation, _greetingCameraKeyForCurrentConversation));
 
         while (speaking.HasWorldParticipants)
         {
@@ -365,15 +399,15 @@ public class SuspectWorldDialogue : MonoBehaviour
             if (animator != null && !string.IsNullOrEmpty(chosen.animationTrigger))
                 animator.SetTrigger(chosen.animationTrigger);
 
-            yield return StartCoroutine(ServerSayLineAndWaitForAdvance(chosen.npcResponse));
+            yield return StartCoroutine(ServerSayLineAndWaitForAdvance(chosen.npcResponse, chosen.cameraTrigger));
         }
 
         _serverConversationRunning = false;
     }
 
-    private IEnumerator ServerSayLineAndWaitForAdvance(string line)
+    private IEnumerator ServerSayLineAndWaitForAdvance(string line, string cameraKey = "")
     {
-        speaking.SayWorldDialogue(line, waitForInput: true);
+        speaking.SayWorldDialogue(line, waitForInput: true, cameraKey: cameraKey ?? string.Empty);
 
         bool advanced = false;
         speaking.ServerBeginWorldAdvanceGate(() => advanced = true);
@@ -396,7 +430,103 @@ public class SuspectWorldDialogue : MonoBehaviour
     {
         if (!_inConversation) return;
         _state = ConversationState.WaitingForChoice;
+
+        // Return to the default dialogue camera while the player picks the next question.
+        ApplyLineCamera(string.Empty);
         DialogueChoiceSystem.Instance.ShowScriptedChoices(texts, OnOptionChosen);
+    }
+
+    private void HandleWorldLineCamera(string cameraKey)
+    {
+        if (!_inConversation) return;
+        ApplyLineCamera(cameraKey);
+    }
+
+    // -------------------------------------------------------------------------
+    // Local presentation — dialogue cameras
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// True when the local player is inside the booth and this NPC is the booth's current
+    /// suspect — the conversation then uses booth dialogue mode and its suspect cam.
+    /// </summary>
+    private bool IsBoothConversationForLocalPlayer()
+    {
+        SuspectCharacter character = GetComponent<SuspectCharacter>();
+        return character != null &&
+               SuspectController.Instance != null &&
+               SuspectController.Instance.CurrentSuspect == character &&
+               PlayerInstance.Instance != null &&
+               !PlayerInstance.Instance.IsOutsideLocal;
+    }
+
+    /// <summary>
+    /// Cuts to the camera for <paramref name="cameraKey"/>, deactivating the previous line camera.
+    /// Keys match <see cref="ScriptedDialogueNode.cameraTrigger"/>: empty = default,
+    /// <c>SuspectCam</c>, <c>SuspectFaceCam</c> / <c>suspect face</c>, or a
+    /// <see cref="ScriptedDialogueRunner"/> registry key.
+    /// </summary>
+    private void ApplyLineCamera(string cameraKey)
+    {
+        GameObject target = ResolveLineCamera(cameraKey);
+        if (target == _activeLineCam) return;
+
+        if (_activeLineCam != null)
+            _activeLineCam.SetActive(false);
+
+        _activeLineCam = target;
+
+        if (_activeLineCam != null)
+            _activeLineCam.SetActive(true);
+    }
+
+    private GameObject ResolveLineCamera(string cameraKey)
+    {
+        SuspectCharacter character = GetComponent<SuspectCharacter>();
+        GameObject wideCam = character != null ? character.SuspectCam : null;
+        GameObject resolved;
+
+        if (string.IsNullOrEmpty(cameraKey) || cameraKey == "SuspectCam")
+        {
+            // Mirrors ScriptedDialogueRunner: an empty trigger defaults to the speaker's SuspectCam.
+            resolved = wideCam;
+        }
+        else if (cameraKey == "SuspectFaceCam" || cameraKey == "suspect face")
+        {
+            // Same rule as ScriptedDialogueRunner: intact booth glass would obscure the close-up,
+            // so use the wide shot until the window is broken.
+            bool glassIntact = _boothCameraMode &&
+                               BreakableGlassController.Instance != null &&
+                               BreakableGlassController.Instance.IsWindowVisible;
+            GameObject faceCam = character != null ? character.SuspectFaceCam : null;
+            resolved = (!glassIntact && faceCam != null) ? faceCam : wideCam;
+
+            if (resolved == null)
+                Debug.LogWarning($"[SuspectWorldDialogue] Camera key '{cameraKey}': '{name}' has no camera assigned.", this);
+        }
+        else
+        {
+            resolved = ScriptedDialogueRunner.Instance != null
+                ? ScriptedDialogueRunner.Instance.GetRegisteredCamera(cameraKey)
+                : null;
+
+            if (resolved == null)
+                Debug.LogWarning($"[SuspectWorldDialogue] No camera entry found for key '{cameraKey}'.", this);
+        }
+
+        // In booth mode the suspect's wide cam is already held open by SuspectController as the
+        // base shot — never adopt it as a line camera, or deactivating the line cam would kill it.
+        if (_boothCameraMode && resolved != null && resolved == wideCam)
+            return null;
+
+        return resolved;
+    }
+
+    private void DeactivateLineCamera()
+    {
+        if (_activeLineCam != null)
+            _activeLineCam.SetActive(false);
+        _activeLineCam = null;
     }
 
     private void OnOptionChosen(int index)
@@ -537,7 +667,14 @@ public class SuspectWorldDialogue : MonoBehaviour
         DialogueChoiceSystem.Instance.HideChoicePanel();
         DialogueManager.Instance?.ClearHistory();
         speaking?.HideWorldDialogueSubtitle();
-        DialogueChoiceSystem.Instance.ExitScriptedDialogueModeOutside();
+
+        DeactivateLineCamera();
+        if (_boothCameraMode)
+            DialogueChoiceSystem.Instance.ExitScriptedDialogueMode(); // also deactivates the booth suspect cam
+        else
+            DialogueChoiceSystem.Instance.ExitScriptedDialogueModeOutside();
+        _boothCameraMode = false;
+
         UIController.Instance.ShowPlayerUI();
         StartCoroutine(RestoreGameplayCursorAfterExit());
 

@@ -35,8 +35,8 @@ public class CheckpointIntegrityBar : StatBar
     [SerializeField] private Color emptyCriticalColor = new(0.26f, 0.05f, 0.04f, 1f);
 
     [Header("Square Outlines")]
-    [Tooltip("How far filled-square outlines are pushed toward white (0 = same as fill, 1 = pure white).")]
-    [SerializeField, Range(0f, 1f)] private float filledOutlineWhiteBlend = 0.55f;
+    [Tooltip("How much darker filled-square outlines are than the fill (0 = same as fill, 1 = black).")]
+    [SerializeField, Range(0f, 1f)] private float filledOutlineDarken = 0.25f;
     [SerializeField, Range(0f, 1f)] private float filledOutlineAlpha = 0.9f;
     [SerializeField] private Color emptyOutlineGoodColor = new(0.55f, 0.59f, 0.17f, 0.8f);
     [SerializeField] private Color emptyOutlineWarningColor = new(0.62f, 0.5f, 0.12f, 0.8f);
@@ -146,7 +146,7 @@ public class CheckpointIntegrityBar : StatBar
 
         Color emptyColor = EvaluateThreeStop(normalizedScore, emptyGoodColor, emptyWarningColor, emptyCriticalColor);
         Color emptyOutline = EvaluateThreeStop(normalizedScore, emptyOutlineGoodColor, emptyOutlineWarningColor, emptyOutlineCriticalColor);
-        Color filledOutline = Color.Lerp(integrityColor, Color.white, filledOutlineWhiteBlend);
+        Color filledOutline = Color.Lerp(integrityColor, Color.black, filledOutlineDarken);
         filledOutline.a = filledOutlineAlpha;
 
         int filledSquareCount = Mathf.Clamp(

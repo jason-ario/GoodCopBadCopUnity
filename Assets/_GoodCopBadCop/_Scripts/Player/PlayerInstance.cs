@@ -524,23 +524,22 @@ public class PlayerInstance : NetworkBehaviour
     }
 
     /// <summary>
-    /// Releases whatever item the player is holding when they die, unhooking it from the
-    /// character (parent constraint, holder/ownership state, equip containers — same as a
-    /// normal throw release) and giving it a small physics impulse so it tumbles to the
-    /// ground with its collider/rigidbody active, instead of floating in place attached to
-    /// the corpse. Leaves it fully interactable so other players can pick it up.
+    /// Owner-side half of the death drop. The server drops the held item and every stowed
+    /// inventory item with real physics and no throw force (see
+    /// <see cref="PlayerInventory.DropAllItemsOnDeathServer"/>); here the dead client only
+    /// forgets them locally — hand IK, equip containers, the hand constraint, and hotbar slots —
+    /// so nothing keeps the items pinned to the corpse on this machine.
     /// </summary>
     private void DropHeldItemOnDeath()
     {
-        if (PlayerPickupController == null || !PlayerPickupController.IsHoldingObject)
+        PlayerInventory inventory = GetComponent<PlayerInventory>();
+        if (inventory != null)
+        {
+            inventory.ClearAllSlotsLocalOnDeath();
             return;
+        }
 
-        PickableObject droppedItem = PlayerPickupController.ReleaseHeldObjectForThrow();
-        if (droppedItem == null)
-            return;
-
-        Vector3 velocity = (Vector3.up * 0.5f) + (transform.forward * 0.5f);
-        droppedItem.ThrowServerRpc(droppedItem.transform.position, velocity);
+        PlayerPickupController?.ReleaseHeldObjectLocallyForServerDrop();
     }
 
     /// <summary>
@@ -588,6 +587,9 @@ public class PlayerInstance : NetworkBehaviour
 
         // Clear the blood-splatter / hurt overlay so it doesn't persist during spectating.
         UIController.Instance?.ScreenDamage?.Hide();
+        var damageVignette = FindFirstObjectByType<GoodCopBadCop.Effects.DamageVignetteView>();
+        if (damageVignette != null)
+            damageVignette.Hide();
 
         SpectateManager.Instance?.StartSpectating();
         Debug.Log("[PlayerInstance] Started spectating.");

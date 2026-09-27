@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -22,7 +23,7 @@ using UnityEngine.UI;
 /// Attach to any Button that represents a "Back" or "Cancel" action.
 /// </summary>
 [RequireComponent(typeof(Button))]
-public class KeyBackButtonActivator : MonoBehaviour
+public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
 {
     [SerializeField] private Key _key = Key.Escape;
 
@@ -98,6 +99,23 @@ public class KeyBackButtonActivator : MonoBehaviour
         }
 
         AnyEscapeBackButtonInteractable = false;
+    }
+
+    /// <summary>
+    /// Mouse clicks land on this (parent) object's raycast Image, so Button only fires this
+    /// object's own onClick. Mirror the key path by also invoking the paired child Button,
+    /// which is where many screens (e.g. Start Campaign Screen) wire the real Back action.
+    /// </summary>
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData.button != PointerEventData.InputButton.Left
+            || _button == null
+            || !_button.isActiveAndEnabled
+            || !_button.interactable)
+            return;
+
+        if (_partner != null)
+            _partner.InvokeButton();
     }
 
     /// <summary>Invokes this activator's Button.onClick if it is currently clickable.</summary>

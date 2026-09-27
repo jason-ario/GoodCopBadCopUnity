@@ -38,7 +38,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: -0.519108, y: 61}
+  m_AnchoredPosition: {x: 0, y: 124}
   m_SizeDelta: {x: 0, y: 120.3895}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &1927364444001039221
@@ -885,7 +885,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 41}
+  m_AnchoredPosition: {x: 0, y: 20}
   m_SizeDelta: {x: 0, y: 97.2133}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &3490139264128101198
@@ -1239,7 +1239,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: -148.99998}
+  m_AnchoredPosition: {x: 0, y: -130.6}
   m_SizeDelta: {x: 0, y: 97.2133}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &8837537053863870540
@@ -1487,10 +1487,17 @@ MonoBehaviour:
   continueButton: {fileID: 5066033765523793974}
   waitingForHostText: {fileID: 8844669244534275885}
   _contentContainer: {fileID: 3793441713665257924}
-  initialDelay: 2
-  rewardRevealDelay: 0.18
-  lineRevealDelay: 0.45
+  initialDelay: 0.35
+  contentFadeDuration: 0.3
+  rowFadeDuration: 0.45
+  rewardRevealDelay: 0.12
+  lineRevealDelay: 0.3
   finalDelayBeforeContinue: 0.4
+  openSound: {fileID: 8300000, guid: 3c9ebbfcedbb39d45a997f286b7c75e1, type: 3}
+  openSoundVolume: 0.8
+  rowSound: {fileID: 8300000, guid: 31592f4dc70b1a6469d96fc2bec5705b, type: 3}
+  rowSoundVolume: 0.55
+  rowSoundPitchRange: {x: 0.94, y: 1.06}
   _maxSingleRevealDuration: 6
   _maxTotalRevealDuration: 45
   _continueWatchdogTimeout: 15
@@ -1696,7 +1703,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: -97.999985}
+  m_AnchoredPosition: {x: 0, y: -90.6}
   m_SizeDelta: {x: 0, y: 97.2133}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!222 &2942808768512857766

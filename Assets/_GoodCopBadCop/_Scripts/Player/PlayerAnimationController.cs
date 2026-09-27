@@ -1093,6 +1093,55 @@ public class PlayerAnimationController : NetworkBehaviour
         // from the spectator's first-person perspective. Reset to 0 when done.
         if (bodyRig != null)
             bodyRig.weight = active ? 1f : 0f;
+
+        if (active)
+            SyncArmsAnimatorForSpectate();
+    }
+
+    /// <summary>
+    /// The first-person arms animator lives under this proxy's CinemachineCamera, which stays
+    /// inactive on observers until spectating activates it. Every one-shot SetAnimBool RPC
+    /// (held-item pickupAnimBool, IsCrouched, ...) received while it was inactive is lost, and
+    /// Unity resets Animator parameters to defaults on activation — so the spectator saw the
+    /// held item without its hold pose. Rebuild the arms state from the always-active body
+    /// animator, then re-derive the held item's hold bool from replicated pickup state so
+    /// late joiners (who never received the original RPC) are covered too.
+    /// Must be called after the camera rig has been activated (see SpectateManager).
+    /// </summary>
+    private void SyncArmsAnimatorForSpectate()
+    {
+        if (armsAnimator == null || !armsAnimator.isActiveAndEnabled) return;
+
+        if (bodyAnimator != null && bodyAnimator.isActiveAndEnabled)
+        {
+            foreach (AnimatorControllerParameter p in bodyAnimator.parameters)
+            {
+                if (p.type != AnimatorControllerParameterType.Bool) continue;
+                if (HasBoolParameter(armsAnimator, p.nameHash))
+                    armsAnimator.SetBool(p.nameHash, bodyAnimator.GetBool(p.nameHash));
+            }
+        }
+
+        PickableItemData itemData = _playerPickupController != null && _playerPickupController.ProxyHeldObject != null
+            ? _playerPickupController.ProxyHeldObject.ItemData
+            : null;
+        if (itemData == null || string.IsNullOrEmpty(itemData.pickupAnimBool)) return;
+
+        int hash = Animator.StringToHash(itemData.pickupAnimBool);
+        if (HasBoolParameter(armsAnimator, hash))
+            armsAnimator.SetBool(hash, true);
+        if (bodyAnimator != null && HasBoolParameter(bodyAnimator, hash))
+            bodyAnimator.SetBool(hash, true);
+    }
+
+    private static bool HasBoolParameter(Animator animator, int nameHash)
+    {
+        foreach (AnimatorControllerParameter p in animator.parameters)
+        {
+            if (p.nameHash == nameHash && p.type == AnimatorControllerParameterType.Bool)
+                return true;
+        }
+        return false;
     }
 
     public void EnableRightArmMask()    {

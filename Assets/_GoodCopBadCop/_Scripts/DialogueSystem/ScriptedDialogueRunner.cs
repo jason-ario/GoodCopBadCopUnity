@@ -1519,6 +1519,22 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         return (key == "SuspectFaceCam" || key == "suspect face") ? character.SuspectFaceCam : character.SuspectCam;
     }
 
+    /// <summary>
+    /// Looks up <paramref name="key"/> in the static <see cref="_cameras"/> registry. Returns null
+    /// when the key is empty or not registered. Used by <see cref="SuspectWorldDialogue"/> so its
+    /// per-line camera triggers accept the same registry keys as scripted dialogue nodes.
+    /// </summary>
+    public GameObject GetRegisteredCamera(string key)
+    {
+        if (string.IsNullOrEmpty(key) || _cameras == null) return null;
+        foreach (var entry in _cameras)
+        {
+            if (entry.key == key && entry.cam != null)
+                return entry.cam;
+        }
+        return null;
+    }
+
     private void DeactivateOverrideCam()
     {
         if (_activeOverrideCam == null) return;
@@ -1772,11 +1788,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         // Non-participants only see the spoken choice while within overhear range of the
         // conversation (the active scripted speaker).
-        if (!OverhearRange.CanLocalPlayerSee(ResolveActiveDialogueSpeakerTransform())) return;
+        Transform conversationSource = ResolveActiveDialogueSpeakerTransform();
+        if (!OverhearRange.CanLocalPlayerSee(conversationSource)) return;
 
         bool isLocalWinner = NetworkManager.Singleton != null &&
                              NetworkManager.Singleton.LocalClientId == winnerClientId;
-        DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.white, isLocalWinner);
+        DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.white, isLocalWinner,
+            overhearSource: conversationSource);
     }
 
     /// <summary>

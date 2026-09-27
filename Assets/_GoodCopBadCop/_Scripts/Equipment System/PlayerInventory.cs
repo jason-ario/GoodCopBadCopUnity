@@ -82,6 +82,36 @@ public class PlayerInventory : NetworkBehaviour
         (index >= 0 && index < _slots.Length) ? _slots[index] : null;
 
     /// <summary>
+    /// Slot contents as seen by any peer, resolved from the owner-written slot mirrors. Unlike
+    /// <see cref="GetItemInSlot"/> (owner-only local state), this works on observers — used by the
+    /// hotbar HUD while spectating this player.
+    /// </summary>
+    public PickableObject GetReplicatedItemInSlot(int index)
+    {
+        NetworkObjectReference itemRef = index == 0 ? _firstSlotRef.Value
+                                       : index == 1 ? _secondSlotRef.Value
+                                       : default;
+        return itemRef.TryGet(out NetworkObject itemObject) ? itemObject.GetComponent<PickableObject>() : null;
+    }
+
+    /// <summary>
+    /// Active slot as seen by any peer: the slot whose mirrored item is the replicated held
+    /// object, or -1 when the hand is empty or holds an unslotted item.
+    /// </summary>
+    public int ReplicatedActiveSlot
+    {
+        get
+        {
+            if (_pickup == null) return -1;
+            ulong heldId = _pickup.HeldObjectRef.NetworkObjectId;
+            if (heldId == 0) return -1;
+            if (_firstSlotRef.Value.NetworkObjectId == heldId) return 0;
+            if (_secondSlotRef.Value.NetworkObjectId == heldId) return 1;
+            return -1;
+        }
+    }
+
+    /// <summary>
     /// Adds every item currently owned by this inventory to a host-side workday snapshot. The
     /// local arrays cover the host player's immediate state, while the replicated references
     /// cover remote players whose local hotbar arrays are intentionally private to their owner.
@@ -127,11 +157,23 @@ public class PlayerInventory : NetworkBehaviour
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    private void Awake() => _pickup = GetComponent<PlayerPickupController>();
+    private void Awake()
+    {
+        _pickup = GetComponent<PlayerPickupController>();
+        _health = GetComponent<PlayerHealth>();
+        _animator = GetComponent<Animator>();
+    }
+
+    private PlayerHealth _health;
+    private Animator _animator;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        if (IsServer && _health != null)
+            _health.OnDeath += DropAllItemsOnDeathServer;
+
         if (!IsOwner) return;
 
         _pickup.OnHeldObjectChanged += HandleHeldObjectChanged;
@@ -142,6 +184,9 @@ public class PlayerInventory : NetworkBehaviour
         base.OnNetworkDespawn();
         if (_pickup != null)
             _pickup.OnHeldObjectChanged -= HandleHeldObjectChanged;
+
+        if (_health != null)
+            _health.OnDeath -= DropAllItemsOnDeathServer;
 
         // Drop any stowed items back to the world so they are not lost on disconnect.
         for (int i = 0; i < _slots.Length; i++)
@@ -365,6 +410,109 @@ public class PlayerInventory : NetworkBehaviour
             _pickup.UnstowItemToHand(target);
             // _stowed[slotIndex] = false and SetActiveSlot handled in HandleHeldObjectChanged.
         }
+    }
+
+    // ── Death drop ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only <see cref="PlayerHealth.OnDeath"/> handler. Drops the item in hand and every
+    /// stowed hotbar item into the world with real physics and no throw force, so nothing stays
+    /// hovering where the player died. Uses the replicated held/slot references, so it is
+    /// server-authoritative and works whether or not the dead client's own teardown lands.
+    /// The owner separately clears its local hold/hotbar state (<see cref="ClearAllSlotsLocalOnDeath"/>).
+    /// </summary>
+    private void DropAllItemsOnDeathServer()
+    {
+        if (!IsServer) return;
+
+        ulong ownerId = OwnerClientId;
+        Vector3 bodyOrigin = GetBodyDropOrigin();
+        var dropped = new HashSet<NetworkObject>();
+        int stowedIndex = 0;
+
+        void Drop(NetworkObjectReference itemRef, bool useItemPosition)
+        {
+            if (!itemRef.TryGet(out NetworkObject netObj) || netObj == null || !netObj.IsSpawned) return;
+            if (!dropped.Add(netObj)) return;
+
+            PickableObject item = netObj.GetComponent<PickableObject>();
+            if (item == null) return;
+
+            // Only release items this player actually still holds (hand or stowed).
+            if (item.HolderClientId != ownerId) return;
+
+            Vector3 position;
+            if (useItemPosition && netObj.gameObject.activeInHierarchy)
+            {
+                position = item.transform.position;
+            }
+            else
+            {
+                // Stowed items are hidden at a stale stow pose — spawn them just above the body,
+                // spread a little so they don't stack inside each other.
+                float angle = stowedIndex++ * 2.4f;
+                position = bodyOrigin + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 0.3f;
+            }
+
+            item.ForceDropWithPhysicsServer(position, Vector3.zero);
+        }
+
+        if (_pickup != null)
+            Drop(_pickup.HeldObjectRef, useItemPosition: true);
+
+        Drop(_firstSlotRef.Value, useItemPosition: false);
+        Drop(_secondSlotRef.Value, useItemPosition: false);
+    }
+
+    /// <summary>A point slightly above the (ragdolling) body, used for stowed-item drops.</summary>
+    private Vector3 GetBodyDropOrigin()
+    {
+        Transform hips = _animator != null && _animator.isHuman
+            ? _animator.GetBoneTransform(HumanBodyBones.Hips)
+            : null;
+
+        Vector3 origin = hips != null ? hips.position
+                       : stowPoint != null ? stowPoint.position
+                       : transform.position + Vector3.up;
+
+        return origin + Vector3.up * 0.3f;
+    }
+
+    /// <summary>
+    /// Owner-only local teardown on death: forgets the held and stowed items without sending any
+    /// drop RPCs (the server already dropped them — see <see cref="DropAllItemsOnDeathServer"/>).
+    /// </summary>
+    public void ClearAllSlotsLocalOnDeath()
+    {
+        if (!IsOwner) return;
+
+        // Host player: OnDeath subscriber order isn't guaranteed, so make sure the server drop
+        // reads the held/slot references before this local teardown clears them. Idempotent —
+        // already-dropped items no longer list this player as holder.
+        if (IsServer)
+            DropAllItemsOnDeathServer();
+
+        _pickup.ReleaseHeldObjectLocallyForServerDrop();
+
+        for (int i = 0; i < _slots.Length; i++)
+        {
+            PickableObject item = _slots[i];
+            if (item == null) continue;
+
+            if (_stowed[i])
+            {
+                // Mirror the server's un-stow locally right away so the item isn't left inactive
+                // on this machine until the replicated stowed flag arrives.
+                item.gameObject.SetActive(true);
+                item.RemoveParent();
+                item.OnDropped();
+            }
+
+            ClearSlot(i);
+        }
+
+        _unslottedHeld = null;
+        SetActiveSlot(-1);
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────

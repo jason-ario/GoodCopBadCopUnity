@@ -101,6 +101,14 @@ public class CorpseResurrectionController : NetworkBehaviour
     [Tooltip("One entry per face mesh that needs a material swap on resurrection.")]
     [SerializeField] private FaceMaterialSwap[] faceMaterialSwaps = System.Array.Empty<FaceMaterialSwap>();
 
+    [Header("Transformation Blend")]
+    [Tooltip("Seconds the body takes to grow from its human proportions into the stretched, twisted " +
+             "mutant silhouette after resurrecting. 0 = instant.")]
+    [Min(0f)]
+    [SerializeField] private float transformationDuration = 2.5f;
+    [Tooltip("Easing of the transformation over its duration (x = normalized time, y = blend 0..1).")]
+    [SerializeField] private AnimationCurve transformationCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
     [Header("Resurrected Movement Sync")]
     [Tooltip("How quickly non-server copies of the resurrected corpse catch up to the server's NavMeshAgent-driven position.")]
     [SerializeField] private float remotePositionLerpSpeed = 15f;
@@ -108,6 +116,16 @@ public class CorpseResurrectionController : NetworkBehaviour
     [SerializeField] private float remoteRotationLerpSpeed = 15f;
     [Tooltip("If a non-server copy is further than this from the server position (metres), it snaps instead of lerping.")]
     [SerializeField] private float remoteSnapDistance = 4f;
+
+    [Header("Corpse Junk (Trash Bag pickup)")]
+    [Tooltip("JunkItem on this Player root, kept disabled while alive. Once the dead body's ragdoll " +
+             "settles it is enabled on every peer so a player holding a TrashBag can bag it, and it is " +
+             "registered with TakeOutTrashTask exactly like a mutant corpse. Must have Destroy On " +
+             "Collect OFF — this controller removes the body itself (hidden while it is still its " +
+             "owner's PlayerObject, despawned once detached). Auto-resolved from this GameObject if empty.")]
+    [SerializeField] private JunkItem corpseJunkItem;
+    [Tooltip("Max seconds to wait for the ragdoll hips to fall asleep before the corpse becomes baggable.")]
+    [SerializeField] private float corpseJunkSettleTimeout = 5f;
 
     // ── Networked state ────────────────────────────────────────────────────────
 
@@ -136,7 +154,21 @@ public class CorpseResurrectionController : NetworkBehaviour
     public bool IsResurrected => _isResurrected.Value;
 
     /// <summary>
-    /// Server-write "completely burned by fire" flag. Only used while this corpse is still its
+    /// Server-write: the resurrected mutant has been permanently killed and now lies as a
+    /// ragdoll corpse (baggable/burnable). Stops the stretch/twist and position sync on every
+    /// peer, and lets late joiners ragdoll the body they never saw die.
+    /// </summary>
+    private readonly NetworkVariable<bool> _mutantDied = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>True while the corpse is an active, walking AI enemy (resurrected and not yet killed).</summary>
+    private bool IsWalkingMutant => _isResurrected.Value && !_mutantDied.Value;
+
+    /// <summary>
+    /// Server-write "corpse removed" flag — set when the body is completely burned by fire OR
+    /// bagged as junk. Only used while this corpse is still its
     /// owner's PlayerObject (the dead client is spectating from it, so it can't be despawned
     /// yet): the body is hidden on every peer — including late joiners — instead. Once the
     /// corpse is no longer a PlayerObject, <see cref="BurnAwayServer"/> despawns it outright.
@@ -148,6 +180,16 @@ public class CorpseResurrectionController : NetworkBehaviour
 
     /// <summary>True on every machine once the corpse has been completely burned away.</summary>
     public bool IsBurnedAway => _isBurnedAway.Value;
+
+    /// <summary>
+    /// Server-write "this dead body is currently baggable junk" flag. Drives
+    /// <see cref="corpseJunkItem"/>'s Unity 'enabled' flag on every peer. A NetworkVariable (rather
+    /// than the one-shot ClientRpc MutantEnemy uses) so late joiners also see a baggable corpse.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isCorpseJunkCollectible = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     /// <summary>
     /// True while the corpse is a resurrected mutant that is still alive. Fire must kill it
@@ -168,6 +210,7 @@ public class CorpseResurrectionController : NetworkBehaviour
     // ApplyResurrectedHitboxSize() can grow the capsule upward from its original base instead of
     // from the world origin.
     private float _originalControllerHeight;
+    private float _originalControllerRadius;
     private Vector3 _originalControllerCenter;
 
     // ── Bone transform cache ───────────────────────────────────────────────────
@@ -207,6 +250,11 @@ public class CorpseResurrectionController : NetworkBehaviour
 
     private bool _hasBeenBurned;
     private Coroutine _resurrectionCoroutine;
+    private Coroutine _corpseJunkCoroutine;
+
+    // Local (per-peer) transformation blend state — see TransformationWeight.
+    private bool _transformationStarted;
+    private float _transformationStartTime;
 
     /// <summary>
     /// True from the moment this player dies until the corpse (or the mutant it resurrects
@@ -231,11 +279,19 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (_characterController != null)
         {
             _originalControllerHeight = _characterController.height;
+            _originalControllerRadius = _characterController.radius;
             _originalControllerCenter = _characterController.center;
         }
 
         if (mutantEnemy == null)
             mutantEnemy = GetComponent<MutantEnemy>();
+
+        if (corpseJunkItem == null)
+            corpseJunkItem = GetComponent<JunkItem>();
+
+        // Living players are never junk. Identical on every peer (runs before spawn).
+        if (corpseJunkItem != null)
+            corpseJunkItem.enabled = false;
 
         // Agent stays disabled until resurrection so it doesn't fight CharacterController.
         if (_navMeshAgent != null)
@@ -249,6 +305,10 @@ public class CorpseResurrectionController : NetworkBehaviour
             // dormancy is tracked by its internal _isActive NetworkVariable instead, which
             // already defaults to false, so there is nothing to disable here.
             mutantEnemy.DisableAutoInit();
+
+            // Killing a resurrected corpse is a real death: no flee-and-despawn, the body
+            // ragdolls through the player's own RagdollController and stays to be bagged.
+            mutantEnemy.ConfigureAsPersistentCorpse(_ragdollController);
         }
 
         // Cache bones and their spawn-pose localPositions now, before any ragdoll
@@ -270,13 +330,35 @@ public class CorpseResurrectionController : NetworkBehaviour
         // Late joiners receive _isResurrected == true as an initial value, which does not raise
         // OnValueChanged — apply the resurrected state explicitly.
         if (!IsServer && _isResurrected.Value)
+        {
+            // Late joiner: show the finished mutant shape, don't replay the transformation.
+            BeginTransformation(instant: true);
             OnResurrectedChanged(false, true);
+        }
+
+        // Late joiner arriving after the resurrected mutant was killed: it never received
+        // MutantEnemy's death RPCs, so put the body back into ragdoll here.
+        if (!IsServer && _mutantDied.Value)
+            _ragdollController?.ActivateRagdoll();
 
         if (_isBurnedAway.Value)
             ApplyBurnedAwayVisuals();
 
         if (mutantEnemy != null)
             mutantEnemy.OnRemovedFromPlay += OnMutantRemovedFromPlay;
+
+        _isCorpseJunkCollectible.OnValueChanged += OnCorpseJunkCollectibleChanged;
+        _mutantDied.OnValueChanged += OnMutantDiedChanged;
+        ApplyCorpseJunkCollectible(_isCorpseJunkCollectible.Value);
+
+        if (IsServer)
+        {
+            if (corpseJunkItem != null)
+                corpseJunkItem.OnCollected += HandleCorpseJunkRemovedServer;
+
+            if (_playerHealth != null)
+                _playerHealth.OnRespawn += OnPlayerRespawnServer;
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -288,15 +370,48 @@ public class CorpseResurrectionController : NetworkBehaviour
 
         _isResurrected.OnValueChanged -= OnResurrectedChanged;
         _isBurnedAway.OnValueChanged -= OnBurnedAwayChanged;
+        _isCorpseJunkCollectible.OnValueChanged -= OnCorpseJunkCollectibleChanged;
+        _mutantDied.OnValueChanged -= OnMutantDiedChanged;
 
         if (mutantEnemy != null)
             mutantEnemy.OnRemovedFromPlay -= OnMutantRemovedFromPlay;
+
+        if (IsServer)
+        {
+            if (corpseJunkItem != null)
+                corpseJunkItem.OnCollected -= HandleCorpseJunkRemovedServer;
+
+            if (_playerHealth != null)
+                _playerHealth.OnRespawn -= OnPlayerRespawnServer;
+
+            // Despawned while still lying around as uncollected junk (e.g. scene teardown):
+            // make sure the cleanup task doesn't keep waiting for it.
+            if (_isCorpseJunkCollectible.Value)
+                TakeOutTrashTask.Instance?.UnregisterExternalJunkItem(NetworkObject);
+        }
     }
 
     private void OnMutantRemovedFromPlay()
     {
-        // The resurrected mutant has been permanently destroyed (killed by fire) —
-        // this GameObject is about to be despawned by MutantEnemy itself.
+        if (!IsServer) return;
+
+        // Permanently killed and the body persists (see MutantEnemy.ConfigureAsPersistentCorpse):
+        // it's a corpse again — keep it alive through revives and make it baggable once the
+        // ragdoll settles, exactly like the original death.
+        if (mutantEnemy != null && mutantEnemy.DiedPermanently && mutantEnemy.LeavesCorpse)
+        {
+            _mutantDied.Value = true;
+
+            if (corpseJunkItem != null)
+            {
+                if (_corpseJunkCoroutine != null)
+                    StopCoroutine(_corpseJunkCoroutine);
+                _corpseJunkCoroutine = StartCoroutine(EnableCorpseJunkAfterSettle());
+            }
+            return;
+        }
+
+        // Otherwise the mutant is about to be despawned by MutantEnemy itself.
         _hasActiveCorpse = false;
     }
 
@@ -309,6 +424,110 @@ public class CorpseResurrectionController : NetworkBehaviour
         _hasBeenBurned = false;
         _hasActiveCorpse = true;
         _resurrectionCoroutine = StartCoroutine(ResurrectionCountdown());
+
+        if (corpseJunkItem != null)
+        {
+            if (_corpseJunkCoroutine != null)
+                StopCoroutine(_corpseJunkCoroutine);
+            _corpseJunkCoroutine = StartCoroutine(EnableCorpseJunkAfterSettle());
+        }
+    }
+
+    // ── Corpse junk (Trash Bag pickup, server-authoritative) ──────────────────
+
+    /// <summary>
+    /// Waits for the ragdoll to come to rest (or <see cref="corpseJunkSettleTimeout"/>), then makes
+    /// the body baggable and hands it to <see cref="TakeOutTrashTask"/>, which owns the cleanup-zone
+    /// check — mirrors <c>MutantEnemy.EnableCorpseJunkPickupAfterSettle</c>.
+    /// </summary>
+    private IEnumerator EnableCorpseJunkAfterSettle()
+    {
+        Rigidbody hipsRb = _boneHips != null ? _boneHips.GetComponent<Rigidbody>() : null;
+        float elapsed = 0f;
+
+        // One frame so the ragdoll has actually been switched to dynamic before polling sleep.
+        yield return null;
+
+        while (hipsRb != null && !hipsRb.IsSleeping() && elapsed < corpseJunkSettleTimeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        _corpseJunkCoroutine = null;
+
+        if (!IsSpawned || !_hasActiveCorpse || IsWalkingMutant || _isBurnedAway.Value)
+            yield break;
+        if (_playerHealth == null || !_playerHealth.IsDead)
+            yield break;
+
+        _isCorpseJunkCollectible.Value = true;
+        ApplyCorpseJunkCollectible(true); // server applies immediately so the task sweep sees it
+
+        TakeOutTrashTask.Instance?.RegisterExternalJunkItem(NetworkObject);
+    }
+
+    /// <summary>Server-only. Stops the body from being baggable junk and drops it from task scoring.</summary>
+    private void ClearCorpseJunkServer()
+    {
+        if (!IsServer) return;
+
+        if (_corpseJunkCoroutine != null)
+        {
+            StopCoroutine(_corpseJunkCoroutine);
+            _corpseJunkCoroutine = null;
+        }
+
+        if (!_isCorpseJunkCollectible.Value) return;
+
+        _isCorpseJunkCollectible.Value = false;
+        ApplyCorpseJunkCollectible(false);
+        TakeOutTrashTask.Instance?.UnregisterExternalJunkItem(NetworkObject);
+    }
+
+    private void OnCorpseJunkCollectibleChanged(bool previous, bool current) => ApplyCorpseJunkCollectible(current);
+
+    private void OnMutantDiedChanged(bool previous, bool current) => ApplyCorpseJunkCollectible(_isCorpseJunkCollectible.Value);
+
+    private void ApplyCorpseJunkCollectible(bool collectible)
+    {
+        // Belt-and-braces on every peer: a walking resurrected enemy is never baggable, whatever
+        // order the replicated flags arrive in.
+        if (IsWalkingMutant)
+            collectible = false;
+
+        if (corpseJunkItem != null && corpseJunkItem.enabled != collectible)
+            corpseJunkItem.enabled = collectible;
+    }
+
+    /// <summary>
+    /// Server-only <see cref="JunkItem.OnCollected"/> handler — fires when the body is bagged
+    /// (<c>JunkItem.CollectServerRpc</c>) or burned through <see cref="JunkItem.BurnAwayServer"/>.
+    /// The JunkItem has already credited/notified <see cref="TakeOutTrashTask"/>; this just cancels
+    /// resurrection and takes the body out of the world.
+    /// </summary>
+    private void HandleCorpseJunkRemovedServer()
+    {
+        if (!IsServer || !IsSpawned) return;
+
+        if (_corpseJunkCoroutine != null)
+        {
+            StopCoroutine(_corpseJunkCoroutine);
+            _corpseJunkCoroutine = null;
+        }
+
+        _isCorpseJunkCollectible.Value = false;
+        ApplyCorpseJunkCollectible(false);
+
+        BurnCorpse(); // cancels the pending resurrection
+        _hasActiveCorpse = false;
+        RemoveCorpseFromWorldServer("bagged/removed as junk");
+    }
+
+    /// <summary>Server-only. Same-object respawn (health reset in place): the body is a living player again.</summary>
+    private void OnPlayerRespawnServer()
+    {
+        ClearCorpseJunkServer();
     }
 
     // ── Detach from reviving player (server-only) ───────────────────────────────
@@ -387,17 +606,36 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (_playerHealth == null || !_playerHealth.IsDead)
             return;
 
+        // Already registered as cleanup junk: burn it through the JunkItem so TakeOutTrashTask is
+        // credited (CreditBurnedJunkItem); its OnCollected → HandleCorpseJunkRemovedServer removes
+        // the body.
+        if (_isCorpseJunkCollectible.Value && corpseJunkItem != null && corpseJunkItem.BurnAwayServer())
+            return;
+
+        ClearCorpseJunkServer();
         BurnCorpse();
         _hasActiveCorpse = false;
+        RemoveCorpseFromWorldServer("burned away");
+    }
+
+    /// <summary>
+    /// Server-only. Takes a finished corpse (burned or bagged) out of the world:
+    ///  - detached corpse (owner already revived): despawned immediately;
+    ///  - still its owner's PlayerObject (owner dead/spectating): hidden on every peer via
+    ///    <see cref="_isBurnedAway"/>; ReviveManager then despawns it normally on revive.
+    /// </summary>
+    private void RemoveCorpseFromWorldServer(string reason)
+    {
+        if (!IsServer || !IsSpawned) return;
 
         if (!NetworkObject.IsPlayerObject)
         {
-            Debug.Log($"[CorpseResurrection] Detached corpse {gameObject.name} burned away — despawning.");
+            Debug.Log($"[CorpseResurrection] Detached corpse {gameObject.name} {reason} — despawning.");
             NetworkObject.Despawn(destroy: true);
             return;
         }
 
-        Debug.Log($"[CorpseResurrection] Corpse {gameObject.name} burned away — hidden until its owner revives.");
+        Debug.Log($"[CorpseResurrection] Corpse {gameObject.name} {reason} — hidden until its owner revives.");
         _isBurnedAway.Value = true;
     }
 
@@ -418,8 +656,8 @@ public class CorpseResurrectionController : NetworkBehaviour
         foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
             r.enabled = false;
 
-        // The root CharacterController is left alone: the dead owner's PlayerMovementController
-        // still runs gravity-only Move() calls on it, which log errors on a disabled controller.
+        // The root CharacterController is left alone: RagdollController already disabled it on
+        // death, and it is the only collider whose enabled state other systems toggle back.
         foreach (Collider c in GetComponentsInChildren<Collider>(true))
         {
             if (c is CharacterController) continue;
@@ -438,14 +676,47 @@ public class CorpseResurrectionController : NetworkBehaviour
     /// every machine that performs physics queries against this collider, i.e. both the server
     /// (Resurrect()) and every client (ResurrectClientRpc()) — see the calls below.
     /// </summary>
-    private void ApplyResurrectedHitboxSize()
+    private void ApplyResurrectedHitboxSize() => ApplyResurrectedHitboxSize(TransformationWeight);
+
+    private void ApplyResurrectedHitboxSize(float weight)
     {
         if (_characterController == null) return;
 
-        float heightDelta = resurrectedControllerHeight - _originalControllerHeight;
-        _characterController.height = resurrectedControllerHeight;
-        _characterController.radius = resurrectedControllerRadius;
+        float height = Mathf.Lerp(_originalControllerHeight, resurrectedControllerHeight, weight);
+        float heightDelta = height - _originalControllerHeight;
+        _characterController.height = height;
+        _characterController.radius = Mathf.Lerp(_originalControllerRadius, resurrectedControllerRadius, weight);
         _characterController.center = _originalControllerCenter + new Vector3(0f, heightDelta * 0.5f, 0f);
+    }
+
+    // ── Transformation blend ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Starts this peer's local human → mutant blend. Every peer runs it from the moment it learns
+    /// about the resurrection; <paramref name="instant"/> is used for late joiners, who should see
+    /// the finished shape rather than replay the transformation.
+    /// </summary>
+    private void BeginTransformation(bool instant)
+    {
+        if (_transformationStarted) return;
+
+        _transformationStarted = true;
+        _transformationStartTime = instant ? float.NegativeInfinity : Time.time;
+    }
+
+    /// <summary>0 = human proportions, 1 = full mutant silhouette.</summary>
+    private float TransformationWeight
+    {
+        get
+        {
+            if (!_transformationStarted) return 0f;
+            if (transformationDuration <= 0f) return 1f;
+
+            float t = Mathf.Clamp01((Time.time - _transformationStartTime) / transformationDuration);
+            return transformationCurve != null && transformationCurve.length > 0
+                ? Mathf.Clamp01(transformationCurve.Evaluate(t))
+                : t;
+        }
     }
 
     // ── Countdown ─────────────────────────────────────────────────────────────
@@ -463,6 +734,9 @@ public class CorpseResurrectionController : NetworkBehaviour
     private void Resurrect()
     {
         if (!IsServer || _isResurrected.Value) return;
+
+        // A body that stands back up is no longer trash.
+        ClearCorpseJunkServer();
 
         // Snap to the nearest valid NavMesh position — the ragdoll may have slid off-mesh.
         if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 3f, NavMesh.AllAreas))
@@ -493,6 +767,7 @@ public class CorpseResurrectionController : NetworkBehaviour
         // just the single root capsule. Applied locally on the server too (mirrors the
         // NavMeshAgent/NetworkTransform re-enables above) in case anything server-side ever
         // queries this collider directly (e.g. a host also acting as a client).
+        BeginTransformation(instant: false);
         ApplyResurrectedHitboxSize();
         _ragdollController?.SetLimbHitboxesActive(true);
 
@@ -533,6 +808,8 @@ public class CorpseResurrectionController : NetworkBehaviour
         // so hit-scans can register on individual limbs/body parts too, not just the root capsule.
         // Must run on every client — each one resolves its own shooter/swinger's weapon hits
         // locally against its own copy of these colliders (see Pistol/Shotgun/MeleeWeaponHitbox).
+        // The capsule then grows with the transformation blend in LateUpdate.
+        BeginTransformation(instant: false);
         ApplyResurrectedHitboxSize();
         _ragdollController?.SetLimbHitboxesActive(true);
 
@@ -582,11 +859,15 @@ public class CorpseResurrectionController : NetworkBehaviour
         // LateUpdate can distort bones and MutantEnemy's animation syncing takes effect.
         if (current && !previous)
         {
+            // A walking enemy is never baggable (ApplyCorpseJunkCollectible enforces it).
+            ApplyCorpseJunkCollectible(_isCorpseJunkCollectible.Value);
+
             _ragdollController?.SetRagdollActive(false);
 
             // Same reasoning as ResurrectClientRpc(): a late joiner never received that RPC, so
             // its own copy of the collider would otherwise stay sized/shaped for the original
             // human body and its ragdoll limb colliders would stay disabled.
+            BeginTransformation(instant: false);
             ApplyResurrectedHitboxSize();
             _ragdollController?.SetLimbHitboxesActive(true);
 
@@ -664,7 +945,7 @@ public class CorpseResurrectionController : NetworkBehaviour
     /// </summary>
     private void Update()
     {
-        if (!IsSpawned || !_isResurrected.Value) return;
+        if (!IsSpawned || !IsWalkingMutant) return;
 
         if (IsServer)
         {
@@ -706,41 +987,31 @@ public class CorpseResurrectionController : NetworkBehaviour
     {
         if (!_isResurrected.Value) return;
 
-        // ── Segment stretch ───────────────────────────────────────────────────
-        // The Humanoid animator drives localRotation via muscle curves but does NOT
-        // write localPosition for non-root bones, so multiplying the original offset
-        // cleanly increases the inter-bone distance without disturbing the mesh topology.
+        // Killed again: the ragdoll owns the skeleton now. Its joints were authored for the human
+        // proportions, so put the bones back once instead of fighting physics every frame.
+        // Checking the Animator too catches the death on clients the same frame
+        // MutantEnemy's ragdoll RPC lands, before _mutantDied replicates.
+        if (_mutantDied.Value || (_animator != null && !_animator.enabled))
+        {
+            if (!_restoredHumanProportions)
+            {
+                _restoredHumanProportions = true;
+                ApplyBoneStretch(0f);
+            }
+            return;
+        }
 
-        if (_boneChest != null)
-            _boneChest.localPosition = _origChestLocalPos * spineStretch;
+        _restoredHumanProportions = false;
+        float w = TransformationWeight;
 
-        if (_boneUpperChest != null)
-            _boneUpperChest.localPosition = _origUpperChestLocalPos * chestStretch;
+        // Grow the hittable capsule alongside the silhouette while the blend is running.
+        if (w < 1f || !_hitboxAtFullSize)
+        {
+            ApplyResurrectedHitboxSize(w);
+            _hitboxAtFullSize = w >= 1f;
+        }
 
-        if (_boneNeck != null)
-            _boneNeck.localPosition = _origNeckLocalPos * neckStretch;
-
-        if (_boneLeftUpperArm != null)
-            _boneLeftUpperArm.localPosition  = _origLeftUpperArmLocalPos  * upperArmStretch;
-        if (_boneLeftLowerArm != null)
-            _boneLeftLowerArm.localPosition  = _origLeftLowerArmLocalPos  * lowerArmStretch;
-        if (_boneLeftHand != null)
-            _boneLeftHand.localPosition      = _origLeftHandLocalPos      * handStretch;
-        if (_boneRightUpperArm != null)
-            _boneRightUpperArm.localPosition = _origRightUpperArmLocalPos * upperArmStretch;
-        if (_boneRightLowerArm != null)
-            _boneRightLowerArm.localPosition = _origRightLowerArmLocalPos * lowerArmStretch;
-        if (_boneRightHand != null)
-            _boneRightHand.localPosition     = _origRightHandLocalPos     * handStretch;
-
-        if (_boneLeftUpperLeg != null)
-            _boneLeftUpperLeg.localPosition  = _origLeftUpperLegLocalPos  * upperLegStretch;
-        if (_boneLeftLowerLeg != null)
-            _boneLeftLowerLeg.localPosition  = _origLeftLowerLegLocalPos  * lowerLegStretch;
-        if (_boneRightUpperLeg != null)
-            _boneRightUpperLeg.localPosition = _origRightUpperLegLocalPos * upperLegStretch;
-        if (_boneRightLowerLeg != null)
-            _boneRightLowerLeg.localPosition = _origRightLowerLegLocalPos * lowerLegStretch;
+        ApplyBoneStretch(w);
 
         // ── Hip compensation ──────────────────────────────────────────────────
         // When legs are stretched, the feet descend into the ground. Compensate by
@@ -753,9 +1024,9 @@ public class CorpseResurrectionController : NetworkBehaviour
         {
             float extraLength = 0f;
             if (_boneLeftUpperLeg != null)
-                extraLength += _origLeftUpperLegLocalPos.magnitude * (upperLegStretch - 1f);
+                extraLength += _origLeftUpperLegLocalPos.magnitude * (Blend(upperLegStretch, w) - 1f);
             if (_boneLeftLowerLeg != null)
-                extraLength += _origLeftLowerLegLocalPos.magnitude * (lowerLegStretch - 1f);
+                extraLength += _origLeftLowerLegLocalPos.magnitude * (Blend(lowerLegStretch, w) - 1f);
 
             if (extraLength > 0f)
                 _boneHips.localPosition += Vector3.up * extraLength;
@@ -764,13 +1035,44 @@ public class CorpseResurrectionController : NetworkBehaviour
         // ── Spine rotation offsets ────────────────────────────────────────────
         // Additive on top of the Animator's rotation output, producing an asymmetric
         // writhing twist. Applied after positions so the twist reads correctly.
+        // Scaled by the blend so the body twists into shape gradually.
         if (_boneSpine != null)
-            _boneSpine.localRotation      *= Quaternion.Euler(spineEulerOffset);
+            _boneSpine.localRotation      *= Quaternion.Euler(spineEulerOffset * w);
         if (_boneChest != null)
-            _boneChest.localRotation      *= Quaternion.Euler(chestEulerOffset);
+            _boneChest.localRotation      *= Quaternion.Euler(chestEulerOffset * w);
         if (_boneUpperChest != null)
-            _boneUpperChest.localRotation *= Quaternion.Euler(upperChestEulerOffset);
+            _boneUpperChest.localRotation *= Quaternion.Euler(upperChestEulerOffset * w);
     }
+
+    private static float Blend(float stretch, float weight) => Mathf.LerpUnclamped(1f, stretch, weight);
+
+    /// <summary>
+    /// Writes every segment's localPosition as its bind-pose offset scaled by the blended stretch.
+    /// The Humanoid animator drives localRotation via muscle curves but does NOT write
+    /// localPosition for non-root bones, so this cleanly changes inter-bone distance.
+    /// <paramref name="w"/> = 0 restores the original human proportions.
+    /// </summary>
+    private void ApplyBoneStretch(float w)
+    {
+        if (_boneChest != null)         _boneChest.localPosition         = _origChestLocalPos         * Blend(spineStretch, w);
+        if (_boneUpperChest != null)    _boneUpperChest.localPosition    = _origUpperChestLocalPos    * Blend(chestStretch, w);
+        if (_boneNeck != null)          _boneNeck.localPosition          = _origNeckLocalPos          * Blend(neckStretch, w);
+
+        if (_boneLeftUpperArm != null)  _boneLeftUpperArm.localPosition  = _origLeftUpperArmLocalPos  * Blend(upperArmStretch, w);
+        if (_boneLeftLowerArm != null)  _boneLeftLowerArm.localPosition  = _origLeftLowerArmLocalPos  * Blend(lowerArmStretch, w);
+        if (_boneLeftHand != null)      _boneLeftHand.localPosition      = _origLeftHandLocalPos      * Blend(handStretch, w);
+        if (_boneRightUpperArm != null) _boneRightUpperArm.localPosition = _origRightUpperArmLocalPos * Blend(upperArmStretch, w);
+        if (_boneRightLowerArm != null) _boneRightLowerArm.localPosition = _origRightLowerArmLocalPos * Blend(lowerArmStretch, w);
+        if (_boneRightHand != null)     _boneRightHand.localPosition     = _origRightHandLocalPos     * Blend(handStretch, w);
+
+        if (_boneLeftUpperLeg != null)  _boneLeftUpperLeg.localPosition  = _origLeftUpperLegLocalPos  * Blend(upperLegStretch, w);
+        if (_boneLeftLowerLeg != null)  _boneLeftLowerLeg.localPosition  = _origLeftLowerLegLocalPos  * Blend(lowerLegStretch, w);
+        if (_boneRightUpperLeg != null) _boneRightUpperLeg.localPosition = _origRightUpperLegLocalPos * Blend(upperLegStretch, w);
+        if (_boneRightLowerLeg != null) _boneRightLowerLeg.localPosition = _origRightLowerLegLocalPos * Blend(lowerLegStretch, w);
+    }
+
+    private bool _restoredHumanProportions;
+    private bool _hitboxAtFullSize;
 
     // ── Server chase loop ─────────────────────────────────────────────────────
     // Chasing, retargeting, door bashing, attacking, and rotation-facing are all owned by

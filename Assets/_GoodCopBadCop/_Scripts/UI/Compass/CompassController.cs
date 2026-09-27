@@ -206,7 +206,12 @@ public class CompassController : MonoBehaviour
             case CompassMarkerCategory.Graffiti:
                 return CleanGraffitiTask.Instance != null && CleanGraffitiTask.Instance.IsActive;
             case CompassMarkerCategory.Fence:
-                return FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive;
+                // Any broken segment counts against Checkpoint Integrity once that system is on
+                // (CheckpointMaintenanceHUD's fence row counts every broken segment, task-tracked
+                // or not), so FenceThreat / mutant-breach damage with no repair round must still
+                // pip. Before integrity is introduced (early Day 1), only a live repair task does.
+                return (FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive)
+                    || CheckpointIntegrityService.IsEnabled;
             case CompassMarkerCategory.Blood:
                 // Only while a blood-cleanup task is actually asking the player to mop. Blood decals
                 // are also scattered cosmetically (end-of-trail splatters, mutant hits) — showing

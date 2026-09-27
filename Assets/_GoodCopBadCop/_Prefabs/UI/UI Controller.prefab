@@ -11309,10 +11309,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cash Earned Notification (1)
       objectReference: {fileID: 0}
-    - target: {fileID: 7149774654454314359, guid: 2461e416e20c7be439d5992233a4b047, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -11739,11 +11735,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: m_InScenePlaced
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 3913330536
+      value: 2350688076
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: m_InScenePlacedDisabledByDefault
@@ -12534,11 +12530,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: m_InScenePlaced
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 381575878
+      value: 485131521
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: m_InScenePlacedDisabledByDefault
@@ -13843,11 +13839,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: m_InScenePlaced
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 1670354390
+      value: 616387875
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: m_InScenePlacedDisabledByDefault
@@ -14840,11 +14836,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: m_InScenePlaced
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 607929308
+      value: 471012371
       objectReference: {fileID: 0}
     - target: {fileID: 3554270672052605590, guid: 094d8b0cf2674994b85ef1d7106c43be, type: 3}
       propertyPath: m_InScenePlacedDisabledByDefault
@@ -16215,11 +16211,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7745535356744623030, guid: 4f93cb18e1c762449a9c014ff75ec96d, type: 3}
       propertyPath: m_InScenePlaced
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7745535356744623030, guid: 4f93cb18e1c762449a9c014ff75ec96d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 2091497335
+      value: 2084188071
       objectReference: {fileID: 0}
     - target: {fileID: 7745535356744623030, guid: 4f93cb18e1c762449a9c014ff75ec96d, type: 3}
       propertyPath: m_InScenePlacedDisabledByDefault
@@ -17615,8 +17611,27 @@ MonoBehaviour:
   - {fileID: 6553347706758096823}
   - {fileID: 6254937297905371146}
   - {fileID: 4086718631269408027}
-  filledSquareColor: {r: 0.75, g: 0.82, b: 0.25, a: 1}
-  emptySquareColor: {r: 0.18, g: 0.19, b: 0.08, a: 1}
+  goodColor: {r: 1, g: 1, b: 1, a: 1}
+  warningColor: {r: 1, g: 0.85, b: 0.1, a: 1}
+  criticalColor: {r: 0.9, g: 0.12, b: 0.1, a: 1}
+  warningThreshold: 0.7
+  criticalThreshold: 0.6
+  emptyGoodColor: {r: 0.18, g: 0.19, b: 0.08, a: 1}
+  emptyWarningColor: {r: 0.24, g: 0.19, b: 0.04, a: 1}
+  emptyCriticalColor: {r: 0.26, g: 0.05, b: 0.04, a: 1}
+  filledOutlineDarken: 0.25
+  filledOutlineAlpha: 0.9
+  emptyOutlineGoodColor: {r: 0.55, g: 0.59, b: 0.17, a: 0.8}
+  emptyOutlineWarningColor: {r: 0.62, g: 0.5, b: 0.12, a: 0.8}
+  emptyOutlineCriticalColor: {r: 0.6, g: 0.16, b: 0.12, a: 0.8}
+  panelBackground: {fileID: 0}
+  panelGoodTint: {r: 1, g: 1, b: 1, a: 1}
+  panelWarningTint: {r: 1, g: 0.88, b: 0.6, a: 1}
+  panelCriticalTint: {r: 0.85, g: 0.38, b: 0.34, a: 1}
+  lowIntegrityWobble: {fileID: 0}
+  shakeThreshold: 0.6
+  minShakeIntensity: 0.4
+  maxShakeIntensity: 1
 --- !u!114 &7973766295984118744 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1315069658917849094, guid: b74c096f8912e7e46a5f61179e7da8cf, type: 3}

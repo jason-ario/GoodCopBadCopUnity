@@ -129,6 +129,135 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!1 &5756873443176563810
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6112843279133977228}
+  - component: {fileID: 4184022689506524358}
+  m_Layer: 0
+  m_Name: Footsteps
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6112843279133977228
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5756873443176563810}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2501469216775164319}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!82 &4184022689506524358
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5756873443176563810}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 96
+  DopplerLevel: 0
+  MinDistance: 2
+  MaxDistance: 20
+  Pan2D: 0
+  rolloffMode: 1
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &7307716854411765365
 GameObject:
   m_ObjectHideFlags: 0
@@ -172,6 +301,7 @@ Transform:
   - {fileID: 3524241835932894003}
   - {fileID: 5077197553117638222}
   - {fileID: 317711138340270492}
+  - {fileID: 6112843279133977228}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &4807087481966983560
@@ -188,10 +318,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 3107953825
   InScenePlacedSourceGlobalObjectIdHash: 3107953825
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -235,16 +367,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MutantEnemy
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 11400000, guid: 0cb5dddba4895be4abc732a2837c36ec, type: 2}
+  assaultAgentTypeName: Mutant
   animator: {fileID: 386687839824223625}
   speedParameterName: Speed
   groundedParameterName: Grounded
   attackBoolName: Attack
   deathBoolName: Death
   runningBoolName: Running
+  ragdollController: {fileID: 0}
   lookAnimator: {fileID: 0}
   lookAtRange: 12
   attackHitbox: {fileID: 291297765939751491}
   attackHitDelay: 0.4
+  useSecondAttackAnimation: 0
+  secondAttackStateName: Mutant Attack 2
+  enableHitAnimation: 0
+  hitTriggerName: Hit
   doorDetectionRadius: 3
   doorOpenCooldownDuration: 3
   hitParticlePrefab: {fileID: 893913727056456344, guid: 57847ba3edbb34f4e9d1ea10ad1289a6, type: 3}
@@ -257,6 +395,7 @@ MonoBehaviour:
   deathGoreBurstSpeedRange: {x: 3, y: 7}
   goreLifetime: 10
   goreMaxFallDistance: 15
+  goreKinematicDelay: 2
   bloodDecalPrefabs:
   - {fileID: 5798377863730634803, guid: d152bf9d5562e0243a3197b173d44ade, type: 3}
   goreGroundLayer:
@@ -299,10 +438,15 @@ MonoBehaviour:
   _footstepInterval: 0.5
   _footstepMovementThreshold: 0.1
   _footstepPitchRandomness: 0.1
+  _footstepAudioSource: {fileID: 0}
+  _footstepVolume: 1
+  _footstepMinDistance: 2
+  _footstepMaxDistance: 20
   _isOutside: 1
   fleeInsteadOfDie: 0
   fleeSpeed: 12
   fleeDespawnTimeout: 8
+  _ignoreFriendlyFireDamage: 0
   _autoInitialiseOnSpawn: 1
 --- !u!114 &7127085182576174026
 MonoBehaviour:
@@ -1324,6 +1468,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   interactText: 
   highlightNameFilter: 
+  _destroyOnCollect: 1
+  _kickable: 1
+  _burnable: 0
 --- !u!1 &7932345873243114423
 GameObject:
   m_ObjectHideFlags: 0

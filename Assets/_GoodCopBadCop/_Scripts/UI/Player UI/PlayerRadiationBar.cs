@@ -11,18 +11,20 @@ public class RadiationBarUI : StatBar
 
     private void OnEnable()
     {
-        SubscribeTo(PlayerInstance.Instance);
+        SubscribeTo(SpectateManager.HudSubject);
     }
 
     private void Update()
     {
+        // HudSubject is the local player, or the watched teammate while spectating.
         // Compare against the current PlayerInstance rather than just checking for a null
         // PlayerRadiation: death/respawn keeps the old (corpse) PlayerInstance alive instead of
         // destroying it (see PlayerInstance.DetachFromPlayerObject), so a cached PlayerRadiation
         // reference never becomes null on its own — it just stops firing events on the corpse,
         // freezing this bar at whatever radiation value it had at death.
-        if (PlayerInstance.Instance != _subscribedInstance)
-            SubscribeTo(PlayerInstance.Instance);
+        PlayerInstance subject = SpectateManager.HudSubject;
+        if (subject != _subscribedInstance)
+            SubscribeTo(subject);
     }
 
     protected override void OnDisable()

@@ -1552,6 +1552,10 @@ public class Day_01 : DayBase
         }
 
         _taskCheckDocumentation = TutorialObjectiveList.Instance?.AddObjective(_taskCheckDocumentationText);
+
+        // First checklist pickup of the Day 1 documentation tutorial — explain how accuracy
+        // affects payout right away, while the player is about to mark anomalies.
+        TutorialOverlay.Instance?.ShowAccuracyPayoutTutorial();
     }
 
     /// <summary>
@@ -1664,9 +1668,9 @@ public class Day_01 : DayBase
             _taskQuarantineHandOff = null;
         }
 
-        // Hide the task list, then show the accuracy-payout overlay.
-        // ReshowSubjectCounter runs after the player closes the overlay.
-        HideObjectiveListThenRun(1.5f, ShowAccuracyPayoutOverlay);
+        // Hide the task list, then restore the subject counter. The accuracy-payout overlay
+        // is now shown earlier, on the first checklist pickup (see OnExamPickedUpSync).
+        HideObjectiveListThenRun(1.5f, ReshowSubjectCounter);
 
         // The documentation tutorial is now fully resolved. Persist the milestone on the server
         // while setting the local state on every client through this shared hand-off event.
@@ -1696,20 +1700,6 @@ public class Day_01 : DayBase
         _greenStampSlot?.SetSlotInteractable(true);
         _yellowStampSlot?.SetSlotInteractable(true);
         _redStampSlot?.SetSlotInteractable(true);
-    }
-
-    /// <summary>
-    /// Shows the accuracy-payout tutorial overlay after the quarantine task list finishes
-    /// clearing. The subject counter task is re-added immediately (independently of the overlay)
-    /// so the two systems don't block each other.
-    /// </summary>
-    private void ShowAccuracyPayoutOverlay()
-    {
-        // Re-show the subject counter right away — the overlay is a separate system.
-        ReshowSubjectCounter();
-
-        // Show the overlay independently; its onComplete is not used to gate the task list.
-        TutorialOverlay.Instance?.ShowAccuracyPayoutTutorial();
     }
 
     /// <summary>

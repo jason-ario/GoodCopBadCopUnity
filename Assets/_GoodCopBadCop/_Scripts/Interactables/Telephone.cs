@@ -145,6 +145,11 @@ public class Telephone : Interactable
     private bool _localOrderScreenOpen;
     private Coroutine _localSequenceCoroutine;
 
+    // Client-only (observers): the remote player the handset is attached to, and whether it is
+    // currently following their camera-arm socket (spectated) instead of the body-arm socket.
+    private PlayerInteractionController _observedHolder;
+    private bool _observedHolderUsesCamSocket;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()
@@ -152,6 +157,30 @@ public class Telephone : Interactable
         base.Awake();
         Instance = this;
         InitVoiceSource();
+    }
+
+    /// <summary>
+    /// Observers only: while the remote holder is being spectated, the spectator sees that
+    /// player's first-person camera rig, so the handset must follow the camera left-arm socket
+    /// (same as the owner) instead of the lagging, shadow-only body arm. Runs in Update so the
+    /// retarget happens before SocketFollow's LateUpdate.
+    /// </summary>
+    private void Update()
+    {
+        if (_observedHolder == null || !handSet.enabled) return;
+
+        bool spectated = IsSpectatedLocally(_observedHolder);
+        if (spectated == _observedHolderUsesCamSocket) return;
+
+        _observedHolderUsesCamSocket = spectated;
+        handSet.SetTarget(GetHandSocketForClient(_observedHolder, isLocalPlayer: spectated));
+    }
+
+    private static bool IsSpectatedLocally(PlayerInteractionController player)
+    {
+        SpectateManager sm = SpectateManager.Instance;
+        return sm != null && sm.IsSpectating && sm.CurrentTarget != null
+            && sm.CurrentTarget.gameObject == player.gameObject;
     }
 
     // ── Phone voice ──────────────────────────────────────────────────────────
@@ -744,7 +773,7 @@ public class Telephone : Interactable
         }
         else
         {
-            if (player == null) return;
+            // Reset the handset even if the holder can't be resolved (e.g. despawned).
             StartCoroutine(ObserverPutDownConstraintSequence());
         }
     }
@@ -828,7 +857,12 @@ public class Telephone : Interactable
     private IEnumerator ObserverGrabConstraintSequence(PlayerInteractionController player)
     {
         yield return new WaitForSeconds(.25f);
-        handSet.SetTarget(GetHandSocketForClient(player, isLocalPlayer: false));
+        if (player == null) yield break;
+
+        // Spectated holder → camera arm socket (what the spectator actually sees); otherwise body arm.
+        _observedHolder = player;
+        _observedHolderUsesCamSocket = IsSpectatedLocally(player);
+        handSet.SetTarget(GetHandSocketForClient(player, isLocalPlayer: _observedHolderUsesCamSocket));
         handSet.enabled = true;
     }
 
@@ -839,6 +873,8 @@ public class Telephone : Interactable
     private IEnumerator ObserverPutDownConstraintSequence()
     {
         yield return new WaitForSeconds(.25f);
+        _observedHolder = null;
+        _observedHolderUsesCamSocket = false;
         handSet.enabled = false;
         handSet.transform.position = _handsetPos.position;
         handSet.transform.rotation = _handsetPos.rotation;
@@ -919,12 +955,38 @@ public class Telephone : Interactable
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>Finds the PlayerInteractionController belonging to the given client ID.</summary>
+    /// <remarks>
+    /// ConnectedClientsList is only reliable on the server/host, so non-host observers fall back to
+    /// the spawn manager's player-object table and finally a scan of spawned player objects.
+    /// </remarks>
     private PlayerInteractionController FindPlayerByClientId(ulong clientId)
     {
-        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null) return null;
+
+        if (nm.IsServer)
         {
-            if (client.ClientId == clientId && client.PlayerObject != null)
-                return client.PlayerObject.GetComponent<PlayerInteractionController>();
+            foreach (var client in nm.ConnectedClientsList)
+            {
+                if (client.ClientId == clientId && client.PlayerObject != null)
+                    return client.PlayerObject.GetComponent<PlayerInteractionController>();
+            }
+        }
+
+        var playerObjects = nm.SpawnManager?.GetPlayerNetworkObjects(clientId);
+        if (playerObjects != null)
+        {
+            foreach (NetworkObject obj in playerObjects)
+            {
+                if (obj != null && obj.TryGetComponent(out PlayerInteractionController pic))
+                    return pic;
+            }
+        }
+
+        foreach (PlayerInteractionController pic in FindObjectsByType<PlayerInteractionController>(FindObjectsSortMode.None))
+        {
+            if (pic.IsSpawned && pic.NetworkObject.IsPlayerObject && pic.OwnerClientId == clientId)
+                return pic;
         }
         return null;
     }

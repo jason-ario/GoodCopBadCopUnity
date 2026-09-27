@@ -719,6 +719,10 @@ public class PlayerPickupController : NetworkBehaviour
         // and DropBroadcastClientRpc / OnUnequip restore it via SetInteractable(true).
         pickableObject.SetInteractable(false);
 
+        // Cancel any in-flight placement punch and snap back to the authored scale, so a quick
+        // re-grab never carries (or later re-punches from) a mid-punch inflated scale.
+        pickableObject.StopScalePunch();
+
         // If another player's grab request for this same object reaches the server first, it
         // will reject ours and fire OnGrabRejected on this client so we can undo the optimistic
         // equip below instead of ending up in a desynced "both players think they hold it" state.
@@ -923,6 +927,44 @@ public class PlayerPickupController : NetworkBehaviour
         {
             objectContainer.UnequipItem(this);
         }
+
+        _camEquippedItem = null;
+        _bodyCurrentlyEquippedItem = null;
+        _heldObject = null;
+        _heldObjectRef.Value = default;
+        itemEquippedIndex.Value = -1;
+        _playerAnimationController.DisableRightArmMask();
+        OnHeldObjectChanged?.Invoke(null);
+
+        ObjectPlacer.Instance.DeactivatePlacer();
+
+        return released;
+    }
+
+    /// <summary>
+    /// Owner-only local teardown of the hold state when the server is authoritatively dropping
+    /// the item itself (see <see cref="PickableObject.ForceDropWithPhysicsServer"/>, driven by
+    /// <see cref="PlayerInventory"/> on death). Clears arm IK, equip containers, and the local
+    /// constraint like <see cref="ReleaseHeldObjectForThrow"/>, but sends NO holder/ownership
+    /// RPCs — those would race with (and could clobber) another player grabbing the dropped item.
+    /// Returns the released item, or null if nothing was held.
+    /// </summary>
+    public PickableObject ReleaseHeldObjectLocallyForServerDrop()
+    {
+        if (_heldObject == null) return null;
+
+        PickableObject released = _heldObject;
+
+        DisableArmIKs();
+        released.AbortUse();
+        released.RemoveParent();
+        released.OnDropped();
+
+        rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+        leftArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
+
+        foreach (var objectContainer in objectContainers)
+            objectContainer.UnequipItem(this);
 
         _camEquippedItem = null;
         _bodyCurrentlyEquippedItem = null;

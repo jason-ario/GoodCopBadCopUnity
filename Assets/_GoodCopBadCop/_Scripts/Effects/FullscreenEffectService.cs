@@ -10,22 +10,35 @@ namespace GoodCopBadCop.Effects
     public sealed class FullscreenEffectService : IFullscreenEffectService
     {
         private FullscreenEffectView view;
+        private DamageVignetteView vignetteView;
 
         public void Play(FullscreenEffectSettings settings, EffectContext context)
         {
             if (settings == null || !settings.Enabled)
                 return;
 
-            if (settings.Mode != EFullscreenEffectMode.OverlaySprite)
-                return;
-
-            if (!TryGetView(out FullscreenEffectView fullscreenView))
+            switch (settings.Mode)
             {
-                Debug.LogWarning("[FullscreenEffectService] FullscreenEffectView is not available.");
-                return;
-            }
+                case EFullscreenEffectMode.OverlaySprite:
+                    if (!TryGetView(out FullscreenEffectView fullscreenView))
+                    {
+                        Debug.LogWarning("[FullscreenEffectService] FullscreenEffectView is not available.");
+                        return;
+                    }
 
-            fullscreenView.Play(settings);
+                    fullscreenView.Play(settings);
+                    break;
+
+                case EFullscreenEffectMode.Vignette:
+                    if (!TryGetVignetteView(out DamageVignetteView damageVignetteView))
+                    {
+                        Debug.LogWarning("[FullscreenEffectService] DamageVignetteView is not available.");
+                        return;
+                    }
+
+                    damageVignetteView.Play(settings);
+                    break;
+            }
         }
 
         private bool TryGetView(out FullscreenEffectView fullscreenView)
@@ -38,6 +51,18 @@ namespace GoodCopBadCop.Effects
 
             fullscreenView = view;
             return fullscreenView != null;
+        }
+
+        private bool TryGetVignetteView(out DamageVignetteView damageVignetteView)
+        {
+            if (vignetteView == null)
+                vignetteView = Object.FindFirstObjectByType<DamageVignetteView>();
+
+            if (vignetteView == null)
+                vignetteView = DamageVignetteView.CreateDefaultView();
+
+            damageVignetteView = vignetteView;
+            return damageVignetteView != null;
         }
     }
 }

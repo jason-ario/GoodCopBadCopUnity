@@ -194,7 +194,8 @@ public class DialogueManager : NetworkBehaviour
         // participants and players within overhear range of the speaker see the subtitle;
         // everyone else just hears the (spatialized) voice audio.
         if (OverhearRange.CanLocalPlayerSee(speaking.transform))
-            SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, showWaitForInput);
+            SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, showWaitForInput,
+                overhearSource: speaking.transform);
         else if (clearHistory)
             ClearHistory();
 
@@ -386,7 +387,10 @@ public class DialogueManager : NetworkBehaviour
     /// dismiss their own echo immediately by advancing.
     /// </summary>
     /// <param name="dismissOnLocalAdvance">Set only for the player who chose this line, so their own echo closes immediately when they advance.</param>
-    public void ShowChoiceEcho(string text, string playerName, Color color, bool dismissOnLocalAdvance = false)
+    /// <param name="overhearSource">Optional conversation source; while set, the echo hides live whenever the local player is out of overhear range (see <see cref="OverhearSubtitleGate"/>).</param>
+    /// <param name="participantsAlwaysSee">With <paramref name="overhearSource"/>: conversation participants ignore the range check.</param>
+    public void ShowChoiceEcho(string text, string playerName, Color color, bool dismissOnLocalAdvance = false,
+        Transform overhearSource = null, bool participantsAlwaysSee = true)
     {
         HideChoiceEcho();
 
@@ -395,6 +399,7 @@ public class DialogueManager : NetworkBehaviour
         Subtitles echo = Instantiate(playerSubtitlesPrefab, subtitlesContainer);
         echo.SetText(text, playerName, color);
         echo.transform.SetAsFirstSibling();
+        OverhearSubtitleGate.Attach(echo.gameObject, overhearSource, participantsAlwaysSee);
 
         _activeChoiceEcho = echo.gameObject;
         _dismissChoiceEchoOnAdvance = dismissOnLocalAdvance;
@@ -440,8 +445,11 @@ public class DialogueManager : NetworkBehaviour
         }
     }
 
+    /// <param name="overhearSource">Optional speaker/conversation source; while set, the subtitle hides live whenever the local player is out of overhear range (see <see cref="OverhearSubtitleGate"/>). Leave null for unconditional lines (phone, megaphone).</param>
+    /// <param name="participantsAlwaysSee">With <paramref name="overhearSource"/>: conversation participants ignore the range check.</param>
     public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default,
-        bool isPlayer = false, bool clearHistory = false, bool waitForInput = false)
+        bool isPlayer = false, bool clearHistory = false, bool waitForInput = false,
+        Transform overhearSource = null, bool participantsAlwaysSee = true)
     {
         DestroyPreviousSubtitles();
 
@@ -471,6 +479,7 @@ public class DialogueManager : NetworkBehaviour
             _nextLineFontOverride = null;
         }
         subtitles.transform.SetAsLastSibling();
+        OverhearSubtitleGate.Attach(subtitles.gameObject, overhearSource, participantsAlwaysSee);
 
         if (waitForInput)
         {

@@ -21,6 +21,26 @@ public class SpectateManager : MonoBehaviour
     public PlayerInstance CurrentTarget => _currentTarget;
 
     /// <summary>
+    /// The player whose stats the HUD (health, radiation, geiger, ammo, hotbar, battery) should
+    /// display: the watched teammate while spectating, otherwise the local player. Null while
+    /// spectating with no valid target. HUD widgets poll this and rebind when it changes.
+    /// </summary>
+    public static PlayerInstance HudSubject
+    {
+        get
+        {
+            var manager = Instance;
+            if (manager != null && manager._isSpectating)
+                return manager._currentTarget != null ? manager._currentTarget : null;
+            return PlayerInstance.Instance;
+        }
+    }
+
+    /// <summary>True when the HUD is currently mirroring a spectated teammate rather than the local player.</summary>
+    public static bool IsHudMirroringTarget =>
+        Instance != null && Instance._isSpectating && Instance._currentTarget != null;
+
+    /// <summary>
     /// True while the watched teammate's AudioListener is the live one (dead local player
     /// spectating). The hidden dev spectator has no local PlayerInstance and uses its own rig listener.
     /// </summary>
@@ -139,6 +159,9 @@ public class SpectateManager : MonoBehaviour
             _currentTarget.SetSpectatorAudioListener(true);
         RefreshLocalAudioListener();
 
+        // Show the HUD mirroring the watched teammate (widgets rebind via HudSubject).
+        UIController.Instance?.ShowPlayerUI();
+
         Debug.Log($"[SpectateManager] Now spectating {_currentTarget.name}.");
     }
 
@@ -174,15 +197,27 @@ public class SpectateManager : MonoBehaviour
         RestoreCurrentTarget();
         _currentTarget = null;
         RefreshLocalAudioListener();
+
+        // Nobody to mirror: hide the HUD rather than showing the dead local player's stats.
+        if (_isSpectating)
+            UIController.Instance?.ClosePlayerUI();
+
         Debug.Log("[SpectateManager] No spectatable teammates available.");
     }
 
     /// <summary>Stops spectating and cleans up visual overrides.</summary>
     public void StopSpectating()
     {
+        bool wasSpectating = _isSpectating;
         _isSpectating = false;
         ClearCurrentTarget();
         RefreshLocalAudioListener();
+
+        // The HUD was mirroring a teammate. A live local player (respawn/revive) re-shows its own
+        // HUD through its restore path; otherwise (dev spectator, still dead) hide it.
+        var local = PlayerInstance.Instance;
+        if (wasSpectating && (local == null || local.PlayerHealth == null || local.PlayerHealth.IsDead))
+            UIController.Instance?.ClosePlayerUI();
 
         if (spectatorUI != null)
             spectatorUI.Hide();

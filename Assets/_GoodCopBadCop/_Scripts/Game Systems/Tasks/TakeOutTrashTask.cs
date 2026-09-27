@@ -984,11 +984,15 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!wasCounted)
             _pendingBonusCollected++;
         else
-            // Drop it from pre-existing tracking explicitly: a counted item whose JunkItem has
-            // _destroyOnCollect = false (e.g. a reusable guard corpse) stays spawned after
-            // collection, so PruneCollectedItems' IsSpawned sweep would never remove it and a
-            // later re-collection of the same object would be double-counted as counted again.
+        {
+            // Drop it from tracking explicitly: a counted item whose JunkItem has
+            // _destroyOnCollect = false (e.g. a reusable guard corpse, or a dead player's corpse
+            // that is hidden rather than despawned while its owner is still spectating from it)
+            // stays spawned after collection, so PruneCollectedItems' IsSpawned sweep would never
+            // remove it and a later re-collection of the same object would be double-counted.
             _countedExistingItems.Remove(netObj);
+            _spawnedItems.Remove(netObj);
+        }
 
         PruneCollectedItems();
         UpdateThreatLevel();

@@ -169,6 +169,10 @@ public class ElectricPanelDiegeticController : DiegeticViewController
 
         // All switches are On and the knob has reached its On position — restore power!
         _panelController?.RestorePower();
+
+        // Exit the view right away (as documented above). Staying inside it meant the very next
+        // click on any breaker — now that power is on — tripped the breaker and cut power again.
+        Close();
     }
 
     private void ResetPanel()

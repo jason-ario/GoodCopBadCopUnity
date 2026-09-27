@@ -258,7 +258,8 @@ public class SpeakingInteraction : NetworkBehaviour
         // Barks/one-off lines have no participant set: only players within overhear range
         // of this speaker see the subtitle. Audio still plays (it is spatialized).
         if (OverhearRange.IsLocalPlayerWithin(transform))
-            DialogueManager.Instance.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory, waitForInput);
+            DialogueManager.Instance.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory, waitForInput,
+                overhearSource: transform, participantsAlwaysSee: false);
         else if (clearHistory)
             DialogueManager.Instance.ClearHistory();
 
@@ -276,23 +277,28 @@ public class SpeakingInteraction : NetworkBehaviour
     /// to <see cref="GameSettings.WorldDialogueOverhearMode"/>: either as a floating bubble over
     /// this speaker (InWorldSubtitles), or as the regular bottom-of-screen subtitle
     /// (NormalSubtitles). Outside that proximity, non-engaged clients see nothing.
+    /// <paramref name="cameraKey"/> is forwarded to engaged participants via
+    /// <see cref="OnWorldLineCamera"/> (empty = default dialogue camera).
     /// </summary>
-    public void SayWorldDialogue(string dialogue, bool clearHistory = false, bool waitForInput = false)
+    public void SayWorldDialogue(string dialogue, bool clearHistory = false, bool waitForInput = false,
+        string cameraKey = "")
     {
+        cameraKey ??= string.Empty;
+
         if (IsServer)
         {
-            SayWorldDialogueClientRpc(dialogue, WorldParticipantIdsSnapshot(), clearHistory, waitForInput);
+            SayWorldDialogueClientRpc(dialogue, WorldParticipantIdsSnapshot(), clearHistory, waitForInput, cameraKey);
         }
         else
         {
-            SayWorldDialogueServerRpc(dialogue, clearHistory, waitForInput);
+            SayWorldDialogueServerRpc(dialogue, clearHistory, waitForInput, cameraKey);
         }
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SayWorldDialogueServerRpc(string dialogue, bool clearHistory, bool waitForInput)
+    private void SayWorldDialogueServerRpc(string dialogue, bool clearHistory, bool waitForInput, string cameraKey)
     {
-        SayWorldDialogueClientRpc(dialogue, WorldParticipantIdsSnapshot(), clearHistory, waitForInput);
+        SayWorldDialogueClientRpc(dialogue, WorldParticipantIdsSnapshot(), clearHistory, waitForInput, cameraKey);
     }
 
     /// <summary>Server-only snapshot of the clients currently engaged in this speaker's world-dialogue conversation.</summary>
@@ -305,13 +311,15 @@ public class SpeakingInteraction : NetworkBehaviour
 
     [ClientRpc]
     private void SayWorldDialogueClientRpc(string dialogue, ulong[] participantIds, bool clearHistory,
-        bool waitForInput)
+        bool waitForInput, string cameraKey)
     {
         bool isEngagedPlayer = NetworkManager.Singleton != null &&
                                Array.IndexOf(participantIds, NetworkManager.Singleton.LocalClientId) >= 0;
 
         if (isEngagedPlayer)
         {
+            // Cut the camera before the subtitle so the shot is live from the first word.
+            OnWorldLineCamera?.Invoke(cameraKey ?? string.Empty);
             DialogueManager.Instance?.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory,
                 waitForInput);
         }
@@ -327,7 +335,7 @@ public class SpeakingInteraction : NetworkBehaviour
                     // waitForInput is intentionally ignored here: the overhearing client has no way to
                     // advance this line themselves, so let it auto-dismiss on its own timer instead.
                     DialogueManager.Instance?.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory,
-                        waitForInput: false);
+                        waitForInput: false, overhearSource: transform, participantsAlwaysSee: false);
                 }
                 else
                 {
@@ -501,6 +509,13 @@ public class SpeakingInteraction : NetworkBehaviour
 
     /// <summary>Fired locally whenever <see cref="IsAwaitingWorldAdvance"/> changes.</summary>
     public event Action<bool> OnWorldAdvanceGateChanged;
+
+    /// <summary>
+    /// Fired locally on engaged world-dialogue participants just before a world-dialogue line is
+    /// presented, carrying that line's camera trigger key (empty = default dialogue camera).
+    /// <see cref="SuspectWorldDialogue"/> subscribes to cut to the matching camera.
+    /// </summary>
+    public event Action<string> OnWorldLineCamera;
 
     private ClientRpcParams WorldParticipantRpcParams()
     {
@@ -837,7 +852,8 @@ public class SpeakingInteraction : NetworkBehaviour
                 // SpawnSubtitles call): a regular subtitle would be immediately wiped out by
                 // DestroyPreviousSubtitles the instant the NPC's response line spawns below it,
                 // exactly the bug ShowChoiceEcho/HideChoiceEcho already exists to avoid.
-                DialogueManager.Instance?.ShowChoiceEcho(choiceText, playerName, Color.white);
+                DialogueManager.Instance?.ShowChoiceEcho(choiceText, playerName, Color.white,
+                    overhearSource: transform, participantsAlwaysSee: false);
             }
             else if (winnerPlayerNetId != 0 &&
                      NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(winnerPlayerNetId, out var netObj))

@@ -236,6 +236,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     private FootstepsAudio _footstepsAudio;
     private PlayerCameraController _playerCameraController;
     private CorpseResurrectionController _corpseResurrection;
+    private PlayerHealth _playerHealth;
     [SerializeField] private Camera camera;
     public Camera Camera => camera;
 
@@ -255,6 +256,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         _footstepsAudio = GetComponent<FootstepsAudio>();
         _playerCameraController = GetComponent<PlayerCameraController>();
         _corpseResurrection = GetComponent<CorpseResurrectionController>();
+        _playerHealth = GetComponent<PlayerHealth>();
         
         CanMove = true;
         CanLook = true;
@@ -373,6 +375,12 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         // A resurrected corpse is driven by the server's NavMeshAgent (MutantEnemy) — the dead
         // owner's gravity-only CharacterController.Move must not fight it.
         if (_corpseResurrection != null && _corpseResurrection.IsResurrected) return;
+
+        // A dead player is a ragdoll: RagdollController.ActivateRagdoll disables the root
+        // CharacterController, so every Move() (including the gravity-only pass below) would log
+        // "CharacterController.Move called on inactive controller". Nothing here should drive it.
+        if (_playerHealth != null && _playerHealth.IsDead) return;
+        if (_characterController == null || !_characterController.enabled) return;
 
         if (canControl == false)
         {

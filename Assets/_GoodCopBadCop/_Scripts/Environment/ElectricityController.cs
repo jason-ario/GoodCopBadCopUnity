@@ -151,6 +151,19 @@ public class ElectricityController : NetworkBehaviour
     }
 
     /// <summary>
+    /// Cuts power as a regular outage that the booth <see cref="ElectricPanelController"/> (or
+    /// <see cref="CircuitBox"/>) can restore, explicitly clearing any stray fuse-box requirement
+    /// first. Used by scripted booth outages such as Day 2's Ocho encounter.
+    /// </summary>
+    public void PowerOffPanelRestorable()
+    {
+        if (!IsServer) return;
+
+        _requiresFuseBoxRestore.Value = false;
+        PowerOff();
+    }
+
+    /// <summary>
     /// Cuts power and marks the outage as requiring the fuse-box puzzle to resolve.
     /// The standard <see cref="CircuitBox"/> will silently reject restore attempts.
     /// </summary>
@@ -205,6 +218,8 @@ public class ElectricityController : NetworkBehaviour
             _powerOffCoroutine = null;
         }
 
+        _electricOffApplied = false;
+
         foreach (var electricObject in electricObjects)
         {
             electricObject.OnElectricityTurnOn?.Invoke();
@@ -233,13 +248,23 @@ public class ElectricityController : NetworkBehaviour
 
         yield return new WaitForSeconds(2f);
 
-        foreach (var electricObject in electricObjects)
+        // The _isPowerOn OnValueChanged callback usually already switched everything off during
+        // this delay. Firing OnElectricityTurnOff a second time would re-reset the electrical
+        // panel (switches off + view closed) under a player who already started repairing it.
+        if (!_electricOffApplied)
         {
-            electricObject.OnElectricityTurnOff?.Invoke();
+            foreach (var electricObject in electricObjects)
+            {
+                electricObject.OnElectricityTurnOff?.Invoke();
+            }
+            _electricOffApplied = true;
         }
 
         _powerOffCoroutine = null;
     }
+
+    /// <summary>Local, per peer: true once OnElectricityTurnOff has run for the current outage.</summary>
+    private bool _electricOffApplied;
 
     // ------------------------------------------------------------------
     // NetworkVariable change callbacks (handle late-joining clients)
@@ -255,6 +280,8 @@ public class ElectricityController : NetworkBehaviour
         // Snap late-joining clients to the correct visual state without SFX.
         if (current)
         {
+            _electricOffApplied = false;
+
             foreach (var electricObject in electricObjects)
             {
                 electricObject.OnElectricityTurnOn?.Invoke();
@@ -271,6 +298,7 @@ public class ElectricityController : NetworkBehaviour
             {
                 electricObject.OnElectricityTurnOff?.Invoke();
             }
+            _electricOffApplied = true;
         }
     }
 }

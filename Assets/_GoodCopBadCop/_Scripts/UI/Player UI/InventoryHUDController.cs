@@ -4,37 +4,66 @@ using UnityEngine;
 /// Bridges <see cref="PlayerInventory"/> (on the runtime-spawned player) with the
 /// two <see cref="InventorySlotUI"/> widgets in the HUD canvas.
 ///
-/// Subscribes to <see cref="PlayerInventory.OnSlotChanged"/> and
-/// <see cref="PlayerInventory.OnActiveSlotChanged"/> to keep the UI in sync.
-/// Uses the same lazy-subscribe pattern as <see cref="HealthBar"/> and
-/// <see cref="RadiationBarUI"/> so it works even when the player spawns after the scene.
+/// For the local player it subscribes to <see cref="PlayerInventory.OnSlotChanged"/> and
+/// <see cref="PlayerInventory.OnActiveSlotChanged"/>. While spectating, those events are
+/// owner-only, so it instead polls the watched teammate's replicated slot mirrors
+/// (<see cref="PlayerInventory.GetReplicatedItemInSlot"/> / <see cref="PlayerInventory.ReplicatedActiveSlot"/>).
 /// </summary>
 public class InventoryHUDController : MonoBehaviour
 {
     [SerializeField] private InventorySlotUI[] slotUIs = new InventorySlotUI[2];
 
     private PlayerInventory _inventory;
+    private bool _mirroring;
+
+    // Last values pushed to the slot widgets in mirroring mode, so they're only touched on change.
+    private PickableObject[] _mirroredItems;
+    private int _mirroredActive = int.MinValue;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    private void OnEnable()  => TrySubscribe();
+    private void OnEnable()  => Rebind();
     private void OnDisable() => Unsubscribe();
 
     private void Update()
     {
-        if (_inventory == null) TrySubscribe();
+        bool mirroring = SpectateManager.IsHudMirroringTarget;
+        if (mirroring != _mirroring || ResolveInventory() != _inventory)
+            Rebind();
+
+        if (_mirroring)
+            RefreshMirrored();
     }
 
     // ── Subscription ──────────────────────────────────────────────────────────
 
-    private void TrySubscribe()
+    private static PlayerInventory ResolveInventory()
     {
-        if (PlayerInstance.Instance == null) return;
+        PlayerInstance subject = SpectateManager.HudSubject;
+        return subject != null ? subject.GetComponent<PlayerInventory>() : null;
+    }
 
-        PlayerInventory inv = PlayerInstance.Instance.GetComponent<PlayerInventory>();
-        if (inv == null) return;
+    private void Rebind()
+    {
+        Unsubscribe();
 
-        _inventory = inv;
+        _mirroring = SpectateManager.IsHudMirroringTarget;
+        _inventory = ResolveInventory();
+
+        if (_inventory == null)
+        {
+            ClearSlots();
+            return;
+        }
+
+        if (_mirroring)
+        {
+            _mirroredItems = new PickableObject[slotUIs.Length];
+            _mirroredActive = int.MinValue;
+            RefreshMirrored(force: true);
+            return;
+        }
+
         _inventory.OnSlotChanged       += HandleSlotChanged;
         _inventory.OnActiveSlotChanged += HandleActiveSlotChanged;
 
@@ -44,10 +73,12 @@ public class InventoryHUDController : MonoBehaviour
 
     private void Unsubscribe()
     {
-        if (_inventory == null) return;
+        if (_inventory != null && !_mirroring)
+        {
+            _inventory.OnSlotChanged       -= HandleSlotChanged;
+            _inventory.OnActiveSlotChanged -= HandleActiveSlotChanged;
+        }
 
-        _inventory.OnSlotChanged       -= HandleSlotChanged;
-        _inventory.OnActiveSlotChanged -= HandleActiveSlotChanged;
         _inventory = null;
     }
 
@@ -76,6 +107,38 @@ public class InventoryHUDController : MonoBehaviour
             PickableObject item = _inventory.GetItemInSlot(i);
             slotUIs[i].SetItem(item);
             slotUIs[i].SetSelected(_inventory.ActiveSlot == i);
+        }
+    }
+
+    private void RefreshMirrored(bool force = false)
+    {
+        if (_inventory == null || _mirroredItems == null) return;
+
+        for (int i = 0; i < slotUIs.Length; i++)
+        {
+            PickableObject item = _inventory.GetReplicatedItemInSlot(i);
+            if (force || item != _mirroredItems[i])
+            {
+                _mirroredItems[i] = item;
+                slotUIs[i].SetItem(item);
+            }
+        }
+
+        int active = _inventory.ReplicatedActiveSlot;
+        if (force || active != _mirroredActive)
+        {
+            _mirroredActive = active;
+            HandleActiveSlotChanged(active);
+        }
+    }
+
+    private void ClearSlots()
+    {
+        for (int i = 0; i < slotUIs.Length; i++)
+        {
+            if (slotUIs[i] == null) continue;
+            slotUIs[i].SetItem(null);
+            slotUIs[i].SetSelected(false);
         }
     }
 }

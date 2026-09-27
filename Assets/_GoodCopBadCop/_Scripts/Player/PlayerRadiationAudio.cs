@@ -67,6 +67,20 @@ public class PlayerRadiationAudio : NetworkBehaviour
         // playing every player's radiation audio simultaneously, not just its own.
         if (!IsOwner) return;
 
+        // Only active (living) players hear the geiger ticker — never a dead body or a
+        // resurrected corpse running around as an AI enemy (the dead owner / host still owns it).
+        if (!_playerRadiation.IsActivePlayer)
+        {
+            _previousRadiation = _playerRadiation.CurrentRadiation;
+            _smoothedRate = 0f;
+            if (_currentState != RadiationSoundState.None)
+            {
+                _currentState = RadiationSoundState.None;
+                StopLoop();
+            }
+            return;
+        }
+
         float current = _playerRadiation.CurrentRadiation;
 
         float instantRate = (current - _previousRadiation) / Time.deltaTime;

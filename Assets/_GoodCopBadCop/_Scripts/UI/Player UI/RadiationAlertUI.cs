@@ -30,7 +30,7 @@ public class RadiationAlertUI : MonoBehaviour
     {
         UIController.OnPauseMenuOpened += HandlePauseMenuOpened;
 
-        SubscribeTo(PlayerInstance.Instance);
+        SubscribeTo(SpectateManager.HudSubject);
     }
 
     private void Update()
@@ -40,8 +40,10 @@ public class RadiationAlertUI : MonoBehaviour
         // PlayerInstance.DetachFromPlayerObject), so our cached PlayerRadiation/PlayerHealth
         // never actually become null on their own — they just silently stop firing events on
         // the corpse. Comparing against the current PlayerInstance.Instance catches that swap.
-        if (PlayerInstance.Instance != _subscribedInstance)
-            SubscribeTo(PlayerInstance.Instance);
+        // HudSubject also follows the watched teammate while spectating.
+        PlayerInstance subject = SpectateManager.HudSubject;
+        if (subject != _subscribedInstance)
+            SubscribeTo(subject);
 
         // Pause menu / main menu visibility can change without firing a dedicated event this
         // script listens to (e.g. closing the pause menu), so re-evaluate every frame.

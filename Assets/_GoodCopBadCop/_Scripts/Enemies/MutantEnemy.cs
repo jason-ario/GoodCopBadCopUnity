@@ -261,6 +261,25 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Random pitch variance applied to each footstep clip.")]
     [SerializeField] private float _footstepPitchRandomness = 0.1f;
 
+    private const string FootstepAudioChildName = "Footsteps";
+
+    [Tooltip("Dedicated AudioSource that follows this mutant and plays footsteps. Forced to fully 3D " +
+             "linear rolloff in Awake. If unassigned, an AudioSource on a direct child named \"Footsteps\" " +
+             "is used; failing that, falls back to a one-shot SFXController emitter.")]
+    [SerializeField] private AudioSource _footstepAudioSource;
+
+    [Range(0f, 1f)]
+    [Tooltip("Base volume of each footstep before the SFX volume setting is applied.")]
+    [SerializeField] private float _footstepVolume = 1f;
+
+    [Tooltip("Distance (m) within which footsteps play at full volume.")]
+    [Min(0.01f)]
+    [SerializeField] private float _footstepMinDistance = 2f;
+
+    [Tooltip("Distance (m) at which footsteps fade to silence (linear rolloff).")]
+    [Min(0.1f)]
+    [SerializeField] private float _footstepMaxDistance = 20f;
+
     [Tooltip("Set to true when this mutant is outdoors, false when indoors. Controls which footstep clip set is used.")]
     [SerializeField] private bool _isOutside = true;
 
@@ -464,6 +483,20 @@ public class MutantEnemy : NetworkBehaviour
         if (lookAnimator == null)
             lookAnimator = GetComponentInChildren<FIMSpace.FLook.FLookAnimator>(true);
 
+        if (_footstepAudioSource == null)
+        {
+            Transform footstepChild = transform.Find(FootstepAudioChildName);
+            if (footstepChild != null)
+                _footstepAudioSource = footstepChild.GetComponent<AudioSource>();
+        }
+
+        if (_footstepAudioSource != null)
+        {
+            SpatialAudioUtility.ConfigureShortRange3D(_footstepAudioSource, _footstepMinDistance, _footstepMaxDistance);
+            _footstepAudioSource.playOnAwake = false;
+            _footstepAudioSource.loop = false;
+        }
+
         // Always stay enabled — see the comment on _isActive above. Dormancy is now driven
         // entirely by _isActive (defaults to false), never by this component's own Unity
         // enabled flag, so every client's synchronization payload for this NetworkBehaviour
@@ -524,7 +557,30 @@ public class MutantEnemy : NetworkBehaviour
         if (!DiedPermanently || !IsSpawned)
             return;
 
+        // A killed resurrected player corpse that is still its owner's PlayerObject must never be
+        // despawned out from under the spectating client — ReviveManager owns that lifecycle.
+        if (NetworkObject.IsPlayerObject)
+            return;
+
         NetworkObject.Despawn();
+    }
+
+    /// <summary>True when a permanent death leaves a persisting corpse (not despawned by <see cref="Die"/>).</summary>
+    public bool LeavesCorpse => deathBehaviour == DeathBehaviour.PlayAnimation;
+
+    /// <summary>
+    /// Configures this MutantEnemy as the dormant brain of a resurrected player corpse
+    /// (<see cref="CorpseResurrectionController"/>): killing it is always a real death (never a
+    /// flee-and-despawn), the body ragdolls through <paramref name="ragdoll"/> and persists so it
+    /// can be bagged. Call from Awake on every peer, before spawn.
+    /// </summary>
+    public void ConfigureAsPersistentCorpse(RagdollController ragdoll)
+    {
+        fleeInsteadOfDie = false;
+        deathBehaviour = DeathBehaviour.PlayAnimation;
+
+        if (ragdollController == null)
+            ragdollController = ragdoll;
     }
 
     /// <summary>
@@ -2570,7 +2626,16 @@ public class MutantEnemy : NetworkBehaviour
         if (clip == null) return;
 
         float pitch = 1f + UnityEngine.Random.Range(-_footstepPitchRandomness, _footstepPitchRandomness);
-        SFXController.Instance?.PlayAtPosition(clip, transform.position, 1f, pitch);
+        float volumeScale = SFXController.Instance != null ? SFXController.Instance.VolumeScale : 1f;
+
+        if (_footstepAudioSource != null)
+        {
+            _footstepAudioSource.pitch = pitch;
+            _footstepAudioSource.PlayOneShot(clip, _footstepVolume * volumeScale);
+            return;
+        }
+
+        SFXController.Instance?.PlayAtPosition(clip, transform.position, _footstepVolume, pitch, _footstepMaxDistance);
     }
 
     /// <summary>Fades out and stops the looping chase music on all clients.</summary>

@@ -68,10 +68,28 @@ public class PlacementFeedback : MonoBehaviour
     // Punch scale
     // -------------------------------------------------------------------------
 
+    // Rest scales for non-PickableObject targets, captured on first punch.
+    private readonly System.Collections.Generic.Dictionary<Transform, Vector3> _restScales = new();
+
     private void PlayPunchScale(Transform target)
     {
+        // PickableObjects own their punch so it is always relative to their authored scale —
+        // punching relative to the current localScale compounded on rapid pickup/drop.
+        if (target.TryGetComponent(out PickableObject pickable))
+        {
+            pickable.PlayScalePunch(punchStrength, punchDuration, punchVibrato, punchElasticity);
+            return;
+        }
+
         target.DOKill(complete: true);
-        target.DOPunchScale(Vector3.Scale(target.localScale, punchStrength), punchDuration, punchVibrato, punchElasticity);
+        if (!_restScales.TryGetValue(target, out Vector3 rest))
+        {
+            rest = target.localScale;
+            _restScales[target] = rest;
+        }
+        target.localScale = rest;
+        target.DOPunchScale(Vector3.Scale(rest, punchStrength), punchDuration, punchVibrato, punchElasticity)
+            .SetLink(target.gameObject);
     }
 
     // -------------------------------------------------------------------------

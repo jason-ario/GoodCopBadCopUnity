@@ -7,7 +7,10 @@ namespace GoodCopBadCop.Effects
 {
     public enum EFullscreenEffectMode
     {
-        OverlaySprite
+        /// <summary>Full-screen UI sprite overlay (see <see cref="FullscreenEffectView"/>).</summary>
+        OverlaySprite,
+        /// <summary>Post-processing Vignette pulse (see <see cref="DamageVignetteView"/>).</summary>
+        Vignette
     }
 
     [Serializable]
@@ -15,11 +18,18 @@ namespace GoodCopBadCop.Effects
     {
         [SerializeField] private bool enabled = true;
         [SerializeField] private EFullscreenEffectMode mode = EFullscreenEffectMode.OverlaySprite;
+        [Tooltip("OverlaySprite mode only.")]
         [SerializeField] private Sprite overlaySprite;
+        [Tooltip("OverlaySprite: image tint. Vignette: vignette color.")]
         [SerializeField] private Color tint = Color.white;
+        [Tooltip("OverlaySprite: peak image alpha. Vignette: peak blend weight over the base look.")]
         [SerializeField, Range(0f, 1f)] private float opacity = 0.2f;
         [SerializeField, Min(0f)] private float duration = 0.35f;
         [SerializeField] private AnimationCurve opacityCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
+        [Tooltip("Vignette mode only. Vignette intensity at full weight.")]
+        [SerializeField, Range(0f, 1f)] private float vignetteIntensity = 0.45f;
+        [Tooltip("Vignette mode only. Higher = softer edge that bleeds further inward.")]
+        [SerializeField, Range(0.01f, 1f)] private float vignetteSmoothness = 0.6f;
 
         public bool Enabled => enabled;
         public EFullscreenEffectMode Mode => mode;
@@ -28,6 +38,8 @@ namespace GoodCopBadCop.Effects
         public float Opacity => opacity;
         public float Duration => duration;
         public AnimationCurve OpacityCurve => opacityCurve;
+        public float VignetteIntensity => vignetteIntensity;
+        public float VignetteSmoothness => vignetteSmoothness;
 
         public static FullscreenEffectSettings Disabled()
         {

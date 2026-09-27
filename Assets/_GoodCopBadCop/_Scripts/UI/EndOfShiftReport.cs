@@ -34,6 +34,7 @@ public class EndOfShiftReportUI : MonoBehaviour
     {
         public string Label;
         public string Value; // null = label only
+        public EndOfShiftReportRow.Tone Tone;
     }
 
     [Header("Rows")]
@@ -81,9 +82,23 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     [Header("Timing")]
     [SerializeField] private float initialDelay = 0.35f;
-    [SerializeField] private float rewardRevealDelay = 0.18f;
-    [SerializeField] private float lineRevealDelay = 0.45f;
+    [Tooltip("Seconds the content panel takes to fade in after the banner appears.")]
+    [SerializeField] private float contentFadeDuration = 0.3f;
+    [Tooltip("Seconds each row takes to fade and ease into place.")]
+    [SerializeField] private float rowFadeDuration = 0.45f;
+    [SerializeField] private float rewardRevealDelay = 0.12f;
+    [SerializeField] private float lineRevealDelay = 0.3f;
     [SerializeField] private float finalDelayBeforeContinue = 0.4f;
+
+    [Header("Audio")]
+    [Tooltip("Played once when the report page opens (also when the reveal is skipped).")]
+    [SerializeField] private AudioClip openSound;
+    [SerializeField, Range(0f, 1f)] private float openSoundVolume = 0.8f;
+    [Tooltip("Played as each row fades in. Not played for rows filled instantly by a skip.")]
+    [SerializeField] private AudioClip rowSound;
+    [SerializeField, Range(0f, 1f)] private float rowSoundVolume = 0.6f;
+    [Tooltip("Random pitch range for the row sound so repeated rows don't sound mechanical.")]
+    [SerializeField] private Vector2 rowSoundPitchRange = new Vector2(0.94f, 1.06f);
 
     [Header("Failsafes")]
     [Tooltip("Hard cap on any single text reveal. Past this the line snaps to its final state and the report moves on.")]
@@ -127,7 +142,9 @@ public class EndOfShiftReportUI : MonoBehaviour
     private bool _skipRequested;
     private bool _affordanceShown;
     private bool _continuePressed;
+    private bool _openSoundPlayed;
     private Button _continueButtonComponent;
+    private CanvasGroup _contentCanvasGroup;
 
     private void Awake()
     {
@@ -145,6 +162,7 @@ public class EndOfShiftReportUI : MonoBehaviour
         _skipRequested = false;
         _affordanceShown = false;
         _continuePressed = false;
+        _openSoundPlayed = false;
 
         gameObject.SetActive(true);
 
@@ -160,7 +178,11 @@ public class EndOfShiftReportUI : MonoBehaviour
     {
         _lines.Clear();
 
-        _lines.Add(new ReportLine { Label = $"Citizens Processed: {_data.Subjects.Count}" });
+        _lines.Add(new ReportLine
+        {
+            Label = $"Citizens Processed: {_data.Subjects.Count}",
+            Tone = EndOfShiftReportRow.Tone.Neutral
+        });
 
         foreach (ShiftSubjectResult subject in _data.Subjects)
         {
@@ -172,16 +194,30 @@ public class EndOfShiftReportUI : MonoBehaviour
             _lines.Add(new ReportLine
             {
                 Label = $"{name}: {detail}",
-                Value = subject.CouponsEarned > 0 ? $"Earned {subject.CouponsEarned}" : null
+                Value = subject.CouponsEarned > 0 ? $"Earned {subject.CouponsEarned}" : null,
+                Tone = ToneForVerdict(subject.Verdict)
             });
         }
 
-        _lines.Add(new ReportLine { Label = $"Passed: {_data.PassedCount}" });
-        _lines.Add(new ReportLine { Label = $"Quarantined: {_data.QuarantinedCount}" });
-        _lines.Add(new ReportLine { Label = $"Killed: {_data.KilledCount}" });
+        _lines.Add(new ReportLine { Label = $"Passed: {_data.PassedCount}", Tone = EndOfShiftReportRow.Tone.Positive });
+        _lines.Add(new ReportLine { Label = $"Quarantined: {_data.QuarantinedCount}", Tone = EndOfShiftReportRow.Tone.Positive });
+        _lines.Add(new ReportLine { Label = $"Killed: {_data.KilledCount}", Tone = EndOfShiftReportRow.Tone.Negative });
 
         if (_data.FledCount > 0)
-            _lines.Add(new ReportLine { Label = $"Fled Wounded: {_data.FledCount}" });
+            _lines.Add(new ReportLine { Label = $"Fled Wounded: {_data.FledCount}", Tone = EndOfShiftReportRow.Tone.Negative });
+    }
+
+    /// <summary>Passed / Quarantined read green, Killed / Fled read orange — matching the tally rows.</summary>
+    private static EndOfShiftReportRow.Tone ToneForVerdict(ShiftSubjectVerdict verdict)
+    {
+        switch (verdict)
+        {
+            case ShiftSubjectVerdict.Passed:
+            case ShiftSubjectVerdict.Quarantined:
+                return EndOfShiftReportRow.Tone.Positive;
+            default:
+                return EndOfShiftReportRow.Tone.Negative;
+        }
     }
 
     public void HideAll()
@@ -335,11 +371,14 @@ public class EndOfShiftReportUI : MonoBehaviour
         if (banner != null)
             banner.SetActive(true);
 
+        PlayOpenSound();
+
         yield return WaitUnscaled(0.5f);
 
         // The sub-header lives inside the content container, so the container must be active
         // before its text can animate — StartCoroutine is a no-op on an inactive GameObject.
         _contentContainer?.SetActive(true);
+        yield return FadeContent(contentFadeDuration);
 
         if (subHeaderText != null)
             yield return subHeaderText.RevealTextBounded(SubHeaderLabel, _maxSingleRevealDuration);
@@ -355,17 +394,25 @@ public class EndOfShiftReportUI : MonoBehaviour
             if (row == null)
                 continue;
 
-            row.Show(); 
+            // Prepare the row fully (tone + label) while invisible, then fade it in as one piece
+            // so the layout doesn't jump and the text isn't typed onto an empty bar.
+            row.SetFade(0f);
+            row.Show();
             row.Clear();
+            row.SetTone(line.Tone);
+            row.SetLabelInstant(line.Label, normalLabelProfile);
             FollowNewestRow();
-            
-            yield return row.RevealLabel(line.Label, normalLabelProfile, _maxSingleRevealDuration);
 
-            yield return WaitUnscaled(rewardRevealDelay);
+            PlayRowSound();
+            yield return row.FadeIn(rowFadeDuration);
+
+            if (_skipRequested)
+                break;
 
             if (line.Value != null)
             {
-                yield return row.RevealValue(line.Value, rewardColor, rewardValueProfile, _maxSingleRevealDuration);
+                yield return WaitUnscaled(rewardRevealDelay);
+                yield return row.RevealValue(line.Value, rewardValueProfile, _maxSingleRevealDuration);
             }
 
             yield return WaitUnscaled(lineRevealDelay);
@@ -397,7 +444,10 @@ public class EndOfShiftReportUI : MonoBehaviour
         if (banner != null)
             banner.SetActive(true);
 
+        PlayOpenSound();
+
         _contentContainer?.SetActive(true);
+        SetContentAlpha(1f);
 
         if (subHeaderText != null)
             subHeaderText.SetTextInstant(SubHeaderLabel);
@@ -409,7 +459,7 @@ public class EndOfShiftReportUI : MonoBehaviour
                 continue;
 
             ReportLine line = _lines[i];
-            row.SetInstant(line.Label, line.Value, rewardColor, showValue: line.Value != null);
+            row.SetInstant(line.Label, line.Value, line.Tone);
         }
 
         StopScrollRoutine();
@@ -676,6 +726,66 @@ public class EndOfShiftReportUI : MonoBehaviour
         if (value > 0) return $"+{value}";
         if (value < 0) return value.ToString();
         return "0";
+    }
+
+    // ----- Content fade -----
+
+    private CanvasGroup GetContentCanvasGroup()
+    {
+        if (_contentCanvasGroup != null || _contentContainer == null)
+            return _contentCanvasGroup;
+
+        _contentCanvasGroup = _contentContainer.GetComponent<CanvasGroup>();
+        if (_contentCanvasGroup == null)
+            _contentCanvasGroup = _contentContainer.AddComponent<CanvasGroup>();
+
+        return _contentCanvasGroup;
+    }
+
+    private void SetContentAlpha(float alpha)
+    {
+        CanvasGroup group = GetContentCanvasGroup();
+        if (group != null)
+            group.alpha = alpha;
+    }
+
+    /// <summary>Runs inside the reveal coroutine; a skip snaps the alpha to 1 via SnapToFinalState.</summary>
+    private IEnumerator FadeContent(float duration)
+    {
+        SetContentAlpha(0f);
+
+        float elapsed = 0f;
+        while (elapsed < duration && !_skipRequested)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            SetContentAlpha(1f - (1f - t) * (1f - t));
+            yield return null;
+        }
+
+        SetContentAlpha(1f);
+    }
+
+    // ----- Audio -----
+
+    private void PlayOpenSound()
+    {
+        if (_openSoundPlayed)
+            return;
+
+        _openSoundPlayed = true;
+
+        if (openSound != null && SFXController.Instance != null)
+            SFXController.Instance.Play(openSound, openSoundVolume);
+    }
+
+    private void PlayRowSound()
+    {
+        if (_skipRequested || rowSound == null || SFXController.Instance == null)
+            return;
+
+        float pitch = Random.Range(rowSoundPitchRange.x, rowSoundPitchRange.y);
+        SFXController.Instance.Play(rowSound, rowSoundVolume, pitch);
     }
 
     public void OnContinueButtonPressed()

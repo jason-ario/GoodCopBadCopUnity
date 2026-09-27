@@ -241,10 +241,10 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
 
     /// <summary>
     /// Whether this task is currently active on every client (mirrors <see cref="_isActive"/>).
-    /// Used by <see cref="CompassController"/> to gate the compass fence pips — a broken fence
-    /// segment should only show on the compass while a repair task is actually active, not any
-    /// time <see cref="PerimiterFence.IsBroken"/> happens to be true (e.g. between a mutant breach
-    /// and this task actually being triggered).
+    /// One of <see cref="CompassController"/>'s two fence-pip gates: broken segments pip while this
+    /// is true OR while <see cref="CheckpointIntegrityService.IsEnabled"/> (integrity-only damage).
+    /// Before integrity is introduced on Day 1, a breach-broken fence gets no pip until this task
+    /// is triggered.
     /// </summary>
     public bool IsActive => _isActive.Value;
 

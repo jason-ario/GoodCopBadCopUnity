@@ -97,7 +97,7 @@ public class GeigerCounterUI : MonoBehaviour
 
     private void OnEnable()
     {
-        SubscribeTo(PlayerInstance.Instance);
+        SubscribeTo(SpectateManager.HudSubject);
     }
 
     private void Update()
@@ -107,8 +107,10 @@ public class GeigerCounterUI : MonoBehaviour
         // destroying it (see PlayerInstance.DetachFromPlayerObject), so a cached PlayerRadiation
         // reference never becomes null on its own — it just stops firing events on the corpse,
         // freezing the gauge at whatever radiation value it had at death.
-        if (PlayerInstance.Instance != _subscribedInstance)
-            SubscribeTo(PlayerInstance.Instance);
+        // HudSubject also follows the watched teammate while spectating.
+        PlayerInstance subject = SpectateManager.HudSubject;
+        if (subject != _subscribedInstance)
+            SubscribeTo(subject);
 
         DecayExposureRate();
         AnimateNeedle();
@@ -169,6 +171,11 @@ public class GeigerCounterUI : MonoBehaviour
         }
 
         _subscribedInstance = playerInstance;
+
+        // Forget the previous subject's reading so switching spectate targets doesn't register
+        // the difference between two players' radiation as a sudden exposure spike.
+        _lastRadiationTime = float.NegativeInfinity;
+
         if (playerInstance == null || playerInstance.PlayerRadiation == null) return;
 
         _playerRadiation = playerInstance.PlayerRadiation;

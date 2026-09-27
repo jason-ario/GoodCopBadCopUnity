@@ -106,6 +106,11 @@ public class PlayerRadiation : NetworkBehaviour
         if (IsInvincible)
             return;
 
+        // Dead bodies (including a resurrected corpse walking around as an AI enemy) don't
+        // accumulate radiation or take radiation damage — only active players do.
+        if (!IsActivePlayer)
+            return;
+
         // While this player is locked inside a scripted (or classic) dialogue cutscene,
         // radiation should not accrue, drain, or damage the player at all — mirrors the
         // cutscene guard used by MutantEnemy/MutantAttackHitbox for combat.
@@ -226,8 +231,16 @@ public class PlayerRadiation : NetworkBehaviour
     private void ApplyAddRadiationServer(float amount)
     {
         if (amount <= 0f) return;
+        if (!IsActivePlayer) return; // hotspots/zones must not irradiate corpses either
         _networkRadiation.Value = Mathf.Clamp(_networkRadiation.Value + amount, 0f, maxRadiation);
     }
+
+    /// <summary>
+    /// True only for a living player that is still its client's PlayerObject — false for a dead
+    /// body, a resurrected corpse (an AI enemy), or a corpse detached from its former owner.
+    /// </summary>
+    public bool IsActivePlayer =>
+        IsSpawned && NetworkObject.IsPlayerObject && (playerHealth == null || !playerHealth.IsDead);
 
     private void ApplyRemoveRadiationServer(float amount)
     {

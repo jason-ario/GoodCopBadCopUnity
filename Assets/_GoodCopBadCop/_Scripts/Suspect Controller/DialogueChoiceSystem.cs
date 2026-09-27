@@ -830,7 +830,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
             : null;
         if (!OverhearRange.CanLocalPlayerSee(conversationSource)) return;
 
-        DialogueManager.Instance.SpawnSubtitles(choiceText, playerName, Color.white, true);
+        DialogueManager.Instance.SpawnSubtitles(choiceText, playerName, Color.white, true,
+            overhearSource: conversationSource);
     }
 
     private IEnumerator NPCRespondToDialogueChoice(int choiceIndex)

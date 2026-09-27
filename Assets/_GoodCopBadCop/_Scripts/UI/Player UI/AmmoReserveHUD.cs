@@ -21,14 +21,25 @@ public class AmmoReserveHUD : MonoBehaviour
 
     private void OnEnable()
     {
-        Bind(PlayerAmmoReserve.Local);
+        Bind(ResolveReserve());
     }
 
     private void Update()
     {
-        // Poll until the local player spawns, and rebind if it respawns as a new object.
-        if (_reserve != PlayerAmmoReserve.Local)
-            Bind(PlayerAmmoReserve.Local);
+        // Poll until the local player spawns, rebind if it respawns as a new object, and follow
+        // the watched teammate while spectating (reserve counts are replicated NetworkVariables).
+        PlayerAmmoReserve target = ResolveReserve();
+        if (_reserve != target)
+            Bind(target);
+    }
+
+    private static PlayerAmmoReserve ResolveReserve()
+    {
+        if (!SpectateManager.IsHudMirroringTarget)
+            return PlayerAmmoReserve.Local;
+
+        PlayerInstance subject = SpectateManager.HudSubject;
+        return subject != null ? subject.GetComponent<PlayerAmmoReserve>() : null;
     }
 
     private void OnDisable()
