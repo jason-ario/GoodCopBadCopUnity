@@ -101,8 +101,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private float jumpForce = 10f;
     [SerializeField] private AudioClip jumpSound;
     [SerializeField] private AudioClip landSound;
-    [Tooltip("How many seconds before actual ground contact the land sound should play, predicted from the current fall speed and a lookahead ground scan.")]
-    [SerializeField] private float landSoundAnticipation = 0.5f;
+    // Renamed from "landSoundAnticipation" (intentionally no FormerlySerializedAs) so the old
+    // early-trigger value serialized on the Player prefab is dropped and touchdown timing is used.
+    [Tooltip("Optional lead time (seconds) to play the land sound before actual ground contact, predicted from the current fall speed and a lookahead ground scan. 0 = play exactly on touchdown.")]
+    [SerializeField, Min(0f)] private float landSoundLeadTime = 0f;
     [Tooltip("Minimum downward speed (m/s) required before the land sound is allowed to play. Filters out the tiny, rapid grounded/ungrounded flickers caused by walking up or down stairs and slopes, which would otherwise re-trigger the sound every step.")]
     [SerializeField] private float minFallSpeedForLandSound = 4f;
 
@@ -495,8 +497,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             // don't repeatedly re-trigger the land sound.
             if (!_wasGrounded && _verticalVelocity < -minFallSpeedForLandSound)
             {
-                // Fallback in case the predictive lookahead below never caught this fall
-                // (e.g. an uneven or steep surface the lookahead ray missed).
+                // Play on actual touchdown, unless the optional anticipation lookahead
+                // below already played it for this fall.
                 if (!_landSoundPlayedForCurrentFall)
                     SFXController.Instance.Play(landSound);
             }
@@ -534,15 +536,15 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
                 if (_verticalVelocity < underwaterTerminalVelocity)
                     _verticalVelocity = underwaterTerminalVelocity;
             }
-            else if (!_landSoundPlayedForCurrentFall && _verticalVelocity < -minFallSpeedForLandSound)
+            else if (landSoundLeadTime > 0f && !_landSoundPlayedForCurrentFall && _verticalVelocity < -minFallSpeedForLandSound)
             {
-                // Predict how far the player will fall in the next landSoundAnticipation
+                // Optional: predict how far the player will fall in the next landSoundLeadTime
                 // seconds (using basic kinematics under the current gravity) and scan that
                 // far below for ground. If found, play the land sound now so it lands on the
-                // player's ear roughly landSoundAnticipation seconds before actual contact.
+                // player's ear roughly landSoundLeadTime seconds before actual contact.
                 float fallSpeed = -_verticalVelocity;
-                float lookaheadDistance = fallSpeed * landSoundAnticipation
-                    + 0.5f * -effectiveGravity * landSoundAnticipation * landSoundAnticipation;
+                float lookaheadDistance = fallSpeed * landSoundLeadTime
+                    + 0.5f * -effectiveGravity * landSoundLeadTime * landSoundLeadTime;
 
                 if (CheckGroundedAhead(lookaheadDistance))
                 {

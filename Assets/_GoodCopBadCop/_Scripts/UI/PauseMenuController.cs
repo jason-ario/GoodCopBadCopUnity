@@ -153,6 +153,7 @@ public class PauseMenuController : MonoBehaviour
     {
         // Progress is only persisted at the start of each day. Drop anything done since then so
         // the menu (and a later Continue) reflects the day-start checkpoint on disk.
+        SaveDataManager.Instance?.StopPlaytimeTracking();
         SaveDataManager.Instance?.RevertToLastCheckpoint();
 
         if (LobbyManager.Instance != null)

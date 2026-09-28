@@ -196,7 +196,9 @@ public class PlayerHealth : NetworkBehaviour
 
         // Blood/impact feedback plays on every real hit, whether or not it's the killing blow —
         // mirrors MutantEnemy.TakeDamage / SuspectCharacter.TakeDamage.
-        SpawnHitEffectClientRpc(hitPoint);
+        // Radiation is internal poisoning (and ticks every frame), so it never bleeds or plays hurt SFX.
+        if (effectKey != EffectKeys.RadiationTickDamage)
+            SpawnHitEffectClientRpc(hitPoint);
 
         if (_networkHealth.Value <= 0f)
             _networkIsDead.Value = true;

@@ -1724,6 +1724,13 @@ public class ShiftManager : NetworkBehaviour
     {
         yield return new WaitUntil(() => PlayerInstance.Instance != null);
 
+        // The other player may be mid-conversation with a world-dialogue NPC (e.g. the Guard)
+        // when Start Shift is pressed. ForceExitSoldierDialogueBeforeCutscene only covers
+        // ScriptedDialogueRunner sequences, so end any local SuspectWorldDialogue conversation
+        // here — before the camera/control lock below — so its Back button, choice panel, line
+        // camera and dialogue lock are released and the server drops this player as a participant.
+        SuspectWorldDialogue.EndAllLocalConversations();
+
         // Either player can press Start Shift while the start-shift screen is open on their own
         // screen only (see GateStartShiftController — each player gets their own targeted
         // open). This RPC fires on every client, so close it here for whichever player(s) still

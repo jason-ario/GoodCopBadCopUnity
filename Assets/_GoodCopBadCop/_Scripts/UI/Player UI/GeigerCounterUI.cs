@@ -78,6 +78,7 @@ public class GeigerCounterUI : MonoBehaviour
     private float _jitterScale;
     private float _previousRadiation;
     private float _lastRadiationTime = float.NegativeInfinity;
+    private bool _isFull;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -175,6 +176,7 @@ public class GeigerCounterUI : MonoBehaviour
         // Forget the previous subject's reading so switching spectate targets doesn't register
         // the difference between two players' radiation as a sudden exposure spike.
         _lastRadiationTime = float.NegativeInfinity;
+        _isFull = false;
 
         if (playerInstance == null || playerInstance.PlayerRadiation == null) return;
 
@@ -207,6 +209,7 @@ public class GeigerCounterUI : MonoBehaviour
 
         _previousRadiation = current;
         _lastRadiationTime = now;
+        _isFull = max > 0f && current >= max - 0.001f;
 
         // ── Arc and text – still reflect the overall/accumulated radiation ─────
         if (arcFillImage != null)
@@ -232,6 +235,15 @@ public class GeigerCounterUI : MonoBehaviour
     /// </summary>
     private void DecayExposureRate()
     {
+        // At max radiation the value is clamped and stops changing, so no more change events
+        // arrive and the measured rate reads as zero. Keep the needle pegged and shaking instead.
+        if (_isFull)
+        {
+            _targetAngle = maxNeedleAngle;
+            _jitterScale = Mathf.Lerp(_jitterScale, 1f, Time.deltaTime * jitterSmoothing);
+            return;
+        }
+
         float sinceLastUpdate = Time.time - _lastRadiationTime;
         if (sinceLastUpdate <= 0.5f)
             return;

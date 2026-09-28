@@ -1174,7 +1174,10 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         float currentHealth = _playerHealth.Health;
 
-        if (currentHealth < _previousHealth && currentHealth > 0f)
+        // Radiation poisoning ticks every frame and is not a physical hit — never play the Hit reaction for it.
+        bool isRadiationTick = _playerHealth.LastHealthEffectKey == GoodCopBadCop.Effects.EffectKeys.RadiationTickDamage;
+
+        if (currentHealth < _previousHealth && currentHealth > 0f && !isRadiationTick)
         {
             bodyAnimator.SetTrigger("Hit");
             armsAnimator.SetTrigger("Hit");

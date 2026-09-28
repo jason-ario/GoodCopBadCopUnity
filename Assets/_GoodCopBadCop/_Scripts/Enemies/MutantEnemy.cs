@@ -387,6 +387,16 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>Grace period after breaking a fence before hunting for another blocking one — see <see cref="_fenceRecheckAllowedTime"/>.</summary>
     private const float FenceRecheckGraceSeconds = 2f;
 
+    // Stuck watchdog (server only) — see UpdateStuckWatchdog / TryRecoverOntoNavMesh.
+    private Vector3 _stuckCheckPosition;
+    private float _stuckTimer;
+    private int _unstickAttempts;
+    private float _nextOffMeshWarningTime;
+    private const float StuckTimeoutSeconds = 2.5f;
+    private const float StuckMinProgress = 0.3f;
+    private static readonly float[] NavMeshRecoveryRadii = { 1f, 3f, 6f, 12f };
+    private static readonly float[] UnstickSearchRadii = { 1.5f, 3f, 5f, 8f };
+
     /// <summary>
     /// True once this enemy has died, regardless of whether it has been despawned yet.
     /// </summary>
@@ -656,7 +666,7 @@ public class MutantEnemy : NetworkBehaviour
 
         while (!_isDead)
         {
-            if (!_agent.isOnNavMesh)
+            if (!_agent.isOnNavMesh && !TryRecoverOntoNavMesh())
             {
                 yield return new WaitForSeconds(retargetInterval);
                 continue;
@@ -667,6 +677,7 @@ public class MutantEnemy : NetworkBehaviour
                 // Frozen — no targeting, no movement, no patrol. Just sit tight until released.
                 SetAgentType(_defaultAgentTypeId);
                 _agent.ResetPath();
+                ResetStuckWatchdog();
                 yield return new WaitForSeconds(retargetInterval);
                 continue;
             }
@@ -682,11 +693,16 @@ public class MutantEnemy : NetworkBehaviour
             // NavMesh, where fences are walls, so wandering mutants never clip through them.
             bool assaulting = _currentTarget != null || (_isAggroed && aggroTarget != null);
             SetAgentType(assaulting && _assaultAgentTypeId != -1 ? _assaultAgentTypeId : _defaultAgentTypeId);
-            if (!_agent.isOnNavMesh)
+            if (!_agent.isOnNavMesh && !TryRecoverOntoNavMesh())
             {
                 yield return new WaitForSeconds(retargetInterval);
                 continue;
             }
+
+            if (assaulting)
+                UpdateStuckWatchdog(_currentTarget != null ? _currentTarget.position : aggroTarget.position, retargetInterval);
+            else
+                ResetStuckWatchdog();
 
             if (_currentTarget != null)
             {
@@ -1083,6 +1099,158 @@ public class MutantEnemy : NetworkBehaviour
             _agent.isStopped = wasStopped;
 
         InvalidateDestination();
+    }
+
+    // ── NavMesh recovery / stuck watchdog ──────────────────────────────────────
+
+    /// <summary>
+    /// Called when the agent is not linked to any NavMesh (e.g. spawned slightly off/above the mesh,
+    /// inside a carved obstacle, or an agent-type switch whose 3 m warp failed). Without this the
+    /// ChaseLoop skipped every tick forever and the mutant stood frozen until moved by hand.
+    /// Searches outward on the current agent type, then falls back to the default (NPC) type.
+    /// </summary>
+    private bool TryRecoverOntoNavMesh()
+    {
+        if (!_agent.enabled)
+            return false;
+        if (_agent.isOnNavMesh)
+            return true;
+
+        if (TryWarpToNearestNavMesh(_agent.agentTypeID))
+            return true;
+
+        if (_agent.agentTypeID != _defaultAgentTypeId)
+        {
+            SetAgentType(_defaultAgentTypeId);
+            if (_agent.isOnNavMesh || TryWarpToNearestNavMesh(_defaultAgentTypeId))
+                return true;
+        }
+
+        if (Time.time >= _nextOffMeshWarningTime)
+        {
+            _nextOffMeshWarningTime = Time.time + 5f;
+            Debug.LogWarning($"[MutantEnemy] {name} is off the NavMesh at {transform.position} and no mesh was found " +
+                             $"within {NavMeshRecoveryRadii[NavMeshRecoveryRadii.Length - 1]}m.", this);
+        }
+        return false;
+    }
+
+    private bool TryWarpToNearestNavMesh(int agentTypeId)
+    {
+        var filter = new NavMeshQueryFilter { agentTypeID = agentTypeId, areaMask = NavMesh.AllAreas };
+        foreach (float radius in NavMeshRecoveryRadii)
+        {
+            if (!NavMesh.SamplePosition(transform.position, out NavMeshHit hit, radius, filter))
+                continue;
+
+            if (_agent.Warp(hit.position) && _agent.isOnNavMesh)
+            {
+                _agent.isStopped = false;
+                InvalidateDestination();
+                ResetStuckWatchdog();
+                Debug.Log($"[MutantEnemy] {name} recovered onto NavMesh ({hit.distance:F2}m).", this);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void ResetStuckWatchdog()
+    {
+        _stuckCheckPosition = transform.position;
+        _stuckTimer = 0f;
+        _unstickAttempts = 0;
+    }
+
+    /// <summary>
+    /// Detects an assaulting mutant that should be closing on <paramref name="goal"/> but hasn't
+    /// moved for <see cref="StuckTimeoutSeconds"/> (wedged against another agent/geometry, or on a
+    /// tiny disconnected NavMesh island). Legit stationary states — attacking, fence/door bashing,
+    /// knockback, stopped — reset the timer.
+    /// </summary>
+    private void UpdateStuckWatchdog(Vector3 goal, float tickInterval)
+    {
+        Vector3 moved = transform.position - _stuckCheckPosition;
+        moved.y = 0f;
+        if (!ShouldBeMakingProgress(goal) || moved.sqrMagnitude > StuckMinProgress * StuckMinProgress)
+        {
+            ResetStuckWatchdog();
+            return;
+        }
+
+        _stuckTimer += tickInterval;
+        if (_stuckTimer < StuckTimeoutSeconds)
+            return;
+
+        _stuckTimer = 0f;
+        _unstickAttempts++;
+        TryUnstick(goal);
+    }
+
+    private bool ShouldBeMakingProgress(Vector3 goal)
+    {
+        if (_knockbackCoroutine != null || _agent.isStopped || _agent.pathPending)
+            return false;
+
+        Vector3 toGoal = goal - transform.position;
+        toGoal.y = 0f;
+        if (toGoal.magnitude <= data.attackRange + 0.5f)
+            return false;
+
+        if (_fenceTarget != null && IsFenceTargetInRange())
+            return false;
+
+        if (_doorTarget != null &&
+            Vector3.Distance(transform.position, _doorTarget.transform.position) <= data.attackRange * 1.5f)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// First attempt: drop the path and force a fresh replan. Later attempts: warp to a nearby
+    /// NavMesh point that has a complete path to <paramref name="goal"/>.
+    /// </summary>
+    private void TryUnstick(Vector3 goal)
+    {
+        _agent.ResetPath();
+        InvalidateDestination();
+
+        if (_unstickAttempts <= 1)
+            return;
+
+        var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = _agent.areaMask };
+        if (!NavMesh.SamplePosition(goal, out NavMeshHit goalHit, 3f, filter))
+            return;
+
+        var path = new NavMeshPath();
+        Vector3 origin = transform.position;
+        const int directions = 8;
+        float angleOffset = UnityEngine.Random.Range(0f, 360f);
+
+        foreach (float radius in UnstickSearchRadii)
+        {
+            for (int i = 0; i < directions; i++)
+            {
+                float angle = (angleOffset + i * (360f / directions)) * Mathf.Deg2Rad;
+                Vector3 candidate = origin + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+
+                if (!NavMesh.SamplePosition(candidate, out NavMeshHit hit, 1f, filter))
+                    continue;
+                if (!NavMesh.CalculatePath(hit.position, goalHit.position, filter, path)
+                    || path.status != NavMeshPathStatus.PathComplete)
+                    continue;
+
+                if (_agent.Warp(hit.position))
+                {
+                    _agent.isStopped = false;
+                    InvalidateDestination();
+                    _stuckCheckPosition = transform.position;
+                    Debug.Log($"[MutantEnemy] {name} was stuck — warped {radius}m to a reachable NavMesh point.", this);
+                    return;
+                }
+            }
+        }
     }
 
     /// <summary>

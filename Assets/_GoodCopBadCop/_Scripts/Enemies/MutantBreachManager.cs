@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 using Random = UnityEngine.Random;
 
 /// <summary>
@@ -56,6 +57,14 @@ public class MutantBreachManager : NetworkBehaviour
     [Header("Scene References")]
     [Tooltip("Fixed world locations mutants can spawn at for a breach. At least one is required.")]
     [SerializeField] private Transform[] breachPoints;
+
+    [Tooltip("Random horizontal scatter (m) around the chosen breach point, so several mutants " +
+             "picking the same point don't spawn stacked inside each other.")]
+    [SerializeField] private float breachSpawnScatterRadius = 1.5f;
+
+    [Tooltip("Max distance (m) searched to snap each spawn onto the mutant's NavMesh. A spawn " +
+             "that isn't linked to the NavMesh never moves (MutantEnemy.ChaseLoop needs isOnNavMesh).")]
+    [SerializeField] private float breachSpawnNavMeshSnapDistance = 5f;
 
     [Tooltip("Fallback target breached mutants head toward ONLY when no living, non-cutscened " +
              "player exists to charge (every breach mutant is always in breach charge mode, " +
@@ -510,7 +519,8 @@ public class MutantBreachManager : NetworkBehaviour
             Transform point = breachPoints[Random.Range(0, breachPoints.Length)];
             GameObject prefab = spawnQueue[i];
 
-            GameObject instance = Instantiate(prefab, point.position, point.rotation);
+            Vector3 spawnPos = GetNavMeshSpawnPosition(point.position, prefab);
+            GameObject instance = Instantiate(prefab, spawnPos, point.rotation);
             NetworkObject netObj = instance.GetComponent<NetworkObject>();
 
             if (netObj == null)
@@ -545,6 +555,34 @@ public class MutantBreachManager : NetworkBehaviour
             if (i < spawnQueue.Count - 1)
                 yield return new WaitForSeconds(data.spawnStaggerSeconds);
         }
+    }
+
+    /// <summary>
+    /// Scatters around <paramref name="breachPoint"/> and snaps the result onto the NavMesh of the
+    /// prefab's own agent type, so the NavMeshAgent links on spawn. Raw breach point transforms can
+    /// sit slightly off/above the mesh or inside a carved obstacle, which left mutants frozen.
+    /// Falls back to the unscattered point, then the raw point, if no mesh is found.
+    /// </summary>
+    private Vector3 GetNavMeshSpawnPosition(Vector3 breachPoint, GameObject prefab)
+    {
+        NavMeshAgent prefabAgent = prefab != null ? prefab.GetComponent<NavMeshAgent>() : null;
+        var filter = new NavMeshQueryFilter
+        {
+            agentTypeID = prefabAgent != null ? prefabAgent.agentTypeID : 0,
+            areaMask = NavMesh.AllAreas
+        };
+
+        Vector2 scatter = Random.insideUnitCircle * breachSpawnScatterRadius;
+        Vector3 scattered = breachPoint + new Vector3(scatter.x, 0f, scatter.y);
+
+        if (NavMesh.SamplePosition(scattered, out NavMeshHit hit, breachSpawnNavMeshSnapDistance, filter))
+            return hit.position;
+        if (NavMesh.SamplePosition(breachPoint, out hit, breachSpawnNavMeshSnapDistance, filter))
+            return hit.position;
+
+        Debug.LogWarning($"[MutantBreachManager] No NavMesh within {breachSpawnNavMeshSnapDistance}m of breach point " +
+                         $"{breachPoint} — mutant may be unable to move. Move the breach point onto the baked NavMesh.", this);
+        return breachPoint;
     }
 
     /// <summary>

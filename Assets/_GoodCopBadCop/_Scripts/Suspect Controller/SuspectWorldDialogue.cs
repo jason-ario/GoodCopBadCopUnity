@@ -126,6 +126,14 @@ public class SuspectWorldDialogue : MonoBehaviour
     // Server-only: guards against starting the authoritative conversation loop twice.
     private bool _serverConversationRunning;
 
+    // Local: set when a forced exit lands while this client's engagement request is still in
+    // flight, so a late grant backs straight out instead of opening the conversation.
+    private bool _cancelPendingEngagement;
+
+    // Every live instance, so a global event (e.g. the intro cutscene starting) can tear down
+    // whichever world conversation the local player is currently in.
+    private static readonly List<SuspectWorldDialogue> _instances = new List<SuspectWorldDialogue>();
+
     public bool InConversation => _inConversation;
 
     private void Awake()
@@ -133,12 +141,35 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (startSitting && animator != null)
             animator.SetBool("Sitting", true);
 
+        _instances.Add(this);
         SubscribeToSpeaking();
     }
 
     private void OnDestroy()
     {
+        _instances.Remove(this);
         UnsubscribeFromSpeaking();
+    }
+
+    /// <summary>
+    /// Local-only. Ends every world-dialogue conversation the local player is in (or is about
+    /// to join) through the normal <see cref="EndConversation"/> path, so the NPC's server-side
+    /// participant set, the Back button, choice panel, subtitles, line cameras and dialogue lock
+    /// are all released. Used when a global sequence (e.g. the intro cutscene) takes over.
+    /// </summary>
+    public static void EndAllLocalConversations()
+    {
+        for (int i = _instances.Count - 1; i >= 0; i--)
+        {
+            SuspectWorldDialogue dialogue = _instances[i];
+            if (dialogue == null) continue;
+
+            if (dialogue._awaitingEngagementResponse)
+                dialogue._cancelPendingEngagement = true;
+
+            if (dialogue._inConversation)
+                dialogue.EndConversation();
+        }
     }
 
     private void SubscribeToSpeaking()
@@ -265,12 +296,22 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (_options == null || _options.Length == 0) return;
 
         _awaitingEngagementResponse = true;
+        _cancelPendingEngagement = false;
         speaking.RequestBeginEngagement(OnEngagementResponse);
     }
 
     private void OnEngagementResponse(bool granted)
     {
         _awaitingEngagementResponse = false;
+
+        // A forced exit (e.g. the intro cutscene starting) landed while this join was in flight.
+        if (_cancelPendingEngagement)
+        {
+            _cancelPendingEngagement = false;
+            if (granted)
+                speaking?.EndEngagement();
+            return;
+        }
 
         if (!granted)
         {
@@ -482,13 +523,21 @@ public class SuspectWorldDialogue : MonoBehaviour
 
     private GameObject ResolveLineCamera(string cameraKey)
     {
+        bool isSuspectCamKey = string.IsNullOrEmpty(cameraKey) || cameraKey == "SuspectCam" ||
+                               cameraKey == "SuspectFaceCam" || cameraKey == "suspect face";
+
+        // World NPCs (and players outside the booth) keep the player-camera dolly-in — the
+        // per-character suspect cams are booth-only. Registry keys still apply if authored.
+        if (!_boothCameraMode && isSuspectCamKey)
+            return null;
+
         SuspectCharacter character = GetComponent<SuspectCharacter>();
         GameObject wideCam = character != null ? character.SuspectCam : null;
         GameObject resolved;
 
         if (string.IsNullOrEmpty(cameraKey) || cameraKey == "SuspectCam")
         {
-            // Mirrors ScriptedDialogueRunner: an empty trigger defaults to the speaker's SuspectCam.
+            // Booth base shot, already held open by SuspectController — filtered to null below.
             resolved = wideCam;
         }
         else if (cameraKey == "SuspectFaceCam" || cameraKey == "suspect face")

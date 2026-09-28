@@ -2603,7 +2603,7 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Waits for the Dusk notification banner (see <see cref="DuskNotificationUI"/>) to fully
-    /// fade in, hold, and fade out before showing the trash/graffiti tutorial overlays. Both the
+    /// fade in, hold, and fade out before showing the Checkpoint Integrity tutorial overlay. Both the
     /// Dusk banner and TutorialOverlay slide down from the top of the screen, so triggering them
     /// at the same instant (as <see cref="OnTrashTaskReadySync"/> used to) made the tutorial
     /// overlay stomp the Dusk banner mid-animation. Falls back to a fixed delay if the Dusk
@@ -2620,9 +2620,9 @@ public class Day_01 : DayBase
 
         yield return new WaitForSeconds(delay);
 
-        TutorialOverlay.Instance?.ShowTrashTutorial(
-            () => TutorialOverlay.Instance?.ShowGraffitiTutorial(
-                () => TutorialOverlay.Instance?.ShowCheckpointIntegrityTutorial()));
+        // Only the Checkpoint Integrity overlay is shown — the trash/graffiti tasks are
+        // self-explanatory via their objective rows, arrows, and highlights.
+        TutorialOverlay.Instance?.ShowCheckpointIntegrityTutorial();
     }
 
     /// <summary>

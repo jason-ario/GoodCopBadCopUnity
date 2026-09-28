@@ -29,9 +29,6 @@ public class LobbyManager : MonoBehaviour
     private bool inviteOverlayWasOpenedByUs;
     private ulong _rejectedFullLobbyId;
 
-    // Replace with your actual Steam App ID. 480 is Valve's test app (Spacewar).
-    private const uint SteamAppId = 3262820;
-
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticState()
     {
@@ -49,19 +46,55 @@ public class LobbyManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
+        InitializeSteam();
+    }
+
+    /// <summary>
+    /// Initializes Steam using the App ID configured on the scene's <see cref="FacepunchTransport"/>.
+    /// That inspector field is the ONLY source of the App ID — there is no hardcoded fallback.
+    /// </summary>
+    private static void InitializeSteam()
+    {
+        var transport = FindFirstObjectByType<FacepunchTransport>(FindObjectsInactive.Include);
+        if (transport == null)
+        {
+            Debug.LogError("[LobbyManager] No FacepunchTransport found in the scene — cannot determine Steam App ID. Steam not initialized.");
+            return;
+        }
+
+        uint appId = transport.SteamAppId;
+        if (appId == 0)
+        {
+            Debug.LogError("[LobbyManager] FacepunchTransport.steamAppId is 0 — set the Steam App ID on the transport. Steam not initialized.");
+            return;
+        }
+
+        // FacepunchTransport.Awake may already have initialized Steam. Calling Init a second
+        // time throws "already initialized", which was being misreported as "is Steam running?".
+        if (SteamClient.IsValid)
+        {
+            if (SteamClient.AppId.Value != appId)
+                Debug.LogWarning($"[LobbyManager] Steam already initialized with AppId={SteamClient.AppId.Value}, expected {appId}. " +
+                                 "Players on different App IDs cannot find each other's lobbies by join code.");
+            else
+                Debug.Log($"[LobbyManager] Steam already initialized. Name={SteamClient.Name} AppId={SteamClient.AppId.Value}");
+            return;
+        }
+
         try
         {
             // asyncCallbacks: false because we call RunCallbacks() manually in Update.
-            SteamClient.Init(SteamAppId, asyncCallbacks: false);
+            SteamClient.Init(appId, asyncCallbacks: false);
 
             if (!SteamClient.IsValid)
                 Debug.LogError("[LobbyManager] SteamClient.Init succeeded but IsValid is false.");
             else
-                Debug.Log($"[LobbyManager] Steam initialized. Name={SteamClient.Name} AppId={SteamAppId}");
+                Debug.Log($"[LobbyManager] Steam initialized. Name={SteamClient.Name} AppId={SteamClient.AppId.Value}");
         }
         catch (Exception e)
         {
-            Debug.LogError($"[LobbyManager] SteamClient.Init failed — is Steam running? {e.Message}");
+            Debug.LogError($"[LobbyManager] SteamClient.Init failed for AppId={appId}. Make sure Steam is running, logged in, " +
+                           $"and this account has access to that App ID. {e.Message}");
         }
     }
 
@@ -344,18 +377,55 @@ public class LobbyManager : MonoBehaviour
 
         var normalizedCode = code.Trim().ToUpperInvariant();
 
-        Debug.Log($"[JoinLobbyByCode] Searching for lobby with join code: {normalizedCode}");
+        if (!SteamClient.IsValid)
+        {
+            Debug.LogError("[JoinLobbyByCode] Steam is not initialized — cannot search for lobbies.");
+            OnJoinFailed?.Invoke("STEAM_NOT_READY");
+            return;
+        }
 
-        var lobbies = await SteamMatchmaking.LobbyList
-            .WithKeyValue(LobbyDataKeyJoinCode, normalizedCode)
-            .RequestAsync();
+        Debug.Log($"[JoinLobbyByCode] Searching for lobby with join code: {normalizedCode} (AppId={SteamClient.AppId.Value})");
+
+        // Steam's lobby search is (a) region-limited by default, so friends in other regions
+        // were never found, and (b) eventually consistent: a freshly created lobby's join_code
+        // metadata can take a few seconds to become searchable. That is why joining on the
+        // pre-game campaign screen (right after the host created the lobby) failed while
+        // later joins succeeded. Search worldwide and retry briefly before giving up.
+        const int MaxSearchAttempts = 4;
+        const float SearchRetryDelaySeconds = 1.5f;
+        Lobby[] lobbies = null;
+
+        for (int attempt = 1; attempt <= MaxSearchAttempts; attempt++)
+        {
+            lobbies = await SteamMatchmaking.LobbyList
+                .FilterDistanceWorldwide()
+                .WithKeyValue(LobbyDataKeyJoinCode, normalizedCode)
+                .RequestAsync();
+
+            if (lobbies != null && lobbies.Length > 0)
+                break;
+
+            if (attempt < MaxSearchAttempts)
+            {
+                Debug.LogWarning($"[JoinLobbyByCode] Attempt {attempt}/{MaxSearchAttempts}: no lobby for '{normalizedCode}' yet — retrying in {SearchRetryDelaySeconds}s...");
+                await Task.Delay(TimeSpan.FromSeconds(SearchRetryDelaySeconds));
+            }
+        }
 
         if (lobbies == null || lobbies.Length == 0)
         {
-            Debug.LogWarning($"[JoinLobbyByCode] No lobby found for code '{normalizedCode}'.");
+            Debug.LogWarning($"[JoinLobbyByCode] No lobby found for code '{normalizedCode}'. " +
+                             $"If the host is definitely online, confirm both players run the game under the same Steam AppId (local={SteamClient.AppId.Value}).");
             OnJoinFailed?.Invoke("CODE_NOT_FOUND");
             return;
         }
+
+        // Leave any lobby/session we're still in (e.g. after backing out of hosting),
+        // otherwise StartClient would be skipped because NetworkManager is still running.
+        if (CurrentLobby.Id != 0 || NetworkManager.Singleton.IsListening)
+            await ExitLobbyAsync();
+
+        DevSpectatorRegistry.IsLocalSpectating = false;
 
         // Take the first match; codes are unique per active session.
         var target = lobbies[0];

@@ -816,8 +816,8 @@ public class DebugConsole : MonoBehaviour
 
         // Mirror Day_01's post-Alexei-dialogue callback: broadcast to all clients that the trash
         // task is ready. Day_01.OnTrashTaskReadySync is what actually adds the "throw away trash"
-        // and "clean graffiti" tutorial objectives and shows the trash/graffiti tutorial overlay
-        // screens — TriggerEndOfShiftSetup alone only spawns/highlights the trash items and
+        // and "clean graffiti" tutorial objectives and shows the Checkpoint Integrity tutorial overlay
+        // screen — TriggerEndOfShiftSetup alone only spawns/highlights the trash items and
         // registers the tasks, it does not show the tutorials themselves.
         TutorialTaskSync.Instance?.BroadcastTrashTaskReadyServer();
 

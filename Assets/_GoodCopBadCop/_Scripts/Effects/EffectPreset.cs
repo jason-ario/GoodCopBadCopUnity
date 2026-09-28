@@ -9,7 +9,10 @@ namespace GoodCopBadCop.Effects
     {
         /// <summary>Full-screen UI sprite overlay (see <see cref="FullscreenEffectView"/>).</summary>
         OverlaySprite,
-        /// <summary>Post-processing Vignette pulse (see <see cref="DamageVignetteView"/>).</summary>
+        /// <summary>
+        /// Post-processing pulse (see <see cref="DamageVignetteView"/>): colored Vignette plus optional
+        /// chromatic aberration, saturation, lens distortion, and a screen color wash.
+        /// </summary>
         Vignette
     }
 
@@ -31,6 +34,18 @@ namespace GoodCopBadCop.Effects
         [Tooltip("Vignette mode only. Higher = softer edge that bleeds further inward.")]
         [SerializeField, Range(0.01f, 1f)] private float vignetteSmoothness = 0.6f;
 
+        [Header("Post-Processing Extras (Vignette mode, values at full weight; 0 = untouched)")]
+        [Tooltip("URP Chromatic Aberration intensity.")]
+        [SerializeField, Range(0f, 1f)] private float chromaticAberration;
+        [Tooltip("URP Color Adjustments saturation. Negative desaturates, positive boosts.")]
+        [SerializeField, Range(-100f, 100f)] private float saturation;
+        [Tooltip("URP Lens Distortion intensity. Negative = pinch/punch, positive = bulge/woozy.")]
+        [SerializeField, Range(-1f, 1f)] private float lensDistortion;
+        [Tooltip("Color multiplied over the whole screen (Color Adjustments color filter).")]
+        [SerializeField] private Color screenTint = Color.white;
+        [Tooltip("How strongly the screen tint is applied. 0 disables the color wash.")]
+        [SerializeField, Range(0f, 1f)] private float screenTintAmount;
+
         public bool Enabled => enabled;
         public EFullscreenEffectMode Mode => mode;
         public Sprite OverlaySprite => overlaySprite;
@@ -40,6 +55,11 @@ namespace GoodCopBadCop.Effects
         public AnimationCurve OpacityCurve => opacityCurve;
         public float VignetteIntensity => vignetteIntensity;
         public float VignetteSmoothness => vignetteSmoothness;
+        public float ChromaticAberration => chromaticAberration;
+        public float Saturation => saturation;
+        public float LensDistortion => lensDistortion;
+        public Color ScreenTint => screenTint;
+        public float ScreenTintAmount => screenTintAmount;
 
         public static FullscreenEffectSettings Disabled()
         {

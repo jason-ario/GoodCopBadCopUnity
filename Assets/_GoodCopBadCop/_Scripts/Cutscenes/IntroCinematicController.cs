@@ -26,6 +26,14 @@ public class IntroCinematicController : MonoBehaviour
     [SerializeField] private TMPTextReveal textReveal;
     [SerializeField] private CanvasGroup continuePrompt;
 
+    [Header("Continue Prompt Animation")]
+    [SerializeField] private float promptDelay = 0.5f;
+    [SerializeField] private float promptFadeInDuration = 0.6f;
+    [SerializeField] private float promptPulsePeriod = 2.2f;
+    [SerializeField, Range(0f, 1f)] private float promptPulseMinAlpha = 0.45f;
+    [SerializeField, Range(0f, 1f)] private float promptPulseMaxAlpha = 0.9f;
+    [SerializeField] private float promptFadeOutDuration = 0.2f;
+
     [Tooltip("Story lines shown in order, one at a time, over the black screen.")]
     [TextArea(2, 4)]
     [SerializeField]
@@ -118,11 +126,34 @@ public class IntroCinematicController : MonoBehaviour
 
         yield return new WaitUntil(() => !textReveal.IsRevealing);
 
-        if (continuePrompt != null)
-            continuePrompt.alpha = 1f;
-
-        yield return new WaitUntil(() => _advanceRequested);
+        // Let the line breathe before offering to advance, then fade the prompt in and pulse it.
+        float t = 0f;
+        while (!_advanceRequested)
+        {
+            t += Time.unscaledDeltaTime;
+            if (continuePrompt != null)
+            {
+                float fadeIn = Mathf.Clamp01((t - promptDelay) / promptFadeInDuration);
+                float pulse = Mathf.Lerp(promptPulseMinAlpha, promptPulseMaxAlpha,
+                    0.5f + 0.5f * Mathf.Cos((t - promptDelay) * Mathf.PI * 2f / promptPulsePeriod));
+                continuePrompt.alpha = t < promptDelay ? 0f : fadeIn * pulse;
+            }
+            yield return null;
+        }
 
         _awaitingInput = false;
+
+        // Brief flash-and-fade acknowledgement of the press.
+        if (continuePrompt != null)
+        {
+            float f = 0f;
+            while (f < promptFadeOutDuration)
+            {
+                f += Time.unscaledDeltaTime;
+                continuePrompt.alpha = 1f - Mathf.Clamp01(f / promptFadeOutDuration);
+                yield return null;
+            }
+            continuePrompt.alpha = 0f;
+        }
     }
 }

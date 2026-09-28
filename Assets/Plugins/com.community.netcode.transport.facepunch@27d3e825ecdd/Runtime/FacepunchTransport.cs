@@ -22,6 +22,9 @@ namespace Netcode.Transports.Facepunch
         [Tooltip("The Steam App ID of your game. Technically you're not allowed to use 480, but Valve doesn't do anything about it so it's fine for testing purposes.")]
         [SerializeField] private uint steamAppId = 480;
 
+        /// <summary>The Steam App ID configured on this transport (single source of truth for SteamClient.Init).</summary>
+        public uint SteamAppId => steamAppId;
+
         [Tooltip("The Steam ID of the user targeted when joining as a client.")]
         [SerializeField] public ulong targetSteamId;
 

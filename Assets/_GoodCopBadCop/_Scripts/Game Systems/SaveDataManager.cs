@@ -501,6 +501,8 @@ public class SaveDataManager : MonoBehaviour
     /// </summary>
     public void RevertToLastCheckpoint()
     {
+        // Playtime is real time spent and must survive checkpoint reverts.
+        FlushPlaytime();
         _saveData = Clone(_committedData);
         Debug.Log("[SaveDataManager] Reverted live save data to the last day-start checkpoint.");
     }
@@ -513,6 +515,48 @@ public class SaveDataManager : MonoBehaviour
     }
 
     private static T Clone<T>(T value) => JsonUtility.FromJson<T>(JsonUtility.ToJson(value));
+
+    // ---------------------------------------------------------------------------
+    // Playtime
+    // ---------------------------------------------------------------------------
+
+    private bool _isTrackingPlaytime;
+
+    /// <summary>Stops accumulating playtime (e.g. when returning to the main menu) and persists it.</summary>
+    public void StopPlaytimeTracking()
+    {
+        FlushPlaytime();
+        _isTrackingPlaytime = false;
+    }
+
+    private void Update()
+    {
+        if (_isTrackingPlaytime && ActiveSlot != null)
+            ActiveSlot.PlaytimeSeconds += Time.unscaledDeltaTime;
+    }
+
+    /// <summary>
+    /// Copies the live slot's playtime into the committed checkpoint and writes it to disk.
+    /// Only playtime is touched — all other progression stays at the day-start checkpoint.
+    /// </summary>
+    private void FlushPlaytime()
+    {
+        if (ActiveSlotIndex < 0 || _saveData == null || _committedData == null) return;
+        SaveSlot live = _saveData.Slots[ActiveSlotIndex];
+        SaveSlot committed = _committedData.Slots[ActiveSlotIndex];
+        if (live == null || committed == null || !committed.IsOccupied) return;
+        if (Math.Abs(committed.PlaytimeSeconds - live.PlaytimeSeconds) < 0.01) return;
+
+        committed.PlaytimeSeconds = live.PlaytimeSeconds;
+        WriteToDisk();
+    }
+
+    private void OnApplicationQuit() => FlushPlaytime();
+
+    private void OnApplicationPause(bool paused)
+    {
+        if (paused) FlushPlaytime();
+    }
 
     private void Awake()
     {
@@ -615,6 +659,8 @@ public class SaveDataManager : MonoBehaviour
         {
             Debug.Log($"[SaveDataManager] Resuming slot {ActiveSlotIndex} ('{ActiveSlot.SlotName}') from its Day {ActiveSlot.CurrentDay} start checkpoint.");
         }
+
+        _isTrackingPlaytime = true;
     }
 
     /// <summary>Deletes the slot at the given index and persists the change.</summary>
@@ -633,7 +679,10 @@ public class SaveDataManager : MonoBehaviour
         Debug.Log($"[SaveDataManager] Slot {index} deleted.");
 
         if (ActiveSlotIndex == index)
+        {
             ActiveSlotIndex = -1;
+            _isTrackingPlaytime = false;
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -905,6 +954,12 @@ public class SaveSlot
     /// session instead of silently resetting to pristine.
     /// </summary>
     public int GlassHits;
+
+    /// <summary>
+    /// Total real-time seconds spent in gameplay on this slot. Unlike other progression, this is
+    /// persisted independently of day-start checkpoints so reverts never lose time played.
+    /// </summary>
+    public double PlaytimeSeconds;
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

@@ -13,6 +13,9 @@ public class JoinLobbyScreen : MonoBehaviour
     private const string ErrorEmptyCode     = "NO CODE ENTERED";
     private const string ErrorInvalidCode   = "INVALID JOIN CODE";
     private const string ErrorLobbyNotFound = "LOBBY NOT FOUND";
+    private const string ErrorLobbyFull     = "LOBBY FULL";
+    private const string ErrorSteamNotReady = "STEAM NOT CONNECTED";
+    private const string ErrorJoinFailed    = "UNABLE TO JOIN LOBBY";
     private const string ErrorInvalidIP     = "INVALID IP ADDRESS";
     private const string StatusLANReady     = "READY — PRESS JOIN TO CONNECT";
 
@@ -102,7 +105,15 @@ public class JoinLobbyScreen : MonoBehaviour
     {
         Debug.LogWarning($"Join failed: {reason}");
         SetConnectingAnimationVisible(false);
-        SetStatus(ErrorLobbyNotFound);
+        SetStatus(reason switch
+        {
+            "CODE_NOT_FOUND"  => ErrorLobbyNotFound,
+            "STEAM_NOT_READY" => ErrorSteamNotReady,
+            "LobbyFull"       => ErrorLobbyFull,
+            "Full"            => ErrorLobbyFull,
+            "DoesntExist"     => ErrorLobbyNotFound,
+            _                 => ErrorJoinFailed,
+        });
     }
 
     private void SetConnectingAnimationVisible(bool visible)

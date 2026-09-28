@@ -121,7 +121,7 @@ public class IDCard : FolderItem
       nameText.text = state.FullName;
       birthDateText.text = state.BirthDate;
       expDateText.text = state.ExpirationDate;
-      idNoText.text = state.IdNumber;
+      idNoText.text = FormatIdNumber(state.IdNumber);
       residentText.text = state.IsResident ? "* Resident of Saplavi *" : "Non-Resident";
       ApplyIdVisualState(state.IsFakeId, state.IsResident);
       if (state.IdPhoto != null)
@@ -134,7 +134,7 @@ public class IDCard : FolderItem
       nameText.text = syncedFullName.Value.ToString();
       birthDateText.text = syncedBirthDate.Value.ToString();
       expDateText.text = syncedExpiry.Value.ToString();
-      idNoText.text = syncedIdNumber.Value.ToString();
+      idNoText.text = FormatIdNumber(syncedIdNumber.Value.ToString());
       residentText.text = syncedIsResident.Value ? "* Resident of Saplavi *" : "Non-Resident";
       ApplyIdVisualState(syncedIsFakeId.Value, syncedIsResident.Value);
    }
@@ -142,7 +142,10 @@ public class IDCard : FolderItem
    private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => nameText.text = current.ToString();
    private void OnBirthDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => birthDateText.text = current.ToString();
    private void OnExpiryChanged(FixedString512Bytes previous, FixedString512Bytes current) => expDateText.text = current.ToString();
-   private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => idNoText.text = current.ToString();
+   private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => idNoText.text = FormatIdNumber(current.ToString());
+
+   /// <summary>The ID number is printed in the card's top-right corner with its own label, since there is no separate "ID:" label object.</summary>
+   private static string FormatIdNumber(string idNumber) => string.IsNullOrEmpty(idNumber) ? string.Empty : "ID: " + idNumber;
    private void OnIdPhotoNameChanged(FixedString512Bytes previous, FixedString512Bytes current)
    {
       ApplyIdPhotoByNameOrFallback(current.ToString(), syncedSuspectRef.Value);

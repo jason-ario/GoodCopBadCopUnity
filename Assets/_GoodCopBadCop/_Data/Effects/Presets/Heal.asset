@@ -11,67 +11,70 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1633b8bff93d4085b850fa6d970267bf, type: 3}
   m_Name: Heal
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   key: player.heal.default
   displayName: Heal
   minInterval: 0.25
   fullscreen:
     enabled: 1
-    mode: 0
-    overlaySprite: {fileID: 21300000, guid: fd431674f57b425f92e97c60ca809031, type: 3}
-    tint: {r: 1, g: 1, b: 1, a: 1}
-    opacity: 0.8
-    duration: 1.17
+    mode: 1
+    overlaySprite: {fileID: 0}
+    tint: {r: 0.25, g: 0.9, b: 0.45, a: 1}
+    opacity: 0.75
+    duration: 1.2
     opacityCurve:
       serializedVersion: 2
       m_Curve:
       - serializedVersion: 3
         time: 0
         value: 0
-        inSlope: 5.5555553
-        outSlope: 5.5555553
-        tangentMode: 35
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
         inWeight: 0
-        outWeight: 0.33333334
+        outWeight: 0
       - serializedVersion: 3
-        time: 0.18
+        time: 0.25
         value: 1
-        inSlope: 2.3993993
-        outSlope: 2.3993993
-        tangentMode: 35
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
-        inWeight: 0.33333334
-        outWeight: 0.33333334
-      - serializedVersion: 3
-        time: 0.55
-        value: 0.72
-        inSlope: -1.1783783
-        outSlope: -1.1783783
-        tangentMode: 35
-        weightedMode: 0
-        inWeight: 0.33333334
-        outWeight: 0.33333334
+        inWeight: 0
+        outWeight: 0
       - serializedVersion: 3
         time: 1
         value: 0
-        inSlope: -1.6000001
-        outSlope: -1.6000001
-        tangentMode: 35
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
         weightedMode: 0
-        inWeight: 0.33333334
+        inWeight: 0
         outWeight: 0
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
+    vignetteIntensity: 0.35
+    vignetteSmoothness: 0.9
+    chromaticAberration: 0
+    saturation: 12
+    lensDistortion: 0
+    screenTint: {r: 0.8, g: 1, b: 0.85, a: 1}
+    screenTintAmount: 0.6
   camera:
     enabled: 1
     localSway:
       enabled: 1
       motion: 2
       duration: 1.17
-      eulerAmplitude: {x: 1.0, y: 0, z: 0.08}
+      eulerAmplitude: {x: 1, y: 0, z: 0.08}
       fieldOfViewOffset: 3
+    localCameraKick:
+      enabled: 0
+      duration: 0.2
+      eulerKick: {x: 0, y: 0, z: 0}
+      fieldOfViewKick: 0
   audio:
     enabled: 0
     clips: []

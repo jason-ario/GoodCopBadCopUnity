@@ -11,16 +11,16 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1633b8bff93d4085b850fa6d970267bf, type: 3}
   m_Name: Drunk
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   key: player.drunk
   displayName: Drunk
   minInterval: 0.05
   fullscreen:
     enabled: 1
-    mode: 0
-    overlaySprite: {fileID: 21300000, guid: 6755f1695e288c74a9af173dbb342b60, type: 3}
-    tint: {r: 0.85, g: 0.95, b: 0.2, a: 1}
-    opacity: 0.45
+    mode: 1
+    overlaySprite: {fileID: 0}
+    tint: {r: 0.3, g: 0.35, b: 0.08, a: 1}
+    opacity: 0.7
     duration: 2.5
     opacityCurve:
       serializedVersion: 2
@@ -32,17 +32,17 @@ MonoBehaviour:
         outSlope: 0
         tangentMode: 0
         weightedMode: 0
-        inWeight: 0.33333334
-        outWeight: 0.33333334
+        inWeight: 0
+        outWeight: 0
       - serializedVersion: 3
-        time: 0.3
+        time: 0.5
         value: 1
         inSlope: 0
         outSlope: 0
         tangentMode: 0
         weightedMode: 0
-        inWeight: 0.33333334
-        outWeight: 0.33333334
+        inWeight: 0
+        outWeight: 0
       - serializedVersion: 3
         time: 1
         value: 0
@@ -50,18 +50,25 @@ MonoBehaviour:
         outSlope: 0
         tangentMode: 0
         weightedMode: 0
-        inWeight: 0.33333334
-        outWeight: 0.33333334
+        inWeight: 0
+        outWeight: 0
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
+    vignetteIntensity: 0.4
+    vignetteSmoothness: 1
+    chromaticAberration: 0.6
+    saturation: 15
+    lensDistortion: 0.3
+    screenTint: {r: 1, g: 0.97, b: 0.8, a: 1}
+    screenTintAmount: 0.5
   camera:
     enabled: 1
     localSway:
       enabled: 1
       motion: 0
       duration: 2.5
-      eulerAmplitude: {x: 1.5, y: 2.5, z: 1.0}
+      eulerAmplitude: {x: 1.5, y: 2.5, z: 1}
       fieldOfViewOffset: 0
     localCameraKick:
       enabled: 0

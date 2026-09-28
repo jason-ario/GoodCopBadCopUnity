@@ -152,6 +152,88 @@ public class UIController : MonoBehaviour
     private void LateUpdate()
     {
         KeyBackButtonActivator.ClearEscapeBackButtonPressedThisFrame();
+        UpdateBackButtonHudAvoidance();
+    }
+
+    // ── Back button / HUD avoidance ──────────────────────────────────────────
+    // The Back button and the Geiger counter share the bottom-left corner. While both are
+    // visible, lift the Back button so it sits above the Geiger counter instead of overlapping it.
+
+    [Header("Back Button HUD Avoidance")]
+    [Tooltip("Vertical gap (canvas units) kept between the top of the Geiger counter and the Back button.")]
+    [SerializeField] private float backButtonHudSpacing = 12f;
+
+    private RectTransform _backButtonRect;
+    private Vector2 _backButtonDefaultPosition;
+    private bool _backButtonLayoutDirty = true;
+    private bool _backButtonLiftedForGeiger;
+    private Vector2Int _backButtonLayoutScreenSize;
+    private readonly Vector3[] _geigerCorners = new Vector3[4];
+
+    private void CacheBackButtonRect()
+    {
+        if (_backButtonRect != null || backButtonUI == null) return;
+
+        // The Back button prefab is the (only) child of Back UI, which stretches full-screen.
+        Transform root = backButtonUI.transform.childCount > 0 ? backButtonUI.transform.GetChild(0) : null;
+        _backButtonRect = root as RectTransform;
+        if (_backButtonRect != null)
+            _backButtonDefaultPosition = _backButtonRect.anchoredPosition;
+    }
+
+    private void UpdateBackButtonHudAvoidance()
+    {
+        if (backButtonUI == null || !backButtonUI.activeSelf) return;
+
+        CacheBackButtonRect();
+        if (_backButtonRect == null) return;
+
+        RectTransform geiger = PlayerUI.Instance != null && PlayerUI.Instance.GeigerCounterUI != null
+            ? PlayerUI.Instance.GeigerCounterUI.transform as RectTransform
+            : null;
+        bool geigerVisible = geiger != null && geiger.gameObject.activeInHierarchy;
+
+        // Only re-layout on state changes (not every frame) so the Geiger's high-radiation
+        // UIWobble shake doesn't make the Back button jitter.
+        Vector2Int screenSize = new Vector2Int(Screen.width, Screen.height);
+        if (!_backButtonLayoutDirty
+            && geigerVisible == _backButtonLiftedForGeiger
+            && screenSize == _backButtonLayoutScreenSize)
+            return;
+
+        _backButtonLayoutDirty = false;
+        _backButtonLiftedForGeiger = geigerVisible;
+        _backButtonLayoutScreenSize = screenSize;
+
+        _backButtonRect.anchoredPosition = _backButtonDefaultPosition;
+        if (!geigerVisible) return;
+
+        RectTransform parent = _backButtonRect.parent as RectTransform;
+        if (parent == null) return;
+
+        // Geiger bounds in the Back button's parent space.
+        geiger.GetWorldCorners(_geigerCorners);
+        float geigerMinX = float.MaxValue, geigerMaxX = float.MinValue, geigerTop = float.MinValue;
+        for (int i = 0; i < 4; i++)
+        {
+            Vector3 p = parent.InverseTransformPoint(_geigerCorners[i]);
+            geigerMinX = Mathf.Min(geigerMinX, p.x);
+            geigerMaxX = Mathf.Max(geigerMaxX, p.x);
+            geigerTop = Mathf.Max(geigerTop, p.y);
+        }
+
+        // Back button bounds (at its default position) in the same space.
+        Rect r = _backButtonRect.rect;
+        Vector3 local = _backButtonRect.localPosition;
+        Vector3 scale = _backButtonRect.localScale;
+        float buttonMinX = local.x + r.xMin * scale.x;
+        float buttonMaxX = local.x + r.xMax * scale.x;
+        float buttonBottom = local.y + r.yMin * scale.y;
+
+        bool overlapsHorizontally = buttonMaxX > geigerMinX && buttonMinX < geigerMaxX;
+        float lift = geigerTop + backButtonHudSpacing - buttonBottom;
+        if (overlapsHorizontally && lift > 0f)
+            _backButtonRect.anchoredPosition = _backButtonDefaultPosition + new Vector2(0f, lift);
     }
 
 
@@ -364,6 +446,8 @@ public class UIController : MonoBehaviour
     {
         backButton.onClick.AddListener(onClickCallback);
         backButtonUI.SetActive(true);
+        _backButtonLayoutDirty = true;
+        UpdateBackButtonHudAvoidance();
     }
 
     public void HideBackButton()
