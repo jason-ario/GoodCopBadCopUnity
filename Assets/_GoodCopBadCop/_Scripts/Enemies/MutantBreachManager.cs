@@ -169,6 +169,25 @@ public class MutantBreachManager : NetworkBehaviour
     /// </summary>
     public bool IsBreachRunning => _breachRunning.Value;
 
+    // ── Breach compass pips ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// NetworkObjectIds of the still-active (alive, not fleeing) breach mutants. Server-written
+    /// every frame while a breach runs so every peer — including late joiners — knows which
+    /// mutants to show as <see cref="CompassMarkerCategory.BreachMutant"/> compass pips. Needed
+    /// because <see cref="MutantEnemy.IsDead"/> is server-only state. Same pattern as
+    /// FollowTrailThreat's pack id list.
+    /// </summary>
+    private readonly NetworkList<ulong> _breachMutantIds = new(
+        new List<ulong>(),
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Local (every peer) set of breach mutant transforms currently registered as compass pips.</summary>
+    private readonly HashSet<Transform> _breachCompassMarkers = new();
+    private readonly List<Transform> _breachMarkerScratch = new();
+    private readonly List<ulong> _breachIdScratch = new();
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -182,6 +201,8 @@ public class MutantBreachManager : NetworkBehaviour
 
         // Runs on every peer — this is what makes the count reach clients (including late joiners).
         _breachRemaining.OnValueChanged += OnBreachRemainingChanged;
+        _breachRunning.OnValueChanged   += OnBreachRunningChanged;
+        SetFenceCarving(!_breachRunning.Value);
 
         if (!IsServer)
         {
@@ -206,12 +227,107 @@ public class MutantBreachManager : NetworkBehaviour
         base.OnNetworkDespawn();
 
         _breachRemaining.OnValueChanged -= OnBreachRemainingChanged;
+        _breachRunning.OnValueChanged   -= OnBreachRunningChanged;
+        SetFenceCarving(true);
 
         CampaignManager.OnDayChanged -= OnDayChanged;
         ShiftManager.OnPostShiftTasksComplete -= OnPostShiftTasksComplete;
 
         ClearFinaleFleeSubscriptions();
         CancelSchedule();
+        ClearBreachCompassMarkers();
+    }
+
+    public override void OnDestroy()
+    {
+        ClearBreachCompassMarkers();
+        base.OnDestroy();
+    }
+
+    private void Update()
+    {
+        if (!IsSpawned) return;
+
+        if (IsServer)
+            PublishActiveBreachMutantIds();
+
+        SyncBreachCompassMarkers();
+    }
+
+    /// <summary>
+    /// Server only. Mirrors the alive, non-fleeing subset of <see cref="_activeBreachMutants"/>
+    /// into <see cref="_breachMutantIds"/>. Runs independently of the counting loop in
+    /// <see cref="RunBreach"/> (which doesn't prune until spawning finishes) so a mutant killed
+    /// mid-stagger loses its pip immediately.
+    /// </summary>
+    private void PublishActiveBreachMutantIds()
+    {
+        _breachIdScratch.Clear();
+        if (_isBreachActive)
+        {
+            foreach (NetworkObject netObj in _activeBreachMutants)
+            {
+                if (netObj == null || !netObj.IsSpawned) continue;
+                if (netObj.TryGetComponent(out MutantEnemy enemy) && enemy.IsDead) continue;
+                _breachIdScratch.Add(netObj.NetworkObjectId);
+            }
+        }
+
+        for (int i = _breachMutantIds.Count - 1; i >= 0; i--)
+        {
+            if (!_breachIdScratch.Contains(_breachMutantIds[i]))
+                _breachMutantIds.RemoveAt(i);
+        }
+
+        foreach (ulong id in _breachIdScratch)
+        {
+            if (!_breachMutantIds.Contains(id))
+                _breachMutantIds.Add(id);
+        }
+    }
+
+    /// <summary>
+    /// Runs on ALL peers. Keeps <see cref="CompassMarkerRegistry"/> in step with the replicated
+    /// breach mutant ids while the breach is running; registers nothing otherwise. Resolved every
+    /// frame because a client can receive an id before the mutant's own spawn message lands.
+    /// </summary>
+    private void SyncBreachCompassMarkers()
+    {
+        bool show = _breachRunning.Value && _breachMutantIds.Count > 0;
+        if (!show && _breachCompassMarkers.Count == 0) return;
+
+        _breachMarkerScratch.Clear();
+        if (show && NetworkManager != null && NetworkManager.SpawnManager != null)
+        {
+            foreach (ulong id in _breachMutantIds)
+            {
+                if (!NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(id, out NetworkObject netObj) || netObj == null)
+                    continue;
+                if (netObj.TryGetComponent(out MutantEnemy mutant) && mutant.IsDead)
+                    continue;
+                _breachMarkerScratch.Add(netObj.transform);
+            }
+        }
+
+        _breachCompassMarkers.RemoveWhere(t =>
+        {
+            if (t != null && _breachMarkerScratch.Contains(t)) return false;
+            CompassMarkerRegistry.Unregister(t);
+            return true;
+        });
+
+        foreach (Transform t in _breachMarkerScratch)
+        {
+            if (_breachCompassMarkers.Add(t))
+                CompassMarkerRegistry.Register(t, CompassMarkerCategory.BreachMutant);
+        }
+    }
+
+    private void ClearBreachCompassMarkers()
+    {
+        foreach (Transform t in _breachCompassMarkers)
+            CompassMarkerRegistry.Unregister(t);
+        _breachCompassMarkers.Clear();
     }
 
     /// <summary>
@@ -219,6 +335,14 @@ public class MutantBreachManager : NetworkBehaviour
     /// Forwards to <see cref="OnBreachCountChangedAllClients"/>, which day scripts use to drive
     /// their objective row.
     /// </summary>
+    private void OnBreachRunningChanged(bool previous, bool current) => SetFenceCarving(!current);
+
+    /// <summary>
+    /// Toggles perimeter-fence carving. Disabled for the duration of a breach so mutants can path
+    /// straight through the fence line, then restored.
+    /// </summary>
+    private static void SetFenceCarving(bool carve) => PerimiterFence.SetBreachPassThrough(!carve);
+
     private void OnBreachRemainingChanged(int previous, int current)
     {
         if (_breachTotal.Value <= 0)
@@ -462,6 +586,7 @@ public class MutantBreachManager : NetworkBehaviour
         _breachCoroutine = null;
         _breachRunning.Value = false;
         _activeBreachMutants.Clear();
+        _breachMutantIds.Clear();
         ClearFinaleFleeSubscriptions();
 
         // Let ShiftManager re-evaluate clock-out now that this breach is fully resolved — it may

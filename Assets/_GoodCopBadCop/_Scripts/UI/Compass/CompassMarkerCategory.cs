@@ -25,4 +25,11 @@ public enum CompassMarkerCategory
     /// <see cref="KillMutantTask"/> is active). Registered by <see cref="FollowTrailThreat"/>.
     /// </summary>
     Enemy,
+
+    /// <summary>
+    /// A still-active mutant from the running mutant breach (the "Repel the mutants" objective).
+    /// Registered by <see cref="MutantBreachManager"/> and only shown while
+    /// <see cref="MutantBreachManager.IsBreachRunning"/> is true.
+    /// </summary>
+    BreachMutant,
 }

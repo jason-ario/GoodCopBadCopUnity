@@ -127,7 +127,8 @@ namespace GoodCopBadCop.VoiceChat
 
         private void ApplyTriggerEnabledState()
         {
-            SetTriggersEnabled(isEnabled && isActiveAndEnabled && IsLocalVoicePlayer());
+            // Voice is now lobby-wide and handled by DissonanceVoiceChatAdapter; proximity triggers stay off.
+            SetTriggersEnabled(false);
         }
 
         private void SetTriggersEnabled(bool enabled)

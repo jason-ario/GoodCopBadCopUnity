@@ -60,6 +60,7 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
     protected override void Awake()
     {
         base.Awake();
+        _navMeshObstacle = GetComponent<NavMeshObstacle>();
         // Gate sounds are replicated to every client; keep them positional and short-range
         // so players far from the gate don't hear it.
         SpatialAudioUtility.ConfigureShortRange3D(audioSource, audioMinDistance, audioMaxDistance);
@@ -82,6 +83,7 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
 
         // Sync visual state on late join.
         ApplyGateVisuals(_gateOpen.Value, _openedIn.Value);
+        UpdateNavMeshObstacle(_gateOpen.Value);
     }
 
     private void Update()
@@ -270,7 +272,16 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
 
     private void OnGateStateChanged(bool oldValue, bool newValue)
     {
-        // Used to keep interactText consistent for late-joining clients.
+        // Authoritative state drives the NavMeshObstacle on every peer (incl. dedicated server).
+        UpdateNavMeshObstacle(newValue);
+    }
+
+    private void UpdateNavMeshObstacle(bool isOpen)
+    {
+        if (_navMeshObstacle == null)
+            _navMeshObstacle = GetComponent<NavMeshObstacle>();
+        if (_navMeshObstacle != null)
+            _navMeshObstacle.enabled = !isOpen;
     }
 
     private void OnOpenDirectionChanged(bool oldValue, bool newValue) { }
@@ -280,8 +291,7 @@ public class GateController : Interactable, IMutantPassable, IHeldItemPassthroug
         _animator.SetBool("OpenedIn", isOpen && openedIn);
         _animator.SetBool("OpenedOut", isOpen && !openedIn);
 
-        if (_navMeshObstacle != null)
-            _navMeshObstacle.enabled = !isOpen;
+        UpdateNavMeshObstacle(isOpen);
     }
 
     /// <summary>Resets the gate to its closed state. Must be called on the server.</summary>

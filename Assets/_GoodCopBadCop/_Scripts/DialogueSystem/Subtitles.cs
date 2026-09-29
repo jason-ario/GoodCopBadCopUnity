@@ -7,15 +7,6 @@ public class Subtitles : MonoBehaviour
 {
     [SerializeField] private TMPTextReveal textReveal;
     [SerializeField] private int maxCharactersPerLine = 50;
-    [SerializeField] private CanvasGroup continuePrompt;
-
-    [Header("Continue Prompt Animation")]
-    [Tooltip("Seconds for the continue prompt to fade in once the typewriter finishes.")]
-    [SerializeField] private float promptFadeInDuration = 0.25f;
-    [Tooltip("Speed of the idle vertical bob.")]
-    [SerializeField] private float promptPulseSpeed = 3f;
-    [Tooltip("Vertical idle bob distance in canvas units.")]
-    [SerializeField] private float promptBobAmount = 3f;
 
     [Header("Speaker Name Tag Template")]
     [Tooltip("Visual template for the conversation name tag. Always hidden on the subtitle itself; " +
@@ -71,64 +62,33 @@ public class Subtitles : MonoBehaviour
             tmp.font = font;
     }
 
-    /// <summary>Shows or hides the continue prompt, waiting for the typewriter to finish before showing it.</summary>
+    /// <summary>
+    /// Arms (or disarms) advance-input gating. There is no visible prompt; when armed,
+    /// <see cref="IsPromptActive"/> becomes true once the typewriter finishes.
+    /// </summary>
     public void ShowContinuePrompt(bool show)
     {
-        if (continuePrompt == null) return;
-
         if (show)
-            StartCoroutine(ShowPromptAfterTypewriter());
+            StartCoroutine(ActivatePromptAfterTypewriter());
         else
-        {
             IsPromptActive = false;
-            continuePrompt.alpha = 0;
-            if (_promptRect != null) _promptRect.anchoredPosition = _promptBasePos;
-        }
     }
 
-    private IEnumerator ShowPromptAfterTypewriter()
+    private IEnumerator ActivatePromptAfterTypewriter()
     {
         IsPromptActive = false;
-        continuePrompt.alpha = 0;
 
         if (textReveal != null)
-        {
             yield return new WaitUntil(() => !textReveal.IsRevealing);
-        }
 
-        // Input gating depends only on IsPromptActive; the fade/pulse is purely cosmetic.
         IsPromptActive = true;
-        _promptActiveTime = 0f;
     }
-
-    private RectTransform _promptRect;
-    private Vector2 _promptBasePos;
-    private float _promptActiveTime;
 
     private void Awake()
     {
-        if (continuePrompt != null)
-        {
-            _promptRect = continuePrompt.transform as RectTransform;
-            if (_promptRect != null) _promptBasePos = _promptRect.anchoredPosition;
-        }
-
         // The speaker name is shown by the standalone ConversationNameTag, never on the subtitle bar.
         if (nameTag != null)
             nameTag.gameObject.SetActive(false);
-    }
-
-    private void Update()
-    {
-        if (!IsPromptActive || continuePrompt == null) return;
-
-        _promptActiveTime += Time.unscaledDeltaTime;
-
-        float fadeIn = promptFadeInDuration > 0f ? Mathf.Clamp01(_promptActiveTime / promptFadeInDuration) : 1f;
-        continuePrompt.alpha = fadeIn;
-
-        if (_promptRect != null)
-            _promptRect.anchoredPosition = _promptBasePos + Vector2.up * (Mathf.Sin(_promptActiveTime * promptPulseSpeed) * promptBobAmount);
     }
 
     /// <summary>

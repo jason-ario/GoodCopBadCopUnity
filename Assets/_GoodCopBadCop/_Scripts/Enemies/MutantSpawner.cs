@@ -37,6 +37,20 @@ public class MutantSpawner : NetworkBehaviour
     [Tooltip("Half-extents of the axis-aligned box (in local space) within which enemies can spawn. The box is centred on this GameObject's position.")]
     [SerializeField] private Vector3 spawnBoxHalfExtents = new Vector3(20f, 0f, 20f);
 
+    [Tooltip("Random spawn points are projected down onto the ground from this height above the spawner, " +
+             "so hills and dips inside the spawn box are handled. Must clear the tallest hill in the box.")]
+    [SerializeField] private float groundProbeHeight = 60f;
+
+    [Tooltip("Random spawn points to try before giving up on a single spawn. Each attempt must land on the " +
+             "NavMesh and have a complete path back to the spawner's area (no disconnected hill islands).")]
+    [SerializeField, Min(1)] private int spawnPlacementAttempts = 12;
+
+    [Tooltip("Optional point on the main walkable NavMesh (e.g. a clearing or road in the woods). Spawn points " +
+             "must have a complete NavMesh path to it, which rejects small disconnected patches on steep hills. " +
+             "Leave empty to use the NavMesh point nearest the spawn centre. Avoid points inside the fenced " +
+             "compound: carved fences make it unreachable outside breaches.")]
+    [SerializeField] private Transform navReachabilityAnchor;
+
     [Header("Timing")]
     [Tooltip("Seconds before the first burst after the game starts.")]
     [SerializeField] private float initialDelay = 10f;
@@ -266,13 +280,6 @@ public class MutantSpawner : NetworkBehaviour
     /// </summary>
     private void SpawnSingleEnemy(bool forceAggro = false)
     {
-        Vector3 localOffset = new Vector3(
-            Random.Range(-spawnBoxHalfExtents.x, spawnBoxHalfExtents.x),
-            Random.Range(-spawnBoxHalfExtents.y, spawnBoxHalfExtents.y),
-            Random.Range(-spawnBoxHalfExtents.z, spawnBoxHalfExtents.z)
-        );
-
-        Vector3 spawnPosition = transform.TransformPoint(localOffset);
         Quaternion spawnRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
         // Roll for a legacy mutant — a resident who previously escaped a full-mutant encounter —
@@ -284,6 +291,13 @@ public class MutantSpawner : NetworkBehaviour
         GameObject prefab = legacyRecord != null
             ? legacyRecord.SuspectData.CharacterPrefab.gameObject
             : mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
+
+        if (!TryFindSpawnPoint(transform.position, prefab, useLocalBox: true, out Vector3 spawnPosition))
+        {
+            Debug.LogWarning($"[MutantSpawner] {name}: no valid NavMesh spawn point found in " +
+                             $"{spawnPlacementAttempts} attempts — skipping this spawn.", this);
+            return;
+        }
 
         GameObject instance = Instantiate(prefab, spawnPosition, spawnRotation);
         NetworkObject netObj = instance.GetComponent<NetworkObject>();
@@ -323,6 +337,86 @@ public class MutantSpawner : NetworkBehaviour
             legacyCharacter.ActivateAsLegacyMutant(forceAggro ? aggroTarget : null);
             Debug.Log($"[MutantSpawner] Spawned legacy mutant '{legacyRecord.SuspectData.name}'.", this);
         }
+    }
+
+    /// <summary>
+    /// Finds a spawn position that is really on the NavMesh surface and connected to the main mesh.
+    /// Each attempt picks a random XZ point in the spawn box, projects it down onto the ground from
+    /// <see cref="groundProbeHeight"/> (spawners sit at y≈0 with a flat box, so without this, mutants
+    /// on hilly ground were placed inside the hill or floating above it), snaps it to the NavMesh for
+    /// the prefab's agent type, and requires a complete path to the reachability anchor.
+    /// </summary>
+    /// <param name="center">World-space centre of the spawn box.</param>
+    /// <param name="useLocalBox">True: the box follows this spawner's rotation/scale. False: world-axis box around <paramref name="center"/>.</param>
+    private bool TryFindSpawnPoint(Vector3 center, GameObject prefab, bool useLocalBox, out Vector3 result)
+    {
+        var prefabAgent = prefab != null ? prefab.GetComponent<NavMeshAgent>() : null;
+        var filter = new NavMeshQueryFilter
+        {
+            agentTypeID = prefabAgent != null ? prefabAgent.agentTypeID : 0,
+            areaMask    = prefabAgent != null ? prefabAgent.areaMask : NavMesh.AllAreas
+        };
+
+        Vector3 anchorSource = navReachabilityAnchor != null ? navReachabilityAnchor.position : center;
+        bool hasAnchor = TrySnapToNavMesh(anchorSource, filter, out Vector3 anchor);
+        var path = new NavMeshPath();
+
+        for (int attempt = 0; attempt < spawnPlacementAttempts; attempt++)
+        {
+            Vector3 offset = new Vector3(
+                Random.Range(-spawnBoxHalfExtents.x, spawnBoxHalfExtents.x),
+                0f,
+                Random.Range(-spawnBoxHalfExtents.z, spawnBoxHalfExtents.z));
+
+            Vector3 candidate = useLocalBox ? transform.TransformPoint(offset) : center + offset;
+
+            if (!TrySnapToNavMesh(candidate, filter, out Vector3 onMesh))
+                continue;
+
+            if (hasAnchor &&
+                (!NavMesh.CalculatePath(onMesh, anchor, filter, path) || path.status != NavMeshPathStatus.PathComplete))
+                continue;
+
+            result = onMesh;
+            return true;
+        }
+
+        result = center;
+        return false;
+    }
+
+    /// <summary>
+    /// Projects <paramref name="point"/> straight down onto the highest ground below
+    /// <see cref="groundProbeHeight"/>, then snaps to the nearest NavMesh point within a short
+    /// radius. Falls back to a wider vertical-only NavMesh sample when nothing is hit.
+    /// </summary>
+    private bool TrySnapToNavMesh(Vector3 point, NavMeshQueryFilter filter, out Vector3 result)
+    {
+        const float snapRadius = 2f;
+
+        Vector3 probeOrigin = new Vector3(point.x, transform.position.y + groundProbeHeight, point.z);
+        if (Physics.Raycast(probeOrigin, Vector3.down, out RaycastHit ground, groundProbeHeight * 2f,
+                            Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        {
+            if (NavMesh.SamplePosition(ground.point, out NavMeshHit hit, snapRadius, filter))
+            {
+                result = hit.position;
+                return true;
+            }
+
+            // Hit something that isn't walkable (tree canopy, rock, roof) — reject this XZ.
+            result = point;
+            return false;
+        }
+
+        if (NavMesh.SamplePosition(point, out NavMeshHit fallback, snapRadius, filter))
+        {
+            result = fallback.position;
+            return true;
+        }
+
+        result = point;
+        return false;
     }
 
     /// <summary>
@@ -494,24 +588,18 @@ public class MutantSpawner : NetworkBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            Vector3 offset = new Vector3(
-                Random.Range(-spawnBoxHalfExtents.x, spawnBoxHalfExtents.x),
-                0f,
-                Random.Range(-spawnBoxHalfExtents.z, spawnBoxHalfExtents.z)
-            );
+            GameObject prefab = mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
 
-            Vector3    spawnPos = center + offset;
-            // Snap onto the baked NavMesh before instantiating — packs are placed at a
-            // scripted destination (e.g. deep in the woods) rather than this spawner's own
-            // ambient box, so raw Instantiate() can land far enough off the NavMesh surface
-            // that NavMeshAgent never links to it. An agent stuck off-mesh silently skips its
-            // entire ChaseLoop (see MutantEnemy.ChaseLoop's isOnNavMesh guard), which looks
-            // exactly like a mutant that never reacts to a nearby player.
-            if (NavMesh.SamplePosition(spawnPos, out NavMeshHit navHit, 10f, NavMesh.AllAreas))
-                spawnPos = navHit.position;
+            // Packs are placed at a scripted destination (e.g. deep in the woods) rather than this
+            // spawner's own box. An agent placed off the NavMesh (or on a disconnected hill island)
+            // never links / never finds a path, and just stands frozen.
+            if (!TryFindSpawnPoint(center, prefab, useLocalBox: false, out Vector3 spawnPos))
+            {
+                Debug.LogWarning($"[MutantSpawner] {name}: no valid NavMesh spawn point near pack centre {center} — skipping one pack member.", this);
+                continue;
+            }
             Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
-            GameObject prefab   = mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
             GameObject instance = Instantiate(prefab, spawnPos, spawnRot);
             NetworkObject netObj = instance.GetComponent<NetworkObject>();
 

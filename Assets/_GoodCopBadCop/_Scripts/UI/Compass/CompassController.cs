@@ -22,6 +22,7 @@ public class CompassController : MonoBehaviour
         { CompassMarkerCategory.Fence,    new Color(0.60f, 0.65f, 0.70f) }, // steel gray
         { CompassMarkerCategory.Blood,    new Color(0.75f, 0.05f, 0.05f) }, // dark red
         { CompassMarkerCategory.Enemy,    new Color(1.00f, 0.10f, 0.10f) }, // bright red
+        { CompassMarkerCategory.BreachMutant, new Color(0.90f, 0.76f, 0.58f) }, // light brown
     };
 
     [Header("Layout")]
@@ -221,6 +222,10 @@ public class CompassController : MonoBehaviour
             case CompassMarkerCategory.Enemy:
                 // Enemy pips only exist while a kill task is actually on the HUD task list.
                 return KillMutantTask.IsActiveTask;
+            case CompassMarkerCategory.BreachMutant:
+                // The breach is its own task ("Repel the mutants" / clock-out gate) — pips exist
+                // only from the alarm until the last breach mutant is killed or flees.
+                return MutantBreachManager.Instance != null && MutantBreachManager.Instance.IsBreachRunning;
             default:
                 return true;
         }

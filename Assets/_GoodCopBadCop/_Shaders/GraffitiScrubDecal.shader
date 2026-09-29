@@ -42,6 +42,8 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         _UVGlowIntensity          ("UV Glow Intensity",     Range(0, 10))        = 0.0
         _UVGlowEdgeSoftness       ("UV Glow Edge Softness", Range(0, 1))         = 0.5
         _UVGlowFalloff            ("UV Glow Falloff",       Range(0.5, 4))       = 1.0
+        // 1 = fully invisible outside UV light cones; inside, only the UV glow colour shows.
+        [ToggleUI] _UVOnly        ("UV Only (Invisible Unless UV Lit)", Float)  = 0.0
     }
 
     SubShader
@@ -134,6 +136,7 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half   _UVGlowIntensity;
                 half   _UVGlowEdgeSoftness;
                 half   _UVGlowFalloff;
+                half   _UVOnly;
             CBUFFER_END
 
             // UV light cone data — GLOBAL shader properties set by UVLight.PushShaderGlobals.
@@ -388,6 +391,16 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 {
                     half glowMask = UVGlowMask(positionWS) * (1.0 - foamMask);
                     finalRGB += _UVGlowColor.rgb * (_UVGlowIntensity * glowMask);
+                }
+
+                // UV-only mode: no lit albedo at all. Coverage comes purely from the UV cone mask,
+                // so the decal is invisible until a UV light hits it. Scrub foam still reads while lit.
+                if (_UVOnly > 0.5)
+                {
+                    half uvMask = (_UVGlowIntensity > 0.0) ? UVGlowMask(positionWS) : 0.0;
+                    finalRGB = lerp(_UVGlowColor.rgb * _UVGlowIntensity,
+                                    _FoamColor.rgb * _FoamBrightness, foamMask);
+                    alpha   *= uvMask;
                 }
 
                 return half4(finalRGB, alpha);

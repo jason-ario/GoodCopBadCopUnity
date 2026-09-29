@@ -59,13 +59,6 @@ public class MutantEnemy : NetworkBehaviour
 
     [SerializeField] private MutantEnemyData data;
 
-    [Header("Navigation")]
-    [Tooltip("NavMesh agent type used while chasing a player, aggroed, or in breach mode. Its NavMesh " +
-             "is baked WITHOUT the breakable PerimiterFences, so the mutant beelines through fence lines " +
-             "and smashes whichever fence is on its route. Patrol/idle uses the agent's default type " +
-             "(the NPC NavMesh, which keeps fences as walls). Leave empty to disable the switch.")]
-    [SerializeField] private string assaultAgentTypeName = "Mutant";
-
     [Header("Animation (optional)")]
     [SerializeField] private Animator animator;
     [SerializeField] private string speedParameterName = "Speed";
@@ -372,12 +365,6 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>Agent type the NavMeshAgent was authored with (NPC NavMesh). Used for patrol/idle.</summary>
     private int _defaultAgentTypeId;
 
-    /// <summary>
-    /// Agent type resolved from <see cref="assaultAgentTypeName"/>, or -1 if that type is missing
-    /// or has no NavMesh baked, in which case the mutant stays on the default type.
-    /// </summary>
-    private int _assaultAgentTypeId = -1;
-
     // Destination deduplication — prevents redundant SetDestination calls for stationary
     // targets, which cause a 1-frame path-recalculation stutter every retarget tick.
     private Vector3 _lastSetDestination = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
@@ -622,7 +609,6 @@ public class MutantEnemy : NetworkBehaviour
         _agent.isStopped = false;
 
         _defaultAgentTypeId = _agent.agentTypeID;
-        _assaultAgentTypeId = ResolveAssaultAgentTypeId();
 
         _spawnPosition = transform.position;
         _isAggroed = canAggro && aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
@@ -688,16 +674,9 @@ public class MutantEnemy : NetworkBehaviour
             if (!wasChasing && _currentTarget != null)
                 OnAnyMutantSpottedPlayer?.Invoke(this);
 
-            // Assault (chase / aggro / breach) runs on the fence-less Mutant NavMesh so the path
-            // goes straight at the target and fences get smashed. Patrol/idle stays on the NPC
-            // NavMesh, where fences are walls, so wandering mutants never clip through them.
+            // Mutants always use their default (Humanoid) agent type. During a breach the
+            // MutantBreachManager disables perimeter-fence carving so paths run through fence lines.
             bool assaulting = _currentTarget != null || (_isAggroed && aggroTarget != null);
-            SetAgentType(assaulting && _assaultAgentTypeId != -1 ? _assaultAgentTypeId : _defaultAgentTypeId);
-            if (!_agent.isOnNavMesh && !TryRecoverOntoNavMesh())
-            {
-                yield return new WaitForSeconds(retargetInterval);
-                continue;
-            }
 
             if (assaulting)
                 UpdateStuckWatchdog(_currentTarget != null ? _currentTarget.position : aggroTarget.position, retargetInterval);
@@ -1042,35 +1021,6 @@ public class MutantEnemy : NetworkBehaviour
     // ── Agent type switching ───────────────────────────────────────────────────
 
     /// <summary>
-    /// Looks up <see cref="assaultAgentTypeName"/> among the project's NavMesh agent types and
-    /// verifies that a NavMesh is actually loaded for it. Returns -1 (disabling the switch) otherwise.
-    /// </summary>
-    private int ResolveAssaultAgentTypeId()
-    {
-        if (string.IsNullOrEmpty(assaultAgentTypeName))
-            return -1;
-
-        for (int i = 0; i < NavMesh.GetSettingsCount(); i++)
-        {
-            int id = NavMesh.GetSettingsByIndex(i).agentTypeID;
-            if (NavMesh.GetSettingsNameFromID(id) != assaultAgentTypeName)
-                continue;
-
-            var filter = new NavMeshQueryFilter { agentTypeID = id, areaMask = NavMesh.AllAreas };
-            if (NavMesh.SamplePosition(transform.position, out _, 10f, filter))
-                return id;
-
-            Debug.LogWarning($"[MutantEnemy] Agent type '{assaultAgentTypeName}' has no baked NavMesh near " +
-                             $"{name}. Bake the Mutant NavMeshSurface. Falling back to the default agent type.", this);
-            return -1;
-        }
-
-        Debug.LogWarning($"[MutantEnemy] NavMesh agent type '{assaultAgentTypeName}' not found. " +
-                         "Mutants will use the default NPC NavMesh.", this);
-        return -1;
-    }
-
-    /// <summary>
     /// Moves the agent onto the NavMesh of <paramref name="agentTypeId"/>. Re-enables the agent so
     /// it binds to the new mesh, then warps it to the nearest point on that mesh if needed. For
     /// example, a mutant standing in a fence gap it just broke is off the NPC mesh, where the
@@ -1216,15 +1166,33 @@ public class MutantEnemy : NetworkBehaviour
         _agent.ResetPath();
         InvalidateDestination();
 
+        // Wedged during a breach: fence carving is off, so the path runs through a fence the sweep
+        // didn't register. Target any intact fence we're pressed against.
+        if (MutantBreachManager.Instance != null && MutantBreachManager.Instance.IsBreachRunning)
+        {
+            PerimiterFence touching = FindFenceNearPoint(transform.position);
+            if (touching != null)
+            {
+                _fenceTarget = touching;
+                Debug.Log($"[MutantEnemy] {name} was stuck against fence {touching.name} — attacking it.", this);
+                return;
+            }
+        }
+
         if (_unstickAttempts <= 1)
             return;
 
         var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = _agent.areaMask };
-        if (!NavMesh.SamplePosition(goal, out NavMeshHit goalHit, 3f, filter))
-            return;
 
+        // The goal (a player inside the compound or booth) is often off-mesh or sealed off by
+        // carved fences, so a complete path is usually impossible during a breach. Accept any
+        // candidate whose path ends meaningfully closer to the goal than our current path does.
+        // That escapes the tiny disconnected NavMesh islands that left breach mutants jittering in place.
+        Vector3 goalPoint = NavMesh.SamplePosition(goal, out NavMeshHit goalHit, 3f, filter) ? goalHit.position : goal;
         var path = new NavMeshPath();
         Vector3 origin = transform.position;
+        float currentEndDistance = PathEndDistanceToGoal(origin, goalPoint, filter, path);
+        const float requiredImprovement = 3f;
         const int directions = 8;
         float angleOffset = UnityEngine.Random.Range(0f, 360f);
 
@@ -1237,8 +1205,11 @@ public class MutantEnemy : NetworkBehaviour
 
                 if (!NavMesh.SamplePosition(candidate, out NavMeshHit hit, 1f, filter))
                     continue;
-                if (!NavMesh.CalculatePath(hit.position, goalHit.position, filter, path)
-                    || path.status != NavMeshPathStatus.PathComplete)
+                float candidateEndDistance = PathEndDistanceToGoal(hit.position, goalPoint, filter, path);
+                bool complete = path.status == NavMeshPathStatus.PathComplete;
+                if (candidateEndDistance == float.MaxValue)
+                    continue;
+                if (!complete && candidateEndDistance > currentEndDistance - requiredImprovement)
                     continue;
 
                 if (_agent.Warp(hit.position))
@@ -1251,6 +1222,22 @@ public class MutantEnemy : NetworkBehaviour
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Horizontal distance from the end of the NavMesh path (<paramref name="from"/> → <paramref name="goal"/>)
+    /// to the goal. 0 for a complete path; float.MaxValue when no path could be calculated at all.
+    /// </summary>
+    private static float PathEndDistanceToGoal(Vector3 from, Vector3 goal, NavMeshQueryFilter filter, NavMeshPath path)
+    {
+        if (!NavMesh.CalculatePath(from, goal, filter, path) || path.corners.Length == 0)
+            return float.MaxValue;
+        if (path.status == NavMeshPathStatus.PathComplete)
+            return 0f;
+
+        Vector3 delta = goal - path.corners[path.corners.Length - 1];
+        delta.y = 0f;
+        return delta.magnitude;
     }
 
     /// <summary>

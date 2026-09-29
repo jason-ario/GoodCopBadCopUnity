@@ -40,8 +40,9 @@ using HighlightPlus;
 ///
 /// Prefab setup:
 ///   - NetworkObject on this GameObject.
-///   - NavMeshObstacle on this GameObject. It is only a bake marker that excludes the fence
-///     from the Mutant NavMesh, and is disabled at runtime (see ApplyNavMeshObstacleState).
+///   - NavMeshObstacle on this GameObject. It carves the fence out of the NavMesh at runtime and
+///     is disabled during breaches (see ApplyNavMeshObstacleState).
+///   - NavMeshModifier with Ignore From Build, so the collider is NOT baked into the NavMesh.
 ///     Hit-feedback shakes the active child mesh root instead of this GameObject's own
 ///     transform, so the obstacle itself never moves.
 ///   - Four child GameObjects (one per visual state) assigned to DamageStateMeshRoots.
@@ -195,6 +196,7 @@ public class PerimiterFence : NetworkBehaviour
     private void Awake()
     {
         _navMeshObstacle = GetComponent<NavMeshObstacle>();
+        ApplyNavMeshObstacleState(0);
 
         _highlightEffect = GetComponent<HighlightEffect>();
         if (_highlightEffect != null)
@@ -406,27 +408,43 @@ public class PerimiterFence : NetworkBehaviour
         _highlightEffect.highlighted = IsBroken && taskActive && highlightsEnabled;
     }
 
+    // ── Breach pass-through ────────────────────────────────────────────────────
+
+    private static readonly System.Collections.Generic.List<PerimiterFence> s_fences = new();
+    private static bool s_breachPassThrough;
+
     /// <summary>
-    /// Keeps this fence's NavMeshObstacle permanently disabled at runtime.
-    ///
-    /// Fence navigation is split across two baked NavMeshes instead:
-    ///   - The NPC surface (Humanoid, ignoreNavMeshObstacle = false) bakes this fence's collider
-    ///     in, so regular NPCs always path around it.
-    ///   - The Mutant surface (ignoreNavMeshObstacle = true) leaves it out, so mutants path
-    ///     straight through fence lines. <c>MutantEnemy</c> detects the fence on its route and
-    ///     smashes it (see <c>FindBlockingFenceTowardTarget</c> / <c>FindBlockingFenceAlongPath</c>).
-    /// The component must stay on this GameObject because that is what excludes the fence
-    /// from the Mutant bake. It must never be enabled: carving would cut both meshes (obstacles
-    /// have no agent-type filter), and its avoidance would push mutants sideways along the fence.
-    /// The physical BoxCollider is never touched here, so the player can never walk through the
-    /// fence regardless of its damage state.
+    /// Toggles fence carving for every fence. While true (a breach is running) fence obstacles stop
+    /// carving the NavMesh so mutants path straight through fence lines and smash whatever fence
+    /// is on their route. Called by <see cref="MutantBreachManager"/> on every peer.
+    /// </summary>
+    public static void SetBreachPassThrough(bool passThrough)
+    {
+        s_breachPassThrough = passThrough;
+        foreach (var fence in s_fences)
+            if (fence != null) fence.ApplyNavMeshObstacleState(fence._appliedState < 0 ? 0 : fence._appliedState);
+    }
+
+    private void OnEnable()  { if (!s_fences.Contains(this)) s_fences.Add(this); }
+    private void OnDisable() => s_fences.Remove(this);
+
+    /// <summary>
+    /// The fence's NavMeshObstacle is the only thing that makes it a NavMesh wall. The fence is
+    /// excluded from the NavMesh bake (NavMeshModifier → Ignore From Build), and the obstacle carves
+    /// it out at runtime instead:
+    ///   - Normal play: carving on, so NPCs and mutants path around the fence.
+    ///   - Breach running, or fence broken through (worst damage state): obstacle disabled, so
+    ///     mutants path through. It is disabled rather than just non-carving, because a
+    ///     non-carving obstacle still applies local avoidance and pushes agents sideways.
+    /// The physical BoxCollider is never touched, so players can never walk through the fence.
     /// </summary>
     private void ApplyNavMeshObstacleState(int state)
     {
         if (_navMeshObstacle == null) return;
 
-        _navMeshObstacle.carving = false;
-        _navMeshObstacle.enabled = false;
+        bool passable = s_breachPassThrough || (MaxDamageLevel > 0 && state >= MaxDamageLevel);
+        _navMeshObstacle.carving = true;
+        _navMeshObstacle.enabled = !passable;
     }
 
     // ── Public server API ──────────────────────────────────────────────────────

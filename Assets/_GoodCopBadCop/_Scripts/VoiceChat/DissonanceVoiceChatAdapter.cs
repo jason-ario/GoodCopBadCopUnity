@@ -14,7 +14,11 @@ namespace GoodCopBadCop.VoiceChat
         private readonly IVoiceChatService service;
         private readonly IVoiceChatCommsRuntime commsRuntime;
         private readonly HashSet<PlayerVoiceChatAdapter> playerAdapters = new();
+        private const string LobbyRoomName = "GoodCopBadCopLobby";
+
         private DissonanceComms comms;
+        private VoiceBroadcastTrigger lobbyBroadcastTrigger;
+        private VoiceReceiptTrigger lobbyReceiptTrigger;
         private DisposableBag disposables;
         private bool appliedLocalSpeaking;
 
@@ -30,6 +34,7 @@ namespace GoodCopBadCop.VoiceChat
 
         public void Initialize()
         {
+            ApplyVoiceQualitySettings();
             comms = commsRuntime.Comms;
 
             PlayerVoiceChatAdapter.Registered += OnPlayerAdapterRegistered;
@@ -125,6 +130,8 @@ namespace GoodCopBadCop.VoiceChat
                 {
                     comms.MicrophoneName = targetMicrophoneName;
                 }
+
+                ApplyLobbyTriggers(enabled, targetMuted);
             }
 
             foreach (PlayerVoiceChatAdapter playerAdapter in playerAdapters)
@@ -142,17 +149,63 @@ namespace GoodCopBadCop.VoiceChat
                 model.ProximityRange.CurrentValue);
         }
 
-        private bool HasActiveTransmission()
+        private static void ApplyVoiceQualitySettings()
         {
-            foreach (PlayerVoiceChatAdapter playerAdapter in playerAdapters)
+            // Must run before DissonanceComms starts capture/encoding for these to take effect.
+            Dissonance.Config.VoiceSettings settings = Dissonance.Config.VoiceSettings.Instance;
+            settings.Quality = AudioQuality.High;
+            settings.DenoiseAmount = Dissonance.Audio.Capture.NoiseSuppressionLevels.Low;
+            settings.BackgroundSoundRemovalEnabled = false;
+        }
+
+        private void ApplyLobbyTriggers(bool enabled, bool muted)
+        {
+            if (lobbyBroadcastTrigger == null)
             {
-                if (playerAdapter != null && playerAdapter.IsTransmitting)
+                GameObject commsObject = comms.gameObject;
+                if (!commsObject.TryGetComponent(out lobbyBroadcastTrigger))
                 {
-                    return true;
+                    lobbyBroadcastTrigger = commsObject.AddComponent<VoiceBroadcastTrigger>();
+                }
+
+                if (!commsObject.TryGetComponent(out lobbyReceiptTrigger))
+                {
+                    lobbyReceiptTrigger = commsObject.AddComponent<VoiceReceiptTrigger>();
                 }
             }
 
-            return false;
+            // Lobby-wide, non-positional voice: independent of whether a player character is spawned.
+            lobbyBroadcastTrigger.ChannelType = CommTriggerTarget.Room;
+            lobbyBroadcastTrigger.RoomName = LobbyRoomName;
+            lobbyBroadcastTrigger.BroadcastPosition = false;
+            lobbyBroadcastTrigger.UseColliderTrigger = false;
+            lobbyBroadcastTrigger.Mode = ToDissonanceMode(model.InputMode.CurrentValue);
+            lobbyBroadcastTrigger.IsMuted = muted;
+            lobbyBroadcastTrigger.enabled = enabled;
+
+            lobbyReceiptTrigger.RoomName = LobbyRoomName;
+            lobbyReceiptTrigger.UseColliderTrigger = false;
+            lobbyReceiptTrigger.enabled = enabled;
+        }
+
+        private static CommActivationMode ToDissonanceMode(EVoiceChatInputMode mode)
+        {
+            switch (mode)
+            {
+                case EVoiceChatInputMode.PushToTalk:
+                    return CommActivationMode.PushToTalk;
+                case EVoiceChatInputMode.OpenMic:
+                    return CommActivationMode.Open;
+                default:
+                    return CommActivationMode.VoiceActivation;
+            }
+        }
+
+        private bool HasActiveTransmission()
+        {
+            return lobbyBroadcastTrigger != null
+                && lobbyBroadcastTrigger.isActiveAndEnabled
+                && lobbyBroadcastTrigger.IsTransmitting;
         }
 
         private static bool HasRemoteNetworkPeer()
