@@ -122,16 +122,17 @@ public class ATM : NetworkBehaviour
     /// trashed, or fence-damaged booth pays out less on every ATM transaction. The resulting
     /// amount is broken down into a mix of coupon denominations (largest first, e.g. 5s then
     /// 1s) so the physically spawned coupons sum exactly to the payout. SERVER ONLY.
+    /// Returns the number of coupons actually dispensed (0 if nothing was paid out).
     /// </summary>
-    public void SpawnCoupons(int amount)
+    public int SpawnCoupons(int amount)
     {
-        if (!IsServer) return;
-        if (amount <= 0) return;
+        if (!IsServer) return 0;
+        if (amount <= 0) return 0;
 
         if (!_isPowered)
         {
             Debug.Log("[ATM] No electricity — coupons not dispensed.");
-            return;
+            return 0;
         }
 
         int adjustedAmount = CheckpointIntegrityService.Instance != null
@@ -142,13 +143,14 @@ public class ATM : NetworkBehaviour
         if (spawnQueue.Count == 0)
         {
             Debug.LogError("[ATM] No coupon prefabs assigned in the Inspector — cannot dispense.");
-            return;
+            return 0;
         }
 
         PlayDispenseSound();
 
         StartCoroutine(SpawnCouponsRoutine(spawnQueue));
         StartCoroutine(ShowPaymentDelayedRoutine(adjustedAmount));
+        return adjustedAmount;
     }
 
     // ── Electricity callbacks — wire via Inspector through ElectricObject events ────

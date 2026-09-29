@@ -1,7 +1,10 @@
 using GoodCopBadCop.Input;
+using GoodCopBadCop.Settings;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// "Zoom mode": close-up view of the document the local player is holding (ID card,
@@ -22,6 +25,8 @@ using UnityEngine.InputSystem;
 ///    are opened first.
 ///  • Arms stay visible by default and both animators are forced to always animate, so
 ///    hand-driven items can't freeze mid-transition when the arms leave the close-up frame.
+///  • A local-only vignette (runtime URP Volume, same approach as DamageVignetteView) fades
+///    in on open and out on close.
 ///
 /// Auto-closes when the item leaves the hand (drop, stow, throw, despawn), when it stops being
 /// zoomable (folder closed), or when a cutscene starts.
@@ -37,6 +42,29 @@ public class HeldItemZoomView : DiegeticViewController
              "During the blend in/out the player camera's near plane is kept, because an animating near plane makes " +
              "Forward+ light clustering flicker.")]
     [SerializeField, Min(0.001f)] private float _nearClipPlane = 0.01f;
+
+    [Header("Vignette")]
+    [Tooltip("Fade a vignette in while zoomed (local-only runtime URP Volume).")]
+    [SerializeField] private bool _useVignette = true;
+
+    [SerializeField] private Color _vignetteColor = Color.black;
+
+    [SerializeField, Range(0f, 1f)] private float _vignetteIntensity = 0.4f;
+
+    [SerializeField, Range(0.01f, 1f)] private float _vignetteSmoothness = 0.45f;
+
+    [Tooltip("Seconds to fade the vignette in when zoom opens.")]
+    [SerializeField, Min(0f)] private float _vignetteFadeIn = 0.35f;
+
+    [Tooltip("Seconds to fade the vignette out when zoom closes.")]
+    [SerializeField, Min(0f)] private float _vignetteFadeOut = 0.25f;
+
+    // Below DamageVignetteView (100) so hit/drunk pulses still layer on top.
+    private const float VignetteVolumePriority = 90f;
+
+    private Volume _vignetteVolume;
+    private VolumeProfile _vignetteProfile;
+    private Vignette _vignette;
 
     private PlayerPickupController _pickup;
     private PlayerInteractionController _interaction;
@@ -94,6 +122,60 @@ public class HeldItemZoomView : DiegeticViewController
     {
         // Guard against teardown order on quit / scene unload (Close touches UIController).
         if (IsActive && UIController.Instance != null) Close();
+        FlushDeferredRelease();
+        if (_vignetteVolume != null) _vignetteVolume.weight = 0f;
+    }
+
+    private void OnDestroy()
+    {
+        if (_vignetteVolume != null) Destroy(_vignetteVolume.gameObject);
+        if (_vignetteProfile != null) Destroy(_vignetteProfile);
+    }
+
+    // ─── Vignette ────────────────────────────────────────────────────────────
+
+    /// <summary>Lazily builds the runtime vignette Volume (local player only, first zoom).</summary>
+    private void EnsureVignetteVolume()
+    {
+        if (_vignetteVolume != null) return;
+
+        var root = new GameObject("Held Item Zoom Vignette");
+        // Match the base post-processing volume's layer so it falls inside the camera's Volume Mask.
+        var baseAnchor = FindAnyObjectByType<GraphicsPreferencesVolumeAnchor>();
+        if (baseAnchor != null) root.layer = baseAnchor.gameObject.layer;
+        root.transform.SetParent(transform, false);
+
+        _vignetteProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+        _vignetteProfile.name = "Held Item Zoom Vignette (Runtime)";
+        _vignette = _vignetteProfile.Add<Vignette>();
+
+        _vignetteVolume = root.AddComponent<Volume>();
+        _vignetteVolume.isGlobal = true;
+        _vignetteVolume.priority = VignetteVolumePriority;
+        _vignetteVolume.weight = 0f;
+        _vignetteVolume.sharedProfile = _vignetteProfile;
+    }
+
+    private void ApplyVignetteSettings()
+    {
+        Color c = _vignetteColor;
+        c.a = 1f;
+        _vignette.active = true;
+        _vignette.color.Override(c);
+        _vignette.intensity.Override(_vignetteIntensity);
+        _vignette.smoothness.Override(_vignetteSmoothness);
+    }
+
+    /// <summary>Fades the vignette weight toward 1 while zoomed and back to 0 after closing.</summary>
+    private void UpdateVignette()
+    {
+        if (_vignetteVolume == null) return;
+
+        float target = IsActive && _useVignette ? 1f : 0f;
+        float duration = target > _vignetteVolume.weight ? _vignetteFadeIn : _vignetteFadeOut;
+        _vignetteVolume.weight = duration <= 0f
+            ? target
+            : Mathf.MoveTowards(_vignetteVolume.weight, target, Time.unscaledDeltaTime / duration);
     }
 
     // ─── Input ───────────────────────────────────────────────────────────────
@@ -186,9 +268,19 @@ public class HeldItemZoomView : DiegeticViewController
 
         _animation?.SetForceAlwaysAnimate(true);
 
+        if (_useVignette)
+        {
+            EnsureVignetteVolume();
+            ApplyVignetteSettings();
+        }
+
         // Documents: act exactly as if the player pressed and is holding LMB.
         if (_target != null && _target.InspectWhileZoomed)
         {
+            // Re-zoomed during a pending blend-out release: keep the use held if it's the same
+            // item; otherwise finish the old release first so the new item starts its own use.
+            if (_releasePending && _releaseItem != _target.Pickable) FlushDeferredRelease();
+            CancelDeferredRelease();
             _pickup.BeginHeldUseFromZoom();
             _holdingUse = true;
         }
@@ -210,8 +302,9 @@ public class HeldItemZoomView : DiegeticViewController
         SetViewNearClip(PlayerNearClip);
         _nearTightened = false;
 
-        ReleaseHeldUse();
-        _animation?.SetForceAlwaysAnimate(false);
+        // Keep the document raised (and animators awake) until the camera has blended back,
+        // so the hand doesn't drop while the view is still moving. Released in LateUpdate.
+        BeginDeferredRelease();
 
         if (_pickup != null)
             _pickup.CanPickUpAndPlace = true;
@@ -219,16 +312,77 @@ public class HeldItemZoomView : DiegeticViewController
         _target = null;
     }
 
+    // ─── Deferred "LMB release" after the blend out ──────────────────────────
+
+    [Tooltip("Safety cap (seconds) on how long the inspect pose is held after closing while waiting for the blend out.")]
+    [SerializeField, Min(0f)] private float _maxReleaseDelay = 2f;
+
+    private bool _releasePending;
+    private PickableObject _releaseItem;
+    private float _releaseDeadline;
+
+    private void BeginDeferredRelease()
+    {
+        _releaseItem = _target != null ? _target.Pickable : null;
+
+        if (!_holdingUse)
+        {
+            _animation?.SetForceAlwaysAnimate(false);
+            return;
+        }
+
+        _releasePending = true;
+        _releaseDeadline = Time.unscaledTime + _maxReleaseDelay;
+    }
+
+    private void CancelDeferredRelease()
+    {
+        _releasePending = false;
+        _releaseItem = null;
+    }
+
+    private void UpdateDeferredRelease()
+    {
+        if (!_releasePending) return;
+
+        bool itemGone = _pickup == null || _pickup.HeldObject == null || _pickup.HeldObject != _releaseItem;
+        if (!itemGone && Time.unscaledTime < _releaseDeadline && IsBlendingOut()) return;
+
+        FlushDeferredRelease();
+    }
+
+    /// <summary>Performs the pending release immediately (no-op if nothing is pending).</summary>
+    private void FlushDeferredRelease()
+    {
+        if (!_releasePending) return;
+        _releasePending = false;
+        ReleaseHeldUse(_releaseItem);
+        _releaseItem = null;
+        _animation?.SetForceAlwaysAnimate(false);
+    }
+
+    /// <summary>
+    /// True until the brain has left the zoom camera and finished blending. Reads last frame's
+    /// brain state (this runs before CinemachineBrain), so the close frame still counts as zoomed.
+    /// </summary>
+    private bool IsBlendingOut()
+    {
+        Camera cam = RaycastCamera;
+        CinemachineBrain brain = cam != null ? cam.GetComponent<CinemachineBrain>() : null;
+        if (brain == null) return false;
+        return ReferenceEquals(brain.ActiveVirtualCamera, ViewCamera) || brain.IsBlending;
+    }
+
     /// <summary>
     /// "Releases LMB". If the document left the hand while zoomed (drop / stow / snatched),
     /// the unequip path already stopped its use; just make sure the inspect bool isn't left on.
     /// </summary>
-    private void ReleaseHeldUse()
+    private void ReleaseHeldUse(PickableObject item)
     {
         if (!_holdingUse || _pickup == null) return;
         _holdingUse = false;
 
-        bool stillHeld = _target != null && _pickup.HeldObject == _target.Pickable;
+        bool stillHeld = item != null && _pickup.HeldObject == item;
         _pickup.EndHeldUseFromZoom();
 
         if (!stillHeld && _pickup.HeldObject == null)
@@ -287,6 +441,10 @@ public class HeldItemZoomView : DiegeticViewController
 
     private void LateUpdate()
     {
+        // Runs while closed too so the vignette can fade out and the deferred release can fire.
+        UpdateVignette();
+        UpdateDeferredRelease();
+
         if (!IsActive || _target == null) return;
 
         UpdateNearClip();

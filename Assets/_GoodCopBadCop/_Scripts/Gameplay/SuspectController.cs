@@ -1225,6 +1225,9 @@ public class SuspectController : NetworkBehaviour
     private bool IsScriptedDay1TutorialSuspect =>
         CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay == 1 && SuspectIndex < 1;
 
+    /// <summary>The subject that already has an end-of-shift report entry (guards duplicate entries). Server only.</summary>
+    private SuspectCharacter _reportRecordedFor;
+
     private IEnumerator PassSequence()
     {
         if (suspectCharacter == null)
@@ -1460,8 +1463,9 @@ public class SuspectController : NetworkBehaviour
         int totalCoupons = Mathf.Max(0,
             couponBaseReward + percentReward - falsePenalty + perfectBonusAmount + evidenceBonus);
 
+        int couponsDispensed = 0;
         if (ATM.Instance != null)
-            ATM.Instance.SpawnCoupons(totalCoupons);
+            couponsDispensed = ATM.Instance.SpawnCoupons(totalCoupons);
         else
             Debug.LogError("[SuspectController] ATM.Instance is null — verdict payout coupons not dispensed.");
 
@@ -1479,7 +1483,8 @@ public class SuspectController : NetworkBehaviour
             perfectBonusAmount + evidenceBonus,
             totalCoupons);
 
-        return totalCoupons;
+        // What the ATM actually paid (after the checkpoint integrity multiplier, or 0 without power).
+        return couponsDispensed;
     }
 
     [ClientRpc]
@@ -1855,6 +1860,16 @@ public class SuspectController : NetworkBehaviour
         if (!IsServer) return;
         if (killed != suspectCharacter) return;
 
+        // Itemize the kill on the end-of-shift report now, while the character's data is intact.
+        // No paperwork was assessed and nothing was paid out. Skipped if this subject already has
+        // an entry (e.g. struck down after their stamp verdict was recorded).
+        if (!IsScriptedDay1TutorialSuspect && _reportRecordedFor != killed)
+        {
+            _reportRecordedFor = killed;
+            ShiftManager.Instance?.RecordSubjectResult(BuildSubjectResult(
+                killed, ShiftSubjectResult.NotAssessed, 0, 0, ShiftSubjectVerdict.Killed));
+        }
+
         StartCoroutine(KilledByPlayerSequence(killed));
     }
 
@@ -1901,14 +1916,9 @@ public class SuspectController : NetworkBehaviour
         yield return new WaitForSeconds(1.5f);
 
         CleanupSpawnedFolder();
-        ShiftManager.Instance.RecordSubjectResult(new ShiftSubjectResult
-        {
-            SubjectName = GetSubjectDisplayName(fled),
-            AnomaliesCaught = ShiftSubjectResult.NotAssessed,
-            AnomaliesTotal = 0,
-            CouponsEarned = 0,
-            Verdict = ShiftSubjectVerdict.Fled
-        });
+        _reportRecordedFor = fled;
+        ShiftManager.Instance.RecordSubjectResult(BuildSubjectResult(
+            fled, ShiftSubjectResult.NotAssessed, 0, 0, ShiftSubjectVerdict.Fled));
         DespawnSuspect(fled);
         ShiftManager.Instance.suspectsFled += 1;
         ShiftManager.Instance.SetNextSuspectReady();
@@ -2157,14 +2167,10 @@ public class SuspectController : NetworkBehaviour
         // tutorial suspect is excluded, matching ShiftManager's processed/verdict tallies.
         if (!IsScriptedDay1TutorialSuspect)
         {
-            ShiftManager.Instance?.RecordSubjectResult(new ShiftSubjectResult
-            {
-                SubjectName = GetSubjectDisplayName(suspectCharacter),
-                AnomaliesCaught = _symptomsFound,
-                AnomaliesTotal = _symptomsTotal,
-                CouponsEarned = couponsIssued,
-                Verdict = ToSubjectVerdict(folder.StampType)
-            });
+            _reportRecordedFor = suspectCharacter;
+            ShiftManager.Instance?.RecordSubjectResult(BuildSubjectResult(
+                suspectCharacter, _symptomsFound, _symptomsTotal, couponsIssued,
+                ToSubjectVerdict(folder.StampType)));
         }
 
         switch (folder.StampType)
@@ -2203,6 +2209,34 @@ public class SuspectController : NetworkBehaviour
             return fullName;
 
         return !string.IsNullOrWhiteSpace(data.Nickname) ? data.Nickname : data.name;
+    }
+
+    /// <summary>
+    /// Builds one end-of-shift report entry, capturing the subject's identity (for the ID photo and
+    /// ID number) and the checkpoint integrity at this exact moment. Server only.
+    /// </summary>
+    private static ShiftSubjectResult BuildSubjectResult(
+        SuspectCharacter character, int anomaliesCaught, int anomaliesTotal, int coupons, ShiftSubjectVerdict verdict)
+    {
+        SuspectData data = character != null ? character.Data : null;
+
+        CheckpointIntegrityService integrity = CheckpointIntegrityService.Instance;
+        integrity.Recalculate();
+        float integrityPercent = integrity.MaxScore > 0f ? integrity.IntegrityScore / integrity.MaxScore : 1f;
+
+        return new ShiftSubjectResult
+        {
+            SubjectName = GetSubjectDisplayName(character),
+            AnomaliesCaught = anomaliesCaught,
+            AnomaliesTotal = anomaliesTotal,
+            CouponsEarned = coupons,
+            Verdict = verdict,
+            SuspectAssetName = data != null ? data.name : string.Empty,
+            IDNumber = data != null ? data.IDNumber : string.Empty,
+            UsedReplacementPhoto = character != null && character.IsReplacement,
+            HasIntegrity = true,
+            IntegrityAtProcessing = Mathf.Clamp01(integrityPercent)
+        };
     }
 
     

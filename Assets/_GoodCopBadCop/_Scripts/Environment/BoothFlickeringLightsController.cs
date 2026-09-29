@@ -72,10 +72,6 @@ public class BoothFlickeringLightsController : MonoBehaviour
     [Tooltip("Maximum duration of the ambient dip in seconds.")]
     [SerializeField] private float maxAmbientDipDuration = 0.12f;
 
-    [Header("Debug")]
-    [Tooltip("Press this key in Play Mode to immediately trigger a single flicker burst.")]
-    [SerializeField] private KeyCode testKey = KeyCode.F;
-
     private float[] _originalIntensities;
     private Coroutine _flickerLoopCoroutine;
     private Coroutine _testBurstCoroutine;
@@ -93,15 +89,9 @@ public class BoothFlickeringLightsController : MonoBehaviour
             StopCoroutine(_ambientFlickerCoroutine);
     }
 
-    private void Update()
-    {
-        if (Input.GetKeyDown(testKey))
-            TriggerTestBurst();
-    }
-
     /// <summary>
     /// Immediately fires a single flicker burst, independent of the anomaly loop.
-    /// Intended for Play Mode testing only.
+    /// Intended for Play Mode testing only (component context menu; no hotkey, since F is zoom).
     /// </summary>
     [ContextMenu("Trigger Test Burst")]
     public void TriggerTestBurst()

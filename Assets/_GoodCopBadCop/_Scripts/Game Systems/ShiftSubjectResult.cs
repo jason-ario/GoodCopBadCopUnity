@@ -26,8 +26,20 @@ public struct ShiftSubjectResult : INetworkSerializable
     public string SubjectName;
     public int AnomaliesCaught;
     public int AnomaliesTotal;
+    /// <summary>Coupons actually dispensed by the ATM for this verdict (after the integrity multiplier).</summary>
     public int CouponsEarned;
     public ShiftSubjectVerdict Verdict;
+
+    /// <summary><see cref="SuspectData"/> asset name, used by clients to resolve the ID photo locally.</summary>
+    public string SuspectAssetName;
+    public string IDNumber;
+    /// <summary>True when the subject was an uncanny replacement, so the replacement ID photo is shown.</summary>
+    public bool UsedReplacementPhoto;
+
+    /// <summary>False for results restored from saves written before integrity was recorded.</summary>
+    public bool HasIntegrity;
+    /// <summary>Checkpoint integrity multiplier (0–1, 1 = 100%) at the moment this subject was processed.</summary>
+    public float IntegrityAtProcessing;
 
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
@@ -42,6 +54,45 @@ public struct ShiftSubjectResult : INetworkSerializable
         byte verdict = (byte)Verdict;
         serializer.SerializeValue(ref verdict);
         Verdict = (ShiftSubjectVerdict)verdict;
+
+        string assetName = SuspectAssetName ?? string.Empty;
+        serializer.SerializeValue(ref assetName);
+        SuspectAssetName = assetName;
+
+        string idNumber = IDNumber ?? string.Empty;
+        serializer.SerializeValue(ref idNumber);
+        IDNumber = idNumber;
+
+        serializer.SerializeValue(ref UsedReplacementPhoto);
+        serializer.SerializeValue(ref HasIntegrity);
+        serializer.SerializeValue(ref IntegrityAtProcessing);
+    }
+
+    /// <summary>
+    /// Resolves this subject's ID photo on the local peer from the run's <see cref="SuspectSet"/>.
+    /// Returns null if the suspect can't be found (e.g. a debug/test entry).
+    /// </summary>
+    public UnityEngine.Texture2D ResolveIDPhoto()
+    {
+        if (string.IsNullOrEmpty(SuspectAssetName))
+            return null;
+
+        SuspectSet set = SuspectRunRecords.Instance != null ? SuspectRunRecords.Instance.allSuspects : null;
+        if (set == null || set.suspects == null)
+            return null;
+
+        foreach (SuspectData data in set.suspects)
+        {
+            if (data == null || data.name != SuspectAssetName)
+                continue;
+
+            if (UsedReplacementPhoto && data.replacementIDPhoto != null)
+                return data.replacementIDPhoto;
+
+            return data.IDPhoto;
+        }
+
+        return null;
     }
 }
 
@@ -63,6 +114,9 @@ public class ShiftReportData
     public int FledCount { get; private set; }
     public int TotalCouponsEarned { get; private set; }
 
+    /// <summary>Mean checkpoint integrity (0–1) across subjects that recorded it; -1 when none did.</summary>
+    public float AverageIntegrity { get; private set; } = -1f;
+
     public ShiftReportData(int day, IEnumerable<ShiftSubjectResult> subjects,
         int populationAlive, int civiliansKilledOvernight, int residentsMutatedOvernight)
     {
@@ -75,9 +129,17 @@ public class ShiftReportData
             Subjects.AddRange(subjects);
 
         // Tallies are derived from the same list as the itemized rows so the two can never disagree.
+        float integritySum = 0f;
+        int integrityCount = 0;
         foreach (ShiftSubjectResult subject in Subjects)
         {
             TotalCouponsEarned += subject.CouponsEarned;
+            if (subject.HasIntegrity)
+            {
+                integritySum += subject.IntegrityAtProcessing;
+                integrityCount++;
+            }
+
             switch (subject.Verdict)
             {
                 case ShiftSubjectVerdict.Passed: PassedCount++; break;
@@ -86,5 +148,8 @@ public class ShiftReportData
                 case ShiftSubjectVerdict.Fled: FledCount++; break;
             }
         }
+
+        if (integrityCount > 0)
+            AverageIntegrity = integritySum / integrityCount;
     }
 }

@@ -12,6 +12,9 @@ public class Subtitles : MonoBehaviour
     [Tooltip("Small downward chevron at the bottom of the black bar, shown once the line is fully revealed.")]
     [SerializeField] private CanvasGroup continueChevron;
     [SerializeField] private float chevronFadeInDuration = 0.2f;
+    [Tooltip("Seconds per full pulse cycle.")]
+    [SerializeField] private float chevronPulsePeriod = 1.4f;
+    [SerializeField, Range(0f, 1f)] private float chevronPulseMinAlpha = 0.35f;
 
     [Header("Speaker Name Tag Template")]
     [Tooltip("Visual template for the conversation name tag. Always hidden on the subtitle itself; " +
@@ -95,14 +98,16 @@ public class Subtitles : MonoBehaviour
 
         if (continueChevron == null) yield break;
 
+        // Fade in, then pulse until the player advances.
         float t = 0f;
-        while (IsPromptActive && t < chevronFadeInDuration)
+        while (IsPromptActive)
         {
             t += Time.unscaledDeltaTime;
-            continueChevron.alpha = Mathf.Clamp01(t / chevronFadeInDuration);
+            float fadeIn = chevronFadeInDuration > 0f ? Mathf.Clamp01(t / chevronFadeInDuration) : 1f;
+            float wave = 0.5f + 0.5f * Mathf.Cos(t * Mathf.PI * 2f / chevronPulsePeriod); // starts at 1
+            continueChevron.alpha = fadeIn * Mathf.Lerp(chevronPulseMinAlpha, 1f, wave);
             yield return null;
         }
-        if (IsPromptActive) continueChevron.alpha = 1f;
     }
 
     private void Awake()
