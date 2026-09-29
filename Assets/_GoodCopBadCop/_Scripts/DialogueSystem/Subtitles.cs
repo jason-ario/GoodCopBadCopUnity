@@ -12,8 +12,7 @@ public class Subtitles : MonoBehaviour
     [Header("Continue Prompt Animation")]
     [Tooltip("Seconds for the continue prompt to fade in once the typewriter finishes.")]
     [SerializeField] private float promptFadeInDuration = 0.25f;
-    [Tooltip("Idle alpha pulse range (min..1) while the prompt is waiting for input.")]
-    [SerializeField, Range(0f, 1f)] private float promptPulseMinAlpha = 0.45f;
+    [Tooltip("Speed of the idle vertical bob.")]
     [SerializeField] private float promptPulseSpeed = 3f;
     [Tooltip("Vertical idle bob distance in canvas units.")]
     [SerializeField] private float promptBobAmount = 3f;
@@ -126,8 +125,7 @@ public class Subtitles : MonoBehaviour
         _promptActiveTime += Time.unscaledDeltaTime;
 
         float fadeIn = promptFadeInDuration > 0f ? Mathf.Clamp01(_promptActiveTime / promptFadeInDuration) : 1f;
-        float wave = (Mathf.Cos(_promptActiveTime * promptPulseSpeed) + 1f) * 0.5f; // starts at 1
-        continuePrompt.alpha = fadeIn * Mathf.Lerp(promptPulseMinAlpha, 1f, wave);
+        continuePrompt.alpha = fadeIn;
 
         if (_promptRect != null)
             _promptRect.anchoredPosition = _promptBasePos + Vector2.up * (Mathf.Sin(_promptActiveTime * promptPulseSpeed) * promptBobAmount);
