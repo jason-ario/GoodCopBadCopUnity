@@ -923,6 +923,26 @@ public class FolderController : PickableObject
         isOpen.Value = open;
     }
 
+    /// <summary>True during the short delay between an open request and the networked open.</summary>
+    public bool IsOpeningOrClosing => isOpeningOrClosing;
+
+    /// <summary>
+    /// Opens the held folder exactly like LMB does (same "HoldingFolderOpen" pose and delay),
+    /// but never closes it. Used by the held-item zoom to open a closed folder before zooming.
+    /// Returns true if an open was started or is already in progress.
+    /// </summary>
+    public bool RequestOpen()
+    {
+        if (isOpen.Value) return false;
+        if (isOpeningOrClosing) return true;
+        if (playerPickupController == null) return false;
+
+        playerPickupController.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
+        StopAllCoroutines();
+        StartCoroutine(WaitAndOpen());
+        return true;
+    }
+
     IEnumerator WaitAndOpen()
     {
         isOpeningOrClosing = true;

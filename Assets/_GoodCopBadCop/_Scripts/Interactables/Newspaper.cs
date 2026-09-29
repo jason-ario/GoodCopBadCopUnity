@@ -1,16 +1,20 @@
 using UnityEngine;
 
+/// <summary>
+/// Held newspaper / daily fax. LMB raises it to read; zoom mode "holds LMB" through the
+/// same path (see <see cref="HeldDocumentInspection"/>).
+/// </summary>
 public class Newspaper : PickableObject
 {
     public override void OnStartUse()
     {
         base.OnStartUse();
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
+        HeldDocumentInspection.BeginFromUse(playerPickupController);
     }
     
     public override void OnStopUse()
     {
         base.OnStopUse();
-        playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
+        HeldDocumentInspection.EndFromUse(playerPickupController);
     }
 }

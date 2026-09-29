@@ -1262,7 +1262,14 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Random yaw so the (projected decal) splatters don't all share one orientation.
         Quaternion yaw = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
-        _spawnedTrailParticles.Add(Instantiate(_trailParticlesPrefab, position, yaw));
+        GameObject splat = Instantiate(_trailParticlesPrefab, position, yaw);
+
+        // Slight per-splatter size variation (footprint only; projection depth Y untouched).
+        float s = UnityEngine.Random.Range(0.8f, 1.15f);
+        Vector3 scale = splat.transform.localScale;
+        splat.transform.localScale = new Vector3(scale.x * s, scale.y, scale.z * s);
+
+        _spawnedTrailParticles.Add(splat);
     }
 
     private void DestroyLocalTrailParticles()

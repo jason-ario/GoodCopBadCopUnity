@@ -287,7 +287,8 @@ public class PlayerPickupController : NetworkBehaviour
         // Previously this was gated behind the cooldown latch, so a click that ended inside the
         // cooldown window (or while the latch was stuck) never called OnStopUse and left the
         // item's isUsing flag true — permanently blocking every tool that guards on it.
-        if (HeldObject != null && LmbUp)
+        // While zoom mode holds the use "button" down, a physical LMB release must not end it.
+        if (HeldObject != null && LmbUp && !_useHeldByZoom)
         {
             StopUsingObject();
         }
@@ -328,7 +329,7 @@ public class PlayerPickupController : NetworkBehaviour
     /// </summary>
     private void EnforceUseReleaseFailsafe()
     {
-        if (_heldObject == null || !_heldObject.IsBeingUsed || LmbHeld)
+        if (_heldObject == null || !_heldObject.IsBeingUsed || LmbHeld || _useHeldByZoom)
         {
             _stuckUseSince = -1f;
             return;
@@ -402,6 +403,40 @@ public class PlayerPickupController : NetworkBehaviour
         _heldObject.OnStartUse();
         
         RequestBodyUseServerRpc();
+    }
+
+    // True while zoom mode (HeldItemZoomView) is "holding LMB" on the held item.
+    private bool _useHeldByZoom;
+
+    /// <summary>
+    /// Zoom mode: behaves exactly as if the player pressed and kept holding LMB on the held
+    /// item (same OnStartUse + body-use RPC path as <see cref="TryUseObject"/>). A physical LMB
+    /// release is ignored until <see cref="EndHeldUseFromZoom"/>. If LMB is already held, the
+    /// existing use simply continues.
+    /// </summary>
+    public void BeginHeldUseFromZoom()
+    {
+        if (_heldObject == null || _useHeldByZoom) return;
+        _useHeldByZoom = true;
+        _stuckUseSince = -1f;
+
+        if (LmbHeld && _heldObject.IsBeingUsed) return;
+
+        _heldObject.OnStartUse();
+        RequestBodyUseServerRpc();
+    }
+
+    /// <summary>
+    /// Zoom mode closed: "releases" the simulated LMB. If the player is still physically
+    /// holding LMB, their own use continues and ends on release as normal.
+    /// </summary>
+    public void EndHeldUseFromZoom()
+    {
+        if (!_useHeldByZoom) return;
+        _useHeldByZoom = false;
+
+        if (_heldObject != null && !LmbHeld)
+            StopUsingObject();
     }
 
     [ServerRpc]

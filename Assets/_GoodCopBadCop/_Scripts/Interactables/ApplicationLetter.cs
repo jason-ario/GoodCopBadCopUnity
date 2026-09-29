@@ -223,4 +223,19 @@ public class ApplicationLetter : FolderItem
             insideThisFolder.RemoveDocument(this, player);
         }
     }
+
+    // LMB inspect, same as the newspaper / daily fax (Application.asset uses the
+    // HoldingNewspaper pose so it shares the Reading Newspaper animation).
+    // Zoom mode "holds LMB" through the same path (see HeldDocumentInspection).
+    public override void OnStartUse()
+    {
+        base.OnStartUse();
+        HeldDocumentInspection.BeginFromUse(playerPickupController);
+    }
+
+    public override void OnStopUse()
+    {
+        base.OnStopUse();
+        HeldDocumentInspection.EndFromUse(playerPickupController);
+    }
 }

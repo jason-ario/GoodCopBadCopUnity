@@ -29,6 +29,10 @@ public class TrailController : MonoBehaviour
              "0 = perfectly even spacing, 1 = fully random within each slot.")]
     [SerializeField, Range(0f, 1f)] private float _jitter = 0.4f;
 
+    [Tooltip("Max sideways offset (metres, horizontal) from the spline for each spawn, " +
+             "so splatters wander off the centre line instead of forming a neat row.")]
+    [SerializeField, Min(0f)] private float _lateralScatter = 0.75f;
+
     [Header("Gizmos")]
     [SerializeField] private Color _splineColor        = new Color(0.85f, 0.10f, 0.10f, 1.00f);
     [SerializeField] private Color _waypointColor      = new Color(1.00f, 0.85f, 0.00f, 1.00f);
@@ -61,8 +65,21 @@ public class TrailController : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            float t = (i + 0.5f + Random.Range(-0.5f, 0.5f) * jitter) / count;
-            positions.Add(SampleSpline(Mathf.Clamp01(t)));
+            float t = Mathf.Clamp01((i + 0.5f + Random.Range(-0.5f, 0.5f) * jitter) / count);
+            Vector3 p = SampleSpline(t);
+
+            if (_lateralScatter > 0f)
+            {
+                // Horizontal perpendicular to the local spline direction.
+                Vector3 tangent = SampleSpline(Mathf.Min(t + 0.01f, 1f)) - SampleSpline(Mathf.Max(t - 0.01f, 0f));
+                tangent.y = 0f;
+                Vector3 side = tangent.sqrMagnitude > 1e-6f
+                    ? Vector3.Cross(Vector3.up, tangent.normalized)
+                    : Vector3.right;
+                p += side * Random.Range(-_lateralScatter, _lateralScatter);
+            }
+
+            positions.Add(p);
         }
 
         return positions;

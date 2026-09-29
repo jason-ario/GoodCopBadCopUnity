@@ -1213,6 +1213,39 @@ public class PlayerAnimationController : NetworkBehaviour
         SetAnimBool("BearTrapStuck", stuck);
     }
 
+    private AnimatorCullingMode _armsCullingBeforeForce;
+    private AnimatorCullingMode _bodyCullingBeforeForce;
+    private bool _alwaysAnimateForced;
+
+    /// <summary>
+    /// Local-only. Forces both animators to keep updating even when their renderers are out
+    /// of view (e.g. a close-up camera that only sees the held item), so hand-driven items
+    /// don't freeze mid-transition. Pass false to restore the previous culling modes.
+    /// </summary>
+    public void SetForceAlwaysAnimate(bool force)
+    {
+        if (force == _alwaysAnimateForced) return;
+        _alwaysAnimateForced = force;
+
+        if (force)
+        {
+            if (armsAnimator != null)
+            {
+                _armsCullingBeforeForce = armsAnimator.cullingMode;
+                armsAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            }
+            if (bodyAnimator != null)
+            {
+                _bodyCullingBeforeForce = bodyAnimator.cullingMode;
+                bodyAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            }
+            return;
+        }
+
+        if (armsAnimator != null) armsAnimator.cullingMode = _armsCullingBeforeForce;
+        if (bodyAnimator != null) bodyAnimator.cullingMode = _bodyCullingBeforeForce;
+    }
+
     public void SetAnimBool(string animString, bool value)
     {
         if (!IsOwner) return;

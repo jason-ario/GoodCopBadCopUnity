@@ -8,6 +8,11 @@ public class Subtitles : MonoBehaviour
     [SerializeField] private TMPTextReveal textReveal;
     [SerializeField] private int maxCharactersPerLine = 50;
 
+    [Header("Continue Chevron")]
+    [Tooltip("Small downward chevron at the bottom of the black bar, shown once the line is fully revealed.")]
+    [SerializeField] private CanvasGroup continueChevron;
+    [SerializeField] private float chevronFadeInDuration = 0.2f;
+
     [Header("Speaker Name Tag Template")]
     [Tooltip("Visual template for the conversation name tag. Always hidden on the subtitle itself; " +
              "ConversationNameTag clones it once and owns the on-screen tag for the whole conversation.")]
@@ -63,29 +68,48 @@ public class Subtitles : MonoBehaviour
     }
 
     /// <summary>
-    /// Arms (or disarms) advance-input gating. There is no visible prompt; when armed,
-    /// <see cref="IsPromptActive"/> becomes true once the typewriter finishes.
+    /// Arms (or disarms) advance-input gating. When armed, <see cref="IsPromptActive"/> becomes
+    /// true once the typewriter finishes and the continue chevron fades in.
     /// </summary>
     public void ShowContinuePrompt(bool show)
     {
         if (show)
             StartCoroutine(ActivatePromptAfterTypewriter());
         else
+        {
             IsPromptActive = false;
+            if (continueChevron != null) continueChevron.alpha = 0f;
+        }
     }
 
     private IEnumerator ActivatePromptAfterTypewriter()
     {
         IsPromptActive = false;
+        if (continueChevron != null) continueChevron.alpha = 0f;
 
         if (textReveal != null)
             yield return new WaitUntil(() => !textReveal.IsRevealing);
 
+        // Input gating depends only on IsPromptActive; the chevron is purely cosmetic.
         IsPromptActive = true;
+
+        if (continueChevron == null) yield break;
+
+        float t = 0f;
+        while (IsPromptActive && t < chevronFadeInDuration)
+        {
+            t += Time.unscaledDeltaTime;
+            continueChevron.alpha = Mathf.Clamp01(t / chevronFadeInDuration);
+            yield return null;
+        }
+        if (IsPromptActive) continueChevron.alpha = 1f;
     }
 
     private void Awake()
     {
+        if (continueChevron != null)
+            continueChevron.alpha = 0f;
+
         // The speaker name is shown by the standalone ConversationNameTag, never on the subtitle bar.
         if (nameTag != null)
             nameTag.gameObject.SetActive(false);

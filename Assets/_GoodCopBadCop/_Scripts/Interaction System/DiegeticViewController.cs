@@ -58,6 +58,9 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// </summary>
     protected Camera RaycastCamera => PlayerInstance.Instance?.GetCamera();
 
+    /// <summary>The CinemachineCamera that becomes active while this view is open.</summary>
+    protected CinemachineCamera ViewCamera => _viewCamera;
+
     // ─── Private state ────────────────────────────────────────────────────────
 
     private Quaternion _baseCameraRotation;
@@ -119,7 +122,9 @@ public abstract class DiegeticViewController : MonoBehaviour
         UIController.Instance.ClosePlayerUI();
 
         // Hide first-person arms so they don't occlude the view.
-        _playerArms = player.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject;
+        _playerArms = HidePlayerArms
+            ? player.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms")?.gameObject
+            : null;
         if (_playerArms != null)
             _playerArms.SetActive(false);
 
@@ -136,7 +141,7 @@ public abstract class DiegeticViewController : MonoBehaviour
         // Diegetic views must never leave the player's point light off — force it on
         // regardless of any indoor/outdoor state or other system that may have hidden it,
         // and remember whether it was already off so Close() can restore the true state.
-        _playerInstance = player.GetComponent<PlayerInstance>();
+        _playerInstance = ForcePlayerLightOn ? player.GetComponent<PlayerInstance>() : null;
         if (_playerInstance != null)
         {
             _preOpenLightActive = _playerInstance.IsOutsideLocal;
@@ -301,6 +306,19 @@ public abstract class DiegeticViewController : MonoBehaviour
     protected virtual bool ShowBackButton => true;
 
     /// <summary>
+    /// When overridden to return false, the first-person arms stay visible while this view
+    /// is open (e.g. zooming on a document the player is still holding). Defaults to true.
+    /// Read once inside <see cref="Open"/>.
+    /// </summary>
+    protected virtual bool HidePlayerArms => true;
+
+    /// <summary>
+    /// When true (default), the player's point light is forced on for the lifetime of the view
+    /// and restored on close. Views that must not affect scene lighting (held item zoom) return false.
+    /// </summary>
+    protected virtual bool ForcePlayerLightOn => true;
+
+    /// <summary>
     /// Called when the player presses the exit key. Defaults to <see cref="Close"/>.
     /// Override to intercept the key — for example, to dismiss a popup before closing the view.
     /// </summary>
@@ -308,7 +326,11 @@ public abstract class DiegeticViewController : MonoBehaviour
 
     // ─── MonoBehaviour ───────────────────────────────────────────────────────
 
-    private void Update()
+    /// <summary>
+    /// Virtual so subclasses can poll their own open input while inactive
+    /// (see <see cref="HeldItemZoomView"/>). Overrides must call base.Update().
+    /// </summary>
+    protected virtual void Update()
     {
         if (!IsActive) return;
 

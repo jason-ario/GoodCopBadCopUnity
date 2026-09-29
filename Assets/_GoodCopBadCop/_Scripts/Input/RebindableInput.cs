@@ -17,7 +17,9 @@ namespace GoodCopBadCop.Input
         PlaceObject,
         ThrowObject,
         ToggleMask,
-        OpenEmotes
+        OpenEmotes,
+        // Appended (not inserted) so serialized GameAction ints on existing assets stay valid.
+        ZoomHeldItem
     }
 
     /// <summary>
@@ -38,6 +40,7 @@ namespace GoodCopBadCop.Input
             { GameAction.Crouch, KeyCode.LeftControl },
             { GameAction.ToggleMask, KeyCode.V },
             { GameAction.OpenEmotes, KeyCode.T },
+            { GameAction.ZoomHeldItem, KeyCode.F },
         };
 
         private static readonly Dictionary<GameAction, int> DefaultMouseButtons = new()
@@ -55,6 +58,7 @@ namespace GoodCopBadCop.Input
             { GameAction.ThrowObject, "rightShoulder" },
             { GameAction.ToggleMask, "" },
             { GameAction.OpenEmotes, "dpad/up" },
+            { GameAction.ZoomHeldItem, "rightStickPress" },
         };
 
         private static readonly Dictionary<GameAction, KeyCode> Keys = new();

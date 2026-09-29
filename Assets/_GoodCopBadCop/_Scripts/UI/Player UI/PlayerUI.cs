@@ -25,17 +25,27 @@ public class PlayerUI : MonoBehaviour
     [Tooltip("Helper icon shown while the local player is wearing the radiation mask.")]
     [SerializeField] private GameObject _maskHelperIcon;
 
+    [Tooltip("Helper icon (zoom key) shown while the local player holds an item with a HeldItemZoomable.")]
+    [SerializeField] private GameObject _zoomHelperIcon;
+
     private PlayerPickupController _pickupController;
     private InternalBattery _currentBattery;
 
     private void Awake()
     {
         Instance = this;
+
+        // The zoom icon is a duplicate of the emotes helper icon; make sure it always shows
+        // the zoom binding regardless of what the duplicated component was serialized with.
+        if (_zoomHelperIcon != null &&
+            _zoomHelperIcon.TryGetComponent(out GoodCopBadCop.UI.HelperIconKeyDisplay zoomKeyDisplay))
+            zoomKeyDisplay.SetAction(GoodCopBadCop.Input.GameAction.ZoomHeldItem);
     }
 
     private void OnEnable()
     {
         _batteryBar?.Hide();
+        SetZoomHelperIconVisible(false);
         TrySubscribeToPickupController();
 
         CheckpointIntegrityService.OnEnabledChanged += OnCheckpointIntegrityEnabledChanged;
@@ -156,6 +166,7 @@ public class PlayerUI : MonoBehaviour
 
         _currentBattery = null;
         _batteryBar?.Hide();
+        SetZoomHelperIconVisible(false);
     }
 
     /// <summary>Shows or hides the radiation mask helper icon.</summary>
@@ -163,6 +174,13 @@ public class PlayerUI : MonoBehaviour
     {
         if (_maskHelperIcon != null)
             _maskHelperIcon.SetActive(visible);
+    }
+
+    /// <summary>Shows or hides the zoom-mode helper icon.</summary>
+    public void SetZoomHelperIconVisible(bool visible)
+    {
+        if (_zoomHelperIcon != null && _zoomHelperIcon.activeSelf != visible)
+            _zoomHelperIcon.SetActive(visible);
     }
 
     // ── Battery bar wiring ───────────────────────────────────────────────────
@@ -184,6 +202,9 @@ public class PlayerUI : MonoBehaviour
 
     private void OnHeldObjectChanged(PickableObject heldObject)
     {
+        // Zoom is local-only, so never advertise it while mirroring a spectated teammate.
+        SetZoomHelperIconVisible(!_wasMirroring && heldObject != null && heldObject.GetComponent<HeldItemZoomable>() != null);
+
         _currentBattery = heldObject != null ? heldObject.GetComponent<InternalBattery>() : null;
 
         if (_currentBattery != null)

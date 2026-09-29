@@ -1,0 +1,355 @@
+using GoodCopBadCop.Input;
+using Unity.Cinemachine;
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+/// <summary>
+/// "Zoom mode": close-up view of the document the local player is holding (ID card,
+/// application, newspaper, daily fax, folder, ...). Built on <see cref="DiegeticViewController"/>
+/// so it shares the mini fridge / tool locker behaviour: Cinemachine blend in, movement +
+/// interaction locked, cursor shown, cursor-driven panning, Q / back button to exit.
+///
+/// Differences from the scene-placed diegetic views:
+///  • Lives on the Player prefab (one shared camera) and opens itself from
+///    <see cref="GameAction.ZoomHeldItem"/> (F by default, rebindable) or gamepad R3 while the
+///    held item has a <see cref="HeldItemZoomable"/>.
+///  • Documents (<see cref="HeldItemZoomable.InspectWhileZoomed"/>): zoom behaves exactly as if
+///    LMB were held for its whole duration (<see cref="PlayerPickupController.BeginHeldUseFromZoom"/>)
+///    and releases it on close. The camera sits on the line from the player's eye to the
+///    document and follows it every frame, so the close-up shows the full inspect animation
+///    exactly as the player would see it — just closer.
+///  • Anchored items (folder "Zoom Cam Pos"): camera pose is locked to the item. Closed folders
+///    are opened first.
+///  • Arms stay visible by default and both animators are forced to always animate, so
+///    hand-driven items can't freeze mid-transition when the arms leave the close-up frame.
+///
+/// Auto-closes when the item leaves the hand (drop, stow, throw, despawn), when it stops being
+/// zoomable (folder closed), or when a cutscene starts.
+/// </summary>
+[DefaultExecutionOrder(-100)] // Write the camera pose before CinemachineBrain's LateUpdate.
+public class HeldItemZoomView : DiegeticViewController
+{
+    [Header("Held Item Zoom")]
+    [Tooltip("Also toggle with the gamepad right stick press.")]
+    [SerializeField] private bool _allowGamepadToggle = true;
+
+    [Tooltip("Near clip plane used by the zoom camera once the blend has finished, so very close documents don't get cut off. " +
+             "During the blend in/out the player camera's near plane is kept, because an animating near plane makes " +
+             "Forward+ light clustering flicker.")]
+    [SerializeField, Min(0.001f)] private float _nearClipPlane = 0.01f;
+
+    private PlayerPickupController _pickup;
+    private PlayerInteractionController _interaction;
+    private PlayerAnimationController _animation;
+    private Transform _eye;
+    private CinemachineCamera _playerVcam;
+    private bool _nearTightened;
+    private PlayerInstance _cutscenePlayer;
+
+    private HeldItemZoomable _target;
+    private bool _holdingUse;
+
+    // Anchor framing (item-local pose).
+    private Vector3 _localCameraPosition;
+    private Quaternion _localCameraRotation;
+
+    // Eye framing (item-local focus + distance along the eye → focus line).
+    private Vector3 _localFocus;
+    private float _eyeDistance;
+
+    // Surface framing (item-local document normal, side chosen toward the eye with hysteresis).
+    private bool _useSurfaceNormal;
+    private Vector3 _localNormal;
+    private float _normalSign = 1f;
+
+    private float _framedHalfSize;
+    private Vector3 _currentPan;
+
+    /// <summary>True while zoom mode is open on this client.</summary>
+    public bool IsZoomed => IsActive;
+
+    protected override bool HidePlayerArms => _target != null && _target.HidePlayerArms;
+
+    // Zoom is a camera move only — it must not change scene lighting.
+    protected override bool ForcePlayerLightOn => false;
+
+    // Panning is driven here in LateUpdate so it composes with the follow.
+    protected override bool SuppressCameraMovement => true;
+
+    private void Awake()
+    {
+        _pickup = GetComponentInParent<PlayerPickupController>();
+        _interaction = GetComponentInParent<PlayerInteractionController>();
+        _animation = GetComponentInParent<PlayerAnimationController>();
+        if (_pickup != null)
+            _eye = _pickup.transform.Find("CinemachineCamera");
+        if (_eye != null)
+            _playerVcam = _eye.GetComponent<CinemachineCamera>();
+
+        if (ViewCamera != null)
+            ViewCamera.gameObject.SetActive(false);
+    }
+
+    private void OnDisable()
+    {
+        // Guard against teardown order on quit / scene unload (Close touches UIController).
+        if (IsActive && UIController.Instance != null) Close();
+    }
+
+    // ─── Input ───────────────────────────────────────────────────────────────
+
+    protected override void Update()
+    {
+        if (!IsActive)
+        {
+            // Return after opening so the same key press isn't read as "close" this frame.
+            if (TogglePressed()) TryOpen();
+            return;
+        }
+
+        base.Update();
+    }
+
+    private bool TogglePressed()
+    {
+        if (RebindableInput.GetKeyDown(GameAction.ZoomHeldItem)) return true;
+        return _allowGamepadToggle && (Gamepad.current?.rightStickButton.wasPressedThisFrame ?? false);
+    }
+
+    /// <summary>
+    /// Opens zoom mode on the currently held item if every gate passes. Safe to call from
+    /// other systems (e.g. a tutorial prompt). Returns true if the view opened.
+    /// </summary>
+    public bool TryOpen()
+    {
+        if (IsActive || _pickup == null || _interaction == null) return false;
+        if (!_pickup.IsLocalPlayer) return false;
+        if (IsAnyViewActive) return false;
+        if (UIController.Instance == null || UIController.Instance.IsPaused) return false;
+        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsInCutscene) return false;
+        if (!_pickup.CanPickUpAndPlace || !_interaction.CanInteract) return false;
+
+        PickableObject held = _pickup.HeldObject;
+        if (held == null) return false;
+
+        HeldItemZoomable zoomable = held.GetComponent<HeldItemZoomable>();
+        if (zoomable == null || !zoomable.CanBeginZoom) return false;
+
+        // Documents already being inspected with LMB are fine — zoom just keeps that use held.
+        if (held.IsBeingUsed && !zoomable.InspectWhileZoomed) return false;
+
+        if (ViewCamera == null)
+        {
+            Debug.LogWarning("[HeldItemZoomView] No view camera assigned.", this);
+            return false;
+        }
+
+        _target = zoomable;
+        _currentPan = Vector3.zero;
+
+        // Opens a closed folder (same as LMB) before the camera moves in.
+        zoomable.PrepareForZoom();
+
+        // Use the player camera's lens exactly (FOV, near plane, physical props) so the blend is
+        // a pure position/rotation move — no lens values animate. Framing uses the same FOV.
+        if (_playerVcam != null) ViewCamera.Lens = _playerVcam.Lens;
+        float fov = ViewCamera.Lens.FieldOfView;
+        _nearTightened = false;
+
+        _useSurfaceNormal = false;
+        if (zoomable.HasCameraAnchor || _eye == null)
+            zoomable.ComputeAnchorPose(fov, out _localCameraPosition, out _localCameraRotation, out _framedHalfSize);
+        else
+        {
+            zoomable.ComputeEyeFraming(fov, out _localFocus, out _eyeDistance, out _framedHalfSize);
+            _useSurfaceNormal = zoomable.TryGetDocumentNormal(out _localNormal);
+            if (_useSurfaceNormal)
+            {
+                Vector3 n = zoomable.transform.TransformDirection(_localNormal);
+                Vector3 toEye = _eye.position - zoomable.transform.TransformPoint(_localFocus);
+                _normalSign = Vector3.Dot(n, toEye) >= 0f ? 1f : -1f;
+            }
+        }
+
+        // Position before activation so Cinemachine blends toward the correct pose from frame one.
+        ApplyCameraPose();
+        Open(_interaction);
+        return true;
+    }
+
+    // ─── DiegeticViewController hooks ────────────────────────────────────────
+
+    protected override void OnOpened()
+    {
+        // Same lock the exam notebook inspection uses: blocks place (RMB) and throw (MMB).
+        _pickup.CanPickUpAndPlace = false;
+
+        _animation?.SetForceAlwaysAnimate(true);
+
+        // Documents: act exactly as if the player pressed and is holding LMB.
+        if (_target != null && _target.InspectWhileZoomed)
+        {
+            _pickup.BeginHeldUseFromZoom();
+            _holdingUse = true;
+        }
+
+        _cutscenePlayer = PlayerInstance.Instance;
+        if (_cutscenePlayer != null)
+            _cutscenePlayer.OnCutsceneStateChanged += HandleCutsceneStateChanged;
+    }
+
+    protected override void OnClosed()
+    {
+        if (_cutscenePlayer != null)
+        {
+            _cutscenePlayer.OnCutsceneStateChanged -= HandleCutsceneStateChanged;
+            _cutscenePlayer = null;
+        }
+
+        // Blend out with the player's near plane (runs before the base deactivates the camera).
+        SetViewNearClip(PlayerNearClip);
+        _nearTightened = false;
+
+        ReleaseHeldUse();
+        _animation?.SetForceAlwaysAnimate(false);
+
+        if (_pickup != null)
+            _pickup.CanPickUpAndPlace = true;
+
+        _target = null;
+    }
+
+    /// <summary>
+    /// "Releases LMB". If the document left the hand while zoomed (drop / stow / snatched),
+    /// the unequip path already stopped its use; just make sure the inspect bool isn't left on.
+    /// </summary>
+    private void ReleaseHeldUse()
+    {
+        if (!_holdingUse || _pickup == null) return;
+        _holdingUse = false;
+
+        bool stillHeld = _target != null && _pickup.HeldObject == _target.Pickable;
+        _pickup.EndHeldUseFromZoom();
+
+        if (!stillHeld && _pickup.HeldObject == null)
+            HeldDocumentInspection.SetInspecting(_pickup, false);
+    }
+
+    protected override void OnUpdate()
+    {
+        if (TogglePressed() || !IsTargetStillValid())
+            Close();
+    }
+
+    private bool IsTargetStillValid()
+    {
+        return _target != null
+            && _target.CanStayZoomed
+            && _pickup != null
+            && _pickup.HeldObject != null
+            && _pickup.HeldObject == _target.Pickable;
+    }
+
+    private void HandleCutsceneStateChanged(bool isInCutscene)
+    {
+        if (isInCutscene && IsActive) Close();
+    }
+
+    // ─── Camera follow + pan ─────────────────────────────────────────────────
+
+    private float PlayerNearClip => _playerVcam != null ? _playerVcam.Lens.NearClipPlane : 0.1f;
+
+    private void SetViewNearClip(float near)
+    {
+        if (ViewCamera == null) return;
+        var lens = ViewCamera.Lens;
+        lens.NearClipPlane = near;
+        ViewCamera.Lens = lens;
+    }
+
+    /// <summary>
+    /// Tightens the near plane only once the brain is fully live on the zoom camera, so the
+    /// near plane never changes mid-blend. Reads last frame's brain state (this runs first).
+    /// </summary>
+    private void UpdateNearClip()
+    {
+        if (_nearTightened) return;
+
+        Camera cam = RaycastCamera;
+        CinemachineBrain brain = cam != null ? cam.GetComponent<CinemachineBrain>() : null;
+        bool blendDone = brain == null
+            || (ReferenceEquals(brain.ActiveVirtualCamera, ViewCamera) && !brain.IsBlending);
+        if (!blendDone) return;
+
+        SetViewNearClip(_nearClipPlane);
+        _nearTightened = true;
+    }
+
+    private void LateUpdate()
+    {
+        if (!IsActive || _target == null) return;
+
+        UpdateNearClip();
+
+        bool paused = UIController.Instance != null && UIController.Instance.IsPaused;
+        if (!paused)
+        {
+            float normX = Mathf.Clamp((Input.mousePosition.x / Screen.width) * 2f - 1f, -1f, 1f);
+            float normY = Mathf.Clamp((Input.mousePosition.y / Screen.height) * 2f - 1f, -1f, 1f);
+            Vector3 targetPan = new Vector3(
+                normX * _target.PanX * _framedHalfSize,
+                normY * _target.PanY * _framedHalfSize,
+                0f);
+
+            float smoothing = _target.PanSmoothing;
+            _currentPan = smoothing <= 0f
+                ? targetPan
+                : Vector3.Lerp(_currentPan, targetPan, 1f - Mathf.Exp(-smoothing * Time.unscaledDeltaTime));
+        }
+
+        ApplyCameraPose();
+    }
+
+    private void ApplyCameraPose()
+    {
+        if (_target == null || ViewCamera == null) return;
+
+        Transform item = _target.transform;
+        Vector3 worldPosition;
+        Quaternion worldRotation;
+
+        if (_target.HasCameraAnchor || _eye == null)
+        {
+            worldRotation = item.rotation * _localCameraRotation;
+            worldPosition = item.TransformPoint(_localCameraPosition);
+        }
+        else
+        {
+            // Move the player's eye toward the document along their line of sight, tracking
+            // the document as the inspect animation raises it.
+            Vector3 focus = item.TransformPoint(_localFocus);
+            Vector3 toEye = _eye.position - focus;
+            if (toEye.sqrMagnitude < 0.0001f) toEye = -_eye.forward;
+            toEye.Normalize();
+
+            Vector3 viewDir = toEye;
+            if (_useSurfaceNormal)
+            {
+                // Look straight down the paper's normal so the camera is flat with the page.
+                // Hysteresis stops the side flipping while the page passes edge-on mid-animation.
+                Vector3 n = item.TransformDirection(_localNormal).normalized;
+                if (Vector3.Dot(n, toEye) * _normalSign < -0.2f) _normalSign = -_normalSign;
+                viewDir = n * _normalSign;
+            }
+
+            Vector3 up = _eye.up;
+            if (Mathf.Abs(Vector3.Dot(up, viewDir)) > 0.98f) up = _eye.forward;
+
+            worldPosition = focus + viewDir * _eyeDistance;
+            worldRotation = Quaternion.LookRotation(-viewDir, up);
+        }
+
+        worldPosition += worldRotation * _currentPan;
+        ViewCamera.transform.SetPositionAndRotation(worldPosition, worldRotation);
+    }
+}

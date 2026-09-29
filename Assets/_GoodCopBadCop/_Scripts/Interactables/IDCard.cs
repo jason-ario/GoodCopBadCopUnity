@@ -334,13 +334,16 @@ public class IDCard : FolderItem
       return new FixedString512Bytes(safeValue);
    }
 
+   // LMB inspect. Zoom mode "holds LMB" through the same path (see HeldDocumentInspection).
    public override void OnStartUse()
    {
-      playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
+      base.OnStartUse();
+      HeldDocumentInspection.BeginFromUse(playerPickupController);
    }
 
    public override void OnStopUse()
    {
-      playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
+      base.OnStopUse();
+      HeldDocumentInspection.EndFromUse(playerPickupController);
    }
 }

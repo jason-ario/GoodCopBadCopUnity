@@ -2020,6 +2020,7 @@ GameObject:
   - component: {fileID: 1865911358797144524}
   - component: {fileID: 2275823021614084389}
   - component: {fileID: 6699935120716399523}
+  - component: {fileID: 689159474826606420}
   m_Layer: 0
   m_Name: ID card
   m_TagString: Untagged
@@ -2520,6 +2521,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
+--- !u!114 &689159474826606420
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5941529599015958412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28b779caa087e6f469ef817b8b6dc5a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HeldItemZoomable
+  _cameraAnchor: {fileID: 0}
+  _focusPoint: {fileID: 0}
+  _fieldOfView: 30
+  _zoomDistance: 0
+  _autoFitPadding: 1.15
+  _minDistance: 0.08
+  _panX: 0.5
+  _panY: 0.4
+  _panSmoothing: 12
+  _inspectWhileZoomed: 1
+  _hidePlayerArms: 0
+  _folderOpenTimeout: 2
 --- !u!1 &7165919114829033488
 GameObject:
   m_ObjectHideFlags: 0
