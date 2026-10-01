@@ -187,7 +187,8 @@ public class Day_01 : DayBase
     [FormerlySerializedAs("_ivanMegaphonePart2")]
     [SerializeField] private ScriptedDialogue _quarantineMegaphonePart2;
 
-    [Tooltip("Seconds after the player clocks in before the shutter opens and Vlad is triggered.")]
+    [Tooltip("Seconds after the player clocks in before the shutter opens. Vlad is summoned " +
+             "immediately on clock-in and walks in during this delay — keep it shorter than his walk.")]
     [SerializeField] private float _shutterOpenDelay = 7f;
 
     [Header("Day 1 — Vlad Dialogue")]
@@ -481,6 +482,13 @@ public class Day_01 : DayBase
     private TutorialObjectiveItem _taskCollectCoupons;
     private TutorialObjectiveItem _taskPressButton;
 
+    // Server-only gates for the "Press button" step. The arrow/task must not appear until the
+    // switch can actually be armed, which needs BOTH every coupon collected AND Vlad's exit to
+    // have reached the gate (PassSequence -> SetNextSuspectReady, caught by the intercept).
+    private bool _pressButtonCouponsCollected;
+    private bool _pressButtonVladExited;
+    private bool _pressButtonBroadcast;
+
     // End-of-shift trash task shown after the Alexei sequence.
     private TutorialObjectiveItem _taskThrowTrash;
     private TutorialObjectiveItem _taskClockOut;
@@ -686,6 +694,10 @@ public class Day_01 : DayBase
         // Reset server-side tutorial counters when the day starts.
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             TutorialTaskSync.Instance?.ResetServerState();
+
+        _pressButtonCouponsCollected = false;
+        _pressButtonVladExited       = false;
+        _pressButtonBroadcast        = false;
 
         if (_deskPlacementBoard != null)
             _deskPlacementBoard.OnItemPlaced += OnFolderPlacedOnDesk;
@@ -1071,28 +1083,19 @@ public class Day_01 : DayBase
     }
 
     /// <summary>
-    /// Server-side coroutine, started once the player clocks in. Waits <see cref="_shutterOpenDelay"/>
-    /// seconds, then:
-    ///   - Opens and locks the rolling shutter.
+    /// Server-side coroutine, started once the player clocks in. Immediately:
     ///   - Arms the Vlad intercept on the first suspect spawn slot (no paperwork, no entry line).
     ///   - Auto-starts the shift (bypassing the switch button for this scripted day).
     ///   - Subscribes to <see cref="ShiftManager.OnNextSuspectReadyForBell"/> once so Vlad
     ///     is summoned automatically when the shift is ready — bypassing the bell mechanic
     ///     for this scripted tutorial character only.
+    /// Then waits <see cref="_shutterOpenDelay"/> seconds (while Vlad walks in) and opens the shutter.
     /// </summary>
     private IEnumerator Day1OpeningSequence()
     {
-        yield return new WaitForSeconds(_shutterOpenDelay);
-
-        // Open the shutter. Left unlocked (ShutterLockedOpen no longer forced true) so the
-        // player is free to close/open it with the lever even before the megaphone instructs
-        // them to use it.
-        ShutterController.Instance.OpenShutter();
-
-        // Animate the lever arm to the up/open position so it matches the shutter state.
-        // Left interactable throughout — the player is free to open/close it even before
-        // the megaphone instructs them to use it.
-        _lever?.AnimateOpenServerSide(1f);
+        // Vlad is summoned the instant the player clocks in so his walk-in isn't stacked on
+        // top of the shutter delay. The shutter still opens after _shutterOpenDelay below,
+        // which runs in parallel with (and finishes before) his ~11 s walk to the window.
 
         // Arm the Vlad intercept so the first suspect slot sends him to the window.
         // ForceNextSuspectNoPaperwork suppresses document hand-off for this appearance only.
@@ -1115,7 +1118,21 @@ public class Day_01 : DayBase
         // Start the shift automatically — no switch press required on Day 1.
         ShiftManager.Instance.TryStartShift();
 
-        Debug.Log("[Day_01] Shutter opened and Vlad intercept armed — shift auto-started.");
+        Debug.Log("[Day_01] Vlad intercept armed — shift auto-started.");
+
+        yield return new WaitForSeconds(_shutterOpenDelay);
+
+        // Open the shutter. Left unlocked (ShutterLockedOpen no longer forced true) so the
+        // player is free to close/open it with the lever even before the megaphone instructs
+        // them to use it.
+        ShutterController.Instance.OpenShutter();
+
+        // Animate the lever arm to the up/open position so it matches the shutter state.
+        // Left interactable throughout — the player is free to open/close it even before
+        // the megaphone instructs them to use it.
+        _lever?.AnimateOpenServerSide(1f);
+
+        Debug.Log("[Day_01] Shutter opened.");
     }
 
     /// <summary>
@@ -2016,7 +2033,25 @@ public class Day_01 : DayBase
         // Clearing the flag here guarantees SwitchButton.SetReadyIfStillPending (which
         // yields one frame before checking) will find false and not light up the button.
         ShiftManager.NextSuspectReadyForBell = false;
+        _pressButtonVladExited = true;
         Debug.Log("[Day_01] Switch button blocked — waiting for ATM coupon collection.");
+        TryBroadcastPressButtonReady();
+    }
+
+    /// <summary>
+    /// Server-only. Broadcasts the "Press button" step (task + arrow on all clients, then
+    /// re-arms the switch) only once every coupon is collected AND Vlad's exit has emitted
+    /// its next-suspect signal. Broadcasting earlier showed the arrow while the intercept
+    /// was still subscribed, so the re-arm was swallowed and the button stayed dead until
+    /// Vlad reached the gate.
+    /// </summary>
+    private void TryBroadcastPressButtonReady()
+    {
+        if (_pressButtonBroadcast || !_pressButtonCouponsCollected || !_pressButtonVladExited) return;
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        _pressButtonBroadcast = true;
+        TutorialTaskSync.Instance?.BroadcastPressButtonReadyServer();
     }
 
     /// <summary>
@@ -2047,12 +2082,15 @@ public class Day_01 : DayBase
         TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskCollectCoupons, preHideDelay: 1.5f);
         _taskCollectCoupons = null;
 
-        // Server-only: immediately allow the player to call the next suspect — no further
-        // dialogue or clock-in gating in between.
+        // Server-only: allow the player to call the next suspect as soon as Vlad's exit has
+        // also signalled next-suspect-ready (see TryBroadcastPressButtonReady).
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            TutorialTaskSync.Instance?.BroadcastPressButtonReadyServer();
+        {
+            _pressButtonCouponsCollected = true;
+            TryBroadcastPressButtonReady();
+        }
 
-        Debug.Log("[Day_01] All coupons collected — press-button task armed immediately.");
+        Debug.Log("[Day_01] All coupons collected — press-button task armed once Vlad has exited.");
     }
 
     /// <summary>
@@ -3622,11 +3660,25 @@ public class Day_01 : DayBase
 
         _stackOfFolders?.SetInteractable(true);
         _documentationExamShopItem?.SetAvailable(true);
+
+        // ShopItem.SetAvailable is a purely local override and this method is server-only, so on
+        // its own the line above never reached remote clients' shops (they'd keep showing '???').
+        // Route through the synced path, which also persists the unlock to the save slot so
+        // ToolShopController.ApplyAvailabilityFromSave re-applies it on every future load.
+        if (MegaphoneDialogueManager.Instance != null && !string.IsNullOrEmpty(_documentationExamItemName))
+            MegaphoneDialogueManager.Instance.SetShopItemAvailableSynced(_documentationExamItemName);
+
         DocumentationExamTutorialComplete = true;
         _greenStampSlot?.SetSlotInteractable(true);
         _yellowStampSlot?.SetSlotInteractable(true);
         _redStampSlot?.SetSlotInteractable(true);
         _lever?.SetInteractable(true);
+
+        // The breach shovels are locked in DayActivated and only unlocked when Day 1's first
+        // breach starts (ArmBreachShovel) or in Day 1's DayDeactivated — neither runs for a save
+        // resumed on Day 2+. Their lock is a NetworkVariable override, so clear it explicitly.
+        _breachShovel1?.UnlockInteractableNetworked();
+        _breachShovel2?.UnlockInteractableNetworked();
 
         // The hammer is locked in DayActivated (_hammer?.SetInteractableNetworked(false)) until
         // the post-breach "Fix Perimeter Fences" tutorial unlocks it later on Day 1 — see

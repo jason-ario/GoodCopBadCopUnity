@@ -13,7 +13,9 @@ using UnityEngine.AI;
 ///
 /// Ambient mutants roam at any time of day — spawning is gated only by <see cref="firstActiveDay"/>
 /// (and, when <see cref="requiresZoneActivation"/> is set, by zone entry) and otherwise runs
-/// continuously regardless of shift/day-night state.
+/// continuously regardless of shift/day-night state, until <see cref="MaxAmbientSpawnsPerDay"/> ambient
+/// spawns have occurred that day across ALL spawners combined (a shared, map-wide budget) — then
+/// every spawner pauses until the campaign day changes.
 ///
 /// Ambient mutants spawned this way (including legacy-mutant reintroductions) never start
 /// aggroed — they always spawn with no aggro target, ignoring <see cref="MutantEnemyData.aggroChance"/>
@@ -74,6 +76,11 @@ public class MutantSpawner : NetworkBehaviour
     [Header("Cap")]
     [Tooltip("Maximum number of active enemies this spawner will maintain. Individual burst spawns are skipped once at or above this cap.")]
     [SerializeField] private int maxActiveEnemies = 10;
+
+    [Tooltip("Maximum number of ambient enemies this spawner may spawn per campaign day. Once reached, " +
+             "ambient spawning stops until the next day. Scripted packs (SpawnPackAt) and the debug " +
+             "aggro cheat are not counted. 0 = unlimited.")]
+    [SerializeField, Min(0)] private int maxSpawnsPerDay = 5;
 
     [Header("Activation")]
     [Tooltip("The first campaign day on which this spawner becomes active.")]
@@ -138,6 +145,28 @@ public class MutantSpawner : NetworkBehaviour
     // Burst-only mode cooldown state (server-only).
     private bool _isOnBurstCooldown;
     private Coroutine _burstCooldownCoroutine;
+    private bool _registeredInBudget;
+
+    // ── Shared Daily Budget ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Maximum ambient enemies spawned per campaign day across every MutantSpawner on the map.
+    /// Scripted packs (<see cref="SpawnPackAt"/>), breaches, and the debug aggro cheat are not counted.
+    /// </summary>
+    public const int MaxAmbientSpawnsPerDay = 5;
+
+    // Map-wide ambient spawn budget (server-only), shared by all spawners and reset when the day changes.
+    private static int s_spawnsToday;
+    private static int s_spawnBudgetDay = int.MinValue;
+    private static int s_activeSpawnerCount;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticState()
+    {
+        s_spawnsToday = 0;
+        s_spawnBudgetDay = int.MinValue;
+        s_activeSpawnerCount = 0;
+    }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -156,6 +185,15 @@ public class MutantSpawner : NetworkBehaviour
 
         CampaignManager.OnDayChanged += OnDayChanged;
 
+        // First spawner of a new session resets the shared map-wide budget.
+        if (s_activeSpawnerCount == 0)
+        {
+            s_spawnsToday = 0;
+            s_spawnBudgetDay = int.MinValue;
+        }
+        s_activeSpawnerCount++;
+        _registeredInBudget = true;
+
         // Ambient spawning runs any time of day — start immediately (subject to the day
         // threshold and zone-activation gating) rather than waiting for a night phase.
         int startingDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
@@ -173,6 +211,12 @@ public class MutantSpawner : NetworkBehaviour
         CampaignManager.OnDayChanged -= OnDayChanged;
         _isRunning = false;
         CancelBurstCooldown();
+
+        if (_registeredInBudget)
+        {
+            _registeredInBudget = false;
+            s_activeSpawnerCount = Mathf.Max(0, s_activeSpawnerCount - 1);
+        }
     }
 
     /// <summary>
@@ -182,6 +226,8 @@ public class MutantSpawner : NetworkBehaviour
     /// </summary>
     private void OnDayChanged(int newDay)
     {
+        RefreshDailySpawnBudget(newDay);
+
         if (newDay < firstActiveDay)
         {
             if (_isRunning)
@@ -224,6 +270,32 @@ public class MutantSpawner : NetworkBehaviour
         return dayIntensityCurve.Evaluate(t);
     }
 
+    // ── Daily Spawn Budget ─────────────────────────────────────────────────────
+
+    private int CurrentCampaignDay => CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+
+    /// <summary>
+    /// Resets the shared map-wide ambient spawn counter when <paramref name="day"/> differs from
+    /// the day the counter was last tracked for.
+    /// </summary>
+    private static void RefreshDailySpawnBudget(int day)
+    {
+        if (day == s_spawnBudgetDay)
+            return;
+
+        s_spawnBudgetDay = day;
+        s_spawnsToday = 0;
+    }
+
+    /// <summary>
+    /// True while the map-wide budget still allows ambient spawns today.
+    /// </summary>
+    private bool HasDailySpawnBudget()
+    {
+        RefreshDailySpawnBudget(CurrentCampaignDay);
+        return s_spawnsToday < MaxAmbientSpawnsPerDay;
+    }
+
     // ── Spawn Loop ─────────────────────────────────────────────────────────────
 
     private IEnumerator SpawnLoop()
@@ -232,6 +304,16 @@ public class MutantSpawner : NetworkBehaviour
 
         while (_isRunning)
         {
+            if (!HasDailySpawnBudget())
+            {
+                Debug.Log($"[MutantSpawner] {name}: map-wide daily cap of {MaxAmbientSpawnsPerDay} reached on Day {s_spawnBudgetDay} — pausing until next day.", this);
+                yield return new WaitUntil(() => !_isRunning || HasDailySpawnBudget());
+                if (!_isRunning)
+                    yield break;
+                yield return new WaitForSeconds(initialDelay);
+                continue;
+            }
+
             yield return StartCoroutine(SpawnBurst());
 
             float intensity = GetDayIntensity();
@@ -259,13 +341,13 @@ public class MutantSpawner : NetworkBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            if (!_isRunning)
+            if (!_isRunning || !HasDailySpawnBudget())
                 yield break;
 
             PruneDeadEnemies();
 
-            if (_activeEnemies.Count < effectiveCap)
-                SpawnSingleEnemy();
+            if (_activeEnemies.Count < effectiveCap && SpawnSingleEnemy())
+                s_spawnsToday++;
 
             if (i < count - 1)
                 yield return new WaitForSeconds(burstSpawnDelay);
@@ -278,7 +360,8 @@ public class MutantSpawner : NetworkBehaviour
     /// <paramref name="forceAggro"/> override (used solely by the debug console's
     /// "Aggroed Mutant" cheat via <see cref="ForceSpawnAggroed"/>), can start hostile.
     /// </summary>
-    private void SpawnSingleEnemy(bool forceAggro = false)
+    /// <returns>True when an enemy was actually spawned.</returns>
+    private bool SpawnSingleEnemy(bool forceAggro = false)
     {
         Quaternion spawnRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
@@ -296,7 +379,7 @@ public class MutantSpawner : NetworkBehaviour
         {
             Debug.LogWarning($"[MutantSpawner] {name}: no valid NavMesh spawn point found in " +
                              $"{spawnPlacementAttempts} attempts — skipping this spawn.", this);
-            return;
+            return false;
         }
 
         GameObject instance = Instantiate(prefab, spawnPosition, spawnRotation);
@@ -306,7 +389,7 @@ public class MutantSpawner : NetworkBehaviour
         {
             Debug.LogError("[MutantSpawner] A prefab in mutantPrefabs is missing a NetworkObject component.", this);
             Destroy(instance);
-            return;
+            return false;
         }
 
         SuspectCharacter legacyCharacter = legacyRecord != null ? instance.GetComponent<SuspectCharacter>() : null;
@@ -337,6 +420,8 @@ public class MutantSpawner : NetworkBehaviour
             legacyCharacter.ActivateAsLegacyMutant(forceAggro ? aggroTarget : null);
             Debug.Log($"[MutantSpawner] Spawned legacy mutant '{legacyRecord.SuspectData.name}'.", this);
         }
+
+        return true;
     }
 
     /// <summary>

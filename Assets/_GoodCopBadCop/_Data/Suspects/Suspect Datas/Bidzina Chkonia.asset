@@ -25,7 +25,7 @@ MonoBehaviour:
   GivesPaperwork: 1
   handwritingFont: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
   startingInfectionScore: 0
-  dailyInfectionProgression: {x: 6, y: 14}
+  dailyInfectionProgression: {x: 4, y: 10}
   alterEgoName: 
   basePersonalityDescriptors: []
   normalBehaviorNotes: 
@@ -119,7 +119,16 @@ MonoBehaviour:
   - "Funny\u2026 I had three aces\u2026 and it still wasn\u2019t enough\u2026"
   - "I miscalculated somewhere\u2026 the math\u2026 the math was wrong\u2026"
   - "House always wins in the end\u2026 I should have\u2026 bet on that\u2026"
-  voiceAudioClips: []
+  voiceAudioClips:
+  - {fileID: 8300000, guid: 39c10d8c4538a3a4b806d526044c2f2a, type: 3}
+  - {fileID: 8300000, guid: eb71ee4c9f5538b49a8c1cad75e1149e, type: 3}
+  - {fileID: 8300000, guid: 73eb0e925d666704d95be76cf9f5ccfc, type: 3}
+  - {fileID: 8300000, guid: b2c35f322cedec74ca7307fd9cc03799, type: 3}
+  - {fileID: 8300000, guid: d002a94d7a1ac9f4b9a214ab0e4296c6, type: 3}
+  - {fileID: 8300000, guid: 2ea1e3dd26c6f9a42b3f314dd22fc0c6, type: 3}
+  - {fileID: 8300000, guid: 64bdca5b7de74114298a1bad284115a9, type: 3}
+  - {fileID: 8300000, guid: 69cf6d91744ab3b40a511f54d7eddcf8, type: 3}
+  - {fileID: 8300000, guid: 409cfbf32a4a1e94f9d5b62851f53bf8, type: 3}
   introDialogue: {fileID: 11400000, guid: c454d2cbd878f6c43a1186adcbc49f01, type: 2}
   questionResponses:
   - question: Where are you coming from?
@@ -132,6 +141,7 @@ MonoBehaviour:
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
+    cameraTrigger: 
   - question: Are you experiencing any symptoms?
     earlyDaysAnswer: Sweaty palms, same as always. Bad for holding cards, good for bluffing. Otherwise nothing.
     midDaysAnswer: I sleep all afternoon and still wake up tired. Headaches when the numbers will not sit still. Nothing the polyclinic can fix.
@@ -142,6 +152,7 @@ MonoBehaviour:
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
+    cameraTrigger: 
   idleBarks:
     earlyDays:
     - Heads or tails, officer? Just kidding. I know when the odds are against me.

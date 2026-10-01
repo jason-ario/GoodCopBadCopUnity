@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Playables;
 
@@ -128,6 +129,12 @@ public abstract class DayBase : MonoBehaviour
     [Range(1, 2)]
     public int ForcedFullMutantCount = 1;
 
+    [Tooltip("Minimum current infection score (0–100) a previously-seen suspect needs before the " +
+             "ForceEarlyFullMutants override may pick them. Prevents a suspect who was passed with only " +
+             "one or two anomalies from jumping straight to full-mutant form the next day.")]
+    [Range(0, 100)]
+    public int ForcedFullMutantMinScore = 45;
+
     [Header("Breach Event")]
     [Tooltip("Whether this day has a mutant breach event or not. When true, MutantBreachManager " +
              "triggers one random breach at the end of the day, once every suspect has been " +
@@ -209,6 +216,24 @@ public abstract class DayBase : MonoBehaviour
 
     private void RefreshAutomaticSubjectCounterTask()
     {
+        // ProgressChanged is a STATIC event, but the only unsubscribe is in DayDeactivated — which
+        // never runs when the scene is torn down (Return to Main Menu / death / disconnect all
+        // reload Main.unity). The destroyed day from the previous session then kept mirroring the
+        // new session's counter; its handle pointed at a destroyed row, so it added a SECOND
+        // "Process N subjects" row alongside the live day's own. Drop the subscription whenever
+        // this handler fires on a destroyed or no-longer-active day.
+        if (this == null)
+        {
+            ProcessResidentsTask.ProgressChanged -= RefreshAutomaticSubjectCounterTask;
+            return;
+        }
+
+        if (CampaignManager.Instance != null && CampaignManager.Instance.ActiveDay != this)
+        {
+            HideAutomaticSubjectCounterTask();
+            return;
+        }
+
         ProcessResidentsTask task = ProcessResidentsTask.Instance;
         int total = task != null ? task.TotalCount : 0;
         int processed = task != null ? task.ProcessedCount : 0;
@@ -309,6 +334,7 @@ public abstract class DayBase : MonoBehaviour
 
         // Best-effort immediate attempt — works on the normal (non-debug-skip) day-advance path.
         RestorePowerIfNoOutageIntended();
+        EnsureDay1TutorialGatesUnlocked();
 
         // DayActivated runs before NGO (re)spawns scene NetworkObjects on the debug-skip path
         // (see Day_01.OnDayStarted for the same issue with ink-stamp locks), so the immediate
@@ -395,6 +421,28 @@ public abstract class DayBase : MonoBehaviour
     private void RestorePowerIfNoOutageIntendedOnDayStart()
     {
         RestorePowerIfNoOutageIntended();
+        EnsureDay1TutorialGatesUnlocked();
+    }
+
+    /// <summary>
+    /// Server-only safety net for every day after Day 1. Day 1's tutorial locks the ink-stamp
+    /// slots and the stack of folders (Day_01.DayActivated / OnDayStarted) and unlocks them
+    /// step-by-step as the tutorial progresses. No later day re-locks them, so from Day 2 onward
+    /// they must always be usable — regardless of entry path (normal advance, resumed save,
+    /// Restart Day, debug skip) and regardless of whether Day_01 ever ran its own unlock steps.
+    /// Both setters no-op until their NetworkObject has spawned, which is why this is re-applied
+    /// from the OnDayStart handler and the short post-activation retry as well.
+    /// </summary>
+    private void EnsureDay1TutorialGatesUnlocked()
+    {
+        if (DayNumber <= 1) return;
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        foreach (InkStamp stamp in FindObjectsByType<InkStamp>(FindObjectsSortMode.None))
+            stamp.SetSlotInteractable(true);
+
+        foreach (StackOfFolders stack in FindObjectsByType<StackOfFolders>(FindObjectsSortMode.None))
+            stack.SetInteractable(true);
     }
 
     /// <summary>
@@ -406,9 +454,11 @@ public abstract class DayBase : MonoBehaviour
     {
         yield return null;
         RestorePowerIfNoOutageIntended();
+        EnsureDay1TutorialGatesUnlocked();
 
         yield return new WaitForSeconds(0.5f);
         RestorePowerIfNoOutageIntended();
+        EnsureDay1TutorialGatesUnlocked();
 
         _powerRestoreRetryCoroutine = null;
     }

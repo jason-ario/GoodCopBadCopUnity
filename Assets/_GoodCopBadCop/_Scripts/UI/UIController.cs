@@ -462,6 +462,8 @@ public class UIController : MonoBehaviour
         if (PlayerInstance.Instance != null)
             PlayerInstance.Instance.CanControl = false;
         PlayerInstance.Instance?.PlayerInteractionController?.SetCanInteract(false, string.Empty);
+        // Mutants ignore and cannot damage the player while the report is up (same as dialogue).
+        PlayerInstance.Instance?.SetIsViewingShiftReport(true);
         ShowCursor();
         endOfShiftReportUI.PlayReport(reportData);
         OnReportShown?.Invoke();
@@ -470,6 +472,7 @@ public class UIController : MonoBehaviour
     public void HideEndOfShiftReport()
     {
         endOfShiftReportUI.gameObject.SetActive(false);
+        PlayerInstance.Instance?.SetIsViewingShiftReport(false);
         HideCursor();
         PlayerInstance.Instance?.PlayerInteractionController?.SetCanInteract(true, string.Empty);
         OnReportHidden?.Invoke();
@@ -693,6 +696,12 @@ public class UIController : MonoBehaviour
     public void ShowPurchaseNotification(string message)
     {
         shopNotificationManager.ShowPurchaseNotification(message);
+    }
+
+    /// <summary>Displays a transient notification for a rejected action (e.g. "Trash is full"), with a negative sound.</summary>
+    public void ShowErrorNotification(string message)
+    {
+        shopNotificationManager.ShowErrorNotification(message);
     }
 
     /// <summary>

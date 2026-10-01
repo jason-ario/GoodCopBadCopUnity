@@ -1,10 +1,13 @@
 using GoodCopBadCop.Effects;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class Cigarette : PickableObject
 {
    [SerializeField] float healAmount = 1;
-   [SerializeField] float radiationAmount = 1;
+   [Tooltip("Radiation added per second while smoking (frame-rate independent).")]
+   [FormerlySerializedAs("radiationAmount")]
+   [SerializeField] float radiationPerSecond = 0.1f;
    [SerializeField] private GameObject particles;
    [SerializeField] SkinnedMeshRenderer _skinnedMeshRenderer;
    [SerializeField] float reductionAmountPerFrame = .01f;
@@ -62,7 +65,7 @@ public class Cigarette : PickableObject
       if (!isUsing) return;
 
       PlayerInstance.Instance.Heal(healAmount, EffectKeys.CigaretteHeal);
-      PlayerInstance.Instance.PlayerRadiation.AddRadiation(radiationAmount);
+      PlayerInstance.Instance.PlayerRadiation.AddRadiation(radiationPerSecond * Time.deltaTime);
       float blendShapeWeight = _skinnedMeshRenderer.GetBlendShapeWeight(0) + reductionAmountPerFrame * Time.deltaTime;
 
       if (blendShapeWeight >= 100)

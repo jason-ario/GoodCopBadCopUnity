@@ -110,7 +110,9 @@ public class SFXController : MonoBehaviour
     /// <param name="volume">Playback volume (0–1).</param>
     /// <param name="pitch">Playback pitch multiplier.</param>
     /// <param name="maxDistance">Maximum audible range in metres. Overrides the prefab's maxDistance when greater than zero.</param>
-    public void PlayAtPosition(AudioClip clip, Vector3 position, float volume = 1f, float pitch = 1f, float maxDistance = DefaultSpatialMaxDistance)
+    /// <param name="minDistance">Distance within which the clip plays at full volume. Overrides the prefab's minDistance when greater than zero.</param>
+    /// <param name="priority">AudioSource priority (0 = highest, 256 = lowest). Overrides the prefab's priority when zero or greater, so important one-shots aren't voice-stolen.</param>
+    public void PlayAtPosition(AudioClip clip, Vector3 position, float volume = 1f, float pitch = 1f, float maxDistance = DefaultSpatialMaxDistance, float minDistance = -1f, int priority = -1)
     {
         if (!clip) return;
 
@@ -130,6 +132,12 @@ public class SFXController : MonoBehaviour
 
         if (maxDistance > 0f)
             source.maxDistance = maxDistance;
+
+        if (minDistance > 0f)
+            source.minDistance = Mathf.Min(minDistance, source.maxDistance - 0.01f);
+
+        if (priority >= 0)
+            source.priority = Mathf.Clamp(priority, 0, 256);
 
         source.Play();
 

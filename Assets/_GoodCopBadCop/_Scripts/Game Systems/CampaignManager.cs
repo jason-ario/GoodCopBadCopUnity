@@ -171,6 +171,26 @@ public class CampaignManager : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     /// <summary>
+    /// Returns the day component of type <typeparamref name="T"/> (e.g. <see cref="Day_01"/>),
+    /// whether or not that day is currently active. Prefer this over a day's static
+    /// <c>Instance</c> from outside that day: those are assigned in the day's <c>Awake</c>, which
+    /// never runs when <see cref="CollectDays"/> deactivates the day's GameObject before it wakes
+    /// (the normal case for any day other than the one being played — e.g. Day 1/Day 2 when a
+    /// save is resumed on Day 3+). Serialized scene references on the returned component are
+    /// valid either way.
+    /// </summary>
+    public T GetDay<T>() where T : DayBase
+    {
+        foreach (DayBase day in _days.Values)
+        {
+            if (day is T typed)
+                return typed;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Entry point called by GameManager when the game starts.
     /// The server determines the current day from the active save slot and writes it to
     /// <see cref="_networkCurrentDay"/>. Non-server clients always read that authoritative
@@ -440,7 +460,10 @@ public class CampaignManager : NetworkBehaviour
     /// </summary>
     private void DespawnDay1Soldier()
     {
-        SuspectCharacter soldier = Day_01.Instance != null ? Day_01.Instance.SoldierCharacter : null;
+        // Resolved via GetDay rather than Day_01.Instance — on a resumed Day 2+ save Day 1's
+        // Awake never runs, so Instance is null and the soldier would never be removed.
+        Day_01 day1 = GetDay<Day_01>();
+        SuspectCharacter soldier = day1 != null ? day1.SoldierCharacter : null;
         if (soldier == null) return;
 
         NetworkObject netObj = soldier.GetComponent<NetworkObject>();
@@ -460,7 +483,10 @@ public class CampaignManager : NetworkBehaviour
     /// </summary>
     private void DespawnDay2Vlad()
     {
-        SuspectCharacter vlad = Day_02.Instance != null ? Day_02.Instance.VladCharacter : null;
+        // Resolved via GetDay rather than Day_02.Instance — on a resumed Day 3+ save Day 2's
+        // Awake never runs, so Instance is null and Vlad would keep appearing every day.
+        Day_02 day2 = GetDay<Day_02>();
+        SuspectCharacter vlad = day2 != null ? day2.VladCharacter : null;
         if (vlad == null) return;
 
         NetworkObject netObj = vlad.GetComponent<NetworkObject>();

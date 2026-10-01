@@ -423,6 +423,17 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 6e8803c8c2354e244a10a06f29ae093a, type: 3}
   _chaseScreamIntervalMin: 3
   _chaseScreamIntervalMax: 6
+  _chaseFirstGruntDelay: {x: 0.3, y: 1.2}
+  _vocalVolume: 1
+  _vocalMinDistance: 4
+  _vocalMaxDistance: 32
+  _deathMinDistance: 6
+  _deathMaxDistance: 45
+  _vocalPriority: 48
+  _hurtSoundCooldown: 0.35
+  _hurtFallbackPitch: 1.2
+  _deathFallbackPitch: 0.75
+  _vocalPitchRandomness: 0.08
   _chaseMusicFadeOutSeconds: 2
   _outsideFootstepClips:
   - {fileID: 8300000, guid: c4d7bef07abcfa94f971d78ab7c74dc1, type: 3}
@@ -439,8 +450,9 @@ MonoBehaviour:
   _footstepPitchRandomness: 0.1
   _footstepAudioSource: {fileID: 0}
   _footstepVolume: 1
-  _footstepMinDistance: 2
-  _footstepMaxDistance: 20
+  _footstepMinDistance: 4
+  _footstepMaxDistance: 24
+  _footstepReferenceSpeed: 3.5
   _isOutside: 1
   fleeInsteadOfDie: 0
   fleeSpeed: 12

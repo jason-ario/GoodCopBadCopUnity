@@ -2047,7 +2047,18 @@ public class ShiftManager : NetworkBehaviour
             // Pickables (including carried items, which are released at the booth's inventory
             // recovery drop point) are restored from the day-start checkpoint by
             // RestoreWorkdaySaveState, kicked off from CampaignManager.StartCampaign.
-            Day_01.Instance?.ForceUnlockTutorialItems();
+            // Resolve earlier days through CampaignManager.GetDay, NOT Day_0X.Instance: those
+            // statics are assigned in each day's Awake, which never runs when
+            // CampaignManager.CollectDays deactivates the day object before it wakes (the normal
+            // case for every day before the resumed one). Using Instance here silently skipped
+            // these unlocks — leaving stamps/folders/tool locker stuck on a reloaded save.
+            CampaignManager campaign = CampaignManager.Instance;
+
+            Day_01 day1 = campaign != null ? campaign.GetDay<Day_01>() : null;
+            if (day1 != null)
+                day1.ForceUnlockTutorialItems();
+            else
+                Debug.LogWarning("[ShiftManager] ResumeSavedDay — Day_01 component not found; tutorial-gated items could not be force-unlocked.");
 
             // CampaignManager.StartCampaign() already restores the coupon total from the active
             // slot, but that only runs once, right as TryStartGame's RPC fires — before this
@@ -2057,10 +2068,16 @@ public class ShiftManager : NetworkBehaviour
             GlobalHostVariables.Instance?.SetMoney(SaveDataManager.Instance.CurrentCash);
 
             // Day 2's tool locker is normally unlocked mid-sequence by Vlad — that sequence only
-            // ever runs while Day 2 itself is active, so a save resumed on Day 2+ needs it
-            // force-unlocked here too.
+            // ever runs while Day 2 itself is active, and its padlock has no persistent _lockId,
+            // so a save resumed on Day 2+ needs it force-unlocked here too.
             if (_currentDay >= 2)
-                Day_02.Instance?.ForceUnlockToolLocker();
+            {
+                Day_02 day2 = campaign != null ? campaign.GetDay<Day_02>() : null;
+                if (day2 != null)
+                    day2.ForceUnlockToolLocker();
+                else
+                    Debug.LogWarning("[ShiftManager] ResumeSavedDay — Day_02 component not found; tool locker could not be force-unlocked.");
+            }
         }
 
         UIController.Instance.ShowPlayerUI();

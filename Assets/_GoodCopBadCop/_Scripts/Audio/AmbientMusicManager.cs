@@ -1,24 +1,19 @@
 using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Periodically plays a random ambient music track during quiet moments, coexisting with
-/// the Radio and with any higher-priority story/encounter music (Alexei chase, mutant
-/// booth/breach music, etc.) driven through <see cref="MusicManager"/>.
+/// Local (per-client) player for the rare ambient music tracks. The schedule itself (when to
+/// play and which track) is owned by the server through <see cref="AmbientMusicDirector"/>,
+/// which replicates a track index + server start time so every player hears the same track
+/// at the same position. This component only:
+/// - Holds the ambient track list and timing/fade configuration (read by the director).
+/// - Plays the replicated track through <see cref="MusicManager"/> at
+///   <see cref="MusicPriority.Ambient"/>, seeked to the current server-time position.
+/// - Ducks the ambient track locally while this client's player is near an "on"
+///   <see cref="Radio"/> (proximity is per-player, so ducking intentionally stays local).
 ///
-/// Behaviour:
-/// - Waits a random duration between <see cref="_minSilenceDuration"/> and
-///   <see cref="_maxSilenceDuration"/> seconds of "silence" (no ambient/encounter music
-///   playing), then plays a random ambient track once at <see cref="MusicPriority.Ambient"/>.
-/// - Encounter-priority calls to <see cref="MusicManager.Play"/> (Alexei, mutant, etc.) are
-///   always accepted over an active Ambient track — <see cref="MusicManager"/> immediately
-///   cross-fades the ambient track out while the new music fades in. When that encounter
-///   music later fades out or stops, priority resets to Ambient and this manager simply
-///   resumes its normal quiet-period schedule (it does not force ambience back on).
-/// - While an ambient track is active, if the local player is within an "on" Radio's
-///   <see cref="Radio.AmbientDuckRange"/>, the ambient track smoothly ducks to silence
-///   (without stopping/cancelling it) and fades back in once the player leaves range or the
-///   radio is switched off — as long as nothing of higher priority has taken over meanwhile.
+/// Encounter-priority music always wins over ambience inside <see cref="MusicManager"/>.
 /// </summary>
 public class AmbientMusicManager : MonoBehaviour
 {
@@ -27,15 +22,17 @@ public class AmbientMusicManager : MonoBehaviour
     [Header("Ambient Tracks")]
     [SerializeField] private AudioClip[] _ambientTracks;
 
-    [Header("Silence Timing")]
-    [Tooltip("Minimum seconds of silence before a new ambient track is chosen.")]
+    [Header("Silence Timing (server)")]
+    [Tooltip("Minimum seconds of silence before the server chooses a new ambient track.")]
     [SerializeField] private float _minSilenceDuration = 300f; // 5 minutes
-    [Tooltip("Maximum seconds of silence before a new ambient track is chosen.")]
+    [Tooltip("Maximum seconds of silence before the server chooses a new ambient track.")]
     [SerializeField] private float _maxSilenceDuration = 600f; // 10 minutes
 
     [Header("Fades")]
     [SerializeField] private float _fadeInDuration = 4f;
     [SerializeField] private float _radioDuckFadeDuration = 2f;
+    [Tooltip("Fade-out used when the server ends/cancels the ambient track or the session ends.")]
+    [SerializeField] private float _stopFadeDuration = 2f;
 
     [Header("Radio Proximity")]
     [Tooltip("Extra distance added on top of each radio's own AmbientDuckRange before ambient starts ducking.")]
@@ -45,10 +42,17 @@ public class AmbientMusicManager : MonoBehaviour
     [Tooltip("How often (seconds) to refresh the cached list of Radios in the scene.")]
     [SerializeField] private float _radioCacheRefreshInterval = 5f;
 
-    private Coroutine _scheduleRoutine;
+    private Coroutine _playRoutine;
     private bool _duckedByRadio;
     private Radio[] _radiosCache;
     private float _radiosCacheTime = -999f;
+
+    public int TrackCount => _ambientTracks != null ? _ambientTracks.Length : 0;
+
+    public AudioClip GetTrack(int index) =>
+        _ambientTracks != null && index >= 0 && index < _ambientTracks.Length ? _ambientTracks[index] : null;
+
+    public float NextSilenceDuration() => Random.Range(_minSilenceDuration, _maxSilenceDuration);
 
     private void Awake()
     {
@@ -67,69 +71,92 @@ public class AmbientMusicManager : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    private void OnEnable()
-    {
-        _scheduleRoutine = StartCoroutine(ScheduleLoop());
-    }
-
     private void OnDisable()
     {
-        if (_scheduleRoutine != null)
-        {
-            StopCoroutine(_scheduleRoutine);
-            _scheduleRoutine = null;
-        }
+        CancelPlayRoutine();
     }
 
-    // ── Main schedule ─────────────────────────────────────────────────────────
+    // ── Network-driven playback (called by AmbientMusicDirector) ─────────────
 
-    private IEnumerator ScheduleLoop()
+    /// <summary>
+    /// Plays ambient track <paramref name="trackIndex"/> so that it lines up with
+    /// <paramref name="startServerTime"/> (server network time). Waits if the start time is
+    /// still in the future, seeks forward if it has already passed (late join / latency).
+    /// </summary>
+    public void PlaySynced(int trackIndex, double startServerTime)
     {
-        while (true)
+        AudioClip clip = GetTrack(trackIndex);
+        if (clip == null)
         {
-            float wait = Random.Range(_minSilenceDuration, _maxSilenceDuration);
-            yield return new WaitForSeconds(wait);
-
-            AudioClip clip = PickRandomTrack();
-            if (clip == null) continue;
-
-            // Don't step on higher-priority music that may already be playing.
-            while (MusicManager.Instance == null || (MusicManager.Instance.IsPlaying && MusicManager.Instance.CurrentPriority != MusicPriority.Ambient))
-                yield return null;
-
-            yield return PlayAmbientTrack(clip);
+            Debug.LogWarning($"[AmbientMusicManager] No ambient track at index {trackIndex}.");
+            return;
         }
+
+        CancelPlayRoutine();
+        _playRoutine = StartCoroutine(PlaySyncedRoutine(clip, startServerTime));
     }
 
-    private IEnumerator PlayAmbientTrack(AudioClip clip)
+    /// <summary>Stops tracking the ambient track and fades it out if it is still the active music.</summary>
+    public void StopSynced()
     {
+        CancelPlayRoutine();
+
+        MusicManager music = MusicManager.Instance;
+        if (music != null && music.IsPlaying && music.CurrentPriority == MusicPriority.Ambient)
+            music.FadeOut(_stopFadeDuration);
+    }
+
+    private IEnumerator PlaySyncedRoutine(AudioClip clip, double startServerTime)
+    {
+        // Wait for the shared start moment (server schedules slightly ahead to absorb latency).
+        while (ServerTimeNow() < startServerTime)
+            yield return null;
+
+        float elapsed = (float)(ServerTimeNow() - startServerTime);
+        if (elapsed >= clip.length - 0.1f) { _playRoutine = null; yield break; }
+
+        MusicManager music = MusicManager.Instance;
+        if (music == null) { _playRoutine = null; yield break; }
+
+        // Local higher-priority music (encounter) keeps playing; MusicManager ignores us.
+        if (music.IsPlaying && music.CurrentPriority != MusicPriority.Ambient) { _playRoutine = null; yield break; }
+
         _duckedByRadio = IsPlayerNearOnRadio();
 
-        MusicManager.Instance.Play(clip, false, _duckedByRadio ? 0f : _fadeInDuration, MusicPriority.Ambient);
+        // Late joiners (well past the start) skip the long fade so they land at the right volume quickly.
+        float fadeIn = _duckedByRadio ? 0f : Mathf.Max(0f, _fadeInDuration - elapsed);
+        music.Play(clip, false, fadeIn, MusicPriority.Ambient, elapsed);
         if (_duckedByRadio)
-            MusicManager.Instance.SetDuck(true, 0f);
+            music.SetDuck(true, 0f);
 
-        float elapsed = 0f;
-        while (elapsed < clip.length)
+        // Local radio ducking for the rest of the track.
+        while (ServerTimeNow() - startServerTime < clip.length)
         {
-            // Something higher priority took over — abandon tracking this clip and
-            // fall back to a fresh silence period.
             if (MusicManager.Instance == null || MusicManager.Instance.CurrentPriority != MusicPriority.Ambient)
-                yield break;
+                break;
 
-            float sinceCheck = 0f;
-            while (sinceCheck < _proximityCheckInterval && elapsed < clip.length)
-            {
-                yield return null;
-                sinceCheck += Time.deltaTime;
-                elapsed += Time.deltaTime;
-            }
+            yield return new WaitForSeconds(_proximityCheckInterval);
 
             if (MusicManager.Instance == null || MusicManager.Instance.CurrentPriority != MusicPriority.Ambient)
-                yield break;
+                break;
 
             UpdateRadioDucking();
         }
+
+        _playRoutine = null;
+    }
+
+    private void CancelPlayRoutine()
+    {
+        if (_playRoutine == null) return;
+        StopCoroutine(_playRoutine);
+        _playRoutine = null;
+    }
+
+    private static double ServerTimeNow()
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        return nm != null && nm.IsListening ? nm.ServerTime.Time : Time.timeAsDouble;
     }
 
     // ── Radio proximity ──────────────────────────────────────────────────────
@@ -169,18 +196,5 @@ public class AmbientMusicManager : MonoBehaviour
 
         _radiosCache = FindObjectsByType<Radio>(FindObjectsSortMode.None);
         _radiosCacheTime = Time.time;
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private AudioClip PickRandomTrack()
-    {
-        if (_ambientTracks == null || _ambientTracks.Length == 0)
-        {
-            Debug.LogWarning("[AmbientMusicManager] No ambient tracks assigned.");
-            return null;
-        }
-
-        return _ambientTracks[Random.Range(0, _ambientTracks.Length)];
     }
 }

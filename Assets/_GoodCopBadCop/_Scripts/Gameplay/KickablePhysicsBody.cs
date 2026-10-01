@@ -97,6 +97,7 @@ public class KickablePhysicsBody : MonoBehaviour
     private bool HasRig => _poseBones.Length > 0;
 
     private bool _ragdollActive;
+    private bool _isHeld;
     private float _activeTime;
     private float _restTime;
     private float _rootAwakeTime;
@@ -182,6 +183,13 @@ public class KickablePhysicsBody : MonoBehaviour
     {
         if (!IsServerRole || _rootRb == null) return;
 
+        // Held by a cutscene constraint: keep it frozen and don't let the timers run.
+        if (_isHeld)
+        {
+            if (!_rootRb.isKinematic) _rootRb.isKinematic = true;
+            return;
+        }
+
         float dt = Time.fixedDeltaTime;
 
         if (_ragdollActive)
@@ -201,6 +209,14 @@ public class KickablePhysicsBody : MonoBehaviour
         }
 
         // Root is simulating on its own (fresh spawn drop, cutscene drop, root-only kick).
+        // Jointed limb bodies that are still kinematic pin the root, so it would never reach
+        // _wakeSpeed — switch the ragdoll on right away instead of waiting for speed.
+        if (HasJointedLimbBodies && AnyColliderEnabled())
+        {
+            ActivateRagdollServer();
+            return;
+        }
+
         if (HasRig && _wakeSpeed > 0f && _rootRb.linearVelocity.sqrMagnitude > _wakeSpeed * _wakeSpeed && AnyColliderEnabled())
         {
             ActivateRagdollServer();
@@ -261,7 +277,7 @@ public class KickablePhysicsBody : MonoBehaviour
     /// <param name="playerSpeed">Kicker's horizontal speed, scales strength between walk and run.</param>
     public void ApplyKickServer(Vector3 direction, Vector3 point, float playerSpeed)
     {
-        if (!IsServerRole || _rootRb == null) return;
+        if (!IsServerRole || _rootRb == null || _isHeld) return;
         if (Time.time - _lastServerKickTime < _serverKickCooldown) return;
         if (!AnyColliderEnabled()) return; // held / hidden (e.g. Vlad during the cutscene)
 
@@ -293,6 +309,69 @@ public class KickablePhysicsBody : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Server-only. Freezes the piece while something else (e.g. a ParentConstraint in
+    /// <see cref="OchoEatingVladCutscene"/>) drives its transform. NetworkRigidbody makes the
+    /// server copy dynamic on spawn, so without this gravity keeps building velocity under the
+    /// constraint and the wake/settle timers run (and expire) before the piece is ever released.
+    /// </summary>
+    public void HoldServer()
+    {
+        if (_rootRb == null) return;
+
+        _isHeld = true;
+        _ragdollActive = false;
+        ResetServerTimers();
+
+        if (!_rootRb.isKinematic)
+        {
+            _rootRb.linearVelocity = Vector3.zero;
+            _rootRb.angularVelocity = Vector3.zero;
+        }
+        _rootRb.isKinematic = true;
+
+        foreach (Rigidbody rb in _boneBodies)
+            if (rb != null) rb.isKinematic = true;
+    }
+
+    /// <summary>
+    /// Server-only. Releases a piece frozen by <see cref="HoldServer"/>: the root goes dynamic from
+    /// rest with fresh wake/settle timers, so it free-falls and only freezes once it has landed.
+    /// </summary>
+    public void ReleaseServer()
+    {
+        if (_rootRb == null) return;
+
+        _isHeld = false;
+        _ragdollActive = false;
+        ResetServerTimers();
+
+        _rootRb.isKinematic = false;
+        _rootRb.linearVelocity = Vector3.zero;
+        _rootRb.angularVelocity = Vector3.zero;
+
+        // Ragdoll is off (limbs kinematic) while held and switched on for the drop. Limbs must go
+        // dynamic together with the root: a dynamic root jointed to kinematic limbs is pinned in
+        // place by the joints and just hangs in mid-air.
+        if (HasRig)
+            ActivateRagdollServer();
+        else
+            _rootRb.WakeUp();
+    }
+
+    /// <summary>
+    /// True when limb Rigidbodies exist and are jointed to the root (authored ragdolls, or
+    /// auto-built ones after their first wake). Such a rig can't move its root on its own.
+    /// </summary>
+    private bool HasJointedLimbBodies => HasRig && _rigBuilt && _boneBodies.Count > 0;
+
+    private void ResetServerTimers()
+    {
+        _activeTime = 0f;
+        _restTime = 0f;
+        _rootAwakeTime = 0f;
+    }
+
     private void ActivateRagdollServer()
     {
         EnsureServerRig();
@@ -307,6 +386,8 @@ public class KickablePhysicsBody : MonoBehaviour
             {
                 if (rb == null) continue;
                 rb.isKinematic = false;
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
                 rb.WakeUp();
             }
             _rootRb.WakeUp();

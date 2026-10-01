@@ -52,10 +52,13 @@ namespace GoodCopBadCop.VoiceChat
             settingsModel.VoiceVolume
                 .Subscribe(value =>
                 {
+                    // Dissonance caps RemoteVoiceVolume at 1.0, so keep it at unity (or silent at 0%)
+                    // and drive loudness through the playback gain stage, which can boost above 1.0.
+                    VoicePlaybackGain.SetVolumePercent(value);
                     DissonanceComms comms = commsRuntime.Comms;
                     if (comms != null)
                     {
-                        comms.RemoteVoiceVolume = UnityEngine.Mathf.Clamp01(value / 100f);
+                        comms.RemoteVoiceVolume = value <= 0f ? 0f : 1f;
                     }
                 })
                 .AddTo(ref disposables);

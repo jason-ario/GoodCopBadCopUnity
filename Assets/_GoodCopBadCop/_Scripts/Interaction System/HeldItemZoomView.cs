@@ -38,9 +38,9 @@ public class HeldItemZoomView : DiegeticViewController
     [Tooltip("Also toggle with the gamepad right stick press.")]
     [SerializeField] private bool _allowGamepadToggle = true;
 
-    [Tooltip("Near clip plane used by the zoom camera once the blend has finished, so very close documents don't get cut off. " +
-             "During the blend in/out the player camera's near plane is kept, because an animating near plane makes " +
-             "Forward+ light clustering flicker.")]
+    [Tooltip("Near clip plane used for the whole time zoom is open, starting on the first frame of the blend in, so the " +
+             "hand/document rising toward the face doesn't get clipped. Snapped (never animated), because an animating " +
+             "near plane makes Forward+ light clustering flicker. The blend out uses the player camera's near plane.")]
     [SerializeField, Min(0.001f)] private float _nearClipPlane = 0.01f;
 
     [Header("Exit Blend")]
@@ -106,7 +106,7 @@ public class HeldItemZoomView : DiegeticViewController
     private PlayerAnimationController _animation;
     private Transform _eye;
     private CinemachineCamera _playerVcam;
-    private bool _nearTightened;
+    private bool _nearClipOverrideActive;
     private PlayerInstance _cutscenePlayer;
 
     private HeldItemZoomable _target;
@@ -162,6 +162,7 @@ public class HeldItemZoomView : DiegeticViewController
     {
         // Guard against teardown order on quit / scene unload (Close touches UIController).
         if (IsActive && UIController.Instance != null) Close();
+        SetNearClipOverride(false);
         if (_vignetteVolume != null) _vignetteVolume.weight = 0f;
     }
 
@@ -276,7 +277,11 @@ public class HeldItemZoomView : DiegeticViewController
         // a pure position/rotation move — no lens values animate. Framing uses the same FOV.
         if (_playerVcam != null) ViewCamera.Lens = _playerVcam.Lens;
         float fov = ViewCamera.Lens.FieldOfView;
-        _nearTightened = false;
+
+        // Close-up near plane from the very first frame. The zoom vcam carries it once live; during
+        // the blend in, OnBrainCameraUpdated pins the render camera to it so it doesn't lerp from
+        // the player's near plane (which would clip the hand as it comes up to the face).
+        SetViewNearClip(_nearClipPlane);
 
         _useSurfaceNormal = false;
         if (zoomable.HasCameraAnchor || _eye == null)
@@ -324,6 +329,8 @@ public class HeldItemZoomView : DiegeticViewController
         _cutscenePlayer = PlayerInstance.Instance;
         if (_cutscenePlayer != null)
             _cutscenePlayer.OnCutsceneStateChanged += HandleCutsceneStateChanged;
+
+        SetNearClipOverride(true);
     }
 
     protected override void OnClosed()
@@ -338,8 +345,8 @@ public class HeldItemZoomView : DiegeticViewController
         // Refresh the camera state now so the FreezeWhenBlendingOut snapshot picks it up — otherwise
         // the frozen exit pose keeps the 0.01 close-up near plane and the lowering arm/document
         // sweeps right across the lens.
+        SetNearClipOverride(false);
         SetViewNearClip(PlayerNearClip);
-        _nearTightened = false;
         if (ViewCamera != null)
         {
             s_ExitBlends[ViewCamera] = (_playerVcam, _exitBlend);
@@ -406,22 +413,29 @@ public class HeldItemZoomView : DiegeticViewController
         ViewCamera.Lens = lens;
     }
 
-    /// <summary>
-    /// Tightens the near plane only once the brain is fully live on the zoom camera, so the
-    /// near plane never changes mid-blend. Reads last frame's brain state (this runs first).
-    /// </summary>
-    private void UpdateNearClip()
+    private void SetNearClipOverride(bool enabled)
     {
-        if (_nearTightened) return;
+        if (enabled == _nearClipOverrideActive) return;
+        _nearClipOverrideActive = enabled;
 
-        Camera cam = RaycastCamera;
-        CinemachineBrain brain = cam != null ? cam.GetComponent<CinemachineBrain>() : null;
-        bool blendDone = brain == null
-            || (ReferenceEquals(brain.ActiveVirtualCamera, ViewCamera) && !brain.IsBlending);
-        if (!blendDone) return;
+        if (enabled) CinemachineCore.CameraUpdatedEvent.AddListener(OnBrainCameraUpdated);
+        else CinemachineCore.CameraUpdatedEvent.RemoveListener(OnBrainCameraUpdated);
+    }
 
-        SetViewNearClip(_nearClipPlane);
-        _nearTightened = true;
+    /// <summary>
+    /// Runs right after a brain writes its blended lens to the render camera. While zoom is open,
+    /// snap the player's render camera to the close-up near plane, so the blend in doesn't lerp it
+    /// from the player value (the hand rising to the face would clip for a moment).
+    /// </summary>
+    private void OnBrainCameraUpdated(CinemachineBrain brain)
+    {
+        if (!IsActive || brain == null) return;
+
+        Camera cam = brain.OutputCamera;
+        if (cam == null || cam != RaycastCamera) return;
+
+        if (!Mathf.Approximately(cam.nearClipPlane, _nearClipPlane))
+            cam.nearClipPlane = _nearClipPlane;
     }
 
     private void LateUpdate()
@@ -430,8 +444,6 @@ public class HeldItemZoomView : DiegeticViewController
         UpdateVignette();
 
         if (!IsActive || _target == null) return;
-
-        UpdateNearClip();
 
         bool paused = UIController.Instance != null && UIController.Instance.IsPaused;
         if (!paused)

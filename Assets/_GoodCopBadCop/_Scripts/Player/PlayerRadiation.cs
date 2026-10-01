@@ -116,7 +116,7 @@ public class PlayerRadiation : NetworkBehaviour
         // cutscene guard used by MutantEnemy/MutantAttackHitbox for combat.
         // IsInCutscene is owner-written and replicated to the server, so this check is
         // server-authoritative even though the flag originates on the owning client.
-        if (playerInstance != null && playerInstance.IsInCutscene)
+        if (playerInstance != null && playerInstance.IsProtectedFromHarm)
             return;
 
         ApplyAddRadiationServer(passiveRadiationPerSecond * RadiationMultiplier * Time.deltaTime);

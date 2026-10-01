@@ -26,10 +26,20 @@ namespace GoodCopBadCop.Effects
         {
             public Volume Volume;
             public VolumeProfile Profile;
-            public Vignette Vignette;
             public ChromaticAberration ChromaticAberration;
             public LensDistortion LensDistortion;
             public ColorAdjustments ColorAdjustments;
+
+            // The vignette lives on its own full-weight volume and is blended manually. Blending it
+            // through volume weight would lerp its color from the base (black) vignette, turning
+            // colored hit vignettes muddy/black for most of the pulse.
+            public Volume VignetteVolume;
+            public VolumeProfile VignetteProfile;
+            public Vignette Vignette;
+            public Color BaseVignetteColor = Color.black;
+            public float BaseVignetteIntensity;
+            public float BaseVignetteSmoothness = 0.2f;
+
             public Coroutine Routine;
         }
 
@@ -55,6 +65,12 @@ namespace GoodCopBadCop.Effects
                 return;
 
             Channel channel = GetOrCreateChannel(settings);
+
+            // Only sample the underlying look while this channel's vignette is idle, otherwise the
+            // stack would already contain our own contribution.
+            if (channel.VignetteVolume.weight <= 0f)
+                CaptureBaseVignette(channel);
+
             Configure(channel, settings);
 
             if (channel.Routine != null)
@@ -74,9 +90,47 @@ namespace GoodCopBadCop.Effects
                     channel.Routine = null;
                 }
 
-                if (channel.Volume != null)
-                    channel.Volume.weight = 0f;
+                SetChannelIdle(channel);
             }
+        }
+
+        private static void SetChannelIdle(Channel channel)
+        {
+            if (channel.Volume != null)
+                channel.Volume.weight = 0f;
+            if (channel.VignetteVolume != null)
+                channel.VignetteVolume.weight = 0f;
+        }
+
+        private static void CaptureBaseVignette(Channel channel)
+        {
+            VolumeStack stack = VolumeManager.instance != null ? VolumeManager.instance.stack : null;
+            Vignette baseVignette = stack != null ? stack.GetComponent<Vignette>() : null;
+            if (baseVignette == null || !baseVignette.active)
+            {
+                channel.BaseVignetteColor = Color.black;
+                channel.BaseVignetteIntensity = 0f;
+                channel.BaseVignetteSmoothness = 0.2f;
+                return;
+            }
+
+            channel.BaseVignetteColor = baseVignette.color.value;
+            channel.BaseVignetteIntensity = baseVignette.intensity.value;
+            channel.BaseVignetteSmoothness = baseVignette.smoothness.value;
+        }
+
+        private Volume CreateVolume(string name, VolumeProfile profile)
+        {
+            var root = new GameObject(name);
+            root.layer = gameObject.layer;
+            root.transform.SetParent(transform, false);
+
+            var volume = root.AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.priority = VolumePriority;
+            volume.weight = 0f;
+            volume.sharedProfile = profile;
+            return volume;
         }
 
         private Channel GetOrCreateChannel(FullscreenEffectSettings settings)
@@ -84,27 +138,24 @@ namespace GoodCopBadCop.Effects
             if (channels.TryGetValue(settings, out Channel existing) && existing.Volume != null)
                 return existing;
 
-            var root = new GameObject("Effect Channel");
-            root.layer = gameObject.layer;
-            root.transform.SetParent(transform, false);
-
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
             profile.name = "Effect Channel Profile (Runtime)";
+
+            var vignetteProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+            vignetteProfile.name = "Effect Channel Vignette Profile (Runtime)";
 
             var channel = new Channel
             {
                 Profile = profile,
-                Vignette = profile.Add<Vignette>(),
                 ChromaticAberration = profile.Add<ChromaticAberration>(),
                 LensDistortion = profile.Add<LensDistortion>(),
-                ColorAdjustments = profile.Add<ColorAdjustments>()
+                ColorAdjustments = profile.Add<ColorAdjustments>(),
+                VignetteProfile = vignetteProfile,
+                Vignette = vignetteProfile.Add<Vignette>()
             };
 
-            channel.Volume = root.AddComponent<Volume>();
-            channel.Volume.isGlobal = true;
-            channel.Volume.priority = VolumePriority;
-            channel.Volume.weight = 0f;
-            channel.Volume.sharedProfile = profile;
+            channel.Volume = CreateVolume("Effect Channel", profile);
+            channel.VignetteVolume = CreateVolume("Effect Channel Vignette", vignetteProfile);
 
             channels[settings] = channel;
             return channel;
@@ -112,13 +163,8 @@ namespace GoodCopBadCop.Effects
 
         private static void Configure(Channel channel, FullscreenEffectSettings settings)
         {
-            Color vignetteColor = settings.Tint;
-            vignetteColor.a = 1f;
-
             channel.Vignette.active = settings.VignetteIntensity > 0f;
-            channel.Vignette.color.Override(vignetteColor);
-            channel.Vignette.intensity.Override(settings.VignetteIntensity);
-            channel.Vignette.smoothness.Override(settings.VignetteSmoothness);
+            ApplyVignette(channel, settings, 0f, 0f);
 
             channel.ChromaticAberration.active = settings.ChromaticAberration > 0f;
             channel.ChromaticAberration.intensity.Override(settings.ChromaticAberration);
@@ -141,6 +187,24 @@ namespace GoodCopBadCop.Effects
             channel.ColorAdjustments.colorFilter.value = filter;
         }
 
+        /// <summary>
+        /// Blends the vignette manually from the captured base look toward the preset.
+        /// <paramref name="colorBlend"/> is normalized to the pulse peak so the vignette reaches the
+        /// full tint color at peak, instead of a darkened mix with the base vignette color.
+        /// </summary>
+        private static void ApplyVignette(Channel channel, FullscreenEffectSettings settings, float blend, float colorBlend)
+        {
+            Color tint = settings.Tint;
+            tint.a = 1f;
+
+            Color color = Color.Lerp(channel.BaseVignetteColor, tint, colorBlend);
+            color.a = 1f;
+
+            channel.Vignette.color.Override(color);
+            channel.Vignette.intensity.Override(Mathf.Lerp(channel.BaseVignetteIntensity, settings.VignetteIntensity, blend));
+            channel.Vignette.smoothness.Override(Mathf.Lerp(channel.BaseVignetteSmoothness, settings.VignetteSmoothness, blend));
+        }
+
         private IEnumerator PlayRoutine(Channel channel, FullscreenEffectSettings settings)
         {
             Volume volume = channel.Volume;
@@ -150,17 +214,24 @@ namespace GoodCopBadCop.Effects
             float carry = volume.weight;
             float elapsed = 0f;
 
+            if (channel.Vignette.active)
+                channel.VignetteVolume.weight = 1f;
+
             while (elapsed < duration)
             {
                 float t = elapsed / duration;
                 float target = peak * Mathf.Clamp01(settings.OpacityCurve.Evaluate(t));
-                volume.weight = Mathf.Max(target, carry * (1f - t));
+                float weight = Mathf.Max(target, carry * (1f - t));
+                volume.weight = weight;
+
+                if (channel.Vignette.active)
+                    ApplyVignette(channel, settings, weight, peak > 0f ? Mathf.Clamp01(weight / peak) : 0f);
 
                 elapsed += Time.unscaledDeltaTime;
                 yield return null;
             }
 
-            volume.weight = 0f;
+            SetChannelIdle(channel);
             channel.Routine = null;
         }
 
@@ -169,8 +240,7 @@ namespace GoodCopBadCop.Effects
             foreach (Channel channel in channels.Values)
             {
                 channel.Routine = null;
-                if (channel.Volume != null)
-                    channel.Volume.weight = 0f;
+                SetChannelIdle(channel);
             }
         }
 
@@ -180,6 +250,8 @@ namespace GoodCopBadCop.Effects
             {
                 if (channel.Profile != null)
                     Destroy(channel.Profile);
+                if (channel.VignetteProfile != null)
+                    Destroy(channel.VignetteProfile);
             }
 
             channels.Clear();

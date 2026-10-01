@@ -5,7 +5,8 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Manages the "Call in Backup" logic in the HQ Order Screen.
-/// Handles money deduction and requests the local player to send a respawn RPC to the server.
+/// Availability is read from <see cref="ReviveManager"/>'s server-replicated roster and the
+/// revive (including the money deduction) is resolved server-side.
 /// The option is always shown; when it can't be used, it is disabled and <see cref="_statusText"/>
 /// explains why, so the screen is never empty.
 /// </summary>
@@ -58,22 +59,13 @@ public class HQOrderScreen : MonoBehaviour
 
         int funds = GlobalHostVariables.Instance != null ? GlobalHostVariables.Instance.money.Value : 0;
         bool hasFunds = funds >= RespawnCost;
-        bool hasTeammate = false;
-        bool hasDeadTeammate = false;
 
-        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
-        {
-            if (client.PlayerObject != null)
-            {
-                var player = client.PlayerObject.GetComponent<PlayerInstance>();
-                if (player != null && player != PlayerInstance.Instance)
-                {
-                    hasTeammate = true;
-                    if (player.PlayerHealth != null && player.PlayerHealth.IsDead)
-                        hasDeadTeammate = true;
-                }
-            }
-        }
+        // Read the server-replicated roster: ConnectedClientsList / PlayerObject are not reliable on
+        // non-host clients, which previously left player 2 unable to see (and revive) a dead host.
+        ulong localClientId = NetworkManager.Singleton.LocalClientId;
+        ReviveManager revive = ReviveManager.Instance;
+        bool hasTeammate = revive != null && revive.HasTeammate(localClientId);
+        bool hasDeadTeammate = revive != null && revive.HasDeadTeammate(localClientId);
 
         if (_respawnButton != null)
             _respawnButton.interactable = hasFunds && hasDeadTeammate;
@@ -100,16 +92,22 @@ public class HQOrderScreen : MonoBehaviour
     }
 
     /// <summary>
-    /// Deducts money and requests the local PlayerInstance to send the respawn RPC.
-    /// UI elements themselves are often not spawned on the network, so we route
-    /// network requests through the local player object.
+    /// Asks the server to revive a dead teammate. The server picks the target from its
+    /// authoritative client list, deducts the cost from the shared pool, and only charges
+    /// when the revive actually happens (booth on Day 1 before shift end, otherwise lobby).
     /// </summary>
     public void CallInBackup()
     {
+        ReviveManager revive = ReviveManager.Instance;
         if (GlobalHostVariables.Instance == null ||
-            PlayerInstance.Instance == null ||
-            ReviveManager.Instance == null ||
+            revive == null ||
             NetworkManager.Singleton == null)
+        {
+            return;
+        }
+
+        if (!revive.HasDeadTeammate(NetworkManager.Singleton.LocalClientId) ||
+            GlobalHostVariables.Instance.money.Value < RespawnCost)
         {
             return;
         }
@@ -118,36 +116,7 @@ public class HQOrderScreen : MonoBehaviour
         if (_respawnButton != null)
             _respawnButton.interactable = false;
 
-        // Find the first dead teammate
-        ulong targetClientId = ulong.MaxValue;
-        PlayerInstance corpse = null;
-
-        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
-        {
-            if (client.PlayerObject != null)
-            {
-                var player = client.PlayerObject.GetComponent<PlayerInstance>();
-                if (player != null &&
-                    player != PlayerInstance.Instance &&
-                    player.PlayerHealth != null &&
-                    player.PlayerHealth.IsDead)
-                {
-                    targetClientId = client.ClientId;
-                    corpse = player;
-                    break;
-                }
-            }
-        }
-
-        if (targetClientId == ulong.MaxValue || corpse == null) return;
-
-        // Attempt to deduct money from the shared pool
-        GlobalHostVariables.Instance.SubtractMoneyFromClient(RespawnCost);
-
-        // Route the revive request through ReviveManager — it handles despawning the
-        // dead player object and spawning a fresh one (booth on Day 1 before shift end,
-        // otherwise the lobby spawn point).
-        ReviveManager.Instance.RevivePlayer(targetClientId, isNewDay: false);
+        revive.RequestReviveDeadTeammate(RespawnCost);
 
         HangUp();
     }

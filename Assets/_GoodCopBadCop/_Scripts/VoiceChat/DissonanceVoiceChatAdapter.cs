@@ -21,6 +21,7 @@ namespace GoodCopBadCop.VoiceChat
         private VoiceReceiptTrigger lobbyReceiptTrigger;
         private DisposableBag disposables;
         private bool appliedLocalSpeaking;
+        private bool voiceActivatedForSession;
 
         public DissonanceVoiceChatAdapter(
             IVoiceChatModel model,
@@ -53,11 +54,13 @@ namespace GoodCopBadCop.VoiceChat
 
         public void Tick()
         {
-            service.SetCommsAvailable(commsRuntime.Comms != null);
-            service.SetNetworkReady(commsRuntime.Comms != null && commsRuntime.Comms.IsNetworkInitialized);
+            RefreshCommsReference();
+
+            service.SetCommsAvailable(comms != null);
+            service.SetNetworkReady(comms != null && comms.IsNetworkInitialized);
 
             bool hasRemotePeer = HasRemoteNetworkPeer();
-            ApplyCommsActive(hasRemotePeer);
+            UpdateSessionActivation(hasRemotePeer);
 
             // TODO: If all players leave the lobby, the microphone indicator can remain visible;
             // handle lobby/network disconnect events and force local speaking off.
@@ -159,6 +162,9 @@ namespace GoodCopBadCop.VoiceChat
             settings.Quality = AudioQuality.High;
             settings.DenoiseAmount = Dissonance.Audio.Capture.NoiseSuppressionLevels.Low;
             settings.BackgroundSoundRemovalEnabled = false;
+            // No ducking: remote voices were dropped 6 dB whenever the local mic transmitted
+            // (including voice-activation false triggers), making voice chat hard to hear.
+            settings.VoiceDuckLevel = 1f;
         }
 
         private void ApplyLobbyTriggers(bool enabled, bool muted)
@@ -205,19 +211,68 @@ namespace GoodCopBadCop.VoiceChat
         }
 
         /// <summary>
-        /// Only run DissonanceComms (and therefore the microphone) when there is someone to talk to.
-        /// Opening the mic forces Bluetooth headsets into their low-quality hands-free profile, so a
-        /// single-player session must never start capture. Disabling DissonanceComms pauses capture
-        /// and releases the microphone; re-enabling starts it (first time) or resumes it.
+        /// Voice chat (DissonanceComms, and therefore the microphone) stays off while the local player
+        /// is alone, because opening the mic forces Bluetooth headsets into their low-quality
+        /// hands-free profile. The first time another player joins the network session it is switched
+        /// on and then stays on for the rest of that session, even if the other players leave.
+        /// When the session ends (lobby left / NetworkManager shut down) it switches off again so the
+        /// next solo session starts with the mic closed.
         /// The GameObject stays active so NfgoPlayer can still find the component on spawn.
         /// </summary>
-        private void ApplyCommsActive(bool active)
+        private void UpdateSessionActivation(bool hasRemotePeer)
+        {
+            NetworkManager networkManager = NetworkManager.Singleton;
+            bool sessionRunning = networkManager != null && networkManager.IsListening;
+
+            if (!sessionRunning)
+            {
+                if (voiceActivatedForSession)
+                {
+                    voiceActivatedForSession = false;
+                    Debug.Log("[VoiceChat] Network session ended - voice chat switched off.");
+                }
+            }
+            else if (!voiceActivatedForSession && hasRemotePeer)
+            {
+                voiceActivatedForSession = true;
+                Debug.Log("[VoiceChat] Another player joined - voice chat switched on for this session.");
+            }
+
+            SetCommsActive(voiceActivatedForSession);
+        }
+
+        private void SetCommsActive(bool active)
+        {
+            if (comms == null || comms.enabled == active)
+            {
+                return;
+            }
+
+            comms.enabled = active;
+            if (active)
+            {
+                // Re-apply mic/mute/trigger state so the lobby room is joined as soon as Dissonance starts.
+                ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Keeps the cached DissonanceComms in sync with the runtime (e.g. if it was destroyed and
+        /// recreated during a scene/network transition) so settings and lobby triggers are never
+        /// applied to a dead object.
+        /// </summary>
+        private void RefreshCommsReference()
         {
             DissonanceComms currentComms = commsRuntime.Comms;
-            if (currentComms != null && currentComms.enabled != active)
+            if (currentComms == comms)
             {
-                currentComms.enabled = active;
+                return;
             }
+
+            comms = currentComms;
+            lobbyBroadcastTrigger = null;
+            lobbyReceiptTrigger = null;
+            ApplySettings();
         }
 
         private bool HasActiveTransmission()

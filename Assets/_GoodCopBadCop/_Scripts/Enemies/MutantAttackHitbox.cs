@@ -78,7 +78,7 @@ public class MutantAttackHitbox : MonoBehaviour
                 // (guards DelayedHitScan coroutines that were already in-flight when the player
                 // entered dialogue mode — the attack animation fires but the hit is suppressed).
                 PlayerInstance playerInstance = root.GetComponent<PlayerInstance>();
-                if (playerInstance != null && playerInstance.IsInCutscene)
+                if (playerInstance != null && playerInstance.IsProtectedFromHarm)
                     continue;
 
                 playerHealth.TakeDamage(damage, EffectKeys.MutantMeleeDamage);

@@ -213,11 +213,13 @@ public class MutantEnemy : NetworkBehaviour
     [Min(0f)]
     [SerializeField] private float deathAnimationDuration = 2f;
 
-    [Tooltip("Sound played on all clients when this enemy dies.")]
+    [Tooltip("Sound played spatially on all clients when this enemy dies (or starts fleeing, for " +
+             "flee-instead-of-die units). If unassigned, falls back to a low-pitched chase clip.")]
     [SerializeField] private AudioClip deathSound;
 
     [Header("Sounds")]
-    [Tooltip("Clips played spatially at random when this mutant takes a hit and survives.")]
+    [Tooltip("Clips played spatially at random when this mutant takes a hit and survives. " +
+             "If empty, falls back to a higher-pitched chase clip so every mutant reacts to hits.")]
     [SerializeField] private AudioClip[] _hurtSounds;
 
     [Tooltip("Clips played spatially at random while this mutant is actively chasing a player. " +
@@ -231,6 +233,50 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Maximum seconds between random chase screams/grunts.")]
     [Min(0.5f)]
     [SerializeField] private float _chaseScreamIntervalMax = 6f;
+
+    [Tooltip("Random delay range (seconds) before the first grunt after this mutant acquires a target, " +
+             "so a chase is announced almost immediately instead of after a full interval.")]
+    [SerializeField] private Vector2 _chaseFirstGruntDelay = new Vector2(0.3f, 1.2f);
+
+    [Range(0f, 1f)]
+    [Tooltip("Base volume of hurt / chase / death vocals before the SFX volume setting is applied.")]
+    [SerializeField] private float _vocalVolume = 1f;
+
+    [Tooltip("Distance (m) within which hurt / chase vocals play at full volume.")]
+    [Min(0.01f)]
+    [SerializeField] private float _vocalMinDistance = 4f;
+
+    [Tooltip("Distance (m) at which hurt / chase vocals fade to silence (linear rolloff).")]
+    [Min(0.1f)]
+    [SerializeField] private float _vocalMaxDistance = 32f;
+
+    [Tooltip("Distance (m) within which the death sound plays at full volume.")]
+    [Min(0.01f)]
+    [SerializeField] private float _deathMinDistance = 6f;
+
+    [Tooltip("Distance (m) at which the death sound fades to silence (linear rolloff).")]
+    [Min(0.1f)]
+    [SerializeField] private float _deathMaxDistance = 45f;
+
+    [Range(0, 256)]
+    [Tooltip("AudioSource priority for vocals (0 = highest). Kept above default (128) so grunts, hurt " +
+             "and death sounds aren't voice-stolen by gunfire/footsteps during busy fights.")]
+    [SerializeField] private int _vocalPriority = 48;
+
+    [Tooltip("Minimum seconds between hurt sounds. Prevents shotgun pellets / flamethrower ticks from " +
+             "stacking a dozen overlapping hurt clips in one frame.")]
+    [Min(0f)]
+    [SerializeField] private float _hurtSoundCooldown = 0.35f;
+
+    [Tooltip("Pitch multiplier applied when a chase clip is reused as a hurt sound (no hurt clips assigned).")]
+    [SerializeField] private float _hurtFallbackPitch = 1.2f;
+
+    [Tooltip("Pitch multiplier applied when a chase clip is reused as the death sound (no death clip assigned).")]
+    [SerializeField] private float _deathFallbackPitch = 0.75f;
+
+    [Range(0f, 0.5f)]
+    [Tooltip("Random pitch variance applied to each vocal clip.")]
+    [SerializeField] private float _vocalPitchRandomness = 0.08f;
 
     [Tooltip("Seconds to fade out chase music when this mutant dies or flees.")]
     [Min(0f)]
@@ -267,11 +313,17 @@ public class MutantEnemy : NetworkBehaviour
 
     [Tooltip("Distance (m) within which footsteps play at full volume.")]
     [Min(0.01f)]
-    [SerializeField] private float _footstepMinDistance = 2f;
+    [SerializeField] private float _footstepMinDistance = 4f;
 
     [Tooltip("Distance (m) at which footsteps fade to silence (linear rolloff).")]
     [Min(0.1f)]
-    [SerializeField] private float _footstepMaxDistance = 20f;
+    [SerializeField] private float _footstepMaxDistance = 24f;
+
+    [Tooltip("Agent speed (m/s) at which the footstep interval equals Footstep Interval. Faster movement " +
+             "(e.g. sprinting at a player) shortens the interval proportionally so steps match the gait. " +
+             "0 disables speed scaling.")]
+    [Min(0f)]
+    [SerializeField] private float _footstepReferenceSpeed = 3.5f;
 
     [Tooltip("Set to true when this mutant is outdoors, false when indoors. Controls which footstep clip set is used.")]
     [SerializeField] private bool _isOutside = true;
@@ -310,6 +362,8 @@ public class MutantEnemy : NetworkBehaviour
     private float _attackCooldownTimer;
     private float _doorOpenCooldownTimer;
     private float _chaseScreamTimer;
+    private bool _hadChaseTarget;
+    private float _nextHurtSoundTime;
     private float _footstepTimer;
     private bool _isDead;
     private Coroutine _knockbackCoroutine;
@@ -1398,18 +1452,26 @@ public class MutantEnemy : NetworkBehaviour
         // ── Chase Scream ───────────────────────────────────────────────────────
         if (_currentTarget != null)
         {
+            // Announce a freshly-acquired target with a quick grunt instead of waiting a full interval.
+            if (!_hadChaseTarget)
+            {
+                _hadChaseTarget = true;
+                _chaseScreamTimer = UnityEngine.Random.Range(
+                    Mathf.Max(0f, _chaseFirstGruntDelay.x),
+                    Mathf.Max(_chaseFirstGruntDelay.x, _chaseFirstGruntDelay.y));
+            }
+
             _chaseScreamTimer -= Time.deltaTime;
             if (_chaseScreamTimer <= 0f && _chaseSounds != null && _chaseSounds.Length > 0)
             {
                 int idx = UnityEngine.Random.Range(0, _chaseSounds.Length);
                 PlayChaseSoundClientRpc(idx);
-                _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
+                _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, Mathf.Max(_chaseScreamIntervalMin, _chaseScreamIntervalMax));
             }
         }
         else
         {
-            // Reset to a fresh interval so the first scream fires naturally after acquiring a target.
-            _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
+            _hadChaseTarget = false;
         }
 
         // ── Footsteps ──────────────────────────────────────────────────────────
@@ -1417,11 +1479,19 @@ public class MutantEnemy : NetworkBehaviour
         // reliably reflects reality on the server, so footstep timing is computed here and
         // broadcast to clients via RPC rather than relying on each client's own (unmoved)
         // NavMeshAgent velocity, matching the pattern used for chase/hurt sounds.
-        bool isMoving = _agent.velocity.sqrMagnitude > _footstepMovementThreshold * _footstepMovementThreshold;
+        float agentSpeed = _agent.velocity.magnitude;
+        bool isMoving = agentSpeed > _footstepMovementThreshold;
         if (isMoving)
         {
+            // Faster gait → shorter interval, clamped so slow shuffles don't go silent and
+            // sprints don't machine-gun.
+            float interval = _footstepInterval;
+            if (_footstepReferenceSpeed > 0f)
+                interval = Mathf.Clamp(_footstepInterval * (_footstepReferenceSpeed / Mathf.Max(agentSpeed, 0.01f)),
+                                       _footstepInterval * 0.5f, _footstepInterval * 1.5f);
+
             _footstepTimer += Time.deltaTime;
-            if (_footstepTimer >= _footstepInterval)
+            if (_footstepTimer >= interval)
             {
                 _footstepTimer = 0f;
                 AudioClip[] clips = _isOutside ? _outsideFootstepClips : _insideFootstepClips;
@@ -1648,7 +1718,8 @@ public class MutantEnemy : NetworkBehaviour
             // IsInCutscene is set by the owning client via DialogueChoiceSystem and replicated
             // to the server through a NetworkVariable, so this check is server-authoritative.
             PlayerInstance pi = client.PlayerObject.GetComponent<PlayerInstance>();
-            if (pi != null && pi.IsInCutscene)
+            // Also covers players viewing the end-of-shift report (IsProtectedFromHarm).
+            if (pi != null && pi.IsProtectedFromHarm)
                 continue;
 
             float sqrDist = (client.PlayerObject.transform.position - transform.position).sqrMagnitude;
@@ -1832,7 +1903,7 @@ public class MutantEnemy : NetworkBehaviour
             // (guards the window between FindNearestTarget clearing the target and the
             // next retarget interval, since _currentTarget can briefly outlive the exclusion).
             PlayerInstance targetPlayer = _currentTarget.GetComponent<PlayerInstance>();
-            if (targetPlayer != null && targetPlayer.IsInCutscene)
+            if (targetPlayer != null && targetPlayer.IsProtectedFromHarm)
                 return;
         }
         else
@@ -2046,10 +2117,14 @@ public class MutantEnemy : NetworkBehaviour
         // (see SpawnDeathGoreBurst), so shooting an enemy that doesn't kill it leaves no
         // gore/junk/blood behind.
 
-        if (_hurtSounds != null && _hurtSounds.Length > 0)
+        if (Time.time >= _nextHurtSoundTime)
         {
-            int idx = UnityEngine.Random.Range(0, _hurtSounds.Length);
-            PlayHurtSoundClientRpc(idx);
+            AudioClip[] pool = HasClips(_hurtSounds) ? _hurtSounds : _chaseSounds;
+            if (HasClips(pool))
+            {
+                _nextHurtSoundTime = Time.time + _hurtSoundCooldown;
+                PlayHurtSoundClientRpc(UnityEngine.Random.Range(0, pool.Length));
+            }
         }
 
         if (knockbackDirection.HasValue)
@@ -2583,11 +2658,12 @@ public class MutantEnemy : NetworkBehaviour
             EnableCorpseJunkPickup();
 
             TriggerDeathAnimationClientRpc();
+            PlayDeathSoundClientRpc(PickDeathFallbackIndex());
             //StartCoroutine(DespawnAfterDelay(deathAnimationDuration));
         }
         else
         {
-            PlayDeathSoundClientRpc();
+            PlayDeathSoundClientRpc(PickDeathFallbackIndex());
 
             if (IsSpawned)
                 NetworkObject.Despawn();
@@ -2684,6 +2760,9 @@ public class MutantEnemy : NetworkBehaviour
         SetFleeingClientRpc(true);
         StopChaseMusicClientRpc();
 
+        // Pained scream as it breaks off — previously a "killed" flee unit made no sound at all.
+        PlayDeathSoundClientRpc(PickDeathFallbackIndex());
+
         // Fire immediately — before the despawn timeout — so listeners can react to the flee
         // itself (e.g. ending a scripted finale encounter) without waiting for the mutant to
         // actually leave the scene.
@@ -2742,34 +2821,59 @@ public class MutantEnemy : NetworkBehaviour
     {
         if (animator != null && !string.IsNullOrEmpty(deathBoolName))
             animator.SetBool(deathBoolName, true);
+    }
 
-        if (deathSound != null)
-            SFXController.Instance.Play(deathSound);
+    private static bool HasClips(AudioClip[] clips) => clips != null && clips.Length > 0;
+
+    /// <summary>
+    /// Server-side. Returns -1 when a dedicated <see cref="deathSound"/> is assigned, otherwise a
+    /// random index into <see cref="_chaseSounds"/> to reuse as a low-pitched death cry. Chosen on
+    /// the server so every client plays the same clip.
+    /// </summary>
+    private int PickDeathFallbackIndex()
+    {
+        if (deathSound != null || !HasClips(_chaseSounds)) return -1;
+        return UnityEngine.Random.Range(0, _chaseSounds.Length);
+    }
+
+    private float RandomVocalPitch(float basePitch)
+        => basePitch * (1f + UnityEngine.Random.Range(-_vocalPitchRandomness, _vocalPitchRandomness));
+
+    private void PlayVocal(AudioClip clip, float pitch, float minDistance, float maxDistance)
+    {
+        if (clip == null || SFXController.Instance == null) return;
+        SFXController.Instance.PlayAtPosition(clip, transform.position, _vocalVolume, pitch,
+            maxDistance, minDistance, _vocalPriority);
     }
 
     [ClientRpc]
-    private void PlayDeathSoundClientRpc()
+    private void PlayDeathSoundClientRpc(int fallbackIndex)
     {
         if (deathSound != null)
-            SFXController.Instance.Play(deathSound);
+        {
+            PlayVocal(deathSound, RandomVocalPitch(1f), _deathMinDistance, _deathMaxDistance);
+            return;
+        }
+
+        if (!HasClips(_chaseSounds) || fallbackIndex < 0 || fallbackIndex >= _chaseSounds.Length) return;
+        PlayVocal(_chaseSounds[fallbackIndex], RandomVocalPitch(_deathFallbackPitch), _deathMinDistance, _deathMaxDistance);
     }
 
     [ClientRpc]
     private void PlayHurtSoundClientRpc(int index)
     {
-        if (_hurtSounds == null || index < 0 || index >= _hurtSounds.Length) return;
-        AudioClip clip = _hurtSounds[index];
-        if (clip != null)
-            SFXController.Instance?.PlayAtPosition(clip, transform.position);
+        bool useHurt = HasClips(_hurtSounds);
+        AudioClip[] pool = useHurt ? _hurtSounds : _chaseSounds;
+        if (!HasClips(pool) || index < 0 || index >= pool.Length) return;
+
+        PlayVocal(pool[index], RandomVocalPitch(useHurt ? 1f : _hurtFallbackPitch), _vocalMinDistance, _vocalMaxDistance);
     }
 
     [ClientRpc]
     private void PlayChaseSoundClientRpc(int index)
     {
-        if (_chaseSounds == null || index < 0 || index >= _chaseSounds.Length) return;
-        AudioClip clip = _chaseSounds[index];
-        if (clip != null)
-            SFXController.Instance?.PlayAtPosition(clip, transform.position);
+        if (!HasClips(_chaseSounds) || index < 0 || index >= _chaseSounds.Length) return;
+        PlayVocal(_chaseSounds[index], RandomVocalPitch(1f), _vocalMinDistance, _vocalMaxDistance);
     }
 
     [ClientRpc]
@@ -2790,7 +2894,7 @@ public class MutantEnemy : NetworkBehaviour
             return;
         }
 
-        SFXController.Instance?.PlayAtPosition(clip, transform.position, _footstepVolume, pitch, _footstepMaxDistance);
+        SFXController.Instance?.PlayAtPosition(clip, transform.position, _footstepVolume, pitch, _footstepMaxDistance, _footstepMinDistance);
     }
 
     /// <summary>Fades out and stops the looping chase music on all clients.</summary>

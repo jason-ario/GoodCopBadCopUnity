@@ -846,6 +846,8 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 
 				#if defined(DEPTH_ONLY_PASS)
 					output.positionCS = TransformObjectToHClip(input.vertex.xyz);
+					// Match the Main pass PS1-style vertex snapping so prepass depth lines up exactly
+					output.positionCS.xy = floor(output.positionCS.xy / output.positionCS.w * _SnapResolution + 0.5) / _SnapResolution * output.positionCS.w;
 					#if defined(DEPTH_NORMALS_PASS)
 						float3 normalWS = TransformObjectToWorldNormal(input.normal);
 						output.normalWS = normalWS; // already normalized in TransformObjectToWorldNormal
@@ -1000,7 +1002,7 @@ Shader "Toony Colors Pro 2/User/Sketch Shader"
 			}
 
 			ZWrite On
-			Cull [_faceCulling]
+			Cull [_Cull]
 			// Injection Point: 'Depth Normals Pass/Shader States'
 
 			HLSLPROGRAM

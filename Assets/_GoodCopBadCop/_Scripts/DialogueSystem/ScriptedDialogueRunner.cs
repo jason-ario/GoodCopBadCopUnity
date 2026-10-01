@@ -1060,8 +1060,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // interaction controller, leaving the cam and interaction lock permanently stuck because
         // ExitScriptedModeClientRpc only calls ExitScriptedDialogueMode for inside players.
         if (PlayerInstance.Instance.IsOutsideLocal)
-            DialogueChoiceSystem.Instance?.EnterScriptedDialogueModeOutside(
-                lookTarget, lookTarget != null ? lookTarget.GetComponent<SuspectWorldDialogue>()?.DialogueCameraVerticalOffset ?? 0f : 0f);
+            EnterOutsideDialogueFacingSpeaker(lookTarget);
         else
             DialogueChoiceSystem.Instance?.EnterScriptedDialogueMode(lookTarget);
 
@@ -1330,12 +1329,49 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Outside players get movement-locked when explicitly requested, but never get the
             // booth suspect-cam activated — camera cuts are handled by SetActiveOverrideCamClientRpc.
             if (lockOutsidePlayers)
-                DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(
-                    lookTarget, lookTarget != null ? lookTarget.GetComponent<SuspectWorldDialogue>()?.DialogueCameraVerticalOffset ?? 0f : 0f);
+                EnterOutsideDialogueFacingSpeaker(lookTarget);
             return;
         }
 
         DialogueChoiceSystem.Instance.EnterScriptedDialogueMode(lookTarget);
+    }
+
+    /// <summary>
+    /// Locks an outside player into dialogue and frames the speaker's head. The speaker's
+    /// NetworkObject root sits at its feet, so it must never be passed straight to the camera dolly.
+    /// </summary>
+    private static void EnterOutsideDialogueFacingSpeaker(Transform speakerRoot)
+    {
+        if (DialogueChoiceSystem.Instance == null) return;
+        SuspectWorldDialogue worldDialogue = speakerRoot != null ? speakerRoot.GetComponentInChildren<SuspectWorldDialogue>(true) : null;
+        DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(
+            ResolveSpeakerHead(speakerRoot, worldDialogue),
+            worldDialogue != null ? worldDialogue.DialogueCameraVerticalOffset : 0f);
+    }
+
+    /// <summary>Head bone of the speaker: SuspectWorldDialogue's look target, then the active
+    /// humanoid Animator's head bone (handles mutated swaps), then the root as a last resort.</summary>
+    private static Transform ResolveSpeakerHead(Transform speakerRoot, SuspectWorldDialogue worldDialogue)
+    {
+        if (speakerRoot == null) return null;
+
+        if (worldDialogue != null)
+        {
+            Transform t = worldDialogue.DialogueLookTarget;
+            if (t != null && t != worldDialogue.transform) return t;
+        }
+
+        foreach (Animator animator in speakerRoot.GetComponentsInChildren<Animator>())
+        {
+            if (!animator.isHuman) continue;
+            Transform head = animator.GetBoneTransform(HumanBodyBones.Head);
+            if (head != null) return head;
+        }
+
+        SpeakingInteraction speaking = speakerRoot.GetComponentInChildren<SpeakingInteraction>();
+        if (speaking != null && speaking.LookTarget != null) return speaking.LookTarget;
+
+        return speakerRoot;
     }
 
     [ClientRpc]

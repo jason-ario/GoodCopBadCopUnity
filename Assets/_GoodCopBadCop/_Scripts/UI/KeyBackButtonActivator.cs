@@ -27,8 +27,16 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
 {
     [SerializeField] private Key _key = Key.Escape;
 
+    [Tooltip("Played through SFXController whenever this Back button is pressed (mouse, key, or gamepad).")]
+    [SerializeField] private AudioClip _clickSfx;
+
     private Button _button;
     private GamepadBackButtonActivator _partner;
+    private TextButton _textButton;
+
+    // One press can invoke both the parent and child Buttons (and several activators on Escape),
+    // so the click sound is limited to once per frame.
+    private static int _lastClickSfxFrame = -1;
 
     private static readonly HashSet<KeyBackButtonActivator> _instances = new HashSet<KeyBackButtonActivator>();
 
@@ -54,6 +62,23 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
     {
         _button = GetComponent<Button>();
         _partner = GetComponentInChildren<GamepadBackButtonActivator>(true);
+        _textButton = GetComponent<TextButton>();
+    }
+
+    /// <summary>True if this activator's own Button can currently be clicked.</summary>
+    public bool IsClickable => _button != null && _button.isActiveAndEnabled && _button.interactable;
+
+    /// <summary>
+    /// Plays the Back click sound at most once per frame. Pointer presses are skipped when a
+    /// <see cref="TextButton"/> on this object already plays its own click sound on pointer down.
+    /// </summary>
+    public void PlayClickSfx(bool fromPointer)
+    {
+        if (_clickSfx == null || _lastClickSfxFrame == Time.frameCount) return;
+        if (fromPointer && _textButton != null && _textButton.HasClickSfx) return;
+
+        _lastClickSfxFrame = Time.frameCount;
+        SFXController.Instance?.Play(_clickSfx);
     }
 
     private void OnEnable()
@@ -73,6 +98,10 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
 
         if (_key == Key.Escape && _button != null && _button.isActiveAndEnabled && _button.interactable)
             EscapeBackButtonPressedThisFrame = true;
+
+        // Checked before invoking, since the Back action usually deactivates this screen.
+        if (IsClickable || (_partner != null && _partner.IsClickable))
+            PlayClickSfx(false);
 
         InvokeButton();
         if (_partner != null)
@@ -113,6 +142,8 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
             || !_button.isActiveAndEnabled
             || !_button.interactable)
             return;
+
+        PlayClickSfx(true);
 
         if (_partner != null)
             _partner.InvokeButton();

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 114000010155069632}
   - component: {fileID: 82279272996311362}
   - component: {fileID: 114316682808651866}
-  - component: {fileID: 6362357847714811055}
+  - component: {fileID: 6384350347078062643}
   m_Layer: 0
   m_Name: PlaybackPrefab
   m_TagString: Untagged
@@ -157,28 +157,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12031778f3aece14ab7ad71b5a5f310f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!169 &6362357847714811055
-AudioLowPassFilter:
+--- !u!114 &6384350347078062643
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1000010352696724}
   m_Enabled: 1
-  serializedVersion: 3
-  m_LowpassResonanceQ: 2
-  lowpassLevelCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0.29513416
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8f5c5c7d5b09e241a3a6508c7ece5f1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GoodCopBadCop.VoiceChat.VoicePlaybackGain

@@ -556,6 +556,7 @@ public class DailySuspectManager : MonoBehaviour
             if (record.daysShown <= 0) continue;                              // must have been seen previously
             if (record.quarantinedOnDay >= 0) continue;                       // must never have been quarantined
             if (record.IsFullyMutated || record.isLegacyMutant) continue;     // already eligible on its own
+            if (record.infectionScore < activeDay.ForcedFullMutantMinScore) continue; // not infected enough yet
             if (record.SuspectData.fullMutantDialogue == null) continue;
             if (record.SuspectData.CharacterPrefab == null) continue;
             if (runRecords.IsFullMutantInstanceActive(record.SuspectData)) continue;

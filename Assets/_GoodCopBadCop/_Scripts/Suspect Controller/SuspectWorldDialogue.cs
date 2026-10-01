@@ -79,8 +79,8 @@ public class SuspectWorldDialogue : MonoBehaviour
 
     [Header("Look At")]
     [Tooltip("The suspect's FLookAnimator. When assigned, the player camera looks at its head " +
-             "bone (LeadBone) on entering conversation, and the suspect looks back at the " +
-             "player's camera for the duration of the conversation.")]
+             "bone (LeadBone) on entering conversation, and the suspect looks back at Camera.main " +
+             "(the live rendering camera, e.g. the booth suspect cam) for the duration of the conversation.")]
     [SerializeField] private FLookAnimator lookAnimator;
 
     [Tooltip("Fine-tunes the dialogue camera dolly-in framing height (meters, +up/-down) for this " +
@@ -92,6 +92,19 @@ public class SuspectWorldDialogue : MonoBehaviour
     /// look target generically (e.g. <see cref="ScriptedDialogueRunner"/>) and need to pass the same
     /// per-character framing tune-up through to <see cref="DialogueChoiceSystem.EnterScriptedDialogueModeOutside"/>.</summary>
     public float DialogueCameraVerticalOffset => dialogueCameraVerticalOffset;
+
+    /// <summary>Head-height transform the player dialogue camera should frame: the FLookAnimator
+    /// LeadBone (head), then the SpeakingInteraction look target, then this root as a last resort.
+    /// Shared with <see cref="ScriptedDialogueRunner"/> so scripted conversations frame the head too.</summary>
+    public Transform DialogueLookTarget
+    {
+        get
+        {
+            if (lookAnimator != null && lookAnimator.LeadBone != null) return lookAnimator.LeadBone;
+            if (speaking != null && speaking.LookTarget != null) return speaking.LookTarget;
+            return transform;
+        }
+    }
 
     [Header("Idle State")]
     [Tooltip("When true, sets the Animator's 'Sitting' bool parameter to true on Awake, so this " +
@@ -346,9 +359,7 @@ public class SuspectWorldDialogue : MonoBehaviour
 
         UIController.Instance.ClosePlayerUI();
 
-        Transform headBone = lookAnimator != null && lookAnimator.LeadBone != null ? lookAnimator.LeadBone : null;
-        Transform lookTarget = headBone != null ? headBone
-            : (speaking != null && speaking.LookTarget != null ? speaking.LookTarget : transform);
+        Transform lookTarget = DialogueLookTarget;
 
         // Booth suspects talked to from inside the booth use the booth dialogue mode, which
         // activates the suspect cam (SuspectController.SetSuspectCamActive). Everyone else —
@@ -368,9 +379,13 @@ public class SuspectWorldDialogue : MonoBehaviour
             _previousObjectToFollow = lookAnimator.ObjectToFollow;
             _restoreObjectToFollow = true;
 
-            Transform playerCamera = PlayerInstance.Instance != null ? PlayerInstance.Instance.CameraTransform : null;
-            if (playerCamera != null)
-                lookAnimator.ObjectToFollow = playerCamera;
+            // Track the rendering camera (CinemachineBrain), not the player's head vcam: in booth
+            // mode the brain blends onto the suspect cam, so the suspect must follow Camera.main.
+            Camera mainCamera = Camera.main;
+            Transform suspectLookTarget = mainCamera != null ? mainCamera.transform
+                : (PlayerInstance.Instance != null ? PlayerInstance.Instance.CameraTransform : null);
+            if (suspectLookTarget != null)
+                lookAnimator.ObjectToFollow = suspectLookTarget;
         }
 
         UIController.Instance.ShowBackButton(EndConversation);

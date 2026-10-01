@@ -23,7 +23,7 @@ public class SuspectData : ScriptableObject
     [Header("Infection")]
     [Range(0, 100)] public int startingInfectionScore = 0;
     [Tooltip("Min and max infection score added per day (noise range).")]
-    public Vector2Int dailyInfectionProgression = new Vector2Int(3, 8);
+    public Vector2Int dailyInfectionProgression = new Vector2Int(8, 18);
 
     [Header("Uncanny Arc — Profile")]
     [Tooltip("Internal alter-ego name — not shown to the player.")]

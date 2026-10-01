@@ -1084,10 +1084,9 @@ public class DebugConsole : MonoBehaviour
     /// before PlayShiftStartFanfare fires — this ensures the correct sky colour and
     /// Day 3 title card are shown (mirrors the SkipToDay / SkipToBoothReady pattern).
     /// Using SkipToOutsideBunker here (teleporting the player straight past the door)
-    /// would silently skip Day 3's start sequence: Day_03's bunker-exit stinger and its
-    /// gore/blood/fence yard-cleanup objectives only reveal off BunkerDoorController's
-    /// OnDoorOpened event, which never fires unless the player actually opens the door
-    /// themselves after spawning inside.
+    /// would skip the natural walk-out through the bunker door (BunkerDoorController's
+    /// OnDoorOpened event never fires unless the player actually opens the door
+    /// themselves after spawning inside).
     ///
     /// Routed through <see cref="EnsureGameStartedThen"/> — same reasoning as
     /// <see cref="SkipToStartOfDay2"/>: calling this cold from the main menu, before the

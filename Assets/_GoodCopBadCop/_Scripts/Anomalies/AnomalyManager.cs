@@ -38,7 +38,7 @@ public class AnomalyManager : MonoBehaviour
              "The same rolled value is applied to every suspect's daily infection increase that day, so some days " +
              "are calmer (near the low end) and some days spike (near the high end). Set both X and Y to 1 to disable " +
              "day-level randomness and always apply a flat 1x. Set both to 0 to freeze infection progression entirely.")]
-    [SerializeField] private Vector2 _infectionProgressionMultiplierRange = new Vector2(0.8f, 1.43f);
+    [SerializeField] private Vector2 _infectionProgressionMultiplierRange = new Vector2(0.85f, 1.2f);
 
     /// <summary>
     /// Rolls a fresh random multiplier within <see cref="_infectionProgressionMultiplierRange"/>. Callers should

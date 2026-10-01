@@ -2,15 +2,29 @@ using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
+/// <summary>
+/// Fills the world-space newspaper canvas for the current day, then snapshots it into the
+/// Newspaper render texture with <see cref="camera"/>.
+/// </summary>
 public class NewspaperContentsController : MonoBehaviour
 {
-    [SerializeField] private TextMeshPro dateText;
-    [SerializeField] private TextMeshPro headerText; 
-    [SerializeField] TextMeshPro subheaderText; 
-    [SerializeField] TextMeshPro descriptionText;
-    [SerializeField] TextMeshPro footerText;
+    [SerializeField] private TMP_Text dateText;
+    [SerializeField] private TMP_Text headerText; 
+    [SerializeField] TMP_Text subheaderText; 
+    [SerializeField] TMP_Text descriptionText;
+    [SerializeField] TMP_Text footerText;
 
+    [Header("Image")]
+    [Tooltip("UI Image that displays each day's newspaper photo. The sprite is assigned as-is; " +
+             "size/aspect come from the Image's own RectTransform and settings.")]
+    [SerializeField] private Image photoImage;
+
+    [Tooltip("Shown when a day's content has no image assigned.")]
+    [SerializeField] private Sprite fallbackImage;
+
+    [Space]
     [SerializeField] private NewspaperContentScriptable[] _newspaperContentScriptables;
     [SerializeField] private GameObject camera;
 
@@ -74,6 +88,23 @@ public class NewspaperContentsController : MonoBehaviour
         subheaderText.text = newspaperContentScriptable.subheaderText;
         descriptionText.text = newspaperContentScriptable.descriptionText;
         footerText.text = newspaperContentScriptable.footerText;
+        ApplyImage(newspaperContentScriptable.image);
+    }
+
+    /// <summary>
+    /// Swaps the day's sprite into <see cref="photoImage"/>. Sizing is left entirely to the Image's
+    /// authored RectTransform/settings. Falls back to <see cref="fallbackImage"/> (or hides the Image
+    /// if none) when the day has no image.
+    /// </summary>
+    private void ApplyImage(Sprite daySprite)
+    {
+        if (photoImage == null) return;
+
+        Sprite sprite = daySprite != null ? daySprite : fallbackImage;
+        photoImage.enabled = sprite != null;
+        if (sprite == null) return;
+
+        photoImage.sprite = sprite;
     }
 
     /// <summary>

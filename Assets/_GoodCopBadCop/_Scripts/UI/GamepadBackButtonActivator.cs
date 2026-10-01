@@ -37,10 +37,17 @@ public class GamepadBackButtonActivator : MonoBehaviour
     {
         if (!(Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)) return;
 
+        // Checked before invoking, since the Back action usually deactivates this screen.
+        if (_partner != null && (IsClickable || _partner.IsClickable))
+            _partner.PlayClickSfx(false);
+
         InvokeButton();
         if (_partner != null)
             _partner.InvokeButton();
     }
+
+    /// <summary>True if this activator's Button can currently be clicked.</summary>
+    public bool IsClickable => _button != null && _button.isActiveAndEnabled && _button.interactable;
 
     /// <summary>Invokes this activator's Button.onClick if it is currently clickable.</summary>
     public void InvokeButton()

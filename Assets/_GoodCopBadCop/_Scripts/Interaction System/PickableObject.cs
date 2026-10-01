@@ -91,6 +91,15 @@ public class PickableObject : Interactable
 
     /// <summary>True while this item is authoritatively contained by a supply box.</summary>
     public bool IsContainedInSupplyBox => _isContainedInSupplyBox.Value;
+
+    /// <summary>
+    /// True while this item is slotted into the given supply box. Reads only replicated state,
+    /// so it gives the same answer on the server, host, and every client.
+    /// </summary>
+    public bool IsContainedInSupplyBoxOf(NetworkObject box) =>
+        box != null &&
+        _isContainedInSupplyBox.Value &&
+        _supplyBoxSlotOwner.Value.NetworkObjectId == box.NetworkObjectId;
     protected bool isUsing;
 
     /// <summary>
@@ -496,6 +505,11 @@ public class PickableObject : Interactable
             _isStowed.Value = false;
         gameObject.SetActive(true);
         RemoveParent();
+
+        // The restore detaches the item from any supply box slot, so it is no longer contained.
+        // Leaving the flag set would keep the box reporting non-empty forever.
+        if (_isContainedInSupplyBox.Value)
+            SetSupplyBoxContainedNetworked(false);
 
         _holdingClientId.Value = ulong.MaxValue;
         NetworkObject.RemoveOwnership();

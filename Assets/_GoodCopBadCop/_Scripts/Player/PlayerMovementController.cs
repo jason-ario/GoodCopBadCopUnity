@@ -1203,11 +1203,14 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     public void PlayFootstepNetworked()
     {
         _footstepsAudio.PlayFootstep();
-        PlayFootstepClientRpc();
+        PlayFootstepRpc();
     }
 
-    [ClientRpc]
-    private void PlayFootstepClientRpc()
+    // Must be invokable by a non-host owner. A [ClientRpc] can only be sent by the server,
+    // so client-owned players' footsteps never reached the host. SendTo.NotMe is relayed
+    // through the server to every peer except the sender.
+    [Rpc(SendTo.NotMe)]
+    private void PlayFootstepRpc()
     {
         // Skip the owner — they already played it above.
         if (IsOwner) return;

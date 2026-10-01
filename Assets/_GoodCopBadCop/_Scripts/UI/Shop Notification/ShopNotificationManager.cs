@@ -13,11 +13,20 @@ public class ShopNotificationManager : MonoBehaviour
     [SerializeField] private AudioClip _notificationSound;
     [Tooltip("Played instead of _notificationSound for confirmed purchases (see ShowPurchaseNotification).")]
     [SerializeField] private AudioClip _purchaseSound;
+    [Tooltip("Negative cue played instead of _notificationSound for rejected actions (see ShowErrorNotification). " +
+             "Falls back to _notificationSound when unassigned.")]
+    [SerializeField] private AudioClip _errorSound;
 
     /// <summary>Spawns a shop notification with the given message using the default notification sound.</summary>
     public void ShowNotification(string message)
     {
         ShowNotification(message, _notificationSound);
+    }
+
+    /// <summary>Spawns a notification for a rejected action (e.g. "Trash is full"), using the negative error sound.</summary>
+    public void ShowErrorNotification(string message)
+    {
+        ShowNotification(message, _errorSound != null ? _errorSound : _notificationSound);
     }
 
     /// <summary>Spawns a shop notification confirming a purchase, using a distinct purchase sound.</summary>

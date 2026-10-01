@@ -110,6 +110,14 @@ public class SwitchButton : Interactable
         player.playerMovementController.SetCanControl(false);
         player.playerMovementController.LookAtTarget(transform);
 
+        // Snapshot the held item's right-arm state so it can be restored after the press —
+        // otherwise a held tool (e.g. the mop) is left with its hand IK pointed at the button,
+        // the right-arm rig at 0 and its hold mask cleared.
+        PlayerAnimationController anim   = player.playerAnimationController;
+        PlayerPickupController    pickup = player.pickupController;
+        PickableObject heldAtStart       = pickup != null ? pickup.HeldObject : null;
+        Transform savedRightArmIKTarget  = anim.RightArmIKTarget;
+
         player.playerAnimationController.RightArmIKTarget = ikTarget;
         player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
         player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
@@ -143,8 +151,37 @@ public class SwitchButton : Interactable
 
         yield return new WaitForSeconds(.25f);
 
-        player.playerAnimationController.DisableRightArmMask();
+        RestoreHeldItemArmPose(anim, pickup, heldAtStart, savedRightArmIKTarget);
         player.playerMovementController.SetCanControl(true);
+    }
+
+    /// <summary>
+    /// Hands the right arm back to whatever item the player was holding before the press,
+    /// mirroring the IK / mask setup in <see cref="PlayerPickupController"/>'s equip path.
+    /// Falls back to the plain no-item state when nothing (or something different) is held.
+    /// </summary>
+    private static void RestoreHeldItemArmPose(PlayerAnimationController anim, PlayerPickupController pickup,
+                                               PickableObject heldAtStart, Transform savedRightArmIKTarget)
+    {
+        PickableObject held = pickup != null ? pickup.HeldObject : null;
+
+        if (held == null || held != heldAtStart || held.ItemData == null)
+        {
+            anim.RightArmIKTarget = null;
+            anim.DisableRightArmMask();
+            return;
+        }
+
+        PickableItemData data = held.ItemData;
+
+        anim.RightArmIKTarget = savedRightArmIKTarget;
+        if (data.useRightIK)
+            anim.SetRightArmRigWeightSmooth(1f, .2f);
+
+        if (data.usesTwoArms)
+            anim.EnableHoldObjectTwoArmsMask();
+        else
+            anim.EnableRightArmMask();
     }
 
     /// <summary>

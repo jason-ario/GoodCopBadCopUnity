@@ -188,7 +188,8 @@ public class PlayerHealth : NetworkBehaviour
         // fully immune to damage from every source (mutants, radiation, fire, etc.) — this
         // is a server-authoritative backstop in addition to the mutant-side targeting/hit
         // checks in MutantEnemy and MutantAttackHitbox.
-        if (_playerInstance != null && _playerInstance.IsInCutscene)
+        // Same immunity applies while the end-of-shift report is on screen (IsProtectedFromHarm).
+        if (_playerInstance != null && _playerInstance.IsProtectedFromHarm)
             return;
 
         _lastHealthEffectKey.Value = ToNetworkEffectKey(effectKey, EffectKeys.DefaultPlayerDamage);

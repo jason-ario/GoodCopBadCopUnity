@@ -30,34 +30,38 @@ public class SupplyBox : PickableObject
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    /// <summary>
-    /// Server-computed empty state replicated to all clients so any player can check
-    /// <see cref="IsEmpty"/> without relying on the local, server-only <see cref="_hasHadItems"/>
-    /// or <see cref="_registeredItems"/> list.
-    /// </summary>
-    private NetworkVariable<bool> _networkIsEmpty = new NetworkVariable<bool>(
-        false,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
-
     /// <summary>Parent transform used to attach per-day items during delivery. Falls back to this transform if contents is unassigned.</summary>
     public Transform ContentsParent => contents != null ? contents.transform : transform;
 
-    /// <summary>Set to true the first time an item is registered so <see cref="IsEmpty"/> can
-    /// distinguish "nothing was ever added" from "everything has been taken".</summary>
-    private bool _hasHadItems;
+    /// <summary>
+    /// True when no spawned item is still slotted into this box. Computed on demand from
+    /// replicated per-item state (containment flag + slot owner), so it is correct on the
+    /// server, host, and every client without any event bookkeeping that could go stale
+    /// (missed pickup events, despawns while contained, checkpoint restores, late joins).
+    /// </summary>
+    public bool IsEmpty => GetItemsStillInBox(null) == 0;
 
     /// <summary>
-    /// Returns true when at least one item was delivered and all of them have since been picked up.
-    /// On the server the authoritative local lists are used directly; on clients the value is read
-    /// from <see cref="_networkIsEmpty"/> which the server keeps in sync.
+    /// Counts spawned items still contained in this box and not held by anyone. Optionally
+    /// collects their names for diagnostics.
     /// </summary>
-    public bool IsEmpty => IsServer
-        ? (_hasHadItems && !_registeredItems.Exists(IsStillInBox))
-        : _networkIsEmpty.Value;
+    public int GetItemsStillInBox(List<string> names)
+    {
+        NetworkManager nm = NetworkManager;
+        if (nm == null || nm.SpawnManager == null || NetworkObject == null) return 0;
 
-    private static bool IsStillInBox(PickableObject item) =>
-        item != null && item.IsSpawned && !item.IsHeld && item.IsContainedInSupplyBox;
+        int count = 0;
+        foreach (NetworkObject netObj in nm.SpawnManager.SpawnedObjectsList)
+        {
+            if (netObj == null || netObj == NetworkObject) continue;
+            if (!netObj.TryGetComponent(out PickableObject item)) continue;
+            if (item.IsHeld || !item.IsContainedInSupplyBoxOf(NetworkObject)) continue;
+
+            count++;
+            names?.Add(item.name);
+        }
+        return count;
+    }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -112,46 +116,27 @@ public class SupplyBox : PickableObject
     // ── Item Registration ─────────────────────────────────────────────────────
 
     /// <summary>
-    /// Registers a spawned item so the box can manage its interactability.
-    /// When the item is picked up by a player it automatically unregisters itself
-    /// on the server so closing the box never re-locks it.
+    /// Registers a spawned item so the box can manage its interactability (lock while the box
+    /// is closed/carried, unlock when open). Emptiness is not derived from this list — see
+    /// <see cref="IsEmpty"/>.
     /// </summary>
     public void RegisterItem(PickableObject item)
     {
         if (item == null || _registeredItems.Contains(item)) return;
         _registeredItems.Add(item);
-        _hasHadItems = true;
-        if (IsServer) _networkIsEmpty.Value = false;
-
-        // OnPickedUpNetworked is skipped on the server while the item's interactable lock is
-        // set, which a remote client's grab can race past (host/client lock state differs for a
-        // moment). The server always clears the item's supply-box containment when any player
-        // claims it, independent of that lock, so listen to both and refresh from authoritative state.
-        item.OnPickedUpNetworked += RefreshEmptyStateOnServer;
-        item.OnSupplyBoxContainmentChangedNetworked += _ => RefreshEmptyStateOnServer();
-    }
-
-    /// <summary>
-    /// Server-only: drops any registered item that has left the box (held by any player,
-    /// no longer contained, or despawned) and republishes <see cref="_networkIsEmpty"/>.
-    /// </summary>
-    private void RefreshEmptyStateOnServer()
-    {
-        if (!IsServer) return;
-
-        _registeredItems.RemoveAll(item => !IsStillInBox(item));
-
-        if (IsSpawned)
-            _networkIsEmpty.Value = _hasHadItems && _registeredItems.Count == 0;
     }
 
     /// <summary>Clears all registered items, e.g. when the box is despawned for a new delivery.</summary>
-    public void ClearRegisteredItems()
+    public void ClearRegisteredItems() => _registeredItems.Clear();
+
+    /// <summary>
+    /// Server-only: drops registered items that have left the box (taken, released from
+    /// containment, or despawned) so later open/close/carry lock changes never touch them.
+    /// </summary>
+    private void PruneRegisteredItems()
     {
-        _registeredItems.Clear();
-        _hasHadItems = false;
-        if (IsSpawned && IsServer)
-            _networkIsEmpty.Value = false;
+        _registeredItems.RemoveAll(item =>
+            item == null || !item.IsSpawned || !item.IsContainedInSupplyBoxOf(NetworkObject));
     }
 
     // ── Server-Side Item Lock Helpers ─────────────────────────────────────────
@@ -159,22 +144,25 @@ public class SupplyBox : PickableObject
     /// <summary>Unlocks all registered items so normal holder-based interactability applies.</summary>
     private void UnlockItemsOnServer()
     {
+        PruneRegisteredItems();
         foreach (PickableObject item in _registeredItems)
-            if (item != null && item.IsSpawned) item.UnlockInteractableNetworked();
+            item.UnlockInteractableNetworked();
     }
 
     /// <summary>Permanently locks all registered items regardless of holder state.</summary>
     private void LockItemsOnServer()
     {
+        PruneRegisteredItems();
         foreach (PickableObject item in _registeredItems)
-            if (item != null) item.LockInteractableNetworked();
+            item.LockInteractableNetworked();
     }
 
     /// <summary>Locks only items that are not currently held by a player.</summary>
     private void LockUnheldItemsOnServer()
     {
+        PruneRegisteredItems();
         foreach (PickableObject item in _registeredItems)
-            if (item != null && !item.IsHeld) item.LockInteractableNetworked();
+            if (!item.IsHeld) item.LockInteractableNetworked();
     }
 
     [ServerRpc(RequireOwnership = false)]

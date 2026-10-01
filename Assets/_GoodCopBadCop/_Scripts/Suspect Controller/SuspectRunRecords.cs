@@ -14,6 +14,11 @@ public class SuspectRunRecords : MonoBehaviour
     public Vector2 startingInfectionScore = new Vector2(0, 60);
     public Vector2 inspectionScoreIncreasePerDay = new Vector2(5, 20);
 
+    [Tooltip("Daily infection growth applies to every living suspect, seen or not. Suspects the player has " +
+             "never seen are capped at this score so they can't appear fully mutated (>= 80) before the " +
+             "player has had a chance to process them.")]
+    [Range(0, 100)] public int neverSeenInfectionCap = 70;
+
     [Header("Replacement System")]
     [Tooltip("Number of days after a suspect is killed before their replacement version activates and re-enters the shift pool.")]
     [Min(1)] public int replacementWindowDays = 7;
@@ -347,8 +352,7 @@ public class SuspectRunRecords : MonoBehaviour
     /// Quarantine-treated suspects have their score reset instead — unless they are fully mutated,
     /// in which case the quarantine has no effect.
     /// Suspects who have never been shown to the player (<see cref="SuspectRecord.daysShown"/> == 0)
-    /// are skipped entirely — their score stays at its initial base value until their first
-    /// appearance, regardless of how many campaign days have elapsed in the meantime.
+    /// still progress every day, capped at <see cref="neverSeenInfectionCap"/>.
     /// Checks whether any killed suspect has waited long enough to have their replacement activate.
     /// Persists all changes to disk after advancing.
     /// Call this before DailySuspectManager populates the next shift.
@@ -384,12 +388,9 @@ public class SuspectRunRecords : MonoBehaviour
             // Replacement suspects also skip normal infection advancement (they're handled as doppelgangers).
             if (record.isReplacement) continue;
 
-            // Suspects the player has never encountered stay at their base infection score —
-            // no matter how many days have passed — so their first appearance always reflects
-            // the starting range, not a backlog of unseen days. Progression only begins once
-            // they've actually been shown to the player (record.daysShown > 0, set in
-            // SuspectCharacter.MarkSuspectShown).
-            if (record.daysShown <= 0) continue;
+            // Every living suspect progresses daily, seen or not, so later days naturally present
+            // more infected suspects. Never-seen suspects are capped below the full-mutant threshold.
+            bool neverSeen = record.daysShown <= 0;
 
             if (record.pendingVaccineReset)
             {
@@ -410,7 +411,10 @@ public class SuspectRunRecords : MonoBehaviour
                 Vector2Int range = record.SuspectData.dailyInfectionProgression;
                 int baseIncrease = UnityEngine.Random.Range(range.x, range.y + 1);
                 int increase = Mathf.RoundToInt(baseIncrease * dayMultiplier);
-                record.infectionScore = Mathf.Clamp(record.infectionScore + increase, 0, 100);
+                int cap = neverSeen
+                    ? Mathf.Max(record.infectionScore, Mathf.Min(neverSeenInfectionCap, AnomalyController.FULLY_MUTATED_THRESHOLD - 1))
+                    : 100;
+                record.infectionScore = Mathf.Clamp(record.infectionScore + increase, 0, cap);
                 Debug.Log($"[SuspectRunRecords] '{record.SuspectData.name}' infection +{increase} (base {baseIncrease} × {dayMultiplier:F2}) → {record.infectionScore}{(record.IsFullyMutated ? " [FULLY MUTATED]" : "")}.");
             }
         }

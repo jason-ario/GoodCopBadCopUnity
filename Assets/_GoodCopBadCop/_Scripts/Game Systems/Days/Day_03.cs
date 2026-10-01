@@ -247,20 +247,6 @@ public class Day_03 : DayBase, IDailyTask
     protected override bool SupportsFuseBoxRestore => true;
 
     // -------------------------------------------------------------------------
-    // Inspector — Bunker Exit Stinger
-    // -------------------------------------------------------------------------
-
-    [Header("Day 3 — Bunker Exit Stinger")]
-    [Tooltip("One-shot stinger played the first time a player opens the bunker door and " +
-             "exits for Day 3. Played locally on every client via SFXController, matching " +
-             "the pattern used by UIController's transition stinger.")]
-    [SerializeField] private AudioClip _bunkerExitStinger;
-
-    [SerializeField] private float _bunkerExitStingerVolume = 1f;
-
-    private bool _bunkerExitStingerPlayed;
-
-    // -------------------------------------------------------------------------
     // Inspector — Post-Shift Power Outage (Fuse Box)
     // -------------------------------------------------------------------------
 
@@ -358,14 +344,6 @@ public class Day_03 : DayBase, IDailyTask
         OchoEatingVladCutscene.Instance?.DebugReset();
         OchoEatingVladCutscene.Instance?.TriggerTask();
 
-        // Plays a one-shot stinger the first time a player opens the bunker door and steps
-        // outside for Day 3. Reset per-day so a re-activation (e.g. debug skip) can replay it.
-        _bunkerExitStingerPlayed = false;
-        BunkerDoorController.OnDoorOpened += OnBunkerDoorOpenedFirstTime;
-
-        Debug.Log("[Day_03] DayActivated -- subscribed to BunkerDoorController.OnDoorOpened. " +
-                  "Bunker-exit stinger will play once the player opens the bunker door.");
-
         // Skip the Day 3 mail delivery entirely -- no delivery, no crate, no "Sort the Mail"
         // task. The mechanic is already established on Day 2; Day 3 is already carrying the
         // gore/blood/fence cleanup plus the finale breach. Must be set here, before
@@ -418,7 +396,6 @@ public class Day_03 : DayBase, IDailyTask
 
     private void UnsubscribeAll()
     {
-        BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
         ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
         Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
 
@@ -560,38 +537,6 @@ public class Day_03 : DayBase, IDailyTask
 
         Debug.Log("[Day_03] Post-shift power outage resolved -- fuse box repaired.");
         OnDailyTaskCompleted?.Invoke();
-    }
-
-    // -------------------------------------------------------------------------
-    // Bunker exit stinger -- all clients
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Fired on every client (via <see cref="BunkerDoorController.OnDoorOpened"/>) the moment
-    /// the bunker door swings open. Since the door is force-closed at the start of every day
-    /// (see <see cref="ShiftManager.InBetweenShiftSequence"/> / <see cref="BunkerDoorController.OnDayChanged"/>),
-    /// the first invocation each Day 3 always corresponds to the player's first exit of the day.
-    /// Plays the bunker-exit stinger only. Unsubscribes immediately so later door-opens that
-    /// day (e.g. going back in and out) stay silent.
-    ///
-    /// No objective rows are added here — <see cref="TakeOutTrashTask"/> and
-    /// <see cref="FenceRepairTask"/> are both
-    /// <see cref="ISystemicThreat"/>s, so <see cref="HUDTaskList"/> already adds their rows to
-    /// <see cref="TutorialObjectiveList"/> automatically via the shared <see cref="TaskRegistry"/>
-    /// the moment they're triggered in <see cref="DayActivated"/> (day start). Adding them again
-    /// here on door-open duplicated every row.
-    /// </summary>
-    private void OnBunkerDoorOpenedFirstTime()
-    {
-        if (_bunkerExitStingerPlayed) return;
-        _bunkerExitStingerPlayed = true;
-
-        BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpenedFirstTime;
-
-        if (_bunkerExitStinger == null)
-            Debug.LogWarning("[Day_03] _bunkerExitStinger is not assigned -- skipping stinger playback.");
-        else
-            SFXController.Instance?.Play(_bunkerExitStinger, _bunkerExitStingerVolume);
     }
 }
 

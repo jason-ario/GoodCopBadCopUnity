@@ -597,6 +597,11 @@ public class OchoEatingVladCutscene : NetworkBehaviour
             netObj.Spawn(true);
             _spawnedPieceNetObjs[i] = netObj;
 
+            // NetworkRigidbody makes the server copy dynamic on spawn. Freeze it while the
+            // ParentConstraint carries it, otherwise gravity builds velocity under the constraint
+            // and KickablePhysicsBody's settle timer freezes it before/while it's dropped.
+            HoldPieceServer(instance);
+
             GoreLandingEffectRelay relay = instance.AddComponent<GoreLandingEffectRelay>();
             relay.Initialize(_pieceGroundLayer, HandlePieceLanded);
 
@@ -673,12 +678,49 @@ public class OchoEatingVladCutscene : NetworkBehaviour
             NetworkTransform nt = constraint.GetComponent<NetworkTransform>();
             if (nt != null) nt.enabled = true;
 
+            if (!IsServer) continue;
+
+            Transform pieceTf = constraint.transform;
+
+            // The NetworkTransform was off while held, so clients may hold a stale pose — snap
+            // them to the release pose before the server starts streaming the fall.
+            if (nt != null && nt.IsSpawned && nt.CanCommitToTransform)
+                nt.Teleport(pieceTf.position, pieceTf.rotation, pieceTf.localScale);
+
             Rigidbody rb = _spawnedPieceRigidbodies != null && i < _spawnedPieceRigidbodies.Length
                 ? _spawnedPieceRigidbodies[i]
                 : null;
-            if (IsServer && rb != null)
-                rb.isKinematic = false;
+            ReleasePieceServer(constraint.gameObject, rb);
         }
+    }
+
+    /// <summary>SERVER ONLY — freezes a spawned piece double while it's carried by its constraint.</summary>
+    private static void HoldPieceServer(GameObject piece)
+    {
+        if (piece.TryGetComponent(out KickablePhysicsBody kickable))
+        {
+            kickable.HoldServer();
+            return;
+        }
+
+        if (piece.TryGetComponent(out Rigidbody rb))
+            rb.isKinematic = true;
+    }
+
+    /// <summary>SERVER ONLY — lets a held piece double free-fall from rest.</summary>
+    private static void ReleasePieceServer(GameObject piece, Rigidbody rb)
+    {
+        if (piece.TryGetComponent(out KickablePhysicsBody kickable))
+        {
+            kickable.ReleaseServer();
+            return;
+        }
+
+        if (rb == null) return;
+        rb.isKinematic = false;
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        rb.WakeUp();
     }
 
     /// <summary>SERVER ONLY — despawns any spawned piece doubles (debug/testing only).</summary>

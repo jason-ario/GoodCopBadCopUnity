@@ -25,8 +25,8 @@ public enum MusicPriority
 /// carry a <see cref="MusicPriority"/> so lower-priority music (ambience) never interrupts
 /// higher-priority music (story/encounter stingers) — see <see cref="MusicPriority"/>.
 ///
-/// All methods are client-local — they must be called from a ClientRpc (or directly on a
-/// non-networked host) to reach every connected player.
+/// All methods are client-local — they must be called from a ClientRpc / NetworkVariable
+/// callback (see <see cref="AmbientMusicDirector"/>) to reach every connected player.
 /// </summary>
 [RequireComponent(typeof(AudioSource))]
 public class MusicManager : MonoBehaviour
@@ -119,7 +119,12 @@ public class MusicManager : MonoBehaviour
     /// active priority are ignored while that track is still playing — see
     /// <see cref="MusicPriority"/>.
     /// </param>
-    public void Play(AudioClip clip, bool loop = true, float fadeInDuration = -1f, MusicPriority priority = MusicPriority.Encounter)
+    /// <param name="startTime">
+    /// Playback position in seconds to start from, used for network-synced music. Time
+    /// spent cross-fading out a previous track is added so the position stays in sync.
+    /// Pass a negative value (default) to start from the beginning.
+    /// </param>
+    public void Play(AudioClip clip, bool loop = true, float fadeInDuration = -1f, MusicPriority priority = MusicPriority.Encounter, float startTime = -1f)
     {
         if (clip == null)
         {
@@ -145,11 +150,16 @@ public class MusicManager : MonoBehaviour
         {
             // Cross-fade: quick fade-out of the current track, then swap and fade in.
             float crossFade = Mathf.Min(_crossFadeDuration, fadeIn > 0f ? fadeIn : _crossFadeDuration);
-            _source.DOFade(0f, crossFade).OnComplete(() => SwapAndPlay(clip, loop, fadeIn));
+            float requestedAt = Time.unscaledTime;
+            _source.DOFade(0f, crossFade).OnComplete(() =>
+            {
+                float syncedStart = startTime < 0f ? -1f : startTime + (Time.unscaledTime - requestedAt);
+                SwapAndPlay(clip, loop, fadeIn, syncedStart);
+            });
         }
         else
         {
-            SwapAndPlay(clip, loop, fadeIn);
+            SwapAndPlay(clip, loop, fadeIn, startTime);
         }
     }
 
@@ -211,12 +221,15 @@ public class MusicManager : MonoBehaviour
         return volume;
     }
 
-    private void SwapAndPlay(AudioClip clip, bool loop, float fadeIn)
+    private void SwapAndPlay(AudioClip clip, bool loop, float fadeIn, float startTime = -1f)
     {
         _source.clip   = clip;
         _source.loop   = loop;
         float target = TargetVolume(_currentPriority);
         _source.volume = fadeIn > 0f ? 0f : target;
+        _source.time   = startTime > 0f
+            ? (loop ? startTime % clip.length : Mathf.Min(startTime, Mathf.Max(0f, clip.length - 0.05f)))
+            : 0f;
         _source.Play();
 
         if (fadeIn > 0f)

@@ -284,14 +284,11 @@ public class JunkItem : Interactable
 
     /// <summary>
     /// Triggered by the E key. If the player is holding a non-full TrashBag, collects
-    /// this item. Does nothing when empty-handed or when the bag is already full.
+    /// this item. Does nothing when empty-handed; shows a "Trash is full" toast when the bag is full.
     /// </summary>
     public override void Interact(PlayerInteractionController player)
     {
-        TrashBag bag = player.pickupController.HeldObject as TrashBag;
-        if (bag == null || bag.IsFull) return;
-
-        CollectServerRpc(bag.NetworkObject);
+        TryCollectInto(player.pickupController.HeldObject as TrashBag);
     }
 
     /// <summary>
@@ -300,10 +297,35 @@ public class JunkItem : Interactable
     /// </summary>
     public override void InteractWithItem(PlayerInteractionController player, PickableObject heldItem)
     {
-        TrashBag bag = heldItem as TrashBag;
-        if (bag == null || bag.IsFull) return;
+        TryCollectInto(heldItem as TrashBag);
+    }
+
+    private const string BagFullMessage = "<color=red>Trash is full</color>";
+    private const float  BagFullNotifyCooldown = 1f;
+
+    /// <summary>Shared across all junk items so spamming E/LMB on several items doesn't stack toasts.</summary>
+    private static float _lastBagFullNotifyTime = float.NegativeInfinity;
+
+    private void TryCollectInto(TrashBag bag)
+    {
+        if (bag == null) return;
+
+        if (bag.IsFull)
+        {
+            NotifyBagFull();
+            return;
+        }
 
         CollectServerRpc(bag.NetworkObject);
+    }
+
+    /// <summary>Local-only feedback: "Trash is full" toast plus the negative error sound.</summary>
+    private static void NotifyBagFull()
+    {
+        if (Time.unscaledTime - _lastBagFullNotifyTime < BagFullNotifyCooldown) return;
+        _lastBagFullNotifyTime = Time.unscaledTime;
+
+        UIController.Instance?.ShowErrorNotification(BagFullMessage);
     }
 
     // ── Server RPC ────────────────────────────────────────────────────────────

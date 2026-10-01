@@ -14,6 +14,9 @@ public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     public bool disableAnimation;
     private bool isActiveTab;
 
+    /// <summary>True if this button plays its own click sound on pointer down.</summary>
+    public bool HasClickSfx => sfxOnClick != null;
+
     private void Awake()
     {
         button = GetComponent<Button>();

@@ -6,6 +6,7 @@ public class TrashCan : Interactable
     private const string DocumentationCategory = "Documentation";
     private const string DocumentationTutorialIncompleteMessage =
         "Can't throw away yet";
+    private const string SupplyBoxNotEmptyMessage = "Empty the box first";
 
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip throwTrashSound;
@@ -19,9 +20,15 @@ public class TrashCan : Interactable
     {
         base.InteractWithItem(playerInteractionController, item);
 
-        if (item is SupplyBox supplyBox && !supplyBox.IsEmpty)
+        if (item is SupplyBox supplyBox)
         {
-            return;
+            var remaining = new System.Collections.Generic.List<string>();
+            if (supplyBox.GetItemsStillInBox(remaining) > 0)
+            {
+                Debug.Log($"[TrashCan] Supply box not empty — still contains: {string.Join(", ", remaining)}", this);
+                UIController.Instance?.ShowShopNotification(SupplyBoxNotEmptyMessage);
+                return;
+            }
         }
 
         if (item is ExamNotebook examNotebook &&

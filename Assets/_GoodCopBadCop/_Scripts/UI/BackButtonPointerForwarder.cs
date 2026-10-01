@@ -26,6 +26,7 @@ public class BackButtonPointerForwarder : MonoBehaviour, IPointerClickHandler
             || !_button.interactable)
             return;
 
+        _backButtonActivator?.PlayClickSfx(true);
         _backButtonActivator?.InvokeButton();
     }
 }

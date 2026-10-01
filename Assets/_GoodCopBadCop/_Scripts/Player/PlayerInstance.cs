@@ -54,6 +54,26 @@ public class PlayerInstance : NetworkBehaviour
     /// <summary>True while this player is in a scripted dialogue cutscene.</summary>
     public bool IsInCutscene => _isInCutscene.Value;
 
+    /// <summary>
+    /// True while this player has the end-of-shift report on screen.
+    /// Owner-write (set by <see cref="UIController"/> on the local client); Everyone-read so the
+    /// server can exclude the player from mutant targeting and damage.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isViewingShiftReport = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner
+    );
+
+    /// <summary>True while this player is viewing the end-of-shift report.</summary>
+    public bool IsViewingShiftReport => _isViewingShiftReport.Value;
+
+    /// <summary>
+    /// True while this player must be ignored by mutants and immune to all damage:
+    /// in a dialogue cutscene or viewing the end-of-shift report.
+    /// </summary>
+    public bool IsProtectedFromHarm => IsInCutscene || IsViewingShiftReport;
+
     public bool CanControl
     {
         get => _playerMovementController.CanControl;
@@ -345,6 +365,17 @@ public class PlayerInstance : NetworkBehaviour
     {
         _isInCutscene.Value = value;
         OnCutsceneStateChanged?.Invoke(value);
+    }
+
+    /// <summary>
+    /// Sets <see cref="IsViewingShiftReport"/>. Must only be called on the owning client
+    /// (i.e. on <see cref="Instance"/> from <see cref="UIController"/>).
+    /// </summary>
+    public void SetIsViewingShiftReport(bool value)
+    {
+        if (!IsOwner || _isViewingShiftReport.Value == value)
+            return;
+        _isViewingShiftReport.Value = value;
     }
 
     /// <summary>
