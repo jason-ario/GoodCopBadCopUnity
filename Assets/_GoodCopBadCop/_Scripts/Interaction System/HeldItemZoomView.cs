@@ -43,6 +43,41 @@ public class HeldItemZoomView : DiegeticViewController
              "Forward+ light clustering flicker.")]
     [SerializeField, Min(0.001f)] private float _nearClipPlane = 0.01f;
 
+    [Header("Exit Blend")]
+    [Tooltip("Blend used only when leaving zoom (overrides the brain's default for this transition). " +
+             "HardOut leaves the close-up immediately and eases into the player view, so the camera pulls " +
+             "back together with the lowering document instead of lingering on it.")]
+    [SerializeField] private CinemachineBlendDefinition _exitBlend =
+        new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.HardOut, 0.45f);
+
+    // Exit blends per zoom camera (one per player instance): only applied when blending from that
+    // zoom camera back to its own player camera, so e.g. a cutscene closing zoom keeps its own blend.
+    private static readonly System.Collections.Generic.Dictionary<ICinemachineCamera, (ICinemachineCamera to, CinemachineBlendDefinition blend)>
+        s_ExitBlends = new();
+    private static CinemachineCore.GetBlendOverrideDelegate s_PreviousBlendOverride;
+
+    private static void EnsureBlendOverrideInstalled()
+    {
+        CinemachineCore.GetBlendOverrideDelegate handler = OverrideExitBlend;
+        if (CinemachineCore.GetBlendOverride == handler) return;
+        s_PreviousBlendOverride = CinemachineCore.GetBlendOverride;
+        CinemachineCore.GetBlendOverride = handler;
+    }
+
+    private static CinemachineBlendDefinition OverrideExitBlend(
+        ICinemachineCamera fromVcam, ICinemachineCamera toVcam,
+        CinemachineBlendDefinition defaultBlend, Object owner)
+    {
+        if (s_PreviousBlendOverride != null)
+            defaultBlend = s_PreviousBlendOverride(fromVcam, toVcam, defaultBlend, owner);
+
+        if (fromVcam != null && s_ExitBlends.TryGetValue(fromVcam, out var exit)
+            && (exit.to == null || ReferenceEquals(exit.to, toVcam)))
+            return exit.blend;
+
+        return defaultBlend;
+    }
+
     [Header("Vignette")]
     [Tooltip("Fade a vignette in while zoomed (local-only runtime URP Volume).")]
     [SerializeField] private bool _useVignette = true;
@@ -132,6 +167,7 @@ public class HeldItemZoomView : DiegeticViewController
 
     private void OnDestroy()
     {
+        if (ViewCamera != null) s_ExitBlends.Remove(ViewCamera);
         if (_vignetteVolume != null) Destroy(_vignetteVolume.gameObject);
         if (_vignetteProfile != null) Destroy(_vignetteProfile);
     }
@@ -299,8 +335,17 @@ public class HeldItemZoomView : DiegeticViewController
         }
 
         // Blend out with the player's near plane (runs before the base deactivates the camera).
+        // Refresh the camera state now so the FreezeWhenBlendingOut snapshot picks it up — otherwise
+        // the frozen exit pose keeps the 0.01 close-up near plane and the lowering arm/document
+        // sweeps right across the lens.
         SetViewNearClip(PlayerNearClip);
         _nearTightened = false;
+        if (ViewCamera != null)
+        {
+            s_ExitBlends[ViewCamera] = (_playerVcam, _exitBlend);
+            EnsureBlendOverrideInstalled();
+            ViewCamera.InternalUpdateCameraState(Vector3.up, -1f);
+        }
 
         // Release immediately. The camera is detached from the item for the blend out via the
         // FreezeWhenBlendingOut hint (see Awake), so the hand lowering can't drag the view.
