@@ -115,14 +115,18 @@ public class HeldItemZoomView : DiegeticViewController
             _playerVcam = _eye.GetComponent<CinemachineCamera>();
 
         if (ViewCamera != null)
+        {
+            // Blend out from a snapshot of the zoom camera's last pose instead of a camera that
+            // is still tied to the (now lowering) item — detaches the view at the start of the exit.
+            ViewCamera.BlendHint |= CinemachineCore.BlendHints.FreezeWhenBlendingOut;
             ViewCamera.gameObject.SetActive(false);
+        }
     }
 
     private void OnDisable()
     {
         // Guard against teardown order on quit / scene unload (Close touches UIController).
         if (IsActive && UIController.Instance != null) Close();
-        FlushDeferredRelease();
         if (_vignetteVolume != null) _vignetteVolume.weight = 0f;
     }
 
@@ -277,10 +281,6 @@ public class HeldItemZoomView : DiegeticViewController
         // Documents: act exactly as if the player pressed and is holding LMB.
         if (_target != null && _target.InspectWhileZoomed)
         {
-            // Re-zoomed during a pending blend-out release: keep the use held if it's the same
-            // item; otherwise finish the old release first so the new item starts its own use.
-            if (_releasePending && _releaseItem != _target.Pickable) FlushDeferredRelease();
-            CancelDeferredRelease();
             _pickup.BeginHeldUseFromZoom();
             _holdingUse = true;
         }
@@ -302,75 +302,15 @@ public class HeldItemZoomView : DiegeticViewController
         SetViewNearClip(PlayerNearClip);
         _nearTightened = false;
 
-        // Keep the document raised (and animators awake) until the camera has blended back,
-        // so the hand doesn't drop while the view is still moving. Released in LateUpdate.
-        BeginDeferredRelease();
+        // Release immediately. The camera is detached from the item for the blend out via the
+        // FreezeWhenBlendingOut hint (see Awake), so the hand lowering can't drag the view.
+        ReleaseHeldUse(_target != null ? _target.Pickable : null);
+        _animation?.SetForceAlwaysAnimate(false);
 
         if (_pickup != null)
             _pickup.CanPickUpAndPlace = true;
 
         _target = null;
-    }
-
-    // ─── Deferred "LMB release" after the blend out ──────────────────────────
-
-    [Tooltip("Safety cap (seconds) on how long the inspect pose is held after closing while waiting for the blend out.")]
-    [SerializeField, Min(0f)] private float _maxReleaseDelay = 2f;
-
-    private bool _releasePending;
-    private PickableObject _releaseItem;
-    private float _releaseDeadline;
-
-    private void BeginDeferredRelease()
-    {
-        _releaseItem = _target != null ? _target.Pickable : null;
-
-        if (!_holdingUse)
-        {
-            _animation?.SetForceAlwaysAnimate(false);
-            return;
-        }
-
-        _releasePending = true;
-        _releaseDeadline = Time.unscaledTime + _maxReleaseDelay;
-    }
-
-    private void CancelDeferredRelease()
-    {
-        _releasePending = false;
-        _releaseItem = null;
-    }
-
-    private void UpdateDeferredRelease()
-    {
-        if (!_releasePending) return;
-
-        bool itemGone = _pickup == null || _pickup.HeldObject == null || _pickup.HeldObject != _releaseItem;
-        if (!itemGone && Time.unscaledTime < _releaseDeadline && IsBlendingOut()) return;
-
-        FlushDeferredRelease();
-    }
-
-    /// <summary>Performs the pending release immediately (no-op if nothing is pending).</summary>
-    private void FlushDeferredRelease()
-    {
-        if (!_releasePending) return;
-        _releasePending = false;
-        ReleaseHeldUse(_releaseItem);
-        _releaseItem = null;
-        _animation?.SetForceAlwaysAnimate(false);
-    }
-
-    /// <summary>
-    /// True until the brain has left the zoom camera and finished blending. Reads last frame's
-    /// brain state (this runs before CinemachineBrain), so the close frame still counts as zoomed.
-    /// </summary>
-    private bool IsBlendingOut()
-    {
-        Camera cam = RaycastCamera;
-        CinemachineBrain brain = cam != null ? cam.GetComponent<CinemachineBrain>() : null;
-        if (brain == null) return false;
-        return ReferenceEquals(brain.ActiveVirtualCamera, ViewCamera) || brain.IsBlending;
     }
 
     /// <summary>
@@ -441,9 +381,8 @@ public class HeldItemZoomView : DiegeticViewController
 
     private void LateUpdate()
     {
-        // Runs while closed too so the vignette can fade out and the deferred release can fire.
+        // Runs while closed too so the vignette can fade out.
         UpdateVignette();
-        UpdateDeferredRelease();
 
         if (!IsActive || _target == null) return;
 

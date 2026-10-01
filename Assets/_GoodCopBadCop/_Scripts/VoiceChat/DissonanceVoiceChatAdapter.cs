@@ -56,9 +56,12 @@ namespace GoodCopBadCop.VoiceChat
             service.SetCommsAvailable(commsRuntime.Comms != null);
             service.SetNetworkReady(commsRuntime.Comms != null && commsRuntime.Comms.IsNetworkInitialized);
 
+            bool hasRemotePeer = HasRemoteNetworkPeer();
+            ApplyCommsActive(hasRemotePeer);
+
             // TODO: If all players leave the lobby, the microphone indicator can remain visible;
             // handle lobby/network disconnect events and force local speaking off.
-            bool localSpeaking = HasRemoteNetworkPeer() && HasActiveTransmission();
+            bool localSpeaking = hasRemotePeer && HasActiveTransmission();
             if (appliedLocalSpeaking != localSpeaking)
             {
                 appliedLocalSpeaking = localSpeaking;
@@ -198,6 +201,22 @@ namespace GoodCopBadCop.VoiceChat
                     return CommActivationMode.Open;
                 default:
                     return CommActivationMode.VoiceActivation;
+            }
+        }
+
+        /// <summary>
+        /// Only run DissonanceComms (and therefore the microphone) when there is someone to talk to.
+        /// Opening the mic forces Bluetooth headsets into their low-quality hands-free profile, so a
+        /// single-player session must never start capture. Disabling DissonanceComms pauses capture
+        /// and releases the microphone; re-enabling starts it (first time) or resumes it.
+        /// The GameObject stays active so NfgoPlayer can still find the component on spawn.
+        /// </summary>
+        private void ApplyCommsActive(bool active)
+        {
+            DissonanceComms currentComms = commsRuntime.Comms;
+            if (currentComms != null && currentComms.enabled != active)
+            {
+                currentComms.enabled = active;
             }
         }
 

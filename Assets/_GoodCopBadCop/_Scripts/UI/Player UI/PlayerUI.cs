@@ -46,6 +46,7 @@ public class PlayerUI : MonoBehaviour
     {
         _batteryBar?.Hide();
         SetZoomHelperIconVisible(false);
+        SetMaskHelperIconVisible(IsLocalMaskEquipped());
         TrySubscribeToPickupController();
 
         CheckpointIntegrityService.OnEnabledChanged += OnCheckpointIntegrityEnabledChanged;
@@ -76,6 +77,10 @@ public class PlayerUI : MonoBehaviour
 
         if (_mirroredTarget != null || _wasMirroring)
             EndMirroring();
+
+        // The HUD can activate after the local player spawned (missing the equipment controller's
+        // initial push), so keep the mask icon in step with the replicated mask state every frame.
+        SetMaskHelperIconVisible(IsLocalMaskEquipped());
 
         // Poll until PlayerInstance is available (it sets itself in OnNetworkSpawn), and rebind
         // if the local player respawned as a new object.
@@ -140,10 +145,21 @@ public class PlayerUI : MonoBehaviour
         OnHeldObjectChanged(null);
 
         // Restore the local player's own mask icon state.
-        PlayerEquipmentController localEquipment = PlayerInstance.Instance != null
-            ? PlayerInstance.Instance.GetComponent<PlayerEquipmentController>()
-            : null;
-        SetMaskHelperIconVisible(localEquipment != null && localEquipment.IsMaskEquipped);
+        SetMaskHelperIconVisible(IsLocalMaskEquipped());
+    }
+
+    private PlayerInstance _equipmentOwner;
+    private PlayerEquipmentController _localEquipment;
+
+    private bool IsLocalMaskEquipped()
+    {
+        PlayerInstance local = PlayerInstance.Instance;
+        if (local != _equipmentOwner)
+        {
+            _equipmentOwner = local;
+            _localEquipment = local != null ? local.GetComponent<PlayerEquipmentController>() : null;
+        }
+        return _localEquipment != null && _localEquipment.IsMaskEquipped;
     }
 
     private void UnsubscribeFromPickupController()
@@ -172,7 +188,7 @@ public class PlayerUI : MonoBehaviour
     /// <summary>Shows or hides the radiation mask helper icon.</summary>
     public void SetMaskHelperIconVisible(bool visible)
     {
-        if (_maskHelperIcon != null)
+        if (_maskHelperIcon != null && _maskHelperIcon.activeSelf != visible)
             _maskHelperIcon.SetActive(visible);
     }
 

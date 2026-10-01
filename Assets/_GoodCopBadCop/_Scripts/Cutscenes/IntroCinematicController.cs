@@ -30,9 +30,6 @@ public class IntroCinematicController : MonoBehaviour
     [SerializeField] private float promptDelay = 0.5f;
     [SerializeField] private float promptFadeInDuration = 0.6f;
     [SerializeField] private float promptFadeOutDuration = 0.2f;
-    [Tooltip("Seconds per full pulse cycle of the continue chevron.")]
-    [SerializeField] private float promptPulsePeriod = 1.4f;
-    [SerializeField, Range(0f, 1f)] private float promptPulseMinAlpha = 0.35f;
 
     [Tooltip("Story lines shown in order, one at a time, over the black screen.")]
     [TextArea(2, 4)]
@@ -134,8 +131,7 @@ public class IntroCinematicController : MonoBehaviour
             if (continuePrompt != null)
             {
                 float fadeIn = Mathf.Clamp01((t - promptDelay) / promptFadeInDuration);
-                float wave = 0.5f + 0.5f * Mathf.Cos((t - promptDelay) * Mathf.PI * 2f / promptPulsePeriod);
-                continuePrompt.alpha = t < promptDelay ? 0f : fadeIn * Mathf.Lerp(promptPulseMinAlpha, 1f, wave);
+                continuePrompt.alpha = t < promptDelay ? 0f : fadeIn;
             }
             yield return null;
         }

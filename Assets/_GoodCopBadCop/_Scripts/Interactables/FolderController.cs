@@ -219,10 +219,29 @@ public class FolderController : PickableObject
         return result;
     }
 
+    protected override void Awake()
+    {
+        base.Awake();
+
+        // Stowing deactivates the folder's GameObject. By default an Animator wipes its state and
+        // parameters on disable, so an open folder would come back visually closed while isOpen
+        // (and the player's "HoldingFolderOpen" pose) still say open. Keep the state instead.
+        if (anim != null)
+            anim.keepAnimatorStateOnDisable = true;
+    }
+
     public override void OnNetworkSpawn()
     {
+        base.OnNetworkSpawn();
+
         // Sync visual state on spawn and when variables change
         isOpen.OnValueChanged += OnIsOpenChanged;
+        if (anim != null)
+            anim.SetBool("Open", isOpen.Value);
+
+        // Filed documents are separate NetworkObjects (SocketFollow, not children), so the base
+        // stow deactivation of this GameObject does not hide them — mirror it on every client.
+        OnStowedNetworked += OnStowedAllClients;
 
         // Late-joiner sync: apply stamp visual immediately if already stamped.
         if (isStamped.Value)
@@ -249,6 +268,107 @@ public class FolderController : PickableObject
         {
             _queueSlot0, _queueSlot1, _queueSlot2, _queueSlot3, _queueSlot4
         };
+    }
+
+    /// <summary>
+    /// Folders are runtime per-suspect objects whose lifecycle is owned by SuspectController.
+    /// They historically never registered with the save registry (base OnNetworkSpawn was not
+    /// called), so keep them out of workday captures/tombstones now that it is.
+    /// </summary>
+    public override bool IsPersistedInSave => false;
+
+    public override void OnNetworkDespawn()
+    {
+        FolderDebug("OnNetworkDespawn", withStack: true);
+        base.OnNetworkDespawn();
+        isOpen.OnValueChanged -= OnIsOpenChanged;
+        OnStowedNetworked     -= OnStowedAllClients;
+    }
+
+    /// <summary>
+    /// Owner-local, immediate: hide filed documents the instant the folder is stowed, before the
+    /// networked stowed flag round-trips (OnStowedAllClients covers every other client).
+    /// </summary>
+    public override void OnStowed()
+    {
+        base.OnStowed();
+        FolderDebug("OnStowed (owner)");
+        StopAllCoroutines();
+        isOpeningOrClosing = false;
+        SetDocumentsActive(false);
+    }
+
+    /// <summary>
+    /// Runs on every machine (including late updates on the owner) whenever the authoritative
+    /// stowed state changes, keeping filed documents' visibility in sync with the folder.
+    /// </summary>
+    private void OnStowedAllClients(bool stowed)
+    {
+        FolderDebug($"OnStowedNetworked({stowed})");
+        SetDocumentsActive(!stowed);
+        if (!stowed) SyncOpenVisual();
+    }
+
+    /// <summary>
+    /// The folder only becomes active again when it is unstowed (or first spawned), so restore
+    /// documents and the open visual immediately on the owner without waiting for the network.
+    /// </summary>
+    private void OnEnable()
+    {
+        if (!IsSpawned) return;
+        FolderDebug("OnEnable");
+        SetDocumentsActive(true);
+        SyncOpenVisual();
+    }
+
+    // ── TEMP diagnostics for "folder disappears when placed after stow/unstow" ──────────
+    private const bool k_FolderDebug = true;
+
+    private void FolderDebug(string evt, bool withStack = false)
+    {
+        if (!k_FolderDebug || !IsSpawned) return;
+        string msg = $"[FolderDebug] {evt} | id={NetworkObjectId} frame={Time.frameCount} " +
+                     $"active={gameObject.activeInHierarchy} pos={transform.position} scale={transform.lossyScale} " +
+                     $"held={IsHeld} holder={HolderClientId} open={isOpen.Value} docs={documents?.Count ?? 0} " +
+                     $"server={IsServer} owner={OwnerClientId}";
+        if (withStack) msg += "\n" + System.Environment.StackTrace;
+        Debug.Log(msg, this);
+    }
+
+    private void OnDisable()
+    {
+        FolderDebug("OnDisable", withStack: true);
+    }
+
+    private void LateUpdate()
+    {
+        if (!k_FolderDebug || !IsSpawned || IsHeld) return;
+        // Flag a placed folder that ends up far below the world or at a wildly different scale.
+        if (transform.position.y < -20f || transform.lossyScale.sqrMagnitude < 0.0001f)
+        {
+            if (!_folderDebugFlagged) FolderDebug("ANOMALY (fell through world / zero scale)", withStack: true);
+            _folderDebugFlagged = true;
+        }
+        else _folderDebugFlagged = false;
+    }
+    private bool _folderDebugFlagged;
+
+    /// <summary>Snaps the folder's own Animator to the authoritative open state.</summary>
+    private void SyncOpenVisual()
+    {
+        if (anim == null || !anim.isActiveAndEnabled) return;
+        anim.SetBool("Open", isOpen.Value);
+    }
+
+    private void SetDocumentsActive(bool active)
+    {
+        if (documents == null) return;
+        foreach (PickableObject doc in documents)
+        {
+            if (doc == null || doc.gameObject.activeSelf == active) continue;
+            doc.gameObject.SetActive(active);
+        }
+        if (active) RefreshAllDocumentStates();
     }
 
     public override void Interact(PlayerInteractionController player)
@@ -862,13 +982,15 @@ public class FolderController : PickableObject
 
         if (isStampingLocalPlayer)
         {
-            cinemachineVirtualCamera.SetActive(false);
-            // Release the lean lock before zeroing so PlayerMovementController can resume
-            // driving the lean factor naturally through SetLocalBodyLeanFactor.
+            // Release the lean lock so the camera-offset-driven lean takes over, then snap the
+            // player's camera to its normal first-person look pose while the folder vcam still
+            // owns the view (hidden). The Cinemachine blend then goes straight from the folder
+            // shot to the head, instead of tweening the player camera back from the rig pos
+            // through the leaning body (which clipped and fought mouse look for ~0.5s).
             ppc.PlayerAnimationController.LockBodyLeanFactor = false;
-            ppc.PlayerAnimationController.SetBodyLeanDirect(0f);
+            ppc.PlayerMovementController.SnapCameraToLookPose();
+            cinemachineVirtualCamera.SetActive(false);
             PlayerInstance.Instance.CanControl = true;
-            ppc.PlayerMovementController.ResetCameraPos(false, .5f);
         }
 
         GetComponent<HighlightPlus.HighlightEffect>().highlighted = true;
@@ -1391,6 +1513,7 @@ public class FolderController : PickableObject
 
     public override void OnDropped()
     {
+        FolderDebug("OnDropped");
         base.OnDropped();
         // The authoritative re-enable now happens in OnHeldStateChanged, which fires once
         // _holdingClientId has actually finished updating on the server — OnDropped runs
@@ -1413,6 +1536,7 @@ public class FolderController : PickableObject
     /// </summary>
     protected override void OnHeldStateChanged(bool isHeld)
     {
+        FolderDebug($"OnHeldStateChanged({isHeld})");
         // isOpen.Value is already correctly synced locally on every client at this point
         // (this callback only fires once _holdingClientId itself has finished syncing), so
         // refresh every document's collider/interactable state directly and immediately here.

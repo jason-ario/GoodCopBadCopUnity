@@ -995,35 +995,73 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     void UpdateCameraPositionBasedOnLook()
     {
-        // Calculate how far down we're looking (0 to 1, where 1 is maximum down)
-        float lookDownAmount = Mathf.Clamp01((_cameraPitch) / maxLookAngle);
-
-        // Pick the correct position pair based on crouch state.
-        Transform basePosTransform     = (_isCrouching && camCrouchPos         != null) ? camCrouchPos         : cameraBasePos;
-        Transform lookDownPosTransform = (_isCrouching && camCrouchLookDownPos != null) ? camCrouchLookDownPos : cameraLookDownPos;
-
-        Vector3 targetPos;
-
-        if (lookDownPosTransform != null)
-        {
-            targetPos = Vector3.Lerp(basePosTransform.localPosition, lookDownPosTransform.localPosition, lookDownAmount);
-        }
-        else
-        {
-            Vector3 forwardOffset = Vector3.forward * lookDownAmount * 0.3f;
-            targetPos = basePosTransform.localPosition + forwardOffset;
-        }
+        Vector3 targetPos = GetLookCameraTargetLocalPos(out Transform basePosTransform);
 
         // Smoothly lerp the camera position
         cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, targetPos, lookDownLerpSpeed * Time.deltaTime);
 
-        // Drive body lean based on how far the camera has moved from its base position.
-        if (_playerAnimationController != null && maxCameraOffsetForLean > 0f)
-        {
-            float offsetMagnitude = Vector3.Distance(cameraTransform.localPosition, basePosTransform.localPosition);
-            float leanFactor = Mathf.Clamp01(offsetMagnitude / maxCameraOffsetForLean);
-            _playerAnimationController.SetLocalBodyLeanFactor(leanFactor);
-        }
+        UpdateLeanFromCameraOffset(basePosTransform);
+    }
+
+    /// <summary>
+    /// The pitch-dependent first-person camera rest position (camera-parent local space) that
+    /// <see cref="UpdateCameraPositionBasedOnLook"/> converges to each frame.
+    /// </summary>
+    private Vector3 GetLookCameraTargetLocalPos(out Transform basePosTransform)
+    {
+        // Calculate how far down we're looking (0 to 1, where 1 is maximum down)
+        float lookDownAmount = Mathf.Clamp01((_cameraPitch) / maxLookAngle);
+
+        // Pick the correct position pair based on crouch state.
+        basePosTransform               = (_isCrouching && camCrouchPos         != null) ? camCrouchPos         : cameraBasePos;
+        Transform lookDownPosTransform = (_isCrouching && camCrouchLookDownPos != null) ? camCrouchLookDownPos : cameraLookDownPos;
+
+        if (lookDownPosTransform != null)
+            return Vector3.Lerp(basePosTransform.localPosition, lookDownPosTransform.localPosition, lookDownAmount);
+
+        return basePosTransform.localPosition + Vector3.forward * lookDownAmount * 0.3f;
+    }
+
+    /// <summary>Drives body lean based on how far the camera has moved from its base position.</summary>
+    private void UpdateLeanFromCameraOffset(Transform basePosTransform)
+    {
+        if (_playerAnimationController == null || maxCameraOffsetForLean <= 0f) return;
+
+        float offsetMagnitude = Vector3.Distance(cameraTransform.localPosition, basePosTransform.localPosition);
+        float leanFactor = Mathf.Clamp01(offsetMagnitude / maxCameraOffsetForLean);
+        _playerAnimationController.SetLocalBodyLeanFactor(leanFactor);
+    }
+
+    /// <summary>
+    /// Instantly hands the camera back to normal first-person look after a scripted sequence moved
+    /// it externally (e.g. the folder stamp). Keeps the current world look direction — the body yaws
+    /// to face it and the pitch is adopted — then places the camera exactly where
+    /// <see cref="UpdateCameraPositionBasedOnLook"/> would settle it, with matching body lean.
+    /// Call this while a cinematic vcam still owns the view so the Cinemachine blend back goes
+    /// straight to the correct first-person pose instead of dragging the camera through the body.
+    /// Release any <c>LockBodyLeanFactor</c> before calling so the lean update is accepted.
+    /// </summary>
+    public void SnapCameraToLookPose()
+    {
+        if (cameraTransform == null) return;
+
+        cameraTransform.DOKill();
+
+        Vector3 lookDir = cameraTransform.forward;
+        Vector3 flatDir = new Vector3(lookDir.x, 0f, lookDir.z);
+        if (flatDir.sqrMagnitude > 0.0001f)
+            transform.rotation = Quaternion.LookRotation(flatDir.normalized, Vector3.up);
+
+        float pitch = -Mathf.Asin(Mathf.Clamp(lookDir.y, -1f, 1f)) * Mathf.Rad2Deg;
+        _cameraPitch = Mathf.Clamp(pitch, -maxLookAngle, maxLookAngle);
+        _recoilRotation = Vector3.zero;
+        _smoothedMouseX = 0f;
+        _smoothedMouseY = 0f;
+        targetLookEuler = new Vector3(_cameraPitch, 0f, 0f);
+        cameraTransform.localEulerAngles = targetLookEuler;
+
+        cameraTransform.localPosition = GetLookCameraTargetLocalPos(out Transform basePosTransform);
+        UpdateLeanFromCameraOffset(basePosTransform);
     }
     
     /// <summary>

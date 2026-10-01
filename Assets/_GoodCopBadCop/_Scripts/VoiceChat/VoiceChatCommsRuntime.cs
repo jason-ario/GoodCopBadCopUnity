@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Dissonance;
 using Dissonance.Integrations.Unity_NFGO;
 using UnityEngine;
@@ -58,6 +58,9 @@ namespace GoodCopBadCop.VoiceChat
 
             runtimeObject = new GameObject(RuntimeCommsObjectName);
             comms = runtimeObject.AddComponent<DissonanceComms>();
+            // Start disabled so Dissonance doesn't open the microphone until a remote peer exists.
+            // DissonanceVoiceChatAdapter enables it when the session has more than one player.
+            comms.enabled = false;
             runtimeObject.AddComponent<NfgoCommsNetwork>();
             return comms;
         }
