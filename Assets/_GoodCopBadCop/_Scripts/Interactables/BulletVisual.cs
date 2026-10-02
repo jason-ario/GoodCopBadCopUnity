@@ -16,6 +16,8 @@ using UnityEngine;
 [RequireComponent(typeof(TrailRenderer))]
 public class BulletVisual : MonoBehaviour
 {
+    // NOTE: perimeter fence colliders never stop the tracer (see TryFindImpact).
+
     [Tooltip("Travel speed in metres per second.")]
     [SerializeField] private float _speed = 250f;
 
@@ -53,7 +55,8 @@ public class BulletVisual : MonoBehaviour
         float stepDistance = _speed * Time.deltaTime;
 
         // Check for surfaces in the path before moving so we don't pass through thin geometry.
-        if (Physics.Raycast(transform.position, _direction, out RaycastHit hit, stepDistance, _impactLayers, QueryTriggerInteraction.Ignore))
+        // Perimeter fences are skipped so the tracer matches the hitscan, which passes through them.
+        if (TryFindImpact(stepDistance, out RaycastHit hit))
         {
             SpawnImpact(hit.point, hit.normal);
             Destroy(gameObject);
@@ -61,6 +64,29 @@ public class BulletVisual : MonoBehaviour
         }
 
         transform.position += _direction * stepDistance;
+    }
+
+    private readonly RaycastHit[] _stepHits = new RaycastHit[8];
+
+    private bool TryFindImpact(float stepDistance, out RaycastHit nearest)
+    {
+        nearest = default;
+        int count = Physics.RaycastNonAlloc(transform.position, _direction, _stepHits, stepDistance, _impactLayers, QueryTriggerInteraction.Ignore);
+
+        bool found = false;
+        for (int i = 0; i < count; i++)
+        {
+            RaycastHit h = _stepHits[i];
+            if (h.collider.GetComponentInParent<PerimiterFence>() != null)
+                continue;
+
+            if (!found || h.distance < nearest.distance)
+            {
+                nearest = h;
+                found = true;
+            }
+        }
+        return found;
     }
 
     private void SpawnImpact(Vector3 position, Vector3 normal)

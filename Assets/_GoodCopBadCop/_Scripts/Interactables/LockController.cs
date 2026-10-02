@@ -154,6 +154,29 @@ public class LockController : Interactable
         Debug.Log($"[LockController] ForceUnlock — lock '{_lockId}' unlocked by scripted sequence.");
     }
 
+    /// <summary>
+    /// Server-only: silently unlocks this padlock (no animation/sound) if <see cref="_autoUnlockOnDay"/>
+    /// is set and <paramref name="day"/> has reached it. Covers day changes that happen after this
+    /// padlock already spawned (debug day-skips, JumpToDay), which <see cref="CheckSavedUnlockState"/>
+    /// can't see. Safe to call repeatedly. Returns true if it unlocked the padlock.
+    /// </summary>
+    public bool TryAutoUnlockForDay(int day)
+    {
+        if (!IsServer || !IsSpawned) return false;
+        if (_autoUnlockOnDay <= 0 || day < _autoUnlockOnDay) return false;
+        if (!_isLocked.Value) return false;
+
+        if (!string.IsNullOrEmpty(_lockId) && SaveDataManager.Instance != null)
+            SaveDataManager.Instance.SaveUnlockedLock(_lockId);
+
+        // Leave _isLocked untouched so OnIsLockedChanged doesn't play the unlock animation on
+        // any peer; despawning hides the padlock everywhere (see OnNetworkDespawn).
+        _lockable?.Unlock();
+        NetworkObject.Despawn();
+        Debug.Log($"[LockController] '{name}' auto-unlocked for Day {day} (threshold Day {_autoUnlockOnDay}).");
+        return true;
+    }
+
     // ── Server RPCs ───────────────────────────────────────────────────────────
 
     [ServerRpc(RequireOwnership = false)]

@@ -57,6 +57,9 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     [Tooltip("Maximum hitscan range in metres.")]
     [SerializeField] private float _bulletRange = 150f;
 
+    /// <summary>Hitscan range in metres. Read by the reticle to show the enemy-in-range color.</summary>
+    public float BulletRange => _bulletRange;
+
     [Header("Pistol — Audio")]
     [Tooltip("Gunshot sound played on every client when a round is fired.")]
     [SerializeField] private AudioClip _shootSound;
@@ -243,6 +246,10 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             // must pass straight through it, exactly as if QueryTriggerInteraction.Collide had
             // never been requested.
             if (hit.collider.isTrigger)
+                continue;
+
+            // Perimeter fences are open mesh — shots pass through them, matching melee weapons.
+            if (hit.collider.GetComponentInParent<PerimiterFence>() != null)
                 continue;
 
             if (hit.collider.transform.root.CompareTag("Player"))

@@ -43,6 +43,9 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     [Tooltip("Maximum hitscan range in metres — kept short since this is a close-range weapon.")]
     [SerializeField] private float _bulletRange = 8f;
 
+    /// <summary>Hitscan range in metres. Read by the reticle to show the enemy-in-range color.</summary>
+    public float BulletRange => _bulletRange;
+
     [Header("Shotgun — Audio")]
     [Tooltip("Dry-fire click played locally when the shotgun is empty.")]
     [SerializeField] private AudioClip _emptySound;
@@ -209,6 +212,10 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 // pellets must pass straight through it, exactly as if
                 // QueryTriggerInteraction.Collide had never been requested.
                 if (hit.collider.isTrigger)
+                    continue;
+
+                // Perimeter fences are open mesh — pellets pass through them, matching melee weapons.
+                if (hit.collider.GetComponentInParent<PerimiterFence>() != null)
                     continue;
 
                 Transform root = hit.collider.transform.root;

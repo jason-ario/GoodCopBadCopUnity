@@ -9,16 +9,19 @@ namespace GoodCopBadCop.Effects
     {
         private readonly IPlayerRuntimeModel playerRuntimeModel;
         private readonly IEffectService effectService;
+        private readonly IEffectCatalog effectCatalog;
         private DisposableBag disposables;
         private global::PlayerHealth playerHealth;
         private float previousHealth;
 
         public PlayerHealthEffectsAdapter(
             IPlayerRuntimeModel playerRuntimeModel,
-            IEffectService effectService)
+            IEffectService effectService,
+            IEffectCatalog effectCatalog)
         {
             this.playerRuntimeModel = playerRuntimeModel;
             this.effectService = effectService;
+            this.effectCatalog = effectCatalog;
         }
 
         public void Initialize()
@@ -73,6 +76,12 @@ namespace GoodCopBadCop.Effects
                 string effectKey = string.IsNullOrWhiteSpace(playerHealth.LastHealthEffectKey)
                     ? EffectKeys.DefaultPlayerDamage
                     : playerHealth.LastHealthEffectKey;
+
+                // Damage sources without a dedicated preset (e.g. hazards, vehicle collisions) still
+                // get the default hurt feedback (camera kick + vignette) instead of nothing.
+                if (!effectCatalog.TryGet(effectKey, out _))
+                    effectKey = EffectKeys.DefaultPlayerDamage;
+
                 effectService.PlayByKey(effectKey);
             }
             else if (currentHealth > previousHealth)

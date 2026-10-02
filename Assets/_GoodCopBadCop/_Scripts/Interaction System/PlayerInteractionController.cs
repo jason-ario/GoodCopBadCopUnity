@@ -208,6 +208,50 @@ public class PlayerInteractionController : NetworkBehaviour
             _throwController.ReleaseThrow();
     }
 
+    private void ShowEnemyReticle(bool inRange)
+    {
+        if (lastInteractable != null)
+        {
+            lastInteractable.Highlight(false);
+            lastInteractable = null;
+        }
+
+        reticle.SetEnemyState(true, inRange);
+    }
+
+    /// <summary>
+    /// Mirrors the gun hitscan rules in <see cref="Pistol"/>/<see cref="Shotgun"/>: active mutants
+    /// are hit even through their trigger limb hitboxes, other triggers and perimeter fences are
+    /// transparent, and any other solid collider blocks the shot. Returns the distance to the
+    /// first living, active mutant along the ray, if nothing solid is in front of it.
+    /// </summary>
+    private static bool TryGetGunEnemyHit(Ray ray, float maxDistance, out float distance)
+    {
+        distance = 0f;
+        RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance, Physics.AllLayers, QueryTriggerInteraction.Collide);
+        if (hits.Length == 0) return false;
+
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (RaycastHit hit in hits)
+        {
+            MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
+            if (enemy != null && enemy.IsActive)
+            {
+                if (enemy.IsDead) return false;
+                distance = hit.distance;
+                return true;
+            }
+
+            if (hit.collider.isTrigger) continue;
+            if (hit.collider.GetComponentInParent<PerimiterFence>() != null) continue;
+
+            return false;
+        }
+
+        return false;
+    }
+
     void HandleReticle()
     {
         if (_suspectCamActive)
@@ -238,27 +282,32 @@ public class PlayerInteractionController : NetworkBehaviour
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
         // Weapon-targeting: only takes over the reticle when a living enemy is under the
-        // crosshair AND the player is holding a melee weapon capable of hurting it. Aiming at
-        // an enemy while empty-handed (or holding a non-weapon item) falls through to the
-        // normal interactable logic below, which will show the plain "nothing interactable" state.
-        bool holdingWeapon = _playerPickupController.HeldObject != null
-            && _playerPickupController.HeldObject.GetComponent<MeleeWeaponDurability>() != null;
+        // crosshair AND the player is holding a weapon capable of hurting it (melee, pistol, or
+        // shotgun). Aiming at an enemy while empty-handed (or holding a non-weapon item) falls
+        // through to the normal interactable logic below, which shows the plain "nothing
+        // interactable" state.
+        PickableObject held = _playerPickupController.HeldObject;
+        bool holdingMelee = held != null && held.GetComponent<MeleeWeaponDurability>() != null;
+        float gunRange = held is Pistol pistol ? pistol.BulletRange
+                       : held is Shotgun shotgun ? shotgun.BulletRange
+                       : 0f;
+        bool holdingGun = gunRange > 0f;
 
-        if (holdingWeapon
+        if (holdingMelee
             && Physics.Raycast(ray, out RaycastHit enemyHit, enemyDetectionDistance, ~0, QueryTriggerInteraction.Ignore))
         {
             MutantEnemy enemy = enemyHit.collider.GetComponentInParent<MutantEnemy>();
             if (enemy != null && !enemy.IsDead)
             {
-                if (lastInteractable != null)
-                {
-                    lastInteractable.Highlight(false);
-                    lastInteractable = null;
-                }
-
-                reticle.SetEnemyState(true, enemyHit.distance <= weaponRange);
+                ShowEnemyReticle(enemyHit.distance <= weaponRange);
                 return;
             }
+        }
+        else if (holdingGun
+            && TryGetGunEnemyHit(ray, Mathf.Max(enemyDetectionDistance, gunRange), out float gunHitDistance))
+        {
+            ShowEnemyReticle(gunHitDistance <= gunRange);
+            return;
         }
 
         reticle.SetEnemyState(false);

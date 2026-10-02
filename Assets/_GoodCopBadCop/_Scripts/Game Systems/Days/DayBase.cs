@@ -435,8 +435,15 @@ public abstract class DayBase : MonoBehaviour
     /// </summary>
     private void EnsureDay1TutorialGatesUnlocked()
     {
-        if (DayNumber <= 1) return;
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        // Padlocks with _autoUnlockOnDay (e.g. the exterior back-gate padlock, Day 3+) only check
+        // the day on spawn, so a day change after spawn (debug skip / JumpToDay) would leave them
+        // locked. Re-check against this day on every pass; no-op once unlocked or below threshold.
+        foreach (LockController padlock in FindObjectsByType<LockController>(FindObjectsSortMode.None))
+            padlock.TryAutoUnlockForDay(DayNumber);
+
+        if (DayNumber <= 1) return;
 
         foreach (InkStamp stamp in FindObjectsByType<InkStamp>(FindObjectsSortMode.None))
             stamp.SetSlotInteractable(true);
