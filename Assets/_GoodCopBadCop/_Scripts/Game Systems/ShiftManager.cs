@@ -502,6 +502,7 @@ public class ShiftManager : NetworkBehaviour
             Cash = GlobalHostVariables.Instance != null ? GlobalHostVariables.Instance.money.Value : 0,
             Pickables = PickableObjectRegistry.Instance.CaptureAll(),
             PlayerInventoryItemIds = CapturePlayerInventoryItemIds(),
+            AmmoReserves = AmmoReserveSaveStore.CaptureAll(),
             DailyPickupsInitialized = DailyPickupSpawnManager.Instance != null && DailyPickupSpawnManager.Instance.HasInitializedForDay,
             DailyPickups = DailyPickupSpawnManager.Instance != null
                 ? DailyPickupSpawnManager.Instance.CaptureSaveData()
@@ -643,6 +644,7 @@ public class ShiftManager : NetworkBehaviour
         PickableObjectRegistry.Instance?.RestoreAll(state.Pickables);
         PickableObjectRegistry.Instance?.RestoreBackpackContents(state.Pickables);
         RestorePlayerInventoryAtRecoveryDropPoint(state.PlayerInventoryItemIds);
+        AmmoReserveSaveStore.RestoreAll(state.AmmoReserves);
 
         ProcessResidentsTask.Instance?.RestoreSaveState(state.ProcessResidents);
         CleanGraffitiTask.Instance?.RestoreSaveState(state.Graffiti);

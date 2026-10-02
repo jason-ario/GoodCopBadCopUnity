@@ -29,6 +29,7 @@ public class WorkdaySaveState
     public int Cash;
     public PickableObjectSaveData[] Pickables = Array.Empty<PickableObjectSaveData>();
     public string[] PlayerInventoryItemIds = Array.Empty<string>();
+    public AmmoReserveSaveData[] AmmoReserves = Array.Empty<AmmoReserveSaveData>();
     public bool DailyPickupsInitialized;
     public DailyPickupSaveData[] DailyPickups = Array.Empty<DailyPickupSaveData>();
     public ProcessResidentsTaskSaveState ProcessResidents = new();
@@ -40,6 +41,29 @@ public class WorkdaySaveState
     public FollowTrailTaskSaveState FollowTrail = new();
     public BoothMessTaskSaveState BoothMess = new();
     public string[] PendingDailyTaskIds = Array.Empty<string>();
+}
+
+/// <summary>
+/// One player's <see cref="PlayerAmmoReserve"/> counts, keyed by a stable identity (SteamID, or a
+/// host/client fallback outside Steam). See <see cref="AmmoReserveSaveStore"/>.
+/// </summary>
+[Serializable]
+public class AmmoReserveSaveData
+{
+    public string Key;
+    public int Pistol;
+    public int Shotgun;
+    public int Fuel;
+
+    public bool IsEmpty => Pistol <= 0 && Shotgun <= 0 && Fuel <= 0;
+
+    public AmmoReserveSaveData Copy(string key = null) => new()
+    {
+        Key = key ?? Key,
+        Pistol = Pistol,
+        Shotgun = Shotgun,
+        Fuel = Fuel,
+    };
 }
 
 [Serializable]

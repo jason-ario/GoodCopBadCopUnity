@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>QA GDD - Days 1-4 - Good Cop Bad Cop</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #1a1a1a; max-width: 980px; margin: 0 auto; padding: 24px; }
+  .cover { border-bottom: 3px solid #222; margin-bottom: 18px; padding-bottom: 10px; }
+  .cover h1 { margin: 0; font-size: 22pt; }
+  .cover p { margin: 4px 0 0; color: #555; }
+  h2 { font-size: 15pt; border-bottom: 1px solid #bbb; padding-bottom: 3px; margin-top: 28px; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin-top: 18px; page-break-after: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 14px; font-size: 9pt; }
+  th, td { border: 1px solid #c8c8c8; padding: 4px 6px; vertical-align: top; text-align: left; }
+  th { background: #efefef; }
+  tr { page-break-inside: avoid; }
+  code { font-family: Consolas, monospace; font-size: 8.8pt; background: #f3f3f3; padding: 0 3px; border-radius: 2px; word-break: break-all; }
+  blockquote { border-left: 3px solid #999; margin: 8px 0; padding: 2px 10px; color: #444; background: #fafafa; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 22px 0; }
+  .hint { background: #fff8d6; border: 1px solid #e6d27a; padding: 8px 12px; margin-bottom: 16px; font-size: 9.5pt; }
+  @media print { .hint { display: none; } body { padding: 0; max-width: none; } }
+</style>
+</head>
+<body>
+<div class="hint">To export: press <b>Ctrl+P</b> (Cmd+P on Mac), choose <b>Save as PDF</b>, turn on <b>Background graphics</b>, and turn off headers and footers. This note doesn't appear in the PDF.</div>
+<div class="cover">
+  <h1>Good Cop Bad Cop: QA Game Design Document</h1>
+  <p>Campaign Days 1–4 (demo) · Version 1.0</p>
+</div>
+<div id="content">Loading… (this page needs an internet connection to render the document)</div>
+
+<script type="text/markdown" id="md">
+## 1. Document info
+
+| Field | Value |
+| --- | --- |
+| Game | *Good Cop Bad Cop* (Steam store name: *Uncanny Valley Checkpoint*) |
+| Build scope | Campaign Days 1–4 (demo). Day 4 ends with the "Thanks For Playing" screen |
+| Supported modes | Solo, and 2-player Steam co-op (including late join and host/client disconnect) |
+| Engine | Unity 6000.6, Universal Render Pipeline (3D) |
+| Steam App ID | Store page: `3262820`. The in-game network transport in the main scene is set to `4488670` (**TBC**: confirm which ID the QA build ships with) |
+| Product / company | `UncannyValleyCheckpoint` / `SpiralTrapStudio`, version `0.1.0` |
+| Document version | 1.0, first QA handoff. Date: fill in at handoff |
+
+**Status legend** used throughout:
+
+| Tag | Meaning |
+| --- | --- |
+| **In build** | Checked against the current build data and expected to work as described |
+| **Partial** | Present, but incomplete or simplified compared with the final design |
+| **Not in build** | Designed, but intentionally absent from this demo |
+| **TBC** | Not confirmed yet. Log what you see and flag it for dev confirmation. Don't log it as a bug against this document |
+
+---
+
+## 2. Game overview
+
+**Premise.** It's October 1989. The player is a guard at a remote border checkpoint next to a quarantine zone. Travellers ("subjects") arrive at the booth window one at a time. Some of them are infected or turning into mutants.
+
+**Player role.** Inspect every subject's documents and body, decide whether they **pass**, go to **quarantine** or get **killed**, and keep the checkpoint running: cleaning, repairs, mail, power and defending it from mutant breaches.
+
+**Co-op pitch.** Two guards share one booth. They split the inspection work (one checks papers, the other scans the subject), discuss the verdict over voice chat, and handle the yard and breaches together.
+
+**Core loop in one paragraph.** Each day starts in the bunker. The player walks to the booth, clocks in, calls subjects, inspects documents and anomalies with the booth tools, files evidence in a folder, stamps a verdict and hands the folder back through the window. Coupons are paid out of the ATM for each subject. When the day's last subject is processed, it becomes **Dusk**: post-shift tasks such as cleanup, repairs, power and scripted events have to be finished before the time card machine allows clock-out. After clocking out, the player sleeps in the bunk bed, reads the end-of-shift report and continues to the next day.
+
+---
+
+## 3. Core loop
+
+| Step | What the player does | Expected |
+| --- | --- | --- |
+| 1. Day start | Wake in the bunker. A day-number pop-up plays (Day 1 plays an intro cutscene first) | The day number matches the save slot's day. A save checkpoint is written at day start |
+| 2. Clock in | Use the time card machine | Expected: subjects can't be called before clock-in. Day 4 plays an announcement immediately after clock-in |
+| 3. Call subject | Press the call button in the booth (Day 1 starts automatically) | Expected: one subject walks to the window and puts their ID card and application on the counter |
+| 4. Inspect | Read the documents, use the tools, tick exam checklists, file pages in the folder | See sections 5–6 |
+| 5. Verdict | Stamp the folder (green / yellow / red) and place it at the window | Expected: the verdict plays out, then a payout popup appears and coupons come out of the ATM |
+| 6. Repeat | Call the next subject until the day's quota is done | Expected: the HUD shows "Process N subjects X/Y" |
+| 7. Dusk | A Dusk banner appears. Post-shift tasks appear in the objective list | Expected: clock-out stays locked while any post-shift task or live breach is still open |
+| 8. Clock out | Use the time card machine | Expected: the bunk bed changes from "Finish remaining tasks to end the day" to "Sleep" |
+| 9. Sleep | Interact with the bunk bed and confirm "End the day?" | Expected: the end-of-shift report opens for **all** players at once |
+| 10. Continue | Press Continue on the report (either player can) | Expected: the screen fades and the next day starts. A double press only advances one day |
+
+---
+
+## 4. Controls
+
+Keyboard/mouse bindings marked (R) can be rebound under **Settings → Controls**. Gamepad bindings are fixed.
+
+| Action | Keyboard / mouse | Gamepad |
+| --- | --- | --- |
+| Move | W A S D / arrow keys | Left stick |
+| Look | Mouse | Right stick |
+| Sprint | Left Shift | Left stick press (L3) |
+| Jump | Space | South (A / Cross) |
+| Crouch | Left Ctrl (R) | East (B / Circle) |
+| Interact / pick up (some interactions are hold) | E (R) | West (X / Square) |
+| Use held item (stamp, flashlight mode, scanner, weapon swing) | Left mouse button | Right trigger |
+| Place held object (hold to preview, release to place) | Right mouse button (R) | Left trigger |
+| Throw held object | Middle mouse button (R) | Right bumper |
+| Inventory slot 1 / slot 2 | 1 / 2 | D-pad left / D-pad right |
+| Zoom held item (read documents) | F (R) | Right stick press (R3) |
+| Toggle gas mask | V (R) | Not bound (**TBC**) |
+| Emotes | T (R) | D-pad up |
+| Unequip backpack | G | **TBC** |
+| Dialogue history | H | **TBC** |
+| Pause / close pause | Esc | Start |
+| Back (menus) | Esc | East |
+| Spectator: next / previous teammate | Left / right mouse button | **TBC** |
+| Push-to-talk | **TBC**. Voice mode can be set to push-to-talk in settings | **TBC** |
+
+**Prompt icons.** Expected: on-screen button prompts switch to gamepad icons only after a deliberate gamepad button press. They switch back after a key press, a mouse click or scroll, or a mouse move of 4 px or more. **Expected: moving a stick on its own does not switch the prompts to gamepad.**
+
+> Note: the generic input map also lists C for crouch and gamepad North for interact. The bindings in the table above are the ones gameplay actually reads. If the prompts and the behaviour disagree, log it.
+
+---
+
+## 5. Booth and tools
+
+| Tool | Purpose | How to use | Available | Expected result |
+| --- | --- | --- | --- | --- |
+| ID card | The subject's identity document | Pick up, zoom (F / R3) to read | D1 | Name, birth date, ID number, expiry and photo can be compared with the application form |
+| Application form | Entry request with the stated reason for entry | Pick up, zoom | D1 | Fields can mismatch the ID card (Documentation anomalies) |
+| Folder | Holds the documents and evidence for one subject. The verdict is stamped on it | Take from the drawer/stack, place on the desk, file documents and exam pages into it | D1 | The filed exam pages decide what the player has "identified" for payout (section 7) |
+| Exam checklists (Documentation / Physical / Vitals) | One checklist page per anomaly category. Tick the anomalies you find | Take a page (Day 1: "Get a documentation checklist from the drawer"), tick the boxes, file the page into the folder | Per category unlock day | Expected: only unlocked categories' anomalies are listed. Ticks on a filed page count toward payout |
+| Green stamp | **Pass** | Pick up from its slot, use on the folder, return it to the slot | D1 (after Vlad's tutorial) | The subject goes through the checkpoint into the city |
+| Yellow stamp | **Quarantine** | As above | D1 (quarantine tutorial) | The subject is restrained and taken away. Expected: blocked if all quarantine slots are full (**TBC**: what feedback the player gets when blocked) |
+| Red stamp | **Kill** | As above | **Expected: locked on Day 1, usable from Day 2** | The kill machine executes the subject. The subject is permanently removed from future lineups |
+| Window drop-off | Delivers the verdict | Place the stamped folder at the window | D1 | Starts the verdict sequence and the payout |
+| Call button | Calls the next subject | Interact | D1 (after Vlad), auto-start on D1 | Expected: no new subject while one is still at the window |
+| Lever / shutter | Opens and closes the window shutter | Interact | D1 | Expected: on Day 1 the player is told to close it during the Soldier attack |
+| Flashlight | Light, and a UV mode for mutation checks | Use (LMB / RT) cycles **Off → Regular → UV → Off** | D1 (UV is taught D2) | UV reveals hidden mutations such as blue veins. Drains battery (**TBC**) |
+| Thermometer | Body temperature | Point at the subject | D3 (Vitals) | Normal is about 36.5 °C. A High Temperature anomaly reads about 45.5 °C. The room temperature shifts the reading a little |
+| Radiation scanner | Radiation reading | Aim at a subject within 3 m | D3 (Vitals) | Baseline/minimum reading is 5. A High Radiation anomaly sits around 85 (±4 jitter). Expected: if the **player** is contaminated (exposure rate ≥ 0.3 outside a safe zone), the scanner shows random high readings (90–170 ± 25). This is intended. Drains battery |
+| Guidebook / notebooks | Reference pages for anomalies and tasks | Pick up and read | D1+, pages added as categories unlock | Expected: pages for locked anomalies stay hidden (**TBC**: exact page list) |
+| ATM | Dispenses coupons | Collect the coupon pickups after each verdict | D1 ("Collect coupons at ATM") | Coupons are physical pickups. Expected: the payout matches the popup. Needs power |
+| Tool locker shop | Buy tools and supplies with coupons (e.g. ink refills) | Interact with shop items | Unlocked by Vlad on D2 | **TBC**: full item and price list for the demo |
+| Guard purchase points | Buy yard guards | Interact | D3+ (D3 turns off the default guards and opens 3 purchase points) | **TBC**: price and guard behaviour |
+| Supply box | Daily delivery of items | Open the crate | D2, D3, D4 | Expected: contents differ per day (D2: 2 items, D3: 5, D4: 2) |
+| Postbox / mail | "Sort the mail" task, including spotting prohibited goods | Sort the delivered packages | D2, D4 (no mail on D3) | Expected: on D2 mail arrives only after Vlad's tool-locker scene, on D4 only after clock-in |
+| Telephone | Scripted calls from HQ | Pick up when it rings | D3 post-shift | Expected: the player can't hang up during the scripted dialogue. It hangs up automatically at the end |
+| Fuse box and power switch | Restore power after an outage | Open the box, insert the missing fuses, pull the power lever | D3 post-shift | Expected: the lever highlights only when every fuse slot is filled |
+| Electrical panel | Restore power after Ocho's booth outage | Interact with the panel | After the first-ever kill (D2+) | Expected: power comes back and the highlight clears |
+| Hammer | Repair broken perimeter fences | Hold and use on a broken fence | From the D1 post-breach tutorial | Expected: fence count drops as segments are fixed |
+| Shovels and other melee items | Fight mutants | Pick up, swing (LMB / RT) | Unlocked during the D1 breach | Expected: shovels can't be picked up on D1 before the breach starts |
+| Trash bag dispenser / fire barrel | Bag trash and gore and dispose of it | Grab a bag, collect items, deposit | D1 dusk, D3 | Counter "Throw away trash X/Y" |
+| Mop | Clean blood and graffiti | Use on decals | D1 dusk+ | Graffiti and blood are tracked for Checkpoint Integrity. D3 gore blood decals are cosmetic only |
+| Gas mask | Protection (**TBC**: what it protects against) | Toggle V | **TBC** | **TBC** |
+| Shotgun | **TBC**: availability in the demo and ammo rules | — | **TBC** | **TBC** |
+| Time card machine | Clock in and clock out | Interact | D1 | Expected: clock-out is locked until every subject is processed, every post-shift task is done and no breach is running |
+| Bunker door | Way between the yard and the bunker | Interact | D1 | Expected: closes automatically during the day transition |
+| Bunk bed | Ends the day | Interact, then confirm | After clock-out | Before clock-out it shows "Finish remaining tasks to end the day" and "Can't sleep yet". After clock-out it shows "Sleep" |
+
+---
+
+## 6. Inspection and anomalies
+
+### 6.1 Categories in this demo
+
+The demo has **three** anomaly categories. Behaviour, Supernatural, Environment and Biological are **Not in build**. Old text or UI that mentions "Biological" should be read as Vitals. Log any player-visible "Biological", "Behavior", "Environment" or "Supernatural" label as a bug.
+
+| Category | Unlocks | How the player finds it | Anomalies in the pool |
+| --- | --- | --- | --- |
+| **Documentation** | Day 1 | Compare the ID card with the application form | Wrong name, wrong birth date, expired document, wrong ID number, invalid reason for entry |
+| **Mutations (Physical)** | Day 2 | Look at the subject. Some only show under the UV flashlight | Random tumour, tentacles, black eyes, lesions, blue veins (UV) |
+| **Vitals** | Day 3 | Watch the subject's behaviour and use the thermometer and radiation scanner | Vomiting (comes and goes, 1–2 times per minute), twitching (random twitch animations), high radiation (scanner ≈ 85), high temperature (thermometer ≈ 45.5 °C) |
+
+Expected:
+- A category's anomalies never appear on a subject before its unlock day. The scripted tutorial subjects are the only exception (below).
+- Day 1: the quarantine tutorial subject is forced to have documentation anomalies (5 marked on the checklist).
+- Day 2: the first subject is forced to have **Blue Veins**, so the UV tutorial always has something to show.
+- From Day 3, some subjects can be "full mutants" (Days 3 and 4 force 2 early full mutants). They are scripted to turn hostile in the booth. **TBC**: exact presentation.
+
+### 6.2 Anomaly marking
+
+- The player marks an anomaly by ticking it on the matching category's exam checklist page and filing that page into the subject's folder before stamping.
+- Expected: ticks on a page that isn't filed don't count.
+- Ticking an anomaly the subject doesn't have is a **false positive** and costs coupons (section 7).
+
+### 6.3 Radiation bands (scanner)
+
+| Reading | Meaning |
+| --- | --- |
+| About 5 | Baseline or minimum. Nothing detected |
+| About 85 (±4) | The subject has the High Radiation anomaly |
+| 90–170, jumping around | The **player** is contaminated. The reading is unreliable. This is intended |
+
+**TBC**: the typical reading for a clean subject above baseline, and whether there's a printed threshold on the guidebook page.
+
+---
+
+## 7. Verdicts and economy
+
+### 7.1 Stamps and outcomes
+
+| Stamp | Verdict (report label) | What happens in-game |
+| --- | --- | --- |
+| Green | Pass (Passed) | The subject takes the folder and goes through into the city |
+| Yellow | Quarantine (Quarantined) | Quarantine sequence: the subject is restrained and removed. They are skipped in the next day's lineup (one-day cooldown) and their infection resets. Blocked when quarantine slots are full |
+| Red | Kill (Killed) | The kill machine executes the subject. They are permanently removed from all future lineups. The **first kill ever** in a save sets up Ocho's booth encounter as the next subject |
+
+Expected:
+- Verdicts are decided by the host. Both players see the same outcome.
+- The Day 1 Vlad tutorial subject isn't counted in the shift report.
+- Passing a mutant isn't penalised at the window. The consequence shows up in the population figures on the end-of-shift report (residents dead or mutated overnight). **TBC**: the exact population rules.
+
+### 7.2 Coupon payout (paid per subject, at the verdict)
+
+Values used in this build:
+
+| Component | Value |
+| --- | --- |
+| Base reward | **5** |
+| Accuracy bonus | Up to **+10**, scaled by the share of the subject's active anomaly categories that were correctly identified (rounded) |
+| Perfect bonus | **+5** if at least one category was active, every active category was identified and there were no false positives |
+| False-positive penalty | **−2** for each ticked category the subject doesn't have |
+| Evidence bonus | **+3** for each evidence item filed for a correctly identified category. Evidence for a category the subject doesn't have gives nothing and costs nothing |
+| Minimum | The total never drops below 0 |
+
+Expected:
+- A clean subject with no false positives counts as 100 % accuracy (5 + 10 = 15). No perfect bonus is paid, because that needs at least one active category.
+- The payout is the same whichever verdict is chosen. It rewards **identification**, not the stamp colour.
+- **Checkpoint Integrity** (HUD bar, shown from Day 1 dusk) scales ATM payouts between **0.5× and 1.0×**. It drops with uncleaned graffiti and blood, uncollected trash and broken fences, and recovers when they're dealt with. **TBC**: whether the popup number is before or after scaling.
+- Payout popup order, about 2 s after the verdict: "Found X/Y symptoms" (or "No anomalies present"), then "Bonuses" if any were earned, then "Payout Issued".
+
+### 7.3 End-of-shift report
+
+Shown to every player after sleeping. It lists one row per processed subject: name, ID number, anomalies caught / total, coupons earned, verdict, and the Checkpoint Integrity % at the time they were processed. It also shows **population alive / dead overnight / mutated overnight**. The report is information only and doesn't pay anything. Either player can press **Continue**.
+
+### 7.4 Spending
+
+- Coupons are physical pickups from the ATM and go into the team's money.
+- Spending: tool locker shop (from Day 2), guard purchase points (from Day 3), and the HQ Order screen's **Call in Backup** (revives a dead teammate for a cost; disabled with a reason shown when it can't be used).
+
+---
+
+## 8. Campaign Days 1–4
+
+### Day 1: Orientation (heavily scripted)
+
+| # | Beat | Expected |
+| --- | --- | --- |
+| 1 | Intro cutscene, Day 1 pop-up. The yard fire barrel is lit | — |
+| 2 | Objective **"Clock in for your shift"** (arrow on the time card machine) | After clock-in, the shutter opens by itself after about 7 s. **The booth door is locked for the whole shift** |
+| 3 | Vlad (supervisor) arrives as a tutorial subject and talks to the player | — |
+| 4 | **"Pick up Vlad's documents"** → **"Grab a folder and place it on the desk"** → **"Place documents in folder"** → **"Stamp the folder with the green stamp"** → **"Place folder at the window"** | Stamps can't be used until Vlad gives permission ("Green stamp. Use it to let them pass.") |
+| 5 | **"Collect coupons at ATM"** → **"Press button to call next subject"** | — |
+| 6 | Counter **"Process N subjects X/Y"** appears, counting **3** regular subjects | Vlad and the Soldier aren't counted (see Appendix B) |
+| 7 | Quarantine tutorial on a subject with forced documentation anomalies: megaphone briefing → **"Get a documentation checklist from the drawer"** → **"Check documentation anomalies and add the page to the folder"** → **"Grab the quarantine stamp"** → **"Place folder at the window"** | Yellow stamp is taught here. Red stays locked |
+| 8 | The Soldier arrives (last slot). Cutscene: a mutant (Alexei) drops onto the booth. Megaphone tells the player to use the lever | Expected: the lever arrow clears when the shutter is pulled closed |
+| 9 | Dusk: **"Throw away trash X/Y"** and the graffiti cleanup objective. The Checkpoint Integrity bar appears | Tutorial overlays play after the Dusk banner |
+| 10 | About 5 s after both are done: **first mutant breach**. Megaphone: "Ah shit, not again. The mutants are coming." Objective **"Repel the mutants"**. Shovels unlock about 5 s later | Shovels are highlighted until picked up |
+| 11 | Breach cleared: "Well done, you survived your first breach." Then **"Fix Perimeter Fences"** (hammer tutorial), **"Take out the gore"**, **"Clean up the blood"** | — |
+| 12 | **"Clock out for the day"** → **"Open the bunker"** → **"Go to bed for the night"** | The bed always allows sleep once the bunker step is reached |
+
+### Day 2: Mutations
+
+| # | Beat | Expected |
+| --- | --- | --- |
+| 1 | Day starts in the bunker. The fire barrel is out. **Red stamp is unlocked** from the start | Door isn't locked during the shift |
+| 2 | Vlad waits in the yard. Walking up to him starts a dialogue with camera pans to the supply box. He opens the booth door and unlocks the **tool locker**, then explains it in a second dialogue | Mail must **not** arrive before this scene ends |
+| 3 | Mail delivery, sorting tutorial overlay, objective **"Sort the mail"** | — |
+| 4 | First subject has forced **Blue Veins**. Mutation tutorial: Vlad's UV dialogue → **"Switch the Flashlight to UV mode"** → shine it on the veins (not tracked) → "Tick the boxes for every mutation you can identify" → **"Mark the veins on the Physical Exam"** → file the page | See Appendix B: the notebook step is a watch area |
+| 5 | 5 subjects (counter from the server) | — |
+| 6 | **First kill ever** (in any save, any day from D2): the next subject is Ocho's booth encounter ("Nunya Business"), which causes a power outage fixed at the electrical panel | One time per save |
+| 7 | Dusk: Vlad's out-back sequence. Megaphone "meet me out back" → follow Vlad through the exterior gate, follow the trail to a dead animal, Ocho is seen and runs away | **Clock-out stays locked until this sequence finishes** |
+| 8 | Clock out → sleep → report | — |
+
+### Day 3: Vitals
+
+| # | Beat | Expected |
+| --- | --- | --- |
+| 1 | Leaving the bunker arms a cutscene: walking near the checkpoint roof shows **Ocho eating Vlad**. Ocho drops the remains, jumps away and disappears | Vlad has no lines from here on |
+| 2 | Pre-shift mess: **gore pieces** to bag (trash task) and **broken perimeter fences** (about 33 % of a full roll) | Gore blood decals can be mopped, but they don't count toward any task |
+| 3 | **Vitals** category unlocks. Supply box delivers 5 items. The 3 default yard guards are switched off and 3 guard purchase points open. **No mail today** | **TBC**: whether there's a scripted Vitals tutorial (none found) |
+| 4 | 5 subjects. Up to 2 early full mutants | — |
+| 5 | Dusk: **power cut** right away. About 5 s later the phone rings: **"Answer the Phone"** → HQ call (can't hang up) → **"Restore Power"**: go to the power station, open the fuse box, insert the missing fuses, pull the power lever. A "Fix Fuse" tutorial appears within about 12 m of the fuse box | Clock-out stays locked until power is back |
+| 6 | Clock out → sleep → report | **No mutant breach on Day 3** in this build (see Appendix B) |
+
+### Day 4: Finale
+
+| # | Beat | Expected |
+| --- | --- | --- |
+| 1 | On clock-in, an unfamiliar voice (subtitle name **"???"**, red) takes over the megaphone as Vlad's replacement. It plays as a locked cutscene | — |
+| 2 | Mail arrives only **after** clock-in. **"Sort the mail"**. Supply box delivers 2 items | — |
+| 3 | 5 subjects. Up to 2 early full mutants | — |
+| 4 | After the last subject: the **Ocho breach** starts. Megaphone: "Oh, what's this? A little breach. Hehehehe..." | Clock-out is locked while the breach is running |
+| 5 | Clearing the breach completes the campaign and shows the **Thanks For Playing** screen | **TBC**: the buttons on that screen and where they lead (main menu / Steam wishlist) |
+
+---
+
+## 9. Dusk and night phase
+
+| Rule | Expected |
+| --- | --- |
+| Dusk starts when the day's last subject is processed | Dusk banner shown. Post-shift tasks and threats are added to the objective list |
+| Tasks that block clock-out | Every pending daily task for that day (D2 out-back, D3 power), plus any live breach. Scripted Day 1 cleanup steps come before its clock-out step |
+| Tasks that only affect Integrity | Trash, graffiti, blood and broken fences. Leaving them lowers Checkpoint Integrity and future payouts |
+| Breach | Mutants attack the checkpoint. The objective "Repel the mutants" shows the number remaining. It ends when every mutant is dead. In this build: Day 1 (scripted) and Day 4 (Ocho finale) |
+| Minimum night duration (180 s) | **TBC – needs dev confirmation.** The 180 s timer is in the build data but isn't triggered by the current day flow. The day ends when the player sleeps after clock-out. Don't log "night was shorter than 180 s" as a bug |
+| Health | Each player has 100 HP. Damage comes from mutant attacks and from radiation exposure above 75 % of the exposure meter (up to 5 HP/s) |
+| Day transition | All players are invincible during the fade to the next day. Health and radiation are reset |
+
+**Death and restart**
+
+| Situation | Expected |
+| --- | --- |
+| Player dies (solo) | Death screen with **Restart Day** and **Back to Menu** |
+| Player dies (co-op, teammate alive) | Death screen with **Spectate** (if a teammate is available) and **Back to Menu**. Restart Day is hidden. The teammate can revive the player through HQ Order → Call in Backup |
+| All players dead (co-op) | **Restart Day** is shown to the **host only**. Clients see Back to Menu |
+| Restart Day | Goes back to the day-start checkpoint and reloads the level. Everything since the start of the day is lost. Days 2+ resume at that day's start. Day 1 goes back through the game-start path |
+
+---
+
+## 10. Multiplayer
+
+| Topic | Expected behaviour |
+| --- | --- |
+| Hosting | Host creates a Steam lobby from the campaign screen. A **6-character invite code** is generated (no ambiguous letters or digits). "Copy invite code" shows a "Copied to clipboard" toast |
+| Joining | Join with a Steam invite or by typing the code |
+| Player cap | **2 players are supported for QA.** The lobby technically allows 3 visible players plus 1 hidden developer slot. Treat 3-player sessions as **TBC / unsupported** |
+| Ready-up and start | Clients never see Start. The host can start right away when alone. With 2+ players, Start is enabled only when everyone is ready |
+| Server-authoritative (host decides) | Subject lineup and spawning, verdicts, payouts, coupon spawns, breaches, scripted sequences, clock-in/out state, end-day confirmation |
+| Shared | Objective counters ("Process N subjects"), the end-of-shift report (shown to both at once), sleeping (either player confirming ends the day for both), Continue (either player, first press wins) |
+| Per-client (local) | Tutorial overlays, objective-list presentation, prompt icons, the night-duration timer |
+| Late join | A player who joins after the game has started skips the intro cutscene, spawns at the host's location for the current day, goes straight into gameplay, and has active post-shift tasks and the task list rebuilt. Expected: no duplicate objective rows, the counter matches the host |
+| Client disconnect (unexpected) | The client sees **"Lost connection"**, waits about 2.5 s, and the game reloads to the main scene/menu. The host keeps playing |
+| Host disconnect | Every client gets the lost-connection flow above. **TBC**: the exact message text for host quit vs. a crash |
+| Intentional leave / return to menu | No "Lost connection" message. Returning to the menu reloads the main scene |
+| Spectating | After death, cycle between living teammates. The view moves on automatically if the target dies or leaves. The HUD shows the watched teammate's hotbar, battery and mask |
+
+---
+
+## 11. Save and progression
+
+| Rule | Expected |
+| --- | --- |
+| Slots | **3** save slots |
+| When it saves | **Only at day start (checkpoint).** Progress during a day is kept in memory only |
+| What is lost | Quitting, returning to the menu, connection loss or Restart Day all discard **everything since the start of the current day** (coupons, verdicts, tasks). This is intended |
+| What persists | Day number, money, the subject roster (killed and quarantined records), population, and the "first kill ever" flag that sets up Ocho's booth encounter |
+| Anomaly unlocks | Based on the slot's day (D1 Documentation, D2 Physical, D3 Vitals). Expected: loading a Day 3 slot has all three unlocked. **TBC**: whether the cheat "unlock all" persists |
+| Co-op saves | The save belongs to the host. **TBC**: what the client keeps |
+| Delete slot | Slots can be deleted (**TBC**: where in the menu) |
+
+---
+
+## 12. UI screens
+
+| Screen | Purpose / what to check |
+| --- | --- |
+| Main menu | Start or continue a campaign, settings, quit. Steam wishlist link |
+| Campaign / slot select | Pick one of 3 slots, delete a slot |
+| Pre-game lobby (Start Campaign) | Invite code and copy toast, player list, **Ready Up** (checkmark), **Start Game** (host only) |
+| Day pop-up and Dusk banner | Day number at day start. Dusk banner when the last subject is processed |
+| HUD | Objective/task list, hotbar (2 slots), battery bar, mask icon, Checkpoint Integrity bar (from D1 dusk), reticle and interaction prompts |
+| Tutorial overlays | Slide-down cards (e.g. trash, graffiti, mutant breach, mail sorting, fix fuse). Expected: they never cover the Dusk banner |
+| Subtitles / megaphone | Speaker name and colour (Vlad orange, HQ white, "???" red) |
+| Dialogue history | Log of recent lines (H) |
+| Pause | Esc / Start. Pressing again closes it. Back buttons respond to Esc, gamepad East and mouse click, and each fires exactly once |
+| Settings | Includes Controls rebinding and voice-chat mode. **TBC**: full tab list |
+| Shop / HQ Order | Tool locker purchase popup. HQ Order "Call in Backup" (revive) with a disabled-reason text |
+| End-of-shift report | Section 7.3 |
+| Death screen | Section 9 |
+| Spectator UI | Shows who is being watched and how to cycle |
+| Thanks For Playing | End of demo after the Day 4 breach |
+
+---
+
+## Appendix A: QA tools
+
+### A.1 Save file
+
+- Location: `%USERPROFILE%\AppData\LocalLow\SpiralTrapStudio\UncannyValleyCheckpoint\savedata.json`
+- One file holds all 3 slots.
+- To reset a slot: delete it in-game, or close the game and delete or back up `savedata.json` to wipe all slots.
+- Key bindings and some preferences are stored separately in Unity PlayerPrefs (registry). Deleting the save doesn't reset them.
+
+### A.2 Availability
+
+**All debug tools below are currently enabled in every build type**, development and release. The build's settings asset has the debug-console flag **on**, and nothing else (editor-only or development-build-only checks) restricts them. **TBC**: confirm with dev whether the QA/publisher build should ship with them on, and turn the flag off for any external build.
+
+### A.3 Cheat console: **F12**
+
+| Command | Effect |
+| --- | --- |
+| Skip to Day 1 — Booth Start | Starts or ensures a game, jumps to the Day 1 booth |
+| Free Play — Day 1 Booth (No Tutorial) | Day 1 booth without the tutorial |
+| Skip to Day 1 — Soldier / Alexei Cutscene | Jumps to the Soldier slot |
+| Skip to Day 1 — Mutant Breach | Jumps to the first breach |
+| Skip to End of Day 1 | — |
+| Skip to Day 2 — Start (Inside Bunker) | — |
+| Skip to Day 2 — Vlad Out Back Cutscene | Jumps to the Day 2 post-shift sequence |
+| Skip to Day 2 — Ocho Booth Encounter | — |
+| Skip to Day 3 — Start (Inside Bunker) | — |
+| Skip to Day 3 — In Booth, All Suspects Processed | Jumps to Day 3 dusk |
+| Skip to End of Day 4 — Before Mutant Breach | — |
+| Free Play — Day 4 Booth | — |
+| Free Play — Day 5 Booth | Outside demo scope |
+| Skip to End of Demo (Thanks For Playing) | Marks the campaign complete and shows the end screen |
+| Teleport to Power Station | — |
+| Unlock All Anomalies + Guidebook Pages | — |
+| Smash Booth Glass | — |
+| Trigger End of Shift Report | Shows the report without advancing the day |
+| Trigger Mail Delivery Task | — |
+| Trigger Day 3 Power Outage (Fuse Box) | Host only |
+| Force Next Civilian Suspect — Full Mutant (M) | — |
+| Trigger Mutant Breach | — |
+
+### A.4 Debug hotkeys
+
+| Key | Effect |
+| --- | --- |
+| 0 | +1000 money |
+| F1 | Prepare clock-out (skip the gate) |
+| F2 | Skip to Day 1 |
+| F3 | Force the next subject to be a mutant intruder |
+| F4 | Trigger the configured phone task |
+| F5 / F6 | Add a debug task / complete it |
+| F7 | End the intro cutscene |
+| F8 | End the shift |
+| F9 | Complete all post-shift tasks |
+| F10 | Trigger the "Go Hunting" phone call |
+| F11 | Force the Alexei sequence on the next subject **and** toggle the VFX debug overlay (both bound to F11) |
+| Insert | Queue a test day |
+| K | Kill the local player |
+| H | Hit (damage) the local player. **Conflicts with Dialogue History (H)** |
+| O | Spawn an aggressive mutant |
+| M | Force the next eligible civilian into the full-mutant booth flow |
+| Hold = | Fast-forward time. Releasing returns to normal |
+| ` (backquote) | Anomaly debug overlay: lists the current subject's active anomalies by category |
+
+---
+
+## Appendix B: Known limitations, intended quirks and watch areas
+
+**Intended (not bugs)**
+- The Day 1 counter shows **3** subjects even though 5 lineup slots are set up. Vlad (tutorial) and the Soldier (cutscene) aren't processed subjects.
+- Saving happens only at day start. Quitting mid-day loses that day's progress.
+- The radiation scanner gives random high readings while the player is contaminated.
+- The Day 1 booth door is locked for the whole shift. Days 2–4 aren't locked.
+- Gore blood decals on Day 3 are cosmetic only and don't count toward any task.
+- Vlad is absent from Day 4 onwards (story).
+- No mail on Day 3.
+
+**Conflicts and open items (TBC – needs dev confirmation)**
+1. **Day 3 breach:** the Day 3 design notes describe a scripted breach after the last subject, but the build data has **no breach on Day 3**. In the current build, Day 3 dusk is the power outage only.
+2. **Minimum night 180 s:** the timer is in the data but not triggered by the current flow (section 9).
+3. **Day 2 mutation tutorial:** the scene has no Mutation Exam notebook assigned for the tutorial. The tutorial may stop after the UV step, so the "Mark the veins on the Physical Exam" row might not appear. Check and report.
+4. **Lineups on Days 2–4:** Days 2–4 reference the same hand-authored subject set as Day 1, where the design intends random draws. Watch for identical lineups across days or slots.
+5. **Debug tools are on in all builds** (Appendix A.2).
+6. **Key conflicts:** H (dialogue history vs. debug damage), F11 (two debug functions).
+7. **Steam App ID:** the store page is 3262820, but the main scene transport is set to 4488670.
+8. **Player cap:** the lobby allows 3 visible players, but only 2 are supported.
+9. Unconfirmed tool details: gas mask, shotgun, shop prices, guard purchases, and the gamepad bindings for spectator and push-to-talk.
+
+**Watch areas (regressions seen before)**
+- Duplicate objective rows (e.g. a second "Process N subjects" or "Clock out for the day") after **Continue**, Restart Day or Return to Menu, then starting again.
+- A late joiner's subject counter or lineup UI not matching the host. Only the host's lineup is real. Anything that differs on the client is a bug.
+- Both players confirming sleep, or both pressing Continue, at the same time. Expected: one report and one day advance.
+- A client whose bed won't offer "Sleep" after clock-out.
+- Spectator view: held items and the first-person arms of the watched teammate showing wrong poses.
+- Ragdolls and bodies looking different between host and client.
+
+---
+
+## Appendix C: Glossary
+
+| Term | Meaning |
+| --- | --- |
+| Subject / Suspect | A traveller processed at the booth window |
+| Anomaly | A detectable sign of infection or fraud, in one of three demo categories: Documentation, Mutations (Physical), Vitals |
+| Exam checklist | Per-category page where the player ticks the anomalies they found. It's filed in the folder |
+| False positive | An anomaly ticked that the subject doesn't have. Costs coupons |
+| Evidence | An item filed in the folder that supports a correctly identified category. Earns coupons |
+| Verdict | Pass (green), Quarantine (yellow) or Kill (red) |
+| Coupon | In-game currency paid out of the ATM for each subject |
+| Checkpoint Integrity | 0.5–1.0 payout multiplier based on how clean and intact the yard is |
+| Dusk | The post-shift phase after the last subject of the day |
+| Mutant breach | A wave of mutants attacking the checkpoint that has to be repelled |
+| Full mutant | A subject who turns hostile in the booth |
+| Doppelganger | A planned impostor mechanic for later days. **Not in build** for Days 1–4 |
+| Vlad | The player's supervisor. He runs the Day 1–2 tutorials and is killed on Day 3 |
+| Alexei | The mutant in the Day 1 Soldier cutscene |
+| Ocho | The clown-faced antagonist. Booth encounter after the first kill, seen out back on Day 2, eats Vlad on Day 3, impersonates the new supervisor and leads the finale breach on Day 4 |
+| HQ | Headquarters. Phones the booth (Day 3 power call) and offers Call in Backup |
+| Checkpoint (save) | The day-start save point |
+</script>
+
+<script>
+  (function () {
+    var target = document.getElementById('content');
+    if (typeof marked === 'undefined') {
+      target.textContent = 'Could not load the Markdown renderer. Check your internet connection and reload.';
+      return;
+    }
+    marked.setOptions({ gfm: true, breaks: false });
+    target.innerHTML = marked.parse(document.getElementById('md').textContent);
+  })();
+</script>
+</body>
+</html>

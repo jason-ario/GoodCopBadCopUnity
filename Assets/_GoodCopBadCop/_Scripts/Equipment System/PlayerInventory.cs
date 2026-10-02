@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using GoodCopBadCop.Input;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Two-slot hotbar inventory for the local player.
@@ -213,7 +215,7 @@ public class PlayerInventory : NetworkBehaviour
 
         if (Input.GetKeyDown(KeyCode.Alpha1)) EquipSlot(0);
         if (Input.GetKeyDown(KeyCode.Alpha2)) EquipSlot(1);
-        if (Input.GetKeyDown(KeyCode.R)) TryReloadActiveWeapon();
+        if (ReloadPressed()) TryReloadActiveWeapon();
 
         float scroll = Input.mouseScrollDelta.y;
         if (scroll > 0f) CycleActiveItem(1);
@@ -264,14 +266,25 @@ public class PlayerInventory : NetworkBehaviour
     // ── Reloading ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Pressing R reloads the currently equipped weapon from the local player's
-    /// <see cref="PlayerAmmoReserve"/>. No-ops if the held item isn't reloadable.
+    /// <see cref="GameAction.Reload"/> (R by default, rebindable in Settings -> Controls) or the fixed
+    /// gamepad button from <see cref="RebindableInput.GamepadButtonName"/> (Y / buttonNorth).
+    /// Ignored while paused so the gamepad button can't fire through the pause menu.
+    /// </summary>
+    private static bool ReloadPressed()
+    {
+        if (UIController.Instance != null && UIController.Instance.IsPaused) return false;
+        if (RebindableInput.GetKeyDown(GameAction.Reload)) return true;
+        return Gamepad.current?.buttonNorth.wasPressedThisFrame ?? false;
+    }
+
+    /// <summary>
+    /// Reloads the weapon currently in hand from the local player's <see cref="PlayerAmmoReserve"/>.
+    /// Uses the held object rather than the active hotbar slot so an unslotted weapon (picked up
+    /// while both slots were full) can still be reloaded. No-ops if the held item isn't reloadable.
     /// </summary>
     private void TryReloadActiveWeapon()
     {
-        if (_activeSlot < 0) return;
-
-        if (_slots[_activeSlot] is IInventoryReloadable weapon)
+        if (_pickup != null && _pickup.HeldObject is IInventoryReloadable weapon)
             weapon.RequestReloadFromReserve();
     }
 

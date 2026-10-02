@@ -492,7 +492,7 @@ public class SaveDataManager : MonoBehaviour
 
         _committedData.Slots[ActiveSlotIndex] = Clone(slot);
         WriteToDisk();
-        Debug.Log($"[SaveDataManager] Day {baseline.Day} start checkpoint saved — cash: {baseline.Cash}, pickables: {slot.PickableObjects.Length}, carried items: {baseline.PlayerInventoryItemIds?.Length ?? 0}.");
+        Debug.Log($"[SaveDataManager] Day {baseline.Day} start checkpoint saved — cash: {baseline.Cash}, pickables: {slot.PickableObjects.Length}, carried items: {baseline.PlayerInventoryItemIds?.Length ?? 0}, ammo reserves: {baseline.AmmoReserves?.Length ?? 0}.");
     }
 
     /// <summary>

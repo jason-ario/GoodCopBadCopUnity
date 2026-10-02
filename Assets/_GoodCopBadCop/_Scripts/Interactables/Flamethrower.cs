@@ -692,6 +692,8 @@ public class Flamethrower : PickableObject, IAmmoProvider, IInventoryReloadable
 
     public AmmoType ReserveAmmoType => AmmoType.Fuel;
 
+    public bool NeedsReload => _fuel.Value < MaxFuel;
+
     /// <summary>
     /// Called by <see cref="PlayerInventory"/> when the local player presses R with this
     /// flamethrower equipped. Skips the round-trip when the tank is full or the reserve is empty.

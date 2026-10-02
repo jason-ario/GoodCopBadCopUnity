@@ -160,7 +160,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("Throw Object", "throw_object", GameAction.ThrowObject),
             new Setting("Toggle Mask", "toggle_mask", GameAction.ToggleMask),
             new Setting("Open Emotes", "open_emotes", GameAction.OpenEmotes),
-            new Setting("Zoom Item", "zoom_item", GameAction.ZoomHeldItem)
+            new Setting("Zoom Item", "zoom_item", GameAction.ZoomHeldItem),
+            new Setting("Reload", "reload_key", GameAction.Reload)
         };
 
         private readonly List<Row> rows = new List<Row>();

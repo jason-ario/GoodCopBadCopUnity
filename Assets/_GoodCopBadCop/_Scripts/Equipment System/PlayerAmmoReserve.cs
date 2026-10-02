@@ -1,4 +1,6 @@
 using System;
+using Steamworks;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -12,6 +14,10 @@ using UnityEngine;
 ///
 /// Lives on the root of Player.prefab. The owning client's instance is exposed as <see cref="Local"/>
 /// for HUD code (<see cref="AmmoReserveHUD"/>).
+///
+/// Persistence: on spawn the owner reports a stable identity (SteamID, or a host/client fallback
+/// outside Steam) and the server registers the reserve with <see cref="AmmoReserveSaveStore"/>,
+/// which saves it in the day-start checkpoint and parks it when a client disconnects.
 /// </summary>
 [DisallowMultipleComponent]
 public class PlayerAmmoReserve : NetworkBehaviour
@@ -54,7 +60,10 @@ public class PlayerAmmoReserve : NetworkBehaviour
         _fuel.OnValueChanged    += HandleFuelChanged;
 
         if (IsOwner)
+        {
             Local = this;
+            RegisterSaveKeyServerRpc(BuildLocalSaveKey());
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -66,7 +75,74 @@ public class PlayerAmmoReserve : NetworkBehaviour
         if (Local == this)
             Local = null;
 
+        if (IsServer && !string.IsNullOrEmpty(_saveKey))
+        {
+            // A client leaving a running session keeps its ammo for the next checkpoint / rejoin.
+            // A full shutdown (host leaving, scene teardown) has nothing to hand it to.
+            bool sessionContinues = NetworkManager != null && !NetworkManager.ShutdownInProgress;
+            AmmoReserveSaveStore.UnregisterLive(this, _saveKey, sessionContinues);
+            _saveKey = null;
+        }
+
         base.OnNetworkDespawn();
+    }
+
+    // ── Save identity ─────────────────────────────────────────────────────────
+
+    /// <summary>Server-only. Identity this reserve is saved under, or null before the owner registers.</summary>
+    private string _saveKey;
+
+    /// <summary>
+    /// Owner-side. SteamID when Steam is running; otherwise a host/client fallback so editor and
+    /// non-Steam sessions still round-trip through the save.
+    /// </summary>
+    private string BuildLocalSaveKey()
+    {
+        try
+        {
+            if (SteamClient.IsValid)
+                return $"steam:{SteamClient.SteamId.Value}";
+        }
+        catch (Exception)
+        {
+            // Steam not initialised in this session — fall through to the local key.
+        }
+
+        return IsHost ? "local:host" : "local:client";
+    }
+
+    [ServerRpc]
+    private void RegisterSaveKeyServerRpc(FixedString64Bytes key)
+    {
+        if (!string.IsNullOrEmpty(_saveKey)) return;
+        _saveKey = AmmoReserveSaveStore.RegisterLive(this, key.ToString());
+    }
+
+    /// <summary>Server-only. Current counts as save data under <paramref name="key"/>.</summary>
+    public AmmoReserveSaveData CaptureSaveData(string key) => new()
+    {
+        Key = key,
+        Pistol = _pistol.Value,
+        Shotgun = _shotgun.Value,
+        Fuel = _fuel.Value,
+    };
+
+    /// <summary>Server-only. Sets every count to the saved value (zero when <paramref name="data"/> is null), clamped to the carry limits.</summary>
+    public void ServerSetFromSave(AmmoReserveSaveData data)
+    {
+        if (!IsServer) return;
+        _pistol.Value  = Mathf.Clamp(data?.Pistol  ?? 0, 0, _maxPistolRounds);
+        _shotgun.Value = Mathf.Clamp(data?.Shotgun ?? 0, 0, _maxShotgunShells);
+        _fuel.Value    = Mathf.Clamp(data?.Fuel    ?? 0, 0, _maxFuel);
+    }
+
+    /// <summary>Server-only. Adds saved counts on top of the current ones, capped at the carry limits.</summary>
+    public void ServerAddFromSave(AmmoReserveSaveData data)
+    {
+        if (!IsServer || data == null) return;
+        Add(AmmoType.Pistol, data.Pistol);
+        Add(AmmoType.Shotgun, data.Shotgun);
+        Add(AmmoType.Fuel, data.Fuel);
     }
 
     private void HandlePistolChanged(int previous, int current)  => OnAmountChanged?.Invoke(AmmoType.Pistol, previous, current);

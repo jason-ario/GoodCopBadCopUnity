@@ -474,6 +474,8 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
 
     public AmmoType ReserveAmmoType => AmmoType.Pistol;
 
+    public bool NeedsReload => _roundsRemaining.Value < MaxRounds;
+
     /// <summary>
     /// Called by <see cref="PlayerInventory"/> when the local player presses R with this pistol
     /// equipped. Skips the round-trip when the magazine is full or the local reserve is empty.

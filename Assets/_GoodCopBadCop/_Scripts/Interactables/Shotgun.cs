@@ -402,6 +402,8 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
     public AmmoType ReserveAmmoType => AmmoType.Shotgun;
 
+    public bool NeedsReload => _roundsRemaining.Value < MaxRounds;
+
     /// <summary>
     /// Called by <see cref="PlayerInventory"/> when the local player presses R with this shotgun
     /// equipped. Skips the round-trip when the tube is full or the local reserve is empty.
