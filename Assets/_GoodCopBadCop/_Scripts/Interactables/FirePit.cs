@@ -53,6 +53,11 @@ public class FirePit : Interactable, IIgnitable
     [Tooltip("Looping AudioSource for crackling fire sound.")]
     [SerializeField] private AudioSource _fireAudioSource;
 
+    [Header("Fire Pit — Damage")]
+    [Tooltip("Optional child HazardHitbox covering the flames. Enabled only while the fire is lit, " +
+             "so players standing in or running through the fire take burn damage.")]
+    [SerializeField] private HazardHitbox _fireHazard;
+
     // ── Networked state ────────────────────────────────────────────────────────
 
     private readonly NetworkVariable<bool> _isLit = new(
@@ -303,6 +308,9 @@ public class FirePit : Interactable, IIgnitable
 
         if (_fireAudioSource != null && !_fireAudioSource.isPlaying)
             _fireAudioSource.Play();
+
+        if (_fireHazard != null)
+            _fireHazard.SetHazardActive(true);
     }
 
     private void StopFireVisuals(bool immediate)
@@ -325,6 +333,9 @@ public class FirePit : Interactable, IIgnitable
 
         if (_fireAudioSource != null)
             _fireAudioSource.Stop();
+
+        if (_fireHazard != null)
+            _fireHazard.SetHazardActive(false);
     }
 
     private IEnumerator FadeOutVisuals(float duration)

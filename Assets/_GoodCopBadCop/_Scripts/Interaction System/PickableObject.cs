@@ -434,6 +434,29 @@ public class PickableObject : Interactable
         _cachedSaveId = saveId;
     }
 
+    private string _runtimeItemName;
+    private int _runtimeItemIndex = -1;
+
+    /// <summary>True when this item was spawned at runtime from an <see cref="ItemDatabase"/> entry.</summary>
+    public bool HasRuntimeSource => _runtimeItemIndex >= 0 || !string.IsNullOrEmpty(_runtimeItemName);
+
+    /// <summary>
+    /// Server-only, call before Spawn. Gives a runtime-spawned item a unique durable save id and
+    /// records its <see cref="ItemDatabase"/> source so a load can re-instantiate it. Without this,
+    /// every copy shares a "Name(Clone)" hierarchy id and is silently dropped on load.
+    /// </summary>
+    public void AssignRuntimeItemIdentity(PickableItemData itemData, string saveId = null)
+    {
+        if (itemData == null)
+            throw new ArgumentNullException(nameof(itemData));
+
+        _runtimeItemName = itemData.name;
+        _runtimeItemIndex = ItemDatabase.Instance != null ? ItemDatabase.Instance.GetItemIndex(itemData) : -1;
+        _cachedSaveId = string.IsNullOrWhiteSpace(saveId)
+            ? $"Runtime/{itemData.name}/{Guid.NewGuid():N}"
+            : saveId;
+    }
+
     private string BuildHierarchyPath()
     {
         var path = name;
@@ -451,7 +474,10 @@ public class PickableObject : Interactable
             Exists = true,
             Id = SaveId,
             Position = transform.position,
-            EulerRotation = transform.eulerAngles
+            EulerRotation = transform.eulerAngles,
+            HasRuntimeSource = HasRuntimeSource,
+            RuntimeItemName = _runtimeItemName,
+            RuntimeItemIndex = _runtimeItemIndex
         };
 
         InternalBattery battery = GetComponent<InternalBattery>();

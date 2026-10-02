@@ -379,21 +379,22 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         _enemyCompassMarkers.RemoveWhere(t =>
         {
             if (t != null && _enemyMarkerScratch.Contains(t)) return false;
-            CompassMarkerRegistry.Unregister(t);
+            CompassMarkerRegistry.Unregister(t, CompassMarkerCategory.Enemy);
             return true;
         });
 
+        // Re-assert every frame: the mutant root is shared with its corpse JunkItem.
         foreach (Transform t in _enemyMarkerScratch)
         {
-            if (_enemyCompassMarkers.Add(t))
-                CompassMarkerRegistry.Register(t, CompassMarkerCategory.Enemy);
+            _enemyCompassMarkers.Add(t);
+            CompassMarkerRegistry.Register(t, CompassMarkerCategory.Enemy);
         }
     }
 
     private void ClearEnemyCompassMarkers()
     {
         foreach (Transform t in _enemyCompassMarkers)
-            CompassMarkerRegistry.Unregister(t);
+            CompassMarkerRegistry.Unregister(t, CompassMarkerCategory.Enemy);
         _enemyCompassMarkers.Clear();
     }
 

@@ -191,6 +191,7 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         Player  = 2,
         Glass   = 3,
         Prop    = 4,
+        Suspect = 5,
     }
 
     private readonly struct FireHit
@@ -241,6 +242,12 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
                     return new FireHit(ShotKind.Mutant, new NetworkObjectReference(enemy.NetworkObject), hit.point);
                 continue;
             }
+
+            // Living subjects / world NPCs (Soldier, Vlad, guards). Shots are harmless: they only
+            // trigger a flinch on the server (see SuspectCharacter.PlayHarmlessHitReaction).
+            SuspectCharacter suspect = hit.collider.GetComponentInParent<SuspectCharacter>();
+            if (suspect != null && !suspect.IsDead && suspect.NetworkObject != null)
+                return new FireHit(ShotKind.Suspect, new NetworkObjectReference(suspect.NetworkObject), hit.point);
 
             // An irrelevant trigger (interaction zone, click detector, task area, etc.) — bullets
             // must pass straight through it, exactly as if QueryTriggerInteraction.Collide had
@@ -419,6 +426,13 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         {
             MutantEnemy enemy = targetObj.GetComponent<MutantEnemy>() ?? targetObj.GetComponentInChildren<MutantEnemy>();
             enemy?.TakeDamage(_damage, hitPoint, knockbackDirection: rayDirection);
+            return;
+        }
+
+        if (kind == ShotKind.Suspect)
+        {
+            SuspectCharacter suspect = targetObj.GetComponent<SuspectCharacter>() ?? targetObj.GetComponentInChildren<SuspectCharacter>();
+            suspect?.PlayHarmlessHitReaction(hitPoint);
             return;
         }
 

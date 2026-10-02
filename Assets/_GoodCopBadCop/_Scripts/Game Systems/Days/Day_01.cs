@@ -462,6 +462,11 @@ public class Day_01 : DayBase
     // Tracks how many of Vlad's documents have been filed into a folder.
     private int _docsFiledCount;
 
+    // Local: true once both of Vlad's documents are filed. Guards the desk-board arrow/task
+    // against late arrivals (folder-grab event or the server's folder-placed RPC) that would
+    // otherwise re-mark the desk board after the filing step already finished.
+    private bool _docsFilingComplete;
+
     // The most recently equipped tutorial folder — used so a stamp-station arrow can be
     // swapped onto the folder itself the moment the player grabs a stamp (see
     // OnGreenStampGrabbedForFolderArrow / OnYellowStampGrabbedForFolderArrow).
@@ -612,6 +617,7 @@ public class Day_01 : DayBase
         // Day number pop-up plays.
         ShowClockInArrow(false);
         _taskClockIn = null;
+        _docsFilingComplete = false;
 
         // Drawer is unlocked so the player can grab a folder during the tutorial.
         _drawer?.SetLocked(false);
@@ -1511,8 +1517,9 @@ public class Day_01 : DayBase
 
         if (TutorialMarkerManager.Instance != null)
         {
-            if (_markerDrawer != null)    TutorialMarkerManager.Instance.Unmark(_markerDrawer);
-            if (_markerDeskBoard != null) TutorialMarkerManager.Instance.Mark(_markerDeskBoard);
+            if (_markerDrawer != null) TutorialMarkerManager.Instance.Unmark(_markerDrawer);
+            if (_markerDeskBoard != null && !_docsFilingComplete)
+                TutorialMarkerManager.Instance.Mark(_markerDeskBoard);
         }
     }
 
@@ -1770,11 +1777,17 @@ public class Day_01 : DayBase
             _taskFolder = null;
         }
 
-        if (TutorialMarkerManager.Instance != null)
-        {
-            if (_markerDrawer != null)    TutorialMarkerManager.Instance.Unmark(_markerDrawer);
-            if (_markerDeskBoard != null) TutorialMarkerManager.Instance.Mark(_markerDeskBoard);
-        }
+        if (TutorialMarkerManager.Instance != null && _markerDrawer != null)
+            TutorialMarkerManager.Instance.Unmark(_markerDrawer);
+
+        // Race guard: the player can file both documents before this server round-trip lands
+        // (fast filing). In that case the filing step is already done and the green-stamp arrow
+        // is showing — don't re-mark the desk board or add a "Place documents" row that would
+        // never complete.
+        if (_docsFilingComplete) return;
+
+        if (TutorialMarkerManager.Instance != null && _markerDeskBoard != null)
+            TutorialMarkerManager.Instance.Mark(_markerDeskBoard);
 
         _taskFile = TutorialObjectiveList.Instance?.AddObjective(_taskPlaceDocsText);
 
@@ -1806,6 +1819,7 @@ public class Day_01 : DayBase
 
         // Both core documents filed — complete task 3, add stamp task, and unsubscribe.
         FolderController.OnDocumentAdded -= OnDocumentFiledInFolder;
+        _docsFilingComplete = true;
 
         if (_taskFile != null)
         {

@@ -64,15 +64,15 @@ public class ShiftReportSubjectRow : MonoBehaviour
     };
     [SerializeField] private VerdictStyle quarantinedStyle = new VerdictStyle
     {
-        iconColor = new Color(0.62f, 0.13f, 0.1f, 1f),
+        iconColor = Color.white,
         stampLabel = "QUARANTINE",
-        rowTint = new Color(0.75f, 0.2f, 0.15f, 0.16f),
+        rowTint = new Color(0.9f, 0.72f, 0.1f, 0.18f),
         valueColor = new Color(0.62f, 0.13f, 0.1f, 1f)
     };
     [SerializeField] private VerdictStyle killedStyle = new VerdictStyle
     {
         iconColor = new Color(0.62f, 0.13f, 0.1f, 1f),
-        rowTint = new Color(0f, 0f, 0f, 0f),
+        rowTint = new Color(0.62f, 0.13f, 0.1f, 0.14f),
         valueColor = new Color(0.62f, 0.13f, 0.1f, 1f)
     };
     [SerializeField] private VerdictStyle fledStyle = new VerdictStyle

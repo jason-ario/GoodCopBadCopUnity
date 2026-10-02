@@ -150,24 +150,29 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             ResolveBlast(cam.transform.position, cam.transform.forward,
                 out NetworkObjectReference[] mutantRefs, out int[] mutantPellets,
                 out NetworkObjectReference[] playerRefs, out int[] playerPellets,
+                out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
                 out bool hitGlass);
 
-            FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, playerRefs, playerPellets, hitGlass);
+            FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, playerRefs, playerPellets,
+                suspectRefs, suspectPoints, hitGlass);
         }
     }
 
     /// <summary>
     /// Traces the pellet cone locally on the shooter's machine and accumulates how many pellets
     /// landed on each mutant and each fellow player, plus whether the booth glass was struck.
-    /// Runs on the shooter only — the spread the player sees is the spread that is reported.
+    /// Living subjects / world NPCs are collected once each (first pellet point) — shots only make
+    /// them flinch. Runs on the shooter only — the spread the player sees is the spread that is reported.
     /// </summary>
     private void ResolveBlast(Vector3 rayOrigin, Vector3 rayDirection,
         out NetworkObjectReference[] mutantRefs, out int[] mutantPellets,
         out NetworkObjectReference[] playerRefs, out int[] playerPellets,
+        out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
         out bool hitGlass)
     {
         Dictionary<NetworkObject, int> mutantHits = new();
         Dictionary<NetworkObject, int> playerHits = new();
+        Dictionary<NetworkObject, Vector3> suspectHits = new();
         hitGlass = false;
 
         ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
@@ -208,6 +213,15 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                     break;
                 }
 
+                // Living subjects / world NPCs (Soldier, Vlad, guards) — harmless flinch only.
+                SuspectCharacter suspect = hit.collider.GetComponentInParent<SuspectCharacter>();
+                if (suspect != null && !suspect.IsDead && suspect.NetworkObject != null)
+                {
+                    if (!suspectHits.ContainsKey(suspect.NetworkObject))
+                        suspectHits[suspect.NetworkObject] = hit.point;
+                    break;
+                }
+
                 // An irrelevant trigger (interaction zone, click detector, task area, etc.) —
                 // pellets must pass straight through it, exactly as if
                 // QueryTriggerInteraction.Collide had never been requested.
@@ -244,6 +258,16 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
         ToArrays(mutantHits, out mutantRefs, out mutantPellets);
         ToArrays(playerHits, out playerRefs, out playerPellets);
+
+        suspectRefs   = new NetworkObjectReference[suspectHits.Count];
+        suspectPoints = new Vector3[suspectHits.Count];
+        int s = 0;
+        foreach (var kvp in suspectHits)
+        {
+            suspectRefs[s]   = new NetworkObjectReference(kvp.Key);
+            suspectPoints[s] = kvp.Value;
+            s++;
+        }
     }
 
     private static void ToArrays(Dictionary<NetworkObject, int> hits,
@@ -301,6 +325,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     private void FireServerRpc(Vector3 rayDirection,
         NetworkObjectReference[] mutantRefs, int[] mutantPellets,
         NetworkObjectReference[] playerRefs, int[] playerPellets,
+        NetworkObjectReference[] suspectRefs, Vector3[] suspectPoints,
         bool hitGlass, ServerRpcParams rpcParams = default)
     {
         ulong shooterClientId = rpcParams.Receive.SenderClientId;
@@ -351,6 +376,21 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 if (pellets <= 0) continue;
 
                 playerHealth.TakeDamage(_playerPelletDamage * pellets, EffectKeys.FriendlyGunshotDamage, targetObj.transform.position);
+            }
+        }
+
+        if (suspectRefs != null && suspectPoints != null)
+        {
+            int count = Mathf.Min(suspectRefs.Length, suspectPoints.Length);
+            for (int i = 0; i < count; i++)
+            {
+                if (!suspectRefs[i].TryGet(out NetworkObject targetObj) || targetObj == null) continue;
+
+                // Sanity bound, NOT a hit test — rejects a report that could only come from a bug.
+                if (Vector3.Distance(targetObj.transform.position, suspectPoints[i]) > 6f) continue;
+
+                SuspectCharacter suspect = targetObj.GetComponent<SuspectCharacter>() ?? targetObj.GetComponentInChildren<SuspectCharacter>();
+                suspect?.PlayHarmlessHitReaction(suspectPoints[i]);
             }
         }
 

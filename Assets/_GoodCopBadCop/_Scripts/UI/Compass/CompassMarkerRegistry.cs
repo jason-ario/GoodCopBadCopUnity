@@ -53,6 +53,19 @@ public static class CompassMarkerRegistry
         _markers.Remove(target);
     }
 
+    /// <summary>
+    /// Removes <paramref name="target"/>'s pip only if it is currently registered under
+    /// <paramref name="category"/>. Use this whenever a Transform can be claimed by more than one
+    /// owner — e.g. a mutant root carries both a disabled corpse <c>JunkItem</c> (Junk) and a live
+    /// breach/pack pip (BreachMutant/Enemy); a junk refresh must not wipe the live enemy pip.
+    /// </summary>
+    public static void Unregister(Transform target, CompassMarkerCategory category)
+    {
+        if (ReferenceEquals(target, null)) return;
+        if (_markers.TryGetValue(target, out CompassMarkerCategory current) && current == category)
+            _markers.Remove(target);
+    }
+
     /// <summary>Clears every registered marker. Call on scene teardown so nothing lingers across a scene reload.</summary>
     public static void Clear() => _markers.Clear();
 

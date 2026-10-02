@@ -536,17 +536,9 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
-        GameObject spawnedObject = Instantiate(itemData.PickUpPrefab, position, rotation);
-
-        NetworkObject networkObject = spawnedObject.GetComponent<NetworkObject>();
+        NetworkObject networkObject = PickableObjectRegistry.SpawnRuntimeItemServer(itemData, position, rotation);
         if (networkObject == null)
-        {
-            Debug.LogError($"Spawned pickup prefab {itemData.name} has no NetworkObject component.");
-            Destroy(spawnedObject);
             return;
-        }
-
-        networkObject.Spawn(true);
 
         ulong ownerClientId = rpcParams.Receive.SenderClientId;
 
@@ -632,40 +624,13 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
-        GameObject spawnedObject = Instantiate(itemData.PickUpPrefab, position, rotation);
-        NetworkObject networkObject = spawnedObject.GetComponent<NetworkObject>();
+        // Assigns a durable save identity (so the purchase survives save/load) and handles
+        // ExamNotebook page spawning for dynamically spawned notebooks.
+        NetworkObject networkObject = PickableObjectRegistry.SpawnRuntimeItemServer(itemData, position, rotation);
         if (networkObject == null)
         {
-            Debug.LogError($"Purchased pickup prefab {itemData.name} has no NetworkObject component.");
-            Destroy(spawnedObject);
             GlobalHostVariables.Instance.AddMoney(price);
             return;
-        }
-
-        // NGO only supports nested NetworkObjects for scene-placed objects, not dynamically spawned ones.
-        // The inline ExamPage children in the notebook prefab have a different globalObjectIdHash
-        // from the standalone registered page prefabs — clients can't match them and their spawn fails.
-        // SpawnAndWirePages instantiates from the registered prefab assets instead, so clients can
-        // create matching instances and RPCs/ClientRpcs on those NetworkObjects are delivered correctly.
-        ExamNotebook notebook = networkObject.GetComponent<ExamNotebook>();
-        if (notebook != null)
-        {
-            networkObject.Spawn(true);
-
-            var spawnedPages = notebook.SpawnAndWirePages();
-
-            if (spawnedPages.Count > 0)
-            {
-                var pageRefs = new NetworkObjectReference[spawnedPages.Count];
-                for (int i = 0; i < spawnedPages.Count; i++)
-                    pageRefs[i] = new NetworkObjectReference(spawnedPages[i]);
-                notebook.SetPageReferencesClientRpc(pageRefs);
-            }
-        }
-        else
-        {
-            // Non-notebook object — plain spawn, no nested NetworkObject handling needed.
-            networkObject.Spawn(true);
         }
 
         SpawnAndPickUpClientRpc(
@@ -1477,13 +1442,7 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
-        GameObject spawnedPickup = Instantiate(data.PickUpPrefab, position, rotation);
-
-        NetworkObject netObj = spawnedPickup.GetComponent<NetworkObject>();
-        if (netObj != null)
-        {
-            netObj.Spawn();
-        }
+        PickableObjectRegistry.SpawnRuntimeItemServer(data, position, rotation);
     }
 
     public void DestroyEquippedItem()

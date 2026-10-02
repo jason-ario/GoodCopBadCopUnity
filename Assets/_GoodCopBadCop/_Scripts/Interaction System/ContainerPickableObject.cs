@@ -160,20 +160,12 @@ public abstract class ContainerPickableObject : PickableObject, IAmmoProvider
         }
 
         // Spawn slightly above the container to avoid geometry clipping.
-        GameObject spawnedObject = Instantiate(
-            itemData.PickUpPrefab,
+        NetworkObject no = PickableObjectRegistry.SpawnRuntimeItemServer(
+            itemData,
             transform.position + Vector3.up * 0.5f,
             Quaternion.identity);
-
-        NetworkObject no = spawnedObject.GetComponent<NetworkObject>();
         if (no == null)
-        {
-            Debug.LogError($"[{GetType().Name}] Spawned prefab '{itemData.name}' has no NetworkObject.");
-            Destroy(spawnedObject);
             return;
-        }
-
-        no.Spawn(true);
 
         ulong clientId = rpcParams.Receive.SenderClientId;
         GiveItemToPlayerClientRpc(

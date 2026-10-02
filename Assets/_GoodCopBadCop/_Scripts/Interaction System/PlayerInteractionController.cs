@@ -10,6 +10,16 @@ public class PlayerInteractionController : NetworkBehaviour
     public Camera cam;
     public float interactDistance = 3f;
 
+    [Tooltip("Extra reach added to interactDistance only when the interact ray has passed through the perimeter fence to reach collectible junk. The fence keeps the player ~0.6 m back and gore lies on the ground, so without this, gore more than ~2 m past the fence is out of reach even though it's right there.")]
+    public float fencePassthroughExtraReach = 2f;
+
+    /// <summary>True when the most recent interact-ray resolution reached junk through the fence.</summary>
+    private bool _lastHitReachedThroughFence;
+
+    /// <summary>Reach to compare against the hit returned by the most recent <see cref="TryGetBestInteractHit"/>.</summary>
+    private float CurrentInteractReach =>
+        _lastHitReachedThroughFence ? interactDistance + fencePassthroughExtraReach : interactDistance;
+
     [Tooltip("Max distance at which the player can drop a held object using right-click. Independent of interact distance.")]
     public float placementDistance = 5f;
 
@@ -340,7 +350,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 return;
             }
             
-            bool inRange = hit.distance <= interactDistance;
+            bool inRange = hit.distance <= CurrentInteractReach;
             // Search children too â€” a PlacementSlot used purely for ghosting/snap-pose is often
             // authored on a dedicated child Transform (e.g. a mail cubby's snap point) separate
             // from the GameObject that carries the trigger collider the raycast actually hits.
@@ -569,6 +579,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
     private bool TryGetNearestInteractHit(Ray ray, out RaycastHit bestHit)
     {
+        _lastHitReachedThroughFence = false;
         RaycastHit[] hits = Physics.RaycastAll(ray, 10f, interactLayer);
 
         if (hits.Length == 0)
@@ -617,6 +628,7 @@ public class PlayerInteractionController : NetworkBehaviour
                     return true;
                 }
 
+                _lastHitReachedThroughFence = crossedFence;
                 bestHit = hits[i];
                 return true;
             }
@@ -628,10 +640,16 @@ public class PlayerInteractionController : NetworkBehaviour
             // standing behind it.
             if (!collider.isTrigger)
             {
-                if (!crossedFence && junkPassthroughAllowed && IsPerimeterFence(collider))
+                // A fence is usually several colliders deep along a downward ray (panel, base rail,
+                // posts, adjacent segments, damage-stage meshes) — let the ray through all of them,
+                // not just the first, so gore lying at the foot of the fence stays reachable.
+                if (junkPassthroughAllowed && IsPerimeterFence(collider))
                 {
-                    crossedFence = true;
-                    fenceHit = hits[i];
+                    if (!crossedFence)
+                    {
+                        crossedFence = true;
+                        fenceHit = hits[i];
+                    }
                     continue;
                 }
 
@@ -862,7 +880,7 @@ public class PlayerInteractionController : NetworkBehaviour
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
         // Same tie-break/sticky resolution as the reticle highlight â€” see TryWorldInteract.
-        if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > interactDistance)
+        if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > CurrentInteractReach)
         {
             _playerPickupController.TryUseObject();
             return;
@@ -914,7 +932,7 @@ public class PlayerInteractionController : NetworkBehaviour
         // instead of a plain single-hit Raycast. Otherwise a click can resolve to a different
         // collider than the one currently highlighted whenever two interactables (e.g. a pickup
         // resting on top of a piece of furniture) sit at near-equal ray distances.
-        if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > interactDistance)
+        if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > CurrentInteractReach)
             return;
 
         Interactable interactable = ResolveInteractable(hit.collider);

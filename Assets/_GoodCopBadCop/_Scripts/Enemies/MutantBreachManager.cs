@@ -312,21 +312,23 @@ public class MutantBreachManager : NetworkBehaviour
         _breachCompassMarkers.RemoveWhere(t =>
         {
             if (t != null && _breachMarkerScratch.Contains(t)) return false;
-            CompassMarkerRegistry.Unregister(t);
+            CompassMarkerRegistry.Unregister(t, CompassMarkerCategory.BreachMutant);
             return true;
         });
 
+        // Re-assert every frame (idempotent dictionary write): the mutant root is shared with its
+        // corpse JunkItem, so another owner may have touched the registry entry since last frame.
         foreach (Transform t in _breachMarkerScratch)
         {
-            if (_breachCompassMarkers.Add(t))
-                CompassMarkerRegistry.Register(t, CompassMarkerCategory.BreachMutant);
+            _breachCompassMarkers.Add(t);
+            CompassMarkerRegistry.Register(t, CompassMarkerCategory.BreachMutant);
         }
     }
 
     private void ClearBreachCompassMarkers()
     {
         foreach (Transform t in _breachCompassMarkers)
-            CompassMarkerRegistry.Unregister(t);
+            CompassMarkerRegistry.Unregister(t, CompassMarkerCategory.BreachMutant);
         _breachCompassMarkers.Clear();
     }
 

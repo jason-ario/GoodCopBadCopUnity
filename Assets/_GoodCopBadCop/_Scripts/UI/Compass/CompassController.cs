@@ -20,7 +20,7 @@ public class CompassController : MonoBehaviour
         { CompassMarkerCategory.Junk,     new Color(0.80f, 0.62f, 0.35f) }, // tan/brown
         { CompassMarkerCategory.Graffiti, new Color(0.95f, 0.40f, 0.10f) }, // orange
         { CompassMarkerCategory.Fence,    new Color(0.60f, 0.65f, 0.70f) }, // steel gray
-        { CompassMarkerCategory.Blood,    new Color(0.75f, 0.05f, 0.05f) }, // dark red
+        { CompassMarkerCategory.Blood,    new Color(0.42f, 0.02f, 0.03f) }, // dark red (distinct from bright-red Enemy)
         { CompassMarkerCategory.Enemy,    new Color(1.00f, 0.10f, 0.10f) }, // bright red
         { CompassMarkerCategory.BreachMutant, new Color(0.90f, 0.76f, 0.58f) }, // light brown
     };

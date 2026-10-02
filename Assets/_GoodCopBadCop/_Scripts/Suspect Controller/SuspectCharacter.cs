@@ -916,9 +916,9 @@ public class SuspectCharacter : Interactable
     private bool _suspectUpdateDisabled;
 
     [Header("Combat")]
-    [Tooltip("When enabled, this suspect completely ignores damage and shots from players: no hit " +
-             "reaction, no flee, no death. Use for background NPCs (e.g. guard soldiers, non-interactive " +
-             "story characters) that should never be affected by player weapons.")]
+    [Tooltip("When enabled, this suspect takes no damage from players: no gore, no flee, no death — " +
+             "it only plays a harmless flinch when struck or shot. Use for background NPCs (e.g. guard " +
+             "soldiers, non-interactive story characters) that should never be hurt by player weapons.")]
     [SerializeField] private bool isImmuneToDamage;
 
     [Tooltip("Maximum health points. Reaching zero triggers the death animation.")]
@@ -1896,8 +1896,16 @@ public class SuspectCharacter : Interactable
     /// <param name="hitPoint">World-space impact point used to position the blood particle.</param>
     public void TakeDamage(float amount, Vector3 hitPoint)
     {
-        if (!IsServer || isImmuneToDamage || _isDead || _hasFled || !_isAtBooth)
+        if (!IsServer || _isDead || _hasFled)
             return;
+
+        // World NPCs (Day 1 Soldier, Vlad, guards, scripted walkers) and immune characters still
+        // react to being struck, but take no damage and show no gore.
+        if (isImmuneToDamage || !_isAtBooth)
+        {
+            PlayFlinchClientRpc();
+            return;
+        }
 
         // Cosmetic hit reaction plays for every strike, mutant or not.
         SpawnHitParticleClientRpc(hitPoint);
@@ -1939,6 +1947,23 @@ public class SuspectCharacter : Interactable
             return;
 
         PlayFlinchClientRpc();
+    }
+
+    /// <summary>
+    /// Harmless weapon hit (Pistol / Shotgun): never damages, never fires <see cref="OnHit"/>,
+    /// never kills. A subject at the booth gets the same visual reaction as a melee strike (hit
+    /// particle + <see cref="hitAnimTrigger"/>); world NPCs and immune characters just flinch.
+    /// Server-only.
+    /// </summary>
+    public void PlayHarmlessHitReaction(Vector3 hitPoint)
+    {
+        if (!IsServer || _isDead || _hasFled)
+            return;
+
+        if (_isAtBooth && !isImmuneToDamage)
+            SpawnHitParticleClientRpc(hitPoint);
+        else
+            PlayFlinchClientRpc();
     }
 
     [ClientRpc]

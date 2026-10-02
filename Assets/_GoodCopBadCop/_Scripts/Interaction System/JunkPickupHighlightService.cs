@@ -88,7 +88,7 @@ public static class JunkPickupHighlightService
         if (!_registered.Remove(junk)) return;
 
         junk.SetForceHighlight(false, HighlightHold.PickupAffordance);
-        CompassMarkerRegistry.Unregister(junk.transform);
+        CompassMarkerRegistry.Unregister(junk.transform, CompassMarkerCategory.Junk);
     }
 
     /// <summary>Re-applies the affordance to every tracked item.</summary>
@@ -123,7 +123,7 @@ public static class JunkPickupHighlightService
             if (junk != null)
             {
                 junk.SetForceHighlight(false, HighlightHold.PickupAffordance);
-                CompassMarkerRegistry.Unregister(junk.transform);
+                CompassMarkerRegistry.Unregister(junk.transform, CompassMarkerCategory.Junk);
             }
         }
     }
@@ -138,9 +138,11 @@ public static class JunkPickupHighlightService
 
         // Objective markers follow the same replicated task-ownership state as the persistent
         // highlight. Pickup availability remains independent: unmarked debris is still baggable.
+        // Category-scoped unregister: a living mutant's root also carries its (disabled) corpse
+        // JunkItem, and must keep its BreachMutant/Enemy pip when junk state refreshes.
         if (_enabled && requiredByTask)
             CompassMarkerRegistry.Register(junk.transform, CompassMarkerCategory.Junk);
         else
-            CompassMarkerRegistry.Unregister(junk.transform);
+            CompassMarkerRegistry.Unregister(junk.transform, CompassMarkerCategory.Junk);
     }
 }

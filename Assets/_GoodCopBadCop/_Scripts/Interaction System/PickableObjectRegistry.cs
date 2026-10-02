@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -167,20 +168,140 @@ public class PickableObjectRegistry : MonoBehaviour
     {
         if (data == null || data.Length == 0) return;
 
+        // Runtime-spawned items (purchases etc.) don't exist after a scene load — recreate them
+        // first so the pass below can apply their saved pose and state like any scene item.
+        int respawnedCount = RespawnMissingRuntimeItems(data);
+
         int restoredCount = 0;
+        int failedCount = 0;
+        var missingIds = new List<string>();
         foreach (PickableObjectSaveData entry in data)
         {
             if (entry == null || string.IsNullOrEmpty(entry.Id)) continue;
-            if (!_pickables.TryGetValue(entry.Id, out PickableObject pickable) || pickable == null) continue;
+            if (!_pickables.TryGetValue(entry.Id, out PickableObject pickable) || pickable == null)
+            {
+                if (!entry.HasExistenceState || entry.Exists)
+                    missingIds.Add(entry.Id);
+                continue;
+            }
 
             // Also guards against older saves that still contain stamp entries/tombstones.
             if (!pickable.IsPersistedInSave) continue;
 
-            pickable.ApplySaveData(entry);
-            restoredCount++;
+            // One misbehaving item must never abort the whole restore — that left every item
+            // after it at its scene-authored position.
+            try
+            {
+                pickable.ApplySaveData(entry);
+                restoredCount++;
+            }
+            catch (Exception e)
+            {
+                failedCount++;
+                Debug.LogError($"[PickableObjectRegistry] Failed to restore '{entry.Id}': {e}", pickable);
+            }
         }
 
-        Debug.Log($"[PickableObjectRegistry] Restored {restoredCount}/{data.Length} pickable object(s) from checkpoint.");
+        Debug.Log($"[PickableObjectRegistry] Restored {restoredCount}/{data.Length} pickable object(s) from checkpoint " +
+                  $"(respawned {respawnedCount} runtime item(s), {failedCount} failed, {missingIds.Count} unmatched).");
+        if (missingIds.Count > 0)
+            Debug.LogWarning($"[PickableObjectRegistry] Saved pickables with no live match: {string.Join(", ", missingIds)}");
+    }
+
+    /// <summary>
+    /// Server-only. Instantiates <paramref name="itemData"/>'s pickup prefab, gives it a durable
+    /// runtime save identity, spawns it, and wires ExamNotebook pages. Every runtime spawn of an
+    /// <see cref="ItemDatabase"/> item should go through here so it survives save/load.
+    /// </summary>
+    public static NetworkObject SpawnRuntimeItemServer(PickableItemData itemData, Vector3 position, Quaternion rotation, string saveId = null)
+    {
+        if (itemData == null || itemData.PickUpPrefab == null)
+        {
+            Debug.LogError("[PickableObjectRegistry] SpawnRuntimeItemServer: item data or pickup prefab is missing.");
+            return null;
+        }
+
+        GameObject instance = Instantiate(itemData.PickUpPrefab, position, rotation);
+        NetworkObject networkObject = instance.GetComponent<NetworkObject>();
+        if (networkObject == null)
+        {
+            Debug.LogError($"[PickableObjectRegistry] Pickup prefab for '{itemData.name}' has no NetworkObject component.");
+            Destroy(instance);
+            return null;
+        }
+
+        // Must happen before Spawn: OnNetworkSpawn registers the item under its SaveId.
+        if (instance.TryGetComponent(out PickableObject pickable))
+            pickable.AssignRuntimeItemIdentity(itemData, saveId);
+
+        networkObject.Spawn(true);
+
+        // NGO only supports nested NetworkObjects for scene-placed objects; dynamically spawned
+        // notebooks must spawn their pages from the registered page prefab.
+        if (instance.TryGetComponent(out ExamNotebook notebook))
+        {
+            List<NetworkObject> spawnedPages = notebook.SpawnAndWirePages();
+            if (spawnedPages.Count > 0)
+            {
+                var pageRefs = new NetworkObjectReference[spawnedPages.Count];
+                for (int i = 0; i < spawnedPages.Count; i++)
+                    pageRefs[i] = new NetworkObjectReference(spawnedPages[i]);
+                notebook.SetPageReferencesClientRpc(pageRefs);
+            }
+        }
+
+        return networkObject;
+    }
+
+    private int RespawnMissingRuntimeItems(PickableObjectSaveData[] data)
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer) return 0;
+
+        int count = 0;
+        foreach (PickableObjectSaveData entry in data)
+        {
+            if (entry == null || !entry.HasRuntimeSource || string.IsNullOrEmpty(entry.Id)) continue;
+            if (entry.HasExistenceState && !entry.Exists) continue;
+            if (TryGetPickable(entry.Id, out _)) continue;
+
+            PickableItemData itemData = ResolveRuntimeItemData(entry);
+            if (itemData == null)
+            {
+                Debug.LogWarning($"[PickableObjectRegistry] Cannot respawn saved item '{entry.Id}': ItemDatabase entry '{entry.RuntimeItemName}' (index {entry.RuntimeItemIndex}) not found.");
+                continue;
+            }
+
+            try
+            {
+                if (SpawnRuntimeItemServer(itemData, entry.Position, Quaternion.Euler(entry.EulerRotation), entry.Id) != null)
+                    count++;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[PickableObjectRegistry] Failed to respawn saved item '{entry.Id}': {e}");
+            }
+        }
+
+        return count;
+    }
+
+    private static PickableItemData ResolveRuntimeItemData(PickableObjectSaveData entry)
+    {
+        ItemDatabase db = ItemDatabase.Instance;
+        if (db == null || db.allItems == null) return null;
+
+        // Prefer the asset name so reordering the database never respawns the wrong item.
+        if (!string.IsNullOrEmpty(entry.RuntimeItemName))
+        {
+            foreach (PickableItemData item in db.allItems)
+            {
+                if (item != null && item.name == entry.RuntimeItemName)
+                    return item;
+            }
+        }
+
+        return db.GetItemByIndex(entry.RuntimeItemIndex);
     }
 
     // ── Disconnect rescue ─────────────────────────────────────────────────────

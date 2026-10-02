@@ -18,6 +18,12 @@ public class PickableObjectSaveData
     public Vector3 Position;
     public Vector3 EulerRotation;
 
+    // Runtime-spawned items (shop purchases, dispensers, containers) do not exist in the scene
+    // on load. These record which ItemDatabase entry to re-instantiate them from.
+    public bool HasRuntimeSource;
+    public string RuntimeItemName;
+    public int RuntimeItemIndex = -1;
+
     // Optional, type-specific state. Values are only interpreted by the matching pickable type.
     public bool HasResourceAmount;
     public float ResourceAmount;
