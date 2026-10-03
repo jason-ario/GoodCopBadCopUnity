@@ -12,17 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
   m_Name: ClockInCompleteDialogue
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 0
   nodes:
   - type: 0
     npcLine: Good, now you can call the first subject.
     animationTrigger: 
     cameraTrigger: Megaphone
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: Press that button over there to alert the next in line. Hurry up, you're
-      on the clock!
+    npcLine: '[[Press that button]] over there to alert the next in line. Hurry up, you''re on the clock!'
     animationTrigger: 
     cameraTrigger: Megaphone
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []

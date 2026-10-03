@@ -12,19 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
   m_Name: Day03PowerOutageCallDialogue
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 0
   nodes:
   - type: 0
-    npcLine: Hello? This is Central Power Authority. We've registered a fault on
-      your sector's grid. Your circuit box at the power station has tripped. You
-      need to go reset it manually.
+    npcLine: Hello? This is Central Power Authority. We've registered a fault on your sector's grid. Your circuit box at the power station has tripped. You need to go reset it manually.
     animationTrigger: 
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 11400000, guid: 0ae68bc6a03601b448bb9bc0c8f8bb57, type: 2}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: Head to the power station and find the circuit box. Flip the breakers
-      back on. Until then your whole block stays dark. Move quickly.
+    npcLine: Head to the power station and find the [[circuit box]]. Flip the breakers back on. Until then your whole block stays dark. Move quickly.
     animationTrigger: 
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 11400000, guid: 0ae68bc6a03601b448bb9bc0c8f8bb57, type: 2}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []
