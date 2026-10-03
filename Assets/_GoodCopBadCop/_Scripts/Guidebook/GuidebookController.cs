@@ -5,8 +5,11 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Opens and closes the guidebook when the local player presses Tab.
 /// On open: deactivates the held object, locks movement and look, and sets both
-/// arm animators to the HoldingGuidebook state via PlayerAnimationController.
-/// On close: reverses all of the above.
+/// arm animators to the HoldingGuidebook state via PlayerAnimationController. Also hides the
+/// HUD and takes over the Back button (Escape / click closes the book; the exit prompt next to it
+/// shows the Tab / View key).
+/// On close: reverses all of the above. The book is also put away automatically when a cutscene
+/// or dialogue the player is in ends.
 /// The body guidebook mesh (<see cref="_bodyGuidebookObject"/>) is activated on all clients
 /// via <see cref="PlayerAnimationController.SetGuidebookOpen"/> so other players can see it.
 /// </summary>
@@ -39,6 +42,10 @@ public class GuidebookController : MonoBehaviour
 
     private GuidebookPageController _pageController;
 
+    private bool _wasInCutsceneOrDialogue;
+    private bool _hidHud;
+    private UnityEngine.Events.UnityAction _backButtonAction;
+
     public bool IsOpen { get; private set; }
 
     /// <summary>The guidebook controller of the player who most recently opened their guidebook locally.</summary>
@@ -61,6 +68,35 @@ public class GuidebookController : MonoBehaviour
 
         if (_bodyGuidebookObject != null)
             _bodyGuidebookObject.SetActive(false);
+
+        _backButtonAction = CloseGuidebook;
+    }
+
+    private static bool IsInCutsceneOrDialogue() =>
+        ScriptedDialogueRunner.IsScriptedModeActive
+        || DialogueChoiceSystem.IsInDialogueMode
+        || (PlayerInstance.Instance != null && PlayerInstance.Instance.IsInCutscene);
+
+    /// <summary>Hides the HUD and shows the Back button (Escape / click closes the book).</summary>
+    private void ShowScreenUI()
+    {
+        UIController ui = UIController.Instance;
+        if (ui == null) return;
+
+        _hidHud = ui.IsPlayerUIVisible;
+        if (_hidHud) ui.ClosePlayerUI();
+        ui.ShowExclusiveBackButton(_backButtonAction);
+    }
+
+    private void RestoreScreenUI()
+    {
+        UIController ui = UIController.Instance;
+        if (ui == null) return;
+
+        ui.ReleaseExclusiveBackButton(_backButtonAction);
+        // ShowPlayerUI itself refuses while a cutscene, dialogue or diegetic view is active.
+        if (_hidHud) ui.ShowPlayerUI();
+        _hidHud = false;
     }
 
     private void OnEnable()
@@ -76,6 +112,16 @@ public class GuidebookController : MonoBehaviour
     private void Update()
     {
         if (PlayerInstance.Instance == null || !PlayerInstance.Instance.IsLocalPlayer) return;
+
+        // Put the book away automatically when a cutscene or dialogue ends.
+        bool inScene = IsInCutsceneOrDialogue();
+        bool sceneEnded = _wasInCutsceneOrDialogue && !inScene;
+        _wasInCutsceneOrDialogue = inScene;
+        if (sceneEnded && IsOpen)
+        {
+            CloseGuidebook();
+            return;
+        }
 
         if (!GameSettings.Instance.GuidebookEnabled)
         {
@@ -131,6 +177,8 @@ public class GuidebookController : MonoBehaviour
 
         // Notify all clients to show the body-space guidebook mesh.
         _animationController.SetGuidebookOpen(true);
+
+        ShowScreenUI();
     }
 
     /// <summary>
@@ -141,6 +189,8 @@ public class GuidebookController : MonoBehaviour
         if (!IsOpen) return;
         IsOpen = false;
         OnGuidebookClosed?.Invoke();
+
+        RestoreScreenUI();
 
         _animationController.SetAnimBool(AnimParam, false);
 

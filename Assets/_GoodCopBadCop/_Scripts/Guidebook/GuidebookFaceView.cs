@@ -14,6 +14,13 @@ public struct GuidebookFaceContent
     public int    PageNumber;   // 0 = hide footer
     public bool   IsNew;
     public bool   IsBlank;      // notes filler page: header only, lined body
+
+    /// <summary>Ruled charts printed below the body (the body then only takes the height it needs).</summary>
+    public GuidebookTable[] Tables;
+    /// <summary>Optional boxed warning printed after the charts.</summary>
+    public string Callout;
+
+    public bool HasChart => (Tables != null && Tables.Length > 0) || !string.IsNullOrEmpty(Callout);
 }
 
 /// <summary>
@@ -51,6 +58,35 @@ public class GuidebookFaceView : MonoBehaviour
 
     private static readonly Color DefaultAccent = new Color(0.45f, 0.08f, 0.06f, 1f);
 
+    private GuidebookChartView _chart;
+
+    /// <summary>
+    /// The chart lives in a runtime child of the Layout, sized and anchored like the body, so the
+    /// sheet prefab needs no extra authoring.
+    /// </summary>
+    private GuidebookChartView GetOrCreateChart()
+    {
+        if (_chart != null || _body == null) return _chart;
+
+        RectTransform bodyRect = _body.rectTransform;
+        var go = new GameObject("Chart", typeof(RectTransform));
+        go.layer = _body.gameObject.layer;
+
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(bodyRect.parent, false);
+        rt.SetSiblingIndex(bodyRect.GetSiblingIndex() + 1);
+        rt.anchorMin = bodyRect.anchorMin;
+        rt.anchorMax = bodyRect.anchorMax;
+        rt.pivot     = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(bodyRect.anchoredPosition.x, 0f);
+        rt.sizeDelta = new Vector2(bodyRect.rect.width, 0f);
+
+        _chart = go.AddComponent<GuidebookChartView>();
+        Material ruleMaterial = _divider != null ? _divider.material : null;
+        _chart.Configure(_body, ruleMaterial, _body.color);
+        return _chart;
+    }
+
     public void Apply(in GuidebookFaceContent content)
     {
         Color accent = content.AccentColor.a > 0f ? content.AccentColor : DefaultAccent;
@@ -65,6 +101,7 @@ public class GuidebookFaceView : MonoBehaviour
 
         bool hasImage = !content.IsBlank && content.Image != null;
         bool hasBadge = !content.IsBlank && !string.IsNullOrEmpty(content.Badge);
+        bool hasChart = !content.IsBlank && content.HasChart;
         string body   = content.IsBlank ? BuildNotesLines() : content.Body;
 
         if (_image != null)
@@ -94,7 +131,29 @@ public class GuidebookFaceView : MonoBehaviour
         if (_body != null)
         {
             SetText(_body, body);
-            PlaceTop(_body.rectTransform, cursor, Mathf.Max(0f, cursor - _bodyBottom));
+            float bodyHeight = Mathf.Max(0f, cursor - _bodyBottom);
+            if (hasChart)
+            {
+                bodyHeight = string.IsNullOrEmpty(body)
+                    ? 0f
+                    : Mathf.Min(bodyHeight, _body.GetPreferredValues(body, _body.rectTransform.rect.width, 10000f).y + 4f);
+            }
+            PlaceTop(_body.rectTransform, cursor, bodyHeight);
+            if (hasChart && bodyHeight > 0f) cursor -= bodyHeight + _gap * 1.5f;
+        }
+
+        GuidebookChartView chart = hasChart ? GetOrCreateChart() : _chart;
+        if (chart != null)
+        {
+            if (hasChart)
+            {
+                PlaceTop((RectTransform)chart.transform, cursor, 0f);
+                chart.Build(content.Tables, content.Callout, Mathf.Max(0f, cursor - _bodyBottom));
+            }
+            else
+            {
+                chart.Clear();
+            }
         }
 
         SetText(_footer, content.PageNumber > 0 ? $"- {content.PageNumber} -" : null);

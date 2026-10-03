@@ -307,6 +307,9 @@ public class UIController : MonoBehaviour
         PlayerInstance.Instance.ClosedUIPanel();
     }
 
+    /// <summary>True while the player HUD is shown.</summary>
+    public bool IsPlayerUIVisible => playerUI != null && playerUI.activeSelf;
+
     public void ClosePlayerUI()
     {
         playerUI.SetActive(false);
@@ -443,9 +446,16 @@ public class UIController : MonoBehaviour
     }
     
 
+    // Callbacks registered through ShowBackButton, so an exclusive owner can set them aside and
+    // restore them later (UnityEvent runtime listeners can't be enumerated).
+    private readonly List<UnityAction> _backButtonCallbacks = new List<UnityAction>();
+    private readonly List<UnityAction> _suspendedBackButtonCallbacks = new List<UnityAction>();
+    private bool _backButtonWasVisibleBeforeExclusive;
+
     public void ShowBackButton(UnityAction onClickCallback)
     {
         backButton.onClick.AddListener(onClickCallback);
+        _backButtonCallbacks.Add(onClickCallback);
         backButtonUI.SetActive(true);
         _backButtonLayoutDirty = true;
         UpdateBackButtonHudAvoidance();
@@ -454,7 +464,51 @@ public class UIController : MonoBehaviour
     public void HideBackButton()
     {
         backButton.onClick.RemoveAllListeners();
+        _backButtonCallbacks.Clear();
+        // Whoever owned the button underneath an exclusive owner is done with it too.
+        _suspendedBackButtonCallbacks.Clear();
+        _backButtonWasVisibleBeforeExclusive = false;
         backButtonUI.SetActive(false);
+    }
+
+    /// <summary>
+    /// Shows the Back button with <paramref name="onClickCallback"/> as its only action (Escape /
+    /// click). Any callbacks already on the button (e.g. an open dialogue's "leave") are set aside
+    /// and restored by <see cref="ReleaseExclusiveBackButton"/>.
+    /// </summary>
+    public void ShowExclusiveBackButton(UnityAction onClickCallback)
+    {
+        _backButtonWasVisibleBeforeExclusive = backButtonUI.activeSelf;
+        foreach (UnityAction callback in _backButtonCallbacks)
+        {
+            backButton.onClick.RemoveListener(callback);
+            _suspendedBackButtonCallbacks.Add(callback);
+        }
+        _backButtonCallbacks.Clear();
+        ShowBackButton(onClickCallback);
+    }
+
+    /// <summary>
+    /// Undoes <see cref="ShowExclusiveBackButton"/>: removes <paramref name="onClickCallback"/> and
+    /// restores the callbacks it set aside. If <see cref="HideBackButton"/> ran in between, the
+    /// previous owner is gone and the button simply stays hidden.
+    /// </summary>
+    public void ReleaseExclusiveBackButton(UnityAction onClickCallback)
+    {
+        if (!_backButtonCallbacks.Remove(onClickCallback)) return;
+        backButton.onClick.RemoveListener(onClickCallback);
+
+        foreach (UnityAction callback in _suspendedBackButtonCallbacks)
+        {
+            backButton.onClick.AddListener(callback);
+            _backButtonCallbacks.Add(callback);
+        }
+        _suspendedBackButtonCallbacks.Clear();
+
+        bool visible = _backButtonCallbacks.Count > 0 || _backButtonWasVisibleBeforeExclusive;
+        _backButtonWasVisibleBeforeExclusive = false;
+        backButtonUI.SetActive(visible);
+        _backButtonLayoutDirty = true;
     }
 
 

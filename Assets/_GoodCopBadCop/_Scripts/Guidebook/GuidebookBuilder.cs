@@ -148,40 +148,52 @@ public class GuidebookBuilder : MonoBehaviour
         IReadOnlyList<GuidebookDatabase.DispositionBand> bands = _database.DispositionBands;
         if (bands.Count == 0) return;
 
-        var sb = new StringBuilder();
-        if (!string.IsNullOrEmpty(_database.ScoringIntro))
-            sb.Append(_database.ScoringIntro).Append("\n\n");
-
-        sb.Append("<b>SCORE").Append(PosStatus).Append("STATUS").Append(PosAction).Append("ACTION</b>\n");
+        // Disposition chart: SCORE | STATUS | ACTION.
+        var disposition = new GuidebookTable
+        {
+            ColumnWidths = new[] { 0.9f, 1.25f, 1.85f },
+            Alignments   = new[] { TMPro.TextAlignmentOptions.Center,
+                                   TMPro.TextAlignmentOptions.MidlineLeft,
+                                   TMPro.TextAlignmentOptions.MidlineLeft },
+        };
+        disposition.Rows.Add(new[] { "SCORE", "STATUS", "ACTION" });
         foreach (GuidebookDatabase.DispositionBand band in bands)
         {
             string range = band.MinScore == band.MaxScore ? band.MinScore.ToString() : $"{band.MinScore}-{band.MaxScore}";
-            sb.Append(range).Append(PosStatus).Append(band.Status).Append(PosAction).Append(band.Action).Append('\n');
+            disposition.Rows.Add(new[] { range, Upper(band.Status), Upper(band.Action) });
         }
 
-        bool wroteCostHeader = false;
+        // Live point costs for every category the player can currently meet.
+        var points = new GuidebookTable
+        {
+            Caption      = "POINTS PER CONFIRMED ANOMALY",
+            ColumnWidths = new[] { 3.1f, 0.9f },
+            Alignments   = new[] { TMPro.TextAlignmentOptions.MidlineLeft, TMPro.TextAlignmentOptions.Center },
+        };
+        points.Rows.Add(new[] { "CATEGORY", "POINTS" });
         foreach (GuidebookDatabase.CategoryStyle style in _database.Categories)
         {
             if (!HasUnlockedEntry(style.Category)) continue;
-            if (!wroteCostHeader)
-            {
-                sb.Append("\n<b>POINTS PER ANOMALY</b>\n");
-                wroteCostHeader = true;
-            }
-            sb.Append(style.DisplayName).Append(PosRight).Append('+').Append(AnomalyController.GetAnomalyPointCost(style.Category)).Append('\n');
+            points.Rows.Add(new[] { Upper(style.DisplayName), $"+{AnomalyController.GetAnomalyPointCost(style.Category)}" });
         }
 
-        if (!string.IsNullOrEmpty(_database.DispositionWarning))
-            sb.Append("\n<b>WARNING:</b> ").Append(_database.DispositionWarning);
+        var tables = new List<GuidebookTable> { disposition };
+        if (points.Rows.Count > 1) tables.Add(points);
 
         _faces.Add(new GuidebookFaceContent
         {
             Header      = _database.ScoringHeader,
             Title       = _database.ScoringTitle,
-            Body        = sb.ToString(),
+            Body        = _database.ScoringIntro,
+            Tables      = tables.ToArray(),
+            Callout     = string.IsNullOrEmpty(_database.DispositionWarning)
+                              ? null
+                              : "<b>WARNING:</b> " + _database.DispositionWarning,
             AccentColor = _rulesAccent,
         });
     }
+
+    private static string Upper(string s) => string.IsNullOrEmpty(s) ? s : s.ToUpperInvariant();
 
     private void AddSections()
     {
@@ -311,9 +323,7 @@ public class GuidebookBuilder : MonoBehaviour
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    // Rich-text column stops shared by the scoring table and section contents.
-    private const string PosStatus  = "<pos=20%>";
-    private const string PosAction  = "<pos=48%>";
+    // Rich-text column stop for right-aligned page numbers in section contents.
     private const string PosRight   = "<pos=86%>";
     // Dash bullet with a hanging indent; the line must close with </indent>.
     private const string ListMarker = "-<indent=1.1em>";

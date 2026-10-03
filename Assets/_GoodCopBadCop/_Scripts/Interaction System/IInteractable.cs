@@ -80,6 +80,28 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     [Tooltip("Only highlight children whose names contain this string. Leave empty to disable highlighting entirely.")]
     [SerializeField] private string highlightNameFilter;
 
+    [Header("Persistent Highlight Range")]
+    [Tooltip("Persistent (hold) highlights — tutorial, arrow, junk, mail — are only visible while the camera is within " +
+             "this many meters. They fade in on approach and fade out beyond it. 0 = unlimited. Hover is unaffected.")]
+    [SerializeField, Min(0f)] private float holdHighlightVisibleRange = 50f;
+    [Tooltip("Seconds to fade a persistent highlight in / out when crossing its visible range.")]
+    [SerializeField, Min(0f)] private float holdHighlightFadeDuration = 0.5f;
+
+    /// <summary>Extra distance past the range before an in-range glow fades out, so it doesn't flicker at the boundary.</summary>
+    private const float HoldRangeHysteresis = 1f;
+
+    /// <summary>
+    /// Whether the local camera is within <see cref="holdHighlightVisibleRange"/>. Kept up to date by
+    /// <see cref="HoldHighlightRangeDriver"/> only while a hold is claimed.
+    /// </summary>
+    private bool _holdInRange = true;
+
+    // Authored HighlightEffect fade durations, restored for hover and hold changes so only
+    // range crossings use the range fade.
+    private bool _authoredFadeCached;
+    private float _authoredFadeIn;
+    private float _authoredFadeOut;
+
     /// <summary>
     /// Which systems currently want this object's highlight held on regardless of hover state.
     /// Normal hover-driven <see cref="Highlight"/>(false) calls from
@@ -100,8 +122,11 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// </summary>
     private bool _holdHighlightSuppressed;
 
-    /// <summary>True while a hold is claimed AND not suppressed, i.e. the persistent glow is visible.</summary>
-    private bool IsHoldHighlightVisible => _highlightHolds != HighlightHold.None && !_holdHighlightSuppressed;
+    /// <summary>True while a hold is claimed AND not suppressed — the hold owns this object's highlight state.</summary>
+    private bool IsHoldHighlightActive => _highlightHolds != HighlightHold.None && !_holdHighlightSuppressed;
+
+    /// <summary>True while the hold is active AND the camera is in range, i.e. the persistent glow is visible.</summary>
+    private bool IsHoldHighlightVisible => IsHoldHighlightActive && _holdInRange;
 
     /// <summary>
     /// Whether this object can be interacted with RIGHT NOW. <see cref="PlayerInteractionController"/>
@@ -156,6 +181,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         // first hover to silently fail to render. Visibility is gated by 'highlighted'.
         highlightEffect.enabled = true;
         highlightEffect.highlighted = false;
+        CacheAuthoredFade();
 
         if (!string.IsNullOrEmpty(highlightNameFilter))
             highlightEffect.effectNameFilter = highlightNameFilter;
@@ -165,7 +191,9 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     {
         // While any hold is active (tutorial call-out, pickup affordance), ignore hover-driven
         // attempts to turn the highlight off — it should only clear via SetForceHighlight(false).
-        if (IsHoldHighlightVisible && !highlight)
+        // Checked against the active (not range-visible) state so hover can't cut a range fade short;
+        // the range gate owns visibility while a hold is claimed.
+        if (IsHoldHighlightActive && !highlight)
             return;
 
         // Some subclasses (e.g. WorldPurchaseActionInteractable / WorldShopItemInteractable)
@@ -176,6 +204,9 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         // 'enabled' every call so this class's invariant — always enabled, visibility
         // solely via 'highlighted' — holds no matter what else touched the component.
         highlightEffect.enabled = true;
+
+        // Hover is instant: use the authored fade, not the range fade.
+        ApplyEffectFade(false);
 
         // Drive visibility through 'highlighted', not 'enabled'.
         // Toggling 'enabled' was the cause of the broken-first-hover bug: each
@@ -211,14 +242,80 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public void SetForceHighlight(bool force, HighlightHold source)
     {
         bool wasVisible = IsHoldHighlightVisible;
+        bool hadHold = _highlightHolds != HighlightHold.None;
 
         if (force)
             _highlightHolds |= source;
         else
             _highlightHolds &= ~source;
 
+        bool hasHold = _highlightHolds != HighlightHold.None;
+        if (hasHold && !hadHold)
+        {
+            // Resolve range up front so a far-away claim never flashes on for a frame.
+            _holdInRange = ComputeHoldInRange(true);
+            HoldHighlightRangeDriver.Track(this);
+        }
+        else if (!hasHold && hadHold)
+        {
+            HoldHighlightRangeDriver.Untrack(this);
+        }
+
         if (IsHoldHighlightVisible == wasVisible) return;
-        ApplyHoldHighlightVisual();
+        ApplyHoldHighlightVisual(false);
+    }
+
+    /// <summary>
+    /// Called each frame by <see cref="HoldHighlightRangeDriver"/> while a hold is claimed. Fades the
+    /// persistent glow in when <paramref name="viewerPosition"/> enters <see cref="holdHighlightVisibleRange"/>
+    /// and out when it leaves, mirroring <see cref="TutorialMarker"/>'s visible-range behaviour.
+    /// </summary>
+    public void UpdateHoldHighlightRange(Vector3 viewerPosition)
+    {
+        bool inRange = IsWithinHoldRange(viewerPosition, _holdInRange);
+        if (inRange == _holdInRange) return;
+
+        bool wasVisible = IsHoldHighlightVisible;
+        _holdInRange = inRange;
+
+        if (IsHoldHighlightVisible == wasVisible) return;
+        ApplyHoldHighlightVisual(true);
+    }
+
+    private bool ComputeHoldInRange(bool fallback)
+    {
+        Camera cam = Camera.main;
+        return cam == null ? fallback : IsWithinHoldRange(cam.transform.position, false);
+    }
+
+    private bool IsWithinHoldRange(Vector3 viewerPosition, bool currentlyInRange)
+    {
+        if (holdHighlightVisibleRange <= 0f) return true;
+
+        float range = holdHighlightVisibleRange + (currentlyInRange ? HoldRangeHysteresis : 0f);
+        return (viewerPosition - transform.position).sqrMagnitude <= range * range;
+    }
+
+    private void CacheAuthoredFade()
+    {
+        if (_authoredFadeCached || highlightEffect == null) return;
+
+        _authoredFadeIn = highlightEffect.fadeInDuration;
+        _authoredFadeOut = highlightEffect.fadeOutDuration;
+        _authoredFadeCached = true;
+    }
+
+    /// <summary>
+    /// Sets the HighlightEffect's fade durations right before a <c>highlighted</c> change: the range
+    /// fade for distance crossings, the authored values otherwise. Must always be followed by setting
+    /// <c>highlighted</c> — HighlightPlus reads these live while a fade is in progress.
+    /// </summary>
+    private void ApplyEffectFade(bool rangeFade)
+    {
+        CacheAuthoredFade();
+
+        highlightEffect.fadeInDuration = rangeFade ? holdHighlightFadeDuration : _authoredFadeIn;
+        highlightEffect.fadeOutDuration = rangeFade ? holdHighlightFadeDuration : _authoredFadeOut;
     }
 
     /// <summary>
@@ -235,10 +332,10 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         _holdHighlightSuppressed = suppressed;
 
         if (IsHoldHighlightVisible == wasVisible) return;
-        ApplyHoldHighlightVisual();
+        ApplyHoldHighlightVisual(false);
     }
 
-    private void ApplyHoldHighlightVisual()
+    private void ApplyHoldHighlightVisual(bool rangeFade)
     {
         bool anyHold = IsHoldHighlightVisible;
 
@@ -249,6 +346,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         if (highlightEffect != null)
         {
             highlightEffect.enabled = true;
+            ApplyEffectFade(rangeFade);
             highlightEffect.highlighted = anyHold;
         }
 

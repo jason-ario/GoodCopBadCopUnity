@@ -12,6 +12,11 @@ using UnityEngine.InputSystem;
 /// the left (read) stack; "Previous" flips it back. The visible face swaps at the midpoint of the
 /// flip, when the sheet is edge-on to the viewer.
 ///
+/// Page-turn presses are queued: every press turns one more page, and the next flip starts a
+/// moment after the previous one (<see cref="_queuedTurnInterval"/>) instead of waiting for it to
+/// land, so several sheets can be in the air at once. <see cref="LeftCount"/> is the logical
+/// count and already includes sheets that are still flipping onto the left stack.
+///
 /// Only the two faces of the open spread (plus whatever a flip is revealing) keep their canvases
 /// active — buried sheets render paper only.
 ///
@@ -37,6 +42,9 @@ public class GuidebookPageController : MonoBehaviour
     [SerializeField] private float          _turnDuration     = 0.35f;
     [Tooltip("Per-sheet flip duration used when a tab jump flips across multiple sheets.")]
     [SerializeField] private float          _snapFlipDuration = 0.08f;
+    [Tooltip("Delay between the starts of queued page turns when the player presses repeatedly. " +
+             "Never shorter than the face-swap margin of a flip, so sheets always land in order.")]
+    [SerializeField] private float          _queuedTurnInterval = 0.09f;
     [SerializeField] private float          _arcHeight        = 0.02f;
     [SerializeField] private AnimationCurve _turnCurve        = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     [Tooltip("Fraction of a flip (0-0.5) to wait before revealing the face underneath the lifting sheet, " +
@@ -58,12 +66,15 @@ public class GuidebookPageController : MonoBehaviour
     public int  SheetCount      => _sheets.Count;
     public bool HasNextPage     => _leftCount < _sheets.Count;
     public bool HasPreviousPage => _leftCount > 0;
-    public bool IsBusy          => _isTurning || _isSnapping;
+    public bool IsBusy          => _turnsInFlight > 0 || _isSnapping;
 
     private readonly List<GuidebookSheet> _sheets = new List<GuidebookSheet>();
 
     private int       _leftCount;
-    private bool      _isTurning;
+    private int       _turnsInFlight;
+    private int       _flightDirection;   // +1 next, -1 previous, 0 idle
+    private int       _pendingTurns;      // queued presses: >0 next, <0 previous
+    private float     _lastTurnStartTime = float.NegativeInfinity;
     private bool      _isSnapping;
     private float     _prevStickX;
     private Coroutine _snapSequence;
@@ -72,12 +83,13 @@ public class GuidebookPageController : MonoBehaviour
 
     private void OnDisable()
     {
+        _pendingTurns = 0;
+
         // A flip interrupted by closing the book would leave a sheet mid-air; settle it.
-        if (_isTurning || _isSnapping)
+        if (IsBusy)
         {
             StopAllCoroutines();
-            _snapSequence = null;
-            _isTurning = _isSnapping = false;
+            ResetFlightState();
             SnapTo(_leftCount);
         }
     }
@@ -90,10 +102,12 @@ public class GuidebookPageController : MonoBehaviour
         bool stickPrev = stickX < -StickThreshold && _prevStickX >= -StickThreshold;
         _prevStickX = stickX;
 
-        if (!InputEnabled || IsBusy) return;
+        if (!InputEnabled || _isSnapping) return;
 
-        if (stickNext || NextPressed(gp))      TurnNext(_turnDuration);
-        else if (stickPrev || PrevPressed(gp)) TurnPrevious(_turnDuration);
+        if (stickNext || NextPressed(gp))      QueueTurn(+1);
+        else if (stickPrev || PrevPressed(gp)) QueueTurn(-1);
+
+        PumpQueuedTurns();
     }
 
     // ── Input (Input System device polling, matching project convention) ─────
@@ -114,6 +128,44 @@ public class GuidebookPageController : MonoBehaviour
             || (gp != null && (gp.leftShoulder.wasPressedThisFrame || gp.dpad.left.wasPressedThisFrame));
     }
 
+    // ── Queued turns ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Adds one page turn to the queue. Presses never ask for more pages than remain in that
+    /// direction, and a press in the opposite direction first cancels a queued (not yet started) turn.
+    /// </summary>
+    private void QueueTurn(int direction)
+    {
+        int target = Mathf.Clamp(_leftCount + _pendingTurns + direction, 0, _sheets.Count);
+        _pendingTurns = target - _leftCount;
+    }
+
+    private void PumpQueuedTurns()
+    {
+        if (_pendingTurns == 0) return;
+
+        int direction = _pendingTurns > 0 ? 1 : -1;
+
+        // Reversing mid-flight would grab a sheet that is still in the air: wait for it to land.
+        if (_turnsInFlight > 0 && direction != _flightDirection) return;
+
+        float interval = Mathf.Max(_queuedTurnInterval, _faceSwapMargin * _turnDuration + 0.01f);
+        if (_turnsInFlight > 0 && Time.time - _lastTurnStartTime < interval) return;
+
+        bool started = direction > 0 ? TurnNext(_turnDuration) : TurnPrevious(_turnDuration);
+        if (started) _pendingTurns -= direction;
+        else         _pendingTurns = 0;
+    }
+
+    private void ResetFlightState()
+    {
+        _snapSequence = null;
+        _isSnapping = false;
+        _turnsInFlight = 0;
+        _flightDirection = 0;
+        _pendingTurns = 0;
+    }
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -123,8 +175,7 @@ public class GuidebookPageController : MonoBehaviour
     public void SetSheets(IReadOnlyList<GuidebookSheet> sheets, int leftCount)
     {
         StopAllCoroutines();
-        _snapSequence = null;
-        _isTurning = _isSnapping = false;
+        ResetFlightState();
 
         _sheets.Clear();
         if (sheets != null)
@@ -134,52 +185,64 @@ public class GuidebookPageController : MonoBehaviour
         SnapTo(leftCount);
     }
 
-    /// <summary>Flips the top right-stack sheet onto the left stack.</summary>
-    public void TurnNext(float duration)
+    /// <summary>
+    /// Flips the top right-stack sheet onto the left stack. May start while earlier forward flips
+    /// are still in the air. Returns false if there is no page or a backward flip is in flight.
+    /// </summary>
+    public bool TurnNext(float duration)
     {
-        if (_isTurning || !HasNextPage) return;
+        if (!HasNextPage || (_turnsInFlight > 0 && _flightDirection < 0)) return false;
 
         int idx        = _leftCount;
         int rightCount = _sheets.Count - _leftCount;
+        Vector3 from   = RightPos(rightCount - 1);
+        Vector3 to     = LeftPos(_leftCount);
 
         // Reveal the right sheet underneath once this one has lifted clear; hide the left page
         // it lands on just before touchdown.
         GuidebookSheet under   = idx + 1 < _sheets.Count ? _sheets[idx + 1] : null;
         GuidebookSheet covered = idx - 1 >= 0 ? _sheets[idx - 1] : null;
 
+        _leftCount++;
+        BeginFlight(+1);
         PlayFlipSound();
         StartCoroutine(AnimateTurn(
-            _sheets[idx],
-            RightPos(rightCount - 1), LeftPos(_leftCount),
+            _sheets[idx], from, to,
             0f, -180f,
             duration,
             showBackAtMidpoint: true,
-            onLifted: under   != null ? () => under.SetFace(showBack: false) : null,
-            onLanding: covered != null ? () => covered.SetFace(showBack: true, visible: false) : null,
-            () => { _leftCount++; RefreshFaces(); OnPageChanged?.Invoke(_leftCount); }));
+            onLifted:  under   != null ? () => under.SetFace(showBack: false) : null,
+            onLanding: covered != null ? () => covered.SetFace(showBack: true, visible: false) : null));
+        return true;
     }
 
-    /// <summary>Flips the top left-stack sheet back onto the right stack.</summary>
-    public void TurnPrevious(float duration)
+    /// <summary>
+    /// Flips the top left-stack sheet back onto the right stack. May start while earlier backward
+    /// flips are still in the air. Returns false if there is no page or a forward flip is in flight.
+    /// </summary>
+    public bool TurnPrevious(float duration)
     {
-        if (_isTurning || !HasPreviousPage) return;
+        if (!HasPreviousPage || (_turnsInFlight > 0 && _flightDirection > 0)) return false;
 
         int idx        = _leftCount - 1;
         int rightCount = _sheets.Count - _leftCount;
+        Vector3 from   = LeftPos(_leftCount - 1);
+        Vector3 to     = RightPos(rightCount);
 
         GuidebookSheet under   = idx - 1 >= 0 ? _sheets[idx - 1] : null;
         GuidebookSheet covered = idx + 1 < _sheets.Count ? _sheets[idx + 1] : null;
 
+        _leftCount--;
+        BeginFlight(-1);
         PlayFlipSound();
         StartCoroutine(AnimateTurn(
-            _sheets[idx],
-            LeftPos(_leftCount - 1), RightPos(rightCount),
+            _sheets[idx], from, to,
             180f, 360f,
             duration,
             showBackAtMidpoint: false,
-            onLifted: under   != null ? () => under.SetFace(showBack: true) : null,
-            onLanding: covered != null ? () => covered.SetFace(showBack: false, visible: false) : null,
-            () => { _leftCount--; RefreshFaces(); OnPageChanged?.Invoke(_leftCount); }));
+            onLifted:  under   != null ? () => under.SetFace(showBack: true) : null,
+            onLanding: covered != null ? () => covered.SetFace(showBack: false, visible: false) : null));
+        return true;
     }
 
     /// <summary>Instantly lays every sheet out for the given left-stack count. No animation.</summary>
@@ -208,11 +271,12 @@ public class GuidebookPageController : MonoBehaviour
 
     /// <summary>
     /// Animates sheet flips, one after another, until <paramref name="targetLeftCount"/> sheets
-    /// are on the left stack. Used by section tabs. Cancels any in-progress jump.
+    /// are on the left stack. Used by section tabs. Cancels any in-progress jump and queued presses.
     /// </summary>
     public void FlipTo(int targetLeftCount)
     {
         targetLeftCount = Mathf.Clamp(targetLeftCount, 0, _sheets.Count);
+        _pendingTurns = 0;
         if (targetLeftCount == _leftCount && !_isSnapping) return;
 
         if (_snapSequence != null) StopCoroutine(_snapSequence);
@@ -223,15 +287,15 @@ public class GuidebookPageController : MonoBehaviour
     {
         _isSnapping = true;
 
+        while (_turnsInFlight > 0) yield return null;
+
         while (_leftCount != target)
         {
-            while (_isTurning) yield return null;
-
             if (_leftCount < target) TurnNext(_snapFlipDuration);
             else                     TurnPrevious(_snapFlipDuration);
 
             yield return null;
-            while (_isTurning) yield return null;
+            while (_turnsInFlight > 0) yield return null;
         }
 
         _isSnapping   = false;
@@ -261,6 +325,13 @@ public class GuidebookPageController : MonoBehaviour
 
     // ── Animation ─────────────────────────────────────────────────────────────
 
+    private void BeginFlight(int direction)
+    {
+        _turnsInFlight++;
+        _flightDirection = direction;
+        _lastTurnStartTime = Time.time;
+    }
+
     private void PlayFlipSound()
     {
         if (_audioSource != null && _pageFlipClip != null)
@@ -274,10 +345,8 @@ public class GuidebookPageController : MonoBehaviour
         float duration,
         bool showBackAtMidpoint,
         Action onLifted,
-        Action onLanding,
-        Action onComplete)
+        Action onLanding)
     {
-        _isTurning = true;
         Transform page = sheet.transform;
         bool faceSwitched = false;
         bool lifted       = false;
@@ -318,7 +387,14 @@ public class GuidebookPageController : MonoBehaviour
         page.localPosition = toPos;
         page.localRotation = Quaternion.Euler(0f, 0f, Mathf.Repeat(toZ, 360f));
 
-        _isTurning = false;
-        onComplete?.Invoke();
+        // Faces settle once the last sheet in the air has landed; until then the lift/landing
+        // callbacks of each flight keep the right faces visible.
+        _turnsInFlight = Mathf.Max(0, _turnsInFlight - 1);
+        if (_turnsInFlight == 0)
+        {
+            _flightDirection = 0;
+            RefreshFaces();
+        }
+        OnPageChanged?.Invoke(_leftCount);
     }
 }

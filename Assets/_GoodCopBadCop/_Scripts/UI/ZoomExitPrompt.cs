@@ -5,21 +5,25 @@ using UnityEngine;
 namespace GoodCopBadCop.UI
 {
     /// <summary>
-    /// "[F] Exit" prompt shown while zoom mode (<see cref="HeldItemZoomView"/>) is open, telling the
-    /// player that the zoom key closes it again. The key icon follows the current
-    /// <see cref="GameAction.ZoomHeldItem"/> binding (and the gamepad icon) via
+    /// "[key] Exit" prompt shown next to the Back button while a view that has its own toggle key
+    /// is open:
+    /// <list type="bullet">
+    ///   <item>Zoom mode (<see cref="HeldItemZoomView"/>) - <see cref="GameAction.ZoomHeldItem"/>.</item>
+    ///   <item>The guidebook (<see cref="GuidebookController"/>) - <see cref="GameAction.OpenGuidebook"/> (Tab / View).</item>
+    /// </list>
+    /// The key icon follows the current binding (and the gamepad icon) via
     /// <see cref="HelperIconKeyDisplay"/>.
     ///
     /// Lives next to the Back button (under <c>Back UI</c>) so it stays visible while the player HUD is
-    /// hidden by the diegetic view and moves with the Back button's HUD avoidance. This object must
-    /// stay active so polling keeps running; it toggles <see cref="_root"/>.
+    /// hidden and moves with the Back button's HUD avoidance. This object must stay active so
+    /// polling keeps running; it toggles <see cref="_root"/>.
     /// </summary>
     public class ZoomExitPrompt : MonoBehaviour
     {
-        [Tooltip("Visual root toggled while zoomed. Must be a child of this object so polling keeps running.")]
+        [Tooltip("Visual root toggled while a supported view is open. Must be a child of this object so polling keeps running.")]
         [SerializeField] private GameObject _root;
 
-        [Tooltip("Key icon display; forced to the Zoom Item action on Awake.")]
+        [Tooltip("Key icon display; switched to the open view's toggle action.")]
         [SerializeField] private HelperIconKeyDisplay _keyDisplay;
 
         [Tooltip("Optional label next to the icon.")]
@@ -27,32 +31,41 @@ namespace GoodCopBadCop.UI
 
         [SerializeField] private string _text = "Exit";
 
-        private void Awake()
-        {
-            if (_keyDisplay != null) _keyDisplay.SetAction(GameAction.ZoomHeldItem);
-        }
+        private GameAction? _shownAction;
 
         private void OnEnable()
         {
             if (_label != null) _label.text = _text;
-            SetVisible(IsZoomed());
+            _shownAction = null;
+            Refresh();
         }
 
-        private void Update()
-        {
-            SetVisible(IsZoomed());
-        }
+        private void Update() => Refresh();
 
-        private static bool IsZoomed()
+        private void Refresh()
         {
-            bool paused = UIController.Instance != null && UIController.Instance.IsPaused;
-            return !paused && DiegeticViewController.Current is HeldItemZoomView zoom && zoom.IsZoomed;
-        }
+            GameAction? action = CurrentExitAction();
+            if (action.HasValue && action != _shownAction && _keyDisplay != null)
+                _keyDisplay.SetAction(action.Value);
+            _shownAction = action;
 
-        private void SetVisible(bool visible)
-        {
+            bool visible = action.HasValue;
             if (_root != null && _root.activeSelf != visible)
                 _root.SetActive(visible);
+        }
+
+        private static GameAction? CurrentExitAction()
+        {
+            if (UIController.Instance != null && UIController.Instance.IsPaused) return null;
+
+            if (DiegeticViewController.Current is HeldItemZoomView zoom && zoom.IsZoomed)
+                return GameAction.ZoomHeldItem;
+
+            GuidebookController guidebook = GuidebookController.Local;
+            if (guidebook != null && guidebook.IsOpen)
+                return GameAction.OpenGuidebook;
+
+            return null;
         }
     }
 }

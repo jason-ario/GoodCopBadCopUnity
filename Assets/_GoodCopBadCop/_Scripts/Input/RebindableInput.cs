@@ -20,7 +20,9 @@ namespace GoodCopBadCop.Input
         OpenEmotes,
         // Appended (not inserted) so serialized GameAction ints on existing assets stay valid.
         ZoomHeldItem,
-        Reload
+        Reload,
+        // Not exposed in Settings -> Controls; registered so helper icons can show the Tab / View prompt.
+        OpenGuidebook
     }
 
     /// <summary>
@@ -43,6 +45,7 @@ namespace GoodCopBadCop.Input
             { GameAction.OpenEmotes, KeyCode.T },
             { GameAction.ZoomHeldItem, KeyCode.F },
             { GameAction.Reload, KeyCode.R },
+            { GameAction.OpenGuidebook, KeyCode.Tab },
         };
 
         private static readonly Dictionary<GameAction, int> DefaultMouseButtons = new()
@@ -62,6 +65,7 @@ namespace GoodCopBadCop.Input
             { GameAction.OpenEmotes, "dpad/up" },
             { GameAction.ZoomHeldItem, "rightStickPress" },
             { GameAction.Reload, "buttonNorth" },
+            { GameAction.OpenGuidebook, "select" },
         };
 
         private static readonly Dictionary<GameAction, KeyCode> Keys = new();

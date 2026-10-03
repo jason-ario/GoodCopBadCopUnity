@@ -28,6 +28,9 @@ public class PlayerUI : MonoBehaviour
     [Tooltip("Helper icon (zoom key) shown while the local player holds an item with a HeldItemZoomable.")]
     [SerializeField] private GameObject _zoomHelperIcon;
 
+    [Tooltip("Helper icon (Tab / View) for opening the guidebook. Hidden while the guidebook is disabled.")]
+    [SerializeField] private GameObject _guidebookHelperIcon;
+
     private PlayerPickupController _pickupController;
     private InternalBattery _currentBattery;
 
@@ -40,6 +43,17 @@ public class PlayerUI : MonoBehaviour
         if (_zoomHelperIcon != null &&
             _zoomHelperIcon.TryGetComponent(out GoodCopBadCop.UI.HelperIconKeyDisplay zoomKeyDisplay))
             zoomKeyDisplay.SetAction(GoodCopBadCop.Input.GameAction.ZoomHeldItem);
+
+        if (_guidebookHelperIcon != null &&
+            _guidebookHelperIcon.TryGetComponent(out GoodCopBadCop.UI.HelperIconKeyDisplay guidebookKeyDisplay))
+            guidebookKeyDisplay.SetAction(GoodCopBadCop.Input.GameAction.OpenGuidebook);
+    }
+
+    private void UpdateGuidebookHelperIcon()
+    {
+        if (_guidebookHelperIcon == null) return;
+        bool visible = GameSettings.Instance == null || GameSettings.Instance.GuidebookEnabled;
+        if (_guidebookHelperIcon.activeSelf != visible) _guidebookHelperIcon.SetActive(visible);
     }
 
     private void OnEnable()
@@ -67,6 +81,8 @@ public class PlayerUI : MonoBehaviour
 
     private void Update()
     {
+        UpdateGuidebookHelperIcon();
+
         // While spectating, mirror the watched teammate. Their HeldObject/pickup events are
         // owner-only, so poll the replicated ProxyHeldObject and mask state instead.
         if (SpectateManager.IsHudMirroringTarget)
