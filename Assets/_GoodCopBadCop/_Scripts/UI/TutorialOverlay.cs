@@ -82,7 +82,8 @@ public class TutorialOverlay : MonoBehaviour
     {
         if (!_isShowing) return;
 
-        if (Input.GetKey(KeyCode.R) || (Gamepad.current?.buttonWest.isPressed ?? false))
+        bool holdingR = Input.GetKey(KeyCode.R) && !GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard;
+        if (holdingR || (Gamepad.current?.buttonWest.isPressed ?? false))
         {
             _holdProgress = Mathf.Min(_holdProgress + Time.deltaTime, holdDuration);
         }

@@ -41,7 +41,7 @@ public class PCTerminalEmulatorBootstrapper : MonoBehaviour
 
     private void Update()
     {
-        if (pc == null)
+        if (pc == null || GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard)
             return;
 
         if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))

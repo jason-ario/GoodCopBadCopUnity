@@ -94,6 +94,8 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
 
     private void Update()
     {
+        // While a text field (e.g. the PC search bar) owns the keyboard, Q/Escape belong to it.
+        if (GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard) return;
         if (!(Keyboard.current?[_key].wasPressedThisFrame ?? false)) return;
 
         if (_key == Key.Escape && _button != null && _button.isActiveAndEnabled && _button.interactable)

@@ -140,9 +140,10 @@ namespace GoodCopBadCop.Input
         }
 
         // ── Convenience queries used by gameplay call sites ─────────────────────────
-        public static bool GetKeyDown(GameAction action) => HasKeyBinding(action) && UnityEngine.Input.GetKeyDown(GetKey(action));
-        public static bool GetKeyHeld(GameAction action) => HasKeyBinding(action) && UnityEngine.Input.GetKey(GetKey(action));
-        public static bool GetKeyUp(GameAction action) => HasKeyBinding(action) && UnityEngine.Input.GetKeyUp(GetKey(action));
+        // Keyboard queries are suppressed while an in-game text field owns the keyboard (see TextInputFocus).
+        public static bool GetKeyDown(GameAction action) => HasKeyBinding(action) && !TextInputFocus.IsCapturingKeyboard && UnityEngine.Input.GetKeyDown(GetKey(action));
+        public static bool GetKeyHeld(GameAction action) => HasKeyBinding(action) && !TextInputFocus.IsCapturingKeyboard && UnityEngine.Input.GetKey(GetKey(action));
+        public static bool GetKeyUp(GameAction action) => HasKeyBinding(action) && !TextInputFocus.IsCapturingKeyboard && UnityEngine.Input.GetKeyUp(GetKey(action));
         public static bool GetMouseButtonDown(GameAction action) => HasMouseBinding(action) && UnityEngine.Input.GetMouseButtonDown(GetMouseButton(action));
         public static bool GetMouseButtonHeld(GameAction action) => HasMouseBinding(action) && UnityEngine.Input.GetMouseButton(GetMouseButton(action));
         public static bool GetMouseButtonUp(GameAction action) => HasMouseBinding(action) && UnityEngine.Input.GetMouseButtonUp(GetMouseButton(action));

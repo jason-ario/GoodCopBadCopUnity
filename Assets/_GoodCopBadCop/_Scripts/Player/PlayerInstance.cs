@@ -740,7 +740,7 @@ public class PlayerInstance : NetworkBehaviour
     private void Update()
     {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (IsLocalPlayer && Input.GetKeyDown(KeyCode.K))
+        if (IsLocalPlayer && !GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard && Input.GetKeyDown(KeyCode.K))
             PlayerHealth?.TakeDamage(PlayerHealth.MaxHealth, EffectKeys.PlayerDeath);
 #endif
     }

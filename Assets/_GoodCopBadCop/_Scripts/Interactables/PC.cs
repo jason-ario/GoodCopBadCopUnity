@@ -5,9 +5,11 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using DG.Tweening;
+using GoodCopBadCop.Input;
 using GoodCopBadCop.Population;
 using GoodCopBadCop.SuspectPaperwork;
 using TMPro;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -45,6 +47,7 @@ public class PC : Interactable
         PreviousNews,
         FilterLetters,
         ClearFilter,
+        SetSearch,
         Back
     }
 
@@ -65,6 +68,9 @@ public class PC : Interactable
         public bool HasBack;
         public bool HasPrevious;
         public bool HasNext;
+        /// <summary>Search text typed into the list screen's search bar. Kept while drilling into
+        /// a profile/news entry so Prev/Next and Back stay within the search results.</summary>
+        public FixedString64Bytes SearchQuery;
 
         public static NavSyncState Root(bool active) => new NavSyncState
         {
@@ -76,7 +82,8 @@ public class PC : Interactable
             IsActive = active,
             HasBack = false,
             HasPrevious = false,
-            HasNext = false
+            HasNext = false,
+            SearchQuery = default
         };
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
@@ -90,12 +97,23 @@ public class PC : Interactable
             serializer.SerializeValue(ref HasBack);
             serializer.SerializeValue(ref HasPrevious);
             serializer.SerializeValue(ref HasNext);
+            serializer.SerializeValue(ref SearchQuery);
         }
 
         public bool Equals(NavSyncState other) =>
             Screen == other.Screen && Section == other.Section && Filter == other.Filter &&
             SuspectIndex == other.SuspectIndex && NewsDay == other.NewsDay && IsActive == other.IsActive &&
-            HasBack == other.HasBack && HasPrevious == other.HasPrevious && HasNext == other.HasNext;
+            HasBack == other.HasBack && HasPrevious == other.HasPrevious && HasNext == other.HasNext &&
+            SearchQuery.Equals(other.SearchQuery);
+
+        /// <summary>True when the two states only differ by their search query.</summary>
+        public bool EqualsIgnoringSearch(NavSyncState other)
+        {
+            other.SearchQuery = SearchQuery;
+            other.HasPrevious = HasPrevious;
+            other.HasNext = HasNext;
+            return Equals(other);
+        }
 
         public override bool Equals(object obj) => obj is NavSyncState other && Equals(other);
         public override int GetHashCode() => HashCode.Combine(Screen, Section, Filter, SuspectIndex, NewsDay, IsActive);
@@ -103,6 +121,7 @@ public class PC : Interactable
 
     private const string VillageName = "Saplavi";
     private const int DefaultTerminalPopulation = 300;
+    private const int MaxSearchQueryBytes = 60;
     private static readonly DateTime NewspaperStartDate = new DateTime(1989, 10, 20);
 
     [Header("Data")]
@@ -160,11 +179,22 @@ public class PC : Interactable
     private int _debugCurrentDayOverride = -1;
     private PlayerInteractionController _player;
     private Coroutine _idleFadeCoroutine;
+    private NavSyncState _lastAppliedState;
+    private bool _hasAppliedState;
 
     private void Start()
     {
         CloseAllScreens();
         SetScreenRenderCameraActive(false);
+        if (fileListView != null)
+            fileListView.SearchQueryChanged += HandleSearchQueryChanged;
+    }
+
+    public override void OnDestroy()
+    {
+        if (fileListView != null)
+            fileListView.SearchQueryChanged -= HandleSearchQueryChanged;
+        base.OnDestroy();
     }
 
     public override void OnNetworkSpawn()
@@ -210,11 +240,14 @@ public class PC : Interactable
 
         if (!_navState.Value.IsActive)
             Navigate(NavAction.EnterTerminal);
+        else
+            RefreshSearchField(_navState.Value);
     }
 
     private void Update()
     {
-        if (pcActive && Input.GetButtonDown("Back"))
+        // While the search bar owns the keyboard, Escape only unfocuses it.
+        if (pcActive && Input.GetButtonDown("Back") && !TextInputFocus.IsCapturingKeyboard)
             HandleBackButton();
     }
 
@@ -242,6 +275,8 @@ public class PC : Interactable
 
         if (!_navState.Value.IsActive)
             Navigate(NavAction.EnterTerminal);
+        else
+            RefreshSearchField(_navState.Value);
     }
 
     // ── Public navigation API (buttons / other components call these) ───────────
@@ -297,6 +332,14 @@ public class PC : Interactable
     public void FilterSZ() => Navigate(NavAction.FilterLetters, filter: LetterFilter.SZ);
     public void ClearLetterFilter() => Navigate(NavAction.ClearFilter);
 
+    public void SetSearchQuery(string query) => Navigate(NavAction.SetSearch, search: ToSearchQuery(query));
+
+    private void HandleSearchQueryChanged(string query)
+    {
+        if (pcActive)
+            SetSearchQuery(query);
+    }
+
     // ── Request / dispatch plumbing ──────────────────────────────────────────────
 
     /// <summary>
@@ -305,24 +348,24 @@ public class PC : Interactable
     /// re-renders from the resulting synced state. When not networked (editor preview /
     /// terminal emulator scenes with no NetworkManager), applies and renders immediately.
     /// </summary>
-    private void Navigate(NavAction action, int suspectIndex = -1, int newsDay = -1, LetterFilter filter = LetterFilter.None)
+    private void Navigate(NavAction action, int suspectIndex = -1, int newsDay = -1, LetterFilter filter = LetterFilter.None, FixedString64Bytes search = default)
     {
         if (IsSpawned)
         {
-            RequestNavigateRpc(action, suspectIndex, newsDay, filter);
+            RequestNavigateRpc(action, suspectIndex, newsDay, filter, search);
         }
         else
         {
-            ApplyNavAction(action, suspectIndex, newsDay, filter);
+            ApplyNavAction(action, suspectIndex, newsDay, filter, search);
             ApplySyncedState(_navState.Value);
         }
     }
 
     [Rpc(SendTo.Server, RequireOwnership = false)]
-    private void RequestNavigateRpc(NavAction action, int suspectIndex, int newsDay, LetterFilter filter) =>
-        ApplyNavAction(action, suspectIndex, newsDay, filter);
+    private void RequestNavigateRpc(NavAction action, int suspectIndex, int newsDay, LetterFilter filter, FixedString64Bytes search) =>
+        ApplyNavAction(action, suspectIndex, newsDay, filter, search);
 
-    private void ApplyNavAction(NavAction action, int suspectIndex, int newsDay, LetterFilter filter)
+    private void ApplyNavAction(NavAction action, int suspectIndex, int newsDay, LetterFilter filter, FixedString64Bytes search)
     {
         switch (action)
         {
@@ -343,6 +386,7 @@ public class PC : Interactable
             case NavAction.PreviousNews: ServerStepNews(-1); break;
             case NavAction.FilterLetters: ServerApplyFilter(filter); break;
             case NavAction.ClearFilter: ServerApplyFilter(LetterFilter.None); break;
+            case NavAction.SetSearch: ServerApplySearch(search); break;
             case NavAction.Back: ServerGoBack(); break;
         }
     }
@@ -444,7 +488,7 @@ public class PC : Interactable
         NavSyncState current = _navState.Value;
         if (current.Screen != TerminalScreen.Profile) return;
 
-        List<SuspectData> list = ApplyLetterFilter(GetSectionBaseList(current.Section), current.Filter);
+        List<SuspectData> list = GetVisibleSuspects(current);
         int pos = FindSuspectPosition(list, current.SuspectIndex);
         if (pos < 0) return;
 
@@ -457,12 +501,23 @@ public class PC : Interactable
         NavSyncState current = _navState.Value;
         if (current.Screen != TerminalScreen.NewsEntry) return;
 
-        List<TerminalNewsEntry> entries = BuildNewsEntries();
+        List<TerminalNewsEntry> entries = GetVisibleNewsEntries(current);
         int pos = entries.FindIndex(e => e.Day == current.NewsDay);
         if (pos < 0) return;
 
         int newPos = Mathf.Clamp(pos + direction, 0, entries.Count - 1);
         ServerOpenNewsEntryInternal(entries[newPos].Day, false);
+    }
+
+    private void ServerApplySearch(FixedString64Bytes search)
+    {
+        NavSyncState current = _navState.Value;
+        if (!current.IsActive || current.Screen != TerminalScreen.List) return;
+        if (current.SearchQuery.Equals(search)) return;
+
+        NavSyncState next = current;
+        next.SearchQuery = search;
+        ServerCommit(next, false);
     }
 
     private void ServerApplyFilter(LetterFilter filter)
@@ -478,15 +533,9 @@ public class PC : Interactable
     private bool ComputeHasPrevious(NavSyncState state)
     {
         if (state.Screen == TerminalScreen.Profile)
-        {
-            List<SuspectData> list = ApplyLetterFilter(GetSectionBaseList(state.Section), state.Filter);
-            return FindSuspectPosition(list, state.SuspectIndex) > 0;
-        }
+            return FindSuspectPosition(GetVisibleSuspects(state), state.SuspectIndex) > 0;
         if (state.Screen == TerminalScreen.NewsEntry)
-        {
-            List<TerminalNewsEntry> entries = BuildNewsEntries();
-            return entries.FindIndex(e => e.Day == state.NewsDay) > 0;
-        }
+            return GetVisibleNewsEntries(state).FindIndex(e => e.Day == state.NewsDay) > 0;
         return false;
     }
 
@@ -494,13 +543,13 @@ public class PC : Interactable
     {
         if (state.Screen == TerminalScreen.Profile)
         {
-            List<SuspectData> list = ApplyLetterFilter(GetSectionBaseList(state.Section), state.Filter);
+            List<SuspectData> list = GetVisibleSuspects(state);
             int pos = FindSuspectPosition(list, state.SuspectIndex);
             return pos >= 0 && pos < list.Count - 1;
         }
         if (state.Screen == TerminalScreen.NewsEntry)
         {
-            List<TerminalNewsEntry> entries = BuildNewsEntries();
+            List<TerminalNewsEntry> entries = GetVisibleNewsEntries(state);
             int pos = entries.FindIndex(e => e.Day == state.NewsDay);
             return pos >= 0 && pos < entries.Count - 1;
         }
@@ -511,12 +560,20 @@ public class PC : Interactable
 
     private void ApplySyncedState(NavSyncState state)
     {
+        // Typing in the search bar only changes the query; skip the full cursor reset so the
+        // hovered element (usually the search bar itself) doesn't replay its hover sound per key.
+        bool searchOnlyChange = _hasAppliedState && state.IsActive && _lastAppliedState.IsActive &&
+                                state.Screen == TerminalScreen.List && state.EqualsIgnoringSearch(_lastAppliedState);
+        _lastAppliedState = state;
+        _hasAppliedState = true;
+
         SetScreenRenderCameraActive(state.IsActive);
 
         if (!state.IsActive)
         {
             CloseAllScreens();
             StopIdleSound();
+            RefreshSearchField(state);
             RefreshNavigationButtonsSynced(state);
             return;
         }
@@ -552,23 +609,35 @@ public class PC : Interactable
                 break;
         }
 
+        RefreshSearchField(state);
         RefreshNavigationButtonsSynced(state);
-        RefreshMouseDelayed();
+
+        if (searchOnlyChange)
+            RefreshMouseTargetsOnly();
+        else
+            RefreshMouseDelayed();
     }
 
     private void RenderListScreen(NavSyncState state)
     {
+        string query = state.SearchQuery.ToString();
+        bool searching = !string.IsNullOrWhiteSpace(query);
+
         if (state.Section == TerminalSection.News)
         {
             List<TerminalNewsEntry> entries = BuildNewsEntries();
-            string summary = entries.Count > 0 ? $"NEWS ARCHIVE: {entries.Count} ISSUES" : "NEWS ARCHIVE: NO ISSUES";
-            ShowFileList("News", summary, BuildNewsItems(entries));
+            List<TerminalNewsEntry> visibleEntries = FilterNewsBySearch(entries, query);
+            string summary = searching
+                ? GetSearchSummary(visibleEntries.Count, entries.Count)
+                : entries.Count > 0 ? $"NEWS ARCHIVE: {entries.Count} ISSUES" : "NEWS ARCHIVE: NO ISSUES";
+            ShowFileList("News", summary, WithNoMatchesPlaceholder(BuildNewsItems(visibleEntries), searching));
             return;
         }
 
-        List<SuspectData> baseList = GetSectionBaseList(state.Section);
-        List<SuspectData> visibleList = ApplyLetterFilter(baseList, state.Filter);
-        ShowFileList("Registry", GetSectionSummary(state.Section), BuildSuspectItems(visibleList, state.Section));
+        List<SuspectData> filteredList = ApplyLetterFilter(GetSectionBaseList(state.Section), state.Filter);
+        List<SuspectData> visibleList = FilterSuspectsBySearch(filteredList, query, state.Section);
+        string label = searching ? GetSearchSummary(visibleList.Count, filteredList.Count) : GetSectionSummary(state.Section);
+        ShowFileList("Registry", label, WithNoMatchesPlaceholder(BuildSuspectItems(visibleList, state.Section), searching));
     }
 
     private void RenderProfileScreen(NavSyncState state)
@@ -595,11 +664,30 @@ public class PC : Interactable
 
     private void ShowFileList(string headerText, string label, IReadOnlyList<PCListItemModel> items)
     {
-        CloseAllScreens();
+        // Don't toggle the file list off/on here: that would disable the search bar and drop its
+        // keyboard focus every time the list re-renders while the player is typing.
+        SetViewActive(profileView, false);
+        SetViewActive(newsView, false);
         SetHeader(headerText);
         SetViewActive(fileListView, true);
         fileListView.Show(label, items);
     }
+
+    private void RefreshSearchField(NavSyncState state)
+    {
+        if (fileListView == null) return;
+        bool visible = state.IsActive && state.Screen == TerminalScreen.List;
+        fileListView.ConfigureSearch(visible, state.SearchQuery.ToString(), pcActive);
+    }
+
+    private static List<PCListItemModel> WithNoMatchesPlaceholder(List<PCListItemModel> items, bool searching)
+    {
+        if (searching && items.Count == 0)
+            items.Add(new PCListItemModel("NO MATCHING RECORDS", PCListItemIcon.Unknown, null, null, false));
+        return items;
+    }
+
+    private static string GetSearchSummary(int matches, int total) => $"MATCHES: {matches}/{total}";
 
     private List<PCListItemModel> BuildSuspectItems(IReadOnlyList<SuspectData> suspects, TerminalSection section)
     {
@@ -727,6 +815,60 @@ public class PC : Interactable
         _ => ('A', 'Z')
     };
 
+    // ── Search ──────────────────────────────────────────────────────────────────
+
+    /// <summary>The suspects shown for a state's section after the letter filter and search query.</summary>
+    private List<SuspectData> GetVisibleSuspects(NavSyncState state) =>
+        FilterSuspectsBySearch(ApplyLetterFilter(GetSectionBaseList(state.Section), state.Filter), state.SearchQuery.ToString(), state.Section);
+
+    private List<TerminalNewsEntry> GetVisibleNewsEntries(NavSyncState state) =>
+        FilterNewsBySearch(BuildNewsEntries(), state.SearchQuery.ToString());
+
+    private List<SuspectData> FilterSuspectsBySearch(List<SuspectData> suspects, string query, TerminalSection section)
+    {
+        string[] terms = GetSearchTerms(query);
+        if (suspects == null || terms.Length == 0) return suspects ?? new List<SuspectData>();
+
+        return suspects.Where(s => s != null && MatchesAllTerms(
+            $"{s.LastName}, {s.FirstName} {s.FirstName} {s.LastName} {s.IDNumber} {GetListStatus(s, section)}", terms)).ToList();
+    }
+
+    private static List<TerminalNewsEntry> FilterNewsBySearch(List<TerminalNewsEntry> entries, string query)
+    {
+        string[] terms = GetSearchTerms(query);
+        if (entries == null || terms.Length == 0) return entries ?? new List<TerminalNewsEntry>();
+
+        return entries.Where(e => e != null && MatchesAllTerms(
+            $"{e.Date} {e.Content?.headerText} {e.Content?.subheaderText}", terms)).ToList();
+    }
+
+    private static string[] GetSearchTerms(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return Array.Empty<string>();
+        return NormalizeForAlphabet(query).Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    /// <summary>Accent/case-insensitive: every whitespace-separated term must appear somewhere.</summary>
+    private static bool MatchesAllTerms(string haystack, string[] terms)
+    {
+        string normalized = NormalizeForAlphabet(haystack);
+        for (int i = 0; i < terms.Length; i++)
+        {
+            if (normalized.IndexOf(terms[i], StringComparison.Ordinal) < 0)
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>Converts typed text to the replicated query, truncated to fit a FixedString64Bytes.</summary>
+    private static FixedString64Bytes ToSearchQuery(string query)
+    {
+        string value = (query ?? string.Empty).TrimStart();
+        while (value.Length > 0 && Encoding.UTF8.GetByteCount(value) > MaxSearchQueryBytes)
+            value = value.Substring(0, value.Length - 1);
+        return new FixedString64Bytes(value);
+    }
+
     private int GetSuspectIndex(SuspectData suspect)
     {
         if (suspect == null || _suspectSet == null || _suspectSet.suspects == null) return -1;
@@ -808,6 +950,12 @@ public class PC : Interactable
         if (mouseCursor != null) mouseCursor.SetScreenContent();
     }
 
+    /// <summary>Picks up newly spawned list items without resetting hover/click state.</summary>
+    private void RefreshMouseTargetsOnly()
+    {
+        if (mouseCursor != null) mouseCursor.RefreshClickableElements();
+    }
+
     private void RefreshMouseDelayed()
     {
         RefreshMouseNow();
@@ -845,6 +993,7 @@ public class PC : Interactable
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
         if (_virtualCanvasCursor != null) _virtualCanvasCursor.enabled = false;
+        RefreshSearchField(_navState.Value);
         Navigate(NavAction.ExitTerminal);
         UIController.Instance?.ShowPlayerUI();
         if (_player == null) return;

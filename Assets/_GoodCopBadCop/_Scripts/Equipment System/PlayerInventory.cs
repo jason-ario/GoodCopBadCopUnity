@@ -213,8 +213,11 @@ public class PlayerInventory : NetworkBehaviour
              DialogueChoiceSystem.IsInDialogueMode))
             return;
 
-        if (Input.GetKeyDown(KeyCode.Alpha1)) EquipSlot(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) EquipSlot(1);
+        if (!TextInputFocus.IsCapturingKeyboard)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha1)) EquipSlot(0);
+            if (Input.GetKeyDown(KeyCode.Alpha2)) EquipSlot(1);
+        }
         if (ReloadPressed()) TryReloadActiveWeapon();
 
         float scroll = Input.mouseScrollDelta.y;

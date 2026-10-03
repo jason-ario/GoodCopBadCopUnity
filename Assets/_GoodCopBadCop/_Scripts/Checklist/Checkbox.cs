@@ -10,7 +10,7 @@ public class Checkbox : MonoBehaviour, IClickable
     [SerializeField] private Transform ikTargetTransform;
     [SerializeField] private AudioClip drawSound;
     [Tooltip("Volume multiplier for the draw sound. Values above 1 boost the clip (it is quiet at 1).")]
-    [SerializeField] [Range(0f, 4f)] private float drawVolume = 2.5f;
+    [SerializeField] [Range(0f, 8f)] private float drawVolume = 5f;
 
     /// <summary>
     /// Visual indicator (the "Selected Box" child) shown while this checkbox is the
