@@ -7,12 +7,13 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Logo Burning Paper
-  m_Shader: {fileID: 4800000, guid: d0a4f3d07b898a14395fb17bde6adaf6, type: 3}
+  m_Name: Guidebook Image Lit
+  m_Shader: {fileID: 4800000, guid: 5d32095fe3fae154e95d0250c216d2ba, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - _BACKFACEFLIP_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -29,28 +30,21 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BurnEdgeWidth: 0.04
-    - _BurnProgress: 0.52588344
+    - _AdditionalLightStrength: 0.85
+    - _AmbientStrength: 1
+    - _BackfaceFlip: 1
     - _ColorMask: 15
-    - _GlitchDuration: 0.2
-    - _GlitchDurationMax: 1.5
-    - _GlitchDurationMin: 0.15
-    - _GlitchIntensity: 0.5
-    - _GlitchInterval: 5
-    - _GlitchStrength: 0
-    - _NoiseScale: 19
-    - _NoiseSpeed: 0.55
+    - _Emission: 0
+    - _ShadowStrength: 1
     - _Stencil: 0
     - _StencilComp: 8
     - _StencilOp: 0
     - _StencilReadMask: 255
     - _StencilWriteMask: 255
-    - _WarpStrength: 0.02
-    - _WaveAmplitude: 0.0013
-    - _WaveFrequency: 24.7
-    - _WaveSpeed: 6.73
+    - _UseUIAlphaClip: 0
+    - _Wrap: 0.25
     m_Colors:
-    - _BurnColor: {r: 1, g: 0.35, b: 0, a: 1}
-    - _CharColor: {r: 0.08, g: 0.04, b: 0.02, a: 1}
+    - _Color: {r: 0.82, g: 0.82, b: 0.82, a: 1}
+    - _MinLight: {r: 0.08, g: 0.08, b: 0.08, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

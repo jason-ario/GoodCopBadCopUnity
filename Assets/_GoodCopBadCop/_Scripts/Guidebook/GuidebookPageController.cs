@@ -2,391 +2,262 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
-/// One entry in the guidebook page list.
-/// <see cref="anomalyTypeName"/> controls whether the page is visible (front face lock).
-/// <see cref="backAnomalyTypeName"/> is informational — the back face is always shown
-/// once the page is accessible, with no separate lock.
-/// </summary>
-[Serializable]
-public struct GuidebookPageEntry
-{
-    [Tooltip("The physical page Transform to flip.")]
-    public Transform page;
-
-    [Tooltip("C# type name of the anomaly that must be unlocked before this page appears " +
-             "(e.g. 'BlueVeinsAnomaly'). Leave empty to always show this page.")]
-    public string anomalyTypeName;
-
-    [Tooltip("C# type name of the anomaly shown on the back face of this page. " +
-             "No separate lock — back is always accessible once the page is visible.")]
-    public string backAnomalyTypeName;
-}
-
-/// <summary>
-/// Physical page-stack mechanic for the Guidebook.
+/// Physical page-stack mechanic for the Guidebook. Content-agnostic: <see cref="GuidebookBuilder"/>
+/// supplies the ordered list of <see cref="GuidebookSheet"/>s via <see cref="SetSheets"/>.
 ///
-/// Pages begin on the right (unread) stack. Moving the horizontal axis right flips the
-/// top right page 180° on the Z axis onto the left (read) stack; left flips it back.
+/// Sheets begin on the right (unread) stack. "Next" flips the top right sheet 180° about Z onto
+/// the left (read) stack; "Previous" flips it back. The visible face swaps at the midpoint of the
+/// flip, when the sheet is edge-on to the viewer.
 ///
-/// Each page is double-sided: a "Canvas" child shows the front face and a
-/// "Canvas Back" child (rotated 180° Z) shows the back face. The active face
-/// switches at the midpoint of every flip animation so the content change is
-/// hidden at the moment the page is most edge-on to the viewer.
+/// Only the two faces of the open spread (plus whatever a flip is revealing) keep their canvases
+/// active — buried sheets render paper only.
 ///
-/// Pages can be locked behind an anomaly unlock via <see cref="GuidebookPageEntry.anomalyTypeName"/>.
-/// Locked pages are fully deactivated and contribute no thickness to the stack.
-/// When a new anomaly unlocks, the page is reactivated, the list is rebuilt, and all
-/// positions are recalculated automatically.
+/// Input is ignored unless <see cref="InputEnabled"/> is true. <see cref="GuidebookController"/>
+/// enables it only on the local player's first-person guidebook, so the body-rig and cutscene
+/// copies never react to the local player's keys.
 /// </summary>
 public class GuidebookPageController : MonoBehaviour
 {
-    private const float HorizontalThreshold = 0.5f;
-
-    private const string FrontCanvasName = "Contents/Canvas";
-    private const string BackCanvasName  = "Contents/Canvas Back";
-
-    [Header("Pages")]
-    [Tooltip("All guidebook pages in reading order. Pages with an anomalyTypeName are hidden " +
-             "until that anomaly is unlocked. Leave anomalyTypeName empty to always show.")]
-    [SerializeField] private GuidebookPageEntry[] _pageEntries;
+    private const float StickThreshold = 0.5f;
 
     [Header("Stack Origins — local space")]
     [SerializeField] private Vector3 _rightOrigin = new Vector3( 0.10f, 0f, 0f);
     [SerializeField] private Vector3 _leftOrigin  = new Vector3(-0.10f, 0f, 0f);
 
-    [Tooltip("Y offset added per page in a stack, simulating physical thickness.")]
+    [Tooltip("Y offset added per sheet in a stack, simulating physical thickness.")]
     [SerializeField] private float _pageThickness = 0.002f;
 
-    [Tooltip("Z offset added per page in a stack, preventing depth-plane overlap.")]
+    [Tooltip("Z offset added per sheet in a stack, preventing depth-plane overlap.")]
     [SerializeField] private float _pageDepth = 0.001f;
 
     [Header("Animation")]
     [SerializeField] private float          _turnDuration     = 0.35f;
-    [Tooltip("Per-page flip duration used when animating a tab jump across multiple pages.")]
+    [Tooltip("Per-sheet flip duration used when a tab jump flips across multiple sheets.")]
     [SerializeField] private float          _snapFlipDuration = 0.08f;
     [SerializeField] private float          _arcHeight        = 0.02f;
     [SerializeField] private AnimationCurve _turnCurve        = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [Tooltip("Fraction of a flip (0-0.5) to wait before revealing the face underneath the lifting sheet, " +
+             "and before landing to hide the face it covers. Prevents content clipping through the paper.")]
+    [Range(0f, 0.5f)]
+    [SerializeField] private float          _faceSwapMargin   = 0.15f;
 
     [Header("Audio")]
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip   _pageFlipClip;
 
-    /// <summary>
-    /// Fired when a flip animation completes.
-    /// Argument is the new left-stack count (equivalent to the active page/tab index).
-    /// </summary>
+    /// <summary>Fired when a flip completes. Argument is the new left-stack count.</summary>
     public event Action<int> OnPageChanged;
 
-    // ── Runtime state ─────────────────────────────────────────────────────────
-
-    /// <summary>Unlocked pages that can be flipped through.</summary>
-    private Transform[] _activePages;
+    /// <summary>When false, keyboard/gamepad page-turn input is ignored.</summary>
+    public bool InputEnabled { get; set; }
 
     public int  LeftCount       => _leftCount;
-    public bool HasNextPage     => _activePages != null && _leftCount < _activePages.Length;
-    public bool HasPreviousPage => _activePages != null && _leftCount > 0;
+    public int  SheetCount      => _sheets.Count;
+    public bool HasNextPage     => _leftCount < _sheets.Count;
+    public bool HasPreviousPage => _leftCount > 0;
+    public bool IsBusy          => _isTurning || _isSnapping;
 
-    private int     _leftCount;
-    private bool    _isTurning;
-    private bool    _isSnapping;
-    private float[] _pageZRotations;
-    private float   _prevHorizontal;
+    private readonly List<GuidebookSheet> _sheets = new List<GuidebookSheet>();
+
+    private int       _leftCount;
+    private bool      _isTurning;
+    private bool      _isSnapping;
+    private float     _prevStickX;
     private Coroutine _snapSequence;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    private void OnEnable()
-    {
-        AnomalyUnlockManager.OnAnomalyUnlocked += HandleAnomalyUnlocked;
-        RebuildActivePages();
-        ResetPages();
-    }
-
     private void OnDisable()
     {
-        AnomalyUnlockManager.OnAnomalyUnlocked -= HandleAnomalyUnlocked;
+        // A flip interrupted by closing the book would leave a sheet mid-air; settle it.
+        if (_isTurning || _isSnapping)
+        {
+            StopAllCoroutines();
+            _snapSequence = null;
+            _isTurning = _isSnapping = false;
+            SnapTo(_leftCount);
+        }
     }
 
     private void Update()
     {
-        if (_isTurning || _isSnapping) return;
+        Gamepad gp = Gamepad.current;
+        float stickX = gp != null ? gp.leftStick.x.ReadValue() : 0f;
+        bool stickNext = stickX >  StickThreshold && _prevStickX <=  StickThreshold;
+        bool stickPrev = stickX < -StickThreshold && _prevStickX >= -StickThreshold;
+        _prevStickX = stickX;
 
-        float h = Input.GetAxisRaw("Horizontal");
+        if (!InputEnabled || IsBusy) return;
 
-        if (h > HorizontalThreshold && _prevHorizontal <= HorizontalThreshold)
-            TurnNext(_turnDuration);
-        else if (h < -HorizontalThreshold && _prevHorizontal >= -HorizontalThreshold)
-            TurnPrevious(_turnDuration);
+        if (stickNext || NextPressed(gp))      TurnNext(_turnDuration);
+        else if (stickPrev || PrevPressed(gp)) TurnPrevious(_turnDuration);
+    }
 
-        _prevHorizontal = h;
+    // ── Input (Input System device polling, matching project convention) ─────
+
+    private static bool NextPressed(Gamepad gp)
+    {
+        Keyboard kb = Keyboard.current;
+        return (kb != null && (kb.eKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame
+                               || kb.rightArrowKey.wasPressedThisFrame))
+            || (gp != null && (gp.rightShoulder.wasPressedThisFrame || gp.dpad.right.wasPressedThisFrame));
+    }
+
+    private static bool PrevPressed(Gamepad gp)
+    {
+        Keyboard kb = Keyboard.current;
+        return (kb != null && (kb.qKey.wasPressedThisFrame || kb.aKey.wasPressedThisFrame
+                               || kb.leftArrowKey.wasPressedThisFrame))
+            || (gp != null && (gp.leftShoulder.wasPressedThisFrame || gp.dpad.left.wasPressedThisFrame));
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /// <summary>Flips the top right-stack page onto the left stack (axis right / forward).</summary>
+    /// <summary>
+    /// Replaces the sheet list (reading order) and instantly lays the sheets out with
+    /// <paramref name="leftCount"/> sheets already flipped.
+    /// </summary>
+    public void SetSheets(IReadOnlyList<GuidebookSheet> sheets, int leftCount)
+    {
+        StopAllCoroutines();
+        _snapSequence = null;
+        _isTurning = _isSnapping = false;
+
+        _sheets.Clear();
+        if (sheets != null)
+            foreach (GuidebookSheet s in sheets)
+                if (s != null) _sheets.Add(s);
+
+        SnapTo(leftCount);
+    }
+
+    /// <summary>Flips the top right-stack sheet onto the left stack.</summary>
     public void TurnNext(float duration)
     {
         if (_isTurning || !HasNextPage) return;
 
-        int       rightCount = _activePages.Length - _leftCount;
-        Transform page       = _activePages[_leftCount];
-        int       idx        = _leftCount;
+        int idx        = _leftCount;
+        int rightCount = _sheets.Count - _leftCount;
+
+        // Reveal the right sheet underneath once this one has lifted clear; hide the left page
+        // it lands on just before touchdown.
+        GuidebookSheet under   = idx + 1 < _sheets.Count ? _sheets[idx + 1] : null;
+        GuidebookSheet covered = idx - 1 >= 0 ? _sheets[idx - 1] : null;
 
         PlayFlipSound();
         StartCoroutine(AnimateTurn(
-            page,
-            RightPos(rightCount - 1),
-            LeftPos(_leftCount),
-            _pageZRotations[idx],
-            _pageZRotations[idx] - 180f,
-            idx,
+            _sheets[idx],
+            RightPos(rightCount - 1), LeftPos(_leftCount),
+            0f, -180f,
             duration,
             showBackAtMidpoint: true,
-            () => { _leftCount++; OnPageChanged?.Invoke(_leftCount); }
-        ));
+            onLifted: under   != null ? () => under.SetFace(showBack: false) : null,
+            onLanding: covered != null ? () => covered.SetFace(showBack: true, visible: false) : null,
+            () => { _leftCount++; RefreshFaces(); OnPageChanged?.Invoke(_leftCount); }));
     }
 
-    /// <summary>Flips the top left-stack page back onto the right stack (axis left / back).</summary>
+    /// <summary>Flips the top left-stack sheet back onto the right stack.</summary>
     public void TurnPrevious(float duration)
     {
         if (_isTurning || !HasPreviousPage) return;
 
-        int       rightCount = _activePages.Length - _leftCount;
-        Transform page       = _activePages[_leftCount - 1];
-        int       idx        = _leftCount - 1;
+        int idx        = _leftCount - 1;
+        int rightCount = _sheets.Count - _leftCount;
+
+        GuidebookSheet under   = idx - 1 >= 0 ? _sheets[idx - 1] : null;
+        GuidebookSheet covered = idx + 1 < _sheets.Count ? _sheets[idx + 1] : null;
 
         PlayFlipSound();
         StartCoroutine(AnimateTurn(
-            page,
-            LeftPos(_leftCount - 1),
-            RightPos(rightCount),
-            _pageZRotations[idx],
-            _pageZRotations[idx] + 180f,
-            idx,
+            _sheets[idx],
+            LeftPos(_leftCount - 1), RightPos(rightCount),
+            180f, 360f,
             duration,
             showBackAtMidpoint: false,
-            () => { _leftCount--; OnPageChanged?.Invoke(_leftCount); }
-        ));
+            onLifted: under   != null ? () => under.SetFace(showBack: true) : null,
+            onLanding: covered != null ? () => covered.SetFace(showBack: false, visible: false) : null,
+            () => { _leftCount--; RefreshFaces(); OnPageChanged?.Invoke(_leftCount); }));
     }
 
-    /// <summary>
-    /// Instantly positions all active pages to match <paramref name="leftCount"/> pages on the
-    /// left stack, with no animation. Safe to call from OnEnable or external tab-jump code.
-    /// </summary>
+    /// <summary>Instantly lays every sheet out for the given left-stack count. No animation.</summary>
     public void SnapTo(int leftCount)
     {
-        StopAllCoroutines();
-        _isTurning = false;
+        _leftCount = Mathf.Clamp(leftCount, 0, _sheets.Count);
 
-        if (_activePages == null) return;
-
-        EnsureZArray();
-        _leftCount = Mathf.Clamp(leftCount, 0, _activePages.Length);
-
-        int n = _activePages.Length;
+        int n = _sheets.Count;
         for (int i = 0; i < n; i++)
         {
-            if (_activePages[i] == null) continue;
-
+            Transform t = _sheets[i].transform;
             if (i < _leftCount)
             {
-                _pageZRotations[i]            = 180f;
-                _activePages[i].localPosition = LeftPos(i);
-                _activePages[i].localRotation = Quaternion.Euler(0f, 0f, 180f);
+                t.localPosition = LeftPos(i);
+                t.localRotation = Quaternion.Euler(0f, 0f, 180f);
             }
             else
             {
-                _pageZRotations[i]            = 0f;
-                _activePages[i].localPosition = RightPos(n - 1 - i);
-                _activePages[i].localRotation = Quaternion.identity;
+                t.localPosition = RightPos(n - 1 - i);
+                t.localRotation = Quaternion.identity;
             }
         }
 
-        UpdateFaceVisibility();
+        RefreshFaces();
     }
-
-    /// <summary>Returns every active page to the right stack with zero rotation.</summary>
-    public void ResetPages() => SnapTo(0);
 
     /// <summary>
-    /// Animates page flips in sequence until <paramref name="page"/> is at the top of the
-    /// right stack. Each flip uses <see cref="_snapFlipDuration"/> so the sequence is fast
-    /// but still visually readable. Cancels any in-progress sequence before starting.
-    /// Called by <see cref="GuidebookSectionTab"/> when the player clicks a section tab.
+    /// Animates sheet flips, one after another, until <paramref name="targetLeftCount"/> sheets
+    /// are on the left stack. Used by section tabs. Cancels any in-progress jump.
     /// </summary>
-    public void SnapToPage(Transform page)
+    public void FlipTo(int targetLeftCount)
     {
-        if (_activePages == null || page == null) return;
-        int idx = Array.IndexOf(_activePages, page);
-        if (idx < 0 || idx == _leftCount) return;
+        targetLeftCount = Mathf.Clamp(targetLeftCount, 0, _sheets.Count);
+        if (targetLeftCount == _leftCount && !_isSnapping) return;
 
         if (_snapSequence != null) StopCoroutine(_snapSequence);
-        _snapSequence = StartCoroutine(AnimatedSnapTo(idx));
+        _snapSequence = StartCoroutine(AnimatedFlipTo(targetLeftCount));
     }
 
-    private IEnumerator AnimatedSnapTo(int targetLeftCount)
+    private IEnumerator AnimatedFlipTo(int target)
     {
         _isSnapping = true;
 
-        while (_leftCount != targetLeftCount)
+        while (_leftCount != target)
         {
-            // If already turning (e.g. from a physical input just before click), wait for it.
             while (_isTurning) yield return null;
 
-            if (_leftCount < targetLeftCount)
-                TurnNext(_snapFlipDuration);
-            else
-                TurnPrevious(_snapFlipDuration);
+            if (_leftCount < target) TurnNext(_snapFlipDuration);
+            else                     TurnPrevious(_snapFlipDuration);
 
-            // Wait for the flip we just triggered to start and finish.
-            yield return null; 
+            yield return null;
             while (_isTurning) yield return null;
         }
 
-        _isSnapping = false;
+        _isSnapping   = false;
         _snapSequence = null;
     }
 
-    // ── Face visibility ───────────────────────────────────────────────────────
+    // ── Faces ─────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Shows the correct canvas for the current stack side while also hiding any canvas
-    /// whose anomaly is still locked. Front and back are gated independently so a page
-    /// with only one unlocked side still shows that side correctly.
-    /// </summary>
-    private void SetPageFace(Transform page, bool showBack)
+    /// <summary>Only the open spread renders content: left top shows its back, right top its front.</summary>
+    private void RefreshFaces()
     {
-        bool frontUnlocked = true;
-        bool backUnlocked  = true;
-
-        if (_pageEntries != null)
+        for (int i = 0; i < _sheets.Count; i++)
         {
-            foreach (GuidebookPageEntry entry in _pageEntries)
-            {
-                if (entry.page != page) continue;
-                frontUnlocked = IsEntryUnlocked(entry.anomalyTypeName);
-                backUnlocked  = IsEntryUnlocked(entry.backAnomalyTypeName);
-                break;
-            }
+            bool leftTop  = i == _leftCount - 1;
+            bool rightTop = i == _leftCount;
+            _sheets[i].SetFace(showBack: leftTop, visible: leftTop || rightTop);
         }
-
-        Transform front = page.Find(FrontCanvasName);
-        Transform back  = page.Find(BackCanvasName);
-
-        if (showBack)
-        {
-            if (front != null) front.gameObject.SetActive(false);
-            if (back  != null) back.gameObject.SetActive(backUnlocked);
-        }
-        else
-        {
-            if (front != null) front.gameObject.SetActive(frontUnlocked);
-            if (back  != null) back.gameObject.SetActive(false);
-        }
-    }
-
-    /// <summary>
-    /// Activates or deactivates both Canvas children on a page.
-    /// Call with <c>false</c> for locked pages (blank paper appearance)
-    /// and <c>true</c> when a page becomes accessible. <see cref="UpdateFaceVisibility"/>
-    /// will then determine which face to show based on stack position.
-    /// </summary>
-    private void SetPageContentsActive(Transform page, bool active)
-    {
-        Transform front = page.Find(FrontCanvasName);
-        Transform back  = page.Find(BackCanvasName);
-        if (front != null) front.gameObject.SetActive(active);
-        if (back  != null) back.gameObject.SetActive(active);
-    }
-
-    /// <summary>
-    /// Refreshes front/back Canvas visibility for all active pages based on the current
-    /// left-stack count. Pages on the left stack (already flipped) show their back face.
-    /// </summary>
-    private void UpdateFaceVisibility()
-    {
-        if (_activePages == null) return;
-
-        for (int i = 0; i < _activePages.Length; i++)
-        {
-            if (_activePages[i] == null) continue;
-            SetPageFace(_activePages[i], i < _leftCount);
-        }
-    }
-
-    // ── Unlock handling ───────────────────────────────────────────────────────
-
-    private bool IsEntryUnlocked(string typeName)
-    {
-        return string.IsNullOrEmpty(typeName)
-            || AnomalyUnlockManager.Instance == null
-            || AnomalyUnlockManager.Instance.IsAnomalyUnlocked(typeName);
-    }
-
-    private void RebuildActivePages()
-    {
-        var active = new List<Transform>();
-
-        if (_pageEntries == null)
-        {
-            _activePages = Array.Empty<Transform>();
-            return;
-        }
-
-        foreach (GuidebookPageEntry entry in _pageEntries)
-        {
-            if (entry.page == null) continue;
-
-            bool frontUnlocked = IsEntryUnlocked(entry.anomalyTypeName);
-            bool backUnlocked  = IsEntryUnlocked(entry.backAnomalyTypeName);
-            bool pageActive    = frontUnlocked || backUnlocked;
-
-            entry.page.gameObject.SetActive(pageActive);
-
-            if (pageActive)
-            {
-                // Pre-enable both canvases; UpdateFaceVisibility will immediately
-                // hide whichever face is locked and set the correct stack-side face.
-                SetPageContentsActive(entry.page, true);
-                active.Add(entry.page);
-            }
-        }
-
-        _activePages = active.ToArray();
-    }
-
-    private void HandleAnomalyUnlocked(string typeName)
-    {
-        if (_pageEntries == null) return;
-
-        bool relevant = false;
-        foreach (GuidebookPageEntry entry in _pageEntries)
-        {
-            if (string.Equals(entry.anomalyTypeName,     typeName, StringComparison.Ordinal)
-             || string.Equals(entry.backAnomalyTypeName, typeName, StringComparison.Ordinal))
-            {
-                relevant = true;
-                break;
-            }
-        }
-
-        if (!relevant) return;
-
-        int savedLeft = _leftCount;
-        RebuildActivePages();
-        EnsureZArray();
-        SnapTo(Mathf.Min(savedLeft, _activePages.Length));
     }
 
     // ── Position helpers ──────────────────────────────────────────────────────
 
     private Vector3 RightPos(int stackIndex) =>
-        _rightOrigin + Vector3.up * (stackIndex * _pageThickness) + new Vector3(0f, 0f, stackIndex * _pageDepth);
+        _rightOrigin + new Vector3(0f, stackIndex * _pageThickness, stackIndex * _pageDepth);
 
     private Vector3 LeftPos(int stackIndex) =>
-        _leftOrigin + Vector3.up * (stackIndex * _pageThickness) + new Vector3(0f, 0f, stackIndex * _pageDepth);
+        _leftOrigin + new Vector3(0f, stackIndex * _pageThickness, stackIndex * _pageDepth);
 
     // ── Animation ─────────────────────────────────────────────────────────────
 
@@ -397,31 +268,44 @@ public class GuidebookPageController : MonoBehaviour
     }
 
     private IEnumerator AnimateTurn(
-        Transform page,
-        Vector3   fromPos,
-        Vector3   toPos,
-        float     fromZ,
-        float     toZ,
-        int       pageIndex,
-        float     duration,
-        bool      showBackAtMidpoint,
-        Action    onComplete)
+        GuidebookSheet sheet,
+        Vector3 fromPos, Vector3 toPos,
+        float fromZ, float toZ,
+        float duration,
+        bool showBackAtMidpoint,
+        Action onLifted,
+        Action onLanding,
+        Action onComplete)
     {
         _isTurning = true;
+        Transform page = sheet.transform;
         bool faceSwitched = false;
+        bool lifted       = false;
+        bool landing      = false;
 
         float elapsed = 0f;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float t = _turnCurve.Evaluate(Mathf.Clamp01(elapsed / duration));
+            float progress = Mathf.Clamp01(elapsed / duration);
+            float t = _turnCurve.Evaluate(progress);
 
-            // Switch face at the midpoint — the page is most edge-on at t≈0.5,
-            // hiding the content swap from the viewer.
+            if (!lifted && progress >= _faceSwapMargin)
+            {
+                lifted = true;
+                onLifted?.Invoke();
+            }
+
             if (!faceSwitched && t >= 0.5f)
             {
                 faceSwitched = true;
-                SetPageFace(page, showBackAtMidpoint);
+                sheet.SetFace(showBackAtMidpoint);
+            }
+
+            if (!landing && progress >= 1f - _faceSwapMargin)
+            {
+                landing = true;
+                onLanding?.Invoke();
             }
 
             float arcY = Mathf.Sin(t * Mathf.PI) * _arcHeight;
@@ -431,27 +315,10 @@ public class GuidebookPageController : MonoBehaviour
             yield return null;
         }
 
-        float finalZ = toZ % 360f;
-        if (finalZ < 0f) finalZ += 360f;
-
-        _pageZRotations[pageIndex] = finalZ;
-        page.localPosition         = toPos;
-        page.localRotation         = Quaternion.Euler(0f, 0f, finalZ);
-
-        // Ensure face is correct if the midpoint switch was somehow missed
-        if (!faceSwitched)
-            SetPageFace(page, showBackAtMidpoint);
+        page.localPosition = toPos;
+        page.localRotation = Quaternion.Euler(0f, 0f, Mathf.Repeat(toZ, 360f));
 
         _isTurning = false;
         onComplete?.Invoke();
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private void EnsureZArray()
-    {
-        int needed = _activePages?.Length ?? 0;
-        if (_pageZRotations == null || _pageZRotations.Length != needed)
-            _pageZRotations = new float[needed];
     }
 }

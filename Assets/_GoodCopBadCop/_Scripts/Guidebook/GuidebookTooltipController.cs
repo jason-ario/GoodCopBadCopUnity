@@ -49,8 +49,9 @@ public class GuidebookTooltipController : MonoBehaviour
 
     private void HandleGuidebookOpened()
     {
-        if (_pageController == null)
-            _pageController = FindFirstObjectByType<GuidebookPageController>(FindObjectsInactive.Include);
+        // Bind to the local player's first-person guidebook — the scene also holds body-rig
+        // and cutscene copies, so a global Find could pick the wrong one.
+        _pageController = GuidebookController.Local != null ? GuidebookController.Local.PageController : null;
 
         if (_tooltipContainer != null)
             _tooltipContainer.SetActive(true);

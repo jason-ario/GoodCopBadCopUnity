@@ -1,0 +1,406 @@
+using System.Collections.Generic;
+using System.Text;
+using System.Text.RegularExpressions;
+using UnityEngine;
+
+/// <summary>
+/// Lays the <see cref="GuidebookDatabase"/> out onto pooled <see cref="GuidebookSheet"/>s each time
+/// the guidebook opens, showing only anomalies that are currently unlocked
+/// (<see cref="AnomalyUnlockManager.IsAnomalyUnlocked"/>).
+///
+/// Book order:
+/// <list type="number">
+///   <item>Rule pages (How to play, Pass, Quarantine, Kill, …).</item>
+///   <item>Scoring &amp; disposition page (Conversion Risk Protocol table + live point costs).</item>
+///   <item>One section per category with ≥1 unlocked anomaly: intro page, then one page per anomaly.</item>
+/// </list>
+///
+/// Every section intro is placed on a sheet's BACK face, so jumping to a section shows the intro on
+/// the left and its first anomaly on the right. Blank "field notes" faces pad the gaps.
+///
+/// Rebuilding happens in <see cref="OnEnable"/> (book opening) — never while the player is reading.
+/// The reading position is kept between opens unless the set of unlocked anomalies changed.
+/// </summary>
+[DefaultExecutionOrder(-10)]
+public class GuidebookBuilder : MonoBehaviour
+{
+    [Header("Content")]
+    [SerializeField] private GuidebookDatabase _database;
+
+    [Header("Wiring")]
+    [SerializeField] private GuidebookPageController _pageController;
+    [SerializeField] private GuidebookSheet          _sheetPrefab;
+    [Tooltip("Parent for spawned sheets. Must be the transform the page controller's stack origins are relative to.")]
+    [SerializeField] private Transform               _sheetParent;
+    [SerializeField] private GuidebookSectionTab     _tabPrefab;
+
+    [Header("Tab Placement (sheet-local)")]
+    [SerializeField] private Vector3 _tabFirstSlot  = new Vector3(-0.29f, 0f, -1.247f);
+    [SerializeField] private Vector3 _tabSlotStep   = new Vector3(-0.318f, 0f, 0f);
+    [SerializeField] private int     _tabSlotCount  = 6;
+    [SerializeField] private Vector3 _tabLocalEuler = new Vector3(0f, 180f, 0f);
+
+    [Header("Styling")]
+    [Tooltip("How far tab colours are darkened to produce readable header/badge text colours.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _accentDarken = 0.55f;
+    [SerializeField] private Color _rulesAccent = new Color(0.45f, 0.08f, 0.06f, 1f);
+
+    /// <summary>
+    /// Anomaly type names whose page the local player has already had open in front of them.
+    /// Session-scoped and shared by all guidebook instances. Drives the "NEW" stamp.
+    /// </summary>
+    private static readonly HashSet<string> s_seenAnomalies = new HashSet<string>();
+
+    private readonly List<GuidebookSheet>      _sheetPool = new List<GuidebookSheet>();
+    private readonly List<GuidebookSheet>      _activeSheets = new List<GuidebookSheet>();
+    private readonly List<GuidebookSectionTab> _tabPool = new List<GuidebookSectionTab>();
+    private readonly List<string>              _shownAnomalies = new List<string>();
+    private readonly List<GuidebookFaceContent> _faces = new List<GuidebookFaceContent>();
+    private readonly List<(int faceIndex, string label, Color color)> _tabs =
+        new List<(int, string, Color)>();
+
+    private string _builtSignature;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    private void Awake()
+    {
+        if (_pageController == null) _pageController = GetComponent<GuidebookPageController>();
+        if (_sheetParent == null)    _sheetParent    = transform;
+    }
+
+    private void OnEnable()
+    {
+        if (_database == null || _pageController == null || _sheetPrefab == null)
+        {
+            Debug.LogWarning($"[GuidebookBuilder] '{name}' is missing its database, page controller or sheet prefab.", this);
+            return;
+        }
+
+        string signature = ComputeUnlockSignature();
+        bool unlocksChanged = signature != _builtSignature;
+        _builtSignature = signature;
+
+        int leftCount = unlocksChanged ? 0 : _pageController.LeftCount;
+        Build();
+        _pageController.SetSheets(_activeSheets, leftCount);
+    }
+
+    private void OnDisable()
+    {
+        // Only the local player's first-person copy marks pages as read.
+        if (_pageController != null && _pageController.InputEnabled)
+            foreach (string typeName in _shownAnomalies)
+                s_seenAnomalies.Add(typeName);
+    }
+
+    // ── Build ─────────────────────────────────────────────────────────────────
+
+    private void Build()
+    {
+        _faces.Clear();
+        _tabs.Clear();
+        _shownAnomalies.Clear();
+
+        AddRules();
+        AddScoring();
+        AddSections();
+
+        if (_faces.Count % 2 == 1) _faces.Add(NotesFace());
+
+        for (int i = 0; i < _faces.Count; i++)
+        {
+            GuidebookFaceContent f = _faces[i];
+            if (!f.IsBlank)
+            {
+                f.PageNumber = i + 1;
+                f.Body       = FormatBody(f.Body);
+            }
+            _faces[i] = f;
+        }
+
+        LayoutSheets();
+        LayoutTabs();
+    }
+
+    private void AddRules()
+    {
+        IReadOnlyList<GuidebookDatabase.RulePage> rules = _database.RulePages;
+        if (rules.Count > 0)
+            _tabs.Add((0, _database.RulesTabLabel, _database.RulesTabColor));
+
+        foreach (GuidebookDatabase.RulePage rule in rules)
+        {
+            _faces.Add(new GuidebookFaceContent
+            {
+                Header      = rule.Header,
+                Title       = rule.Title,
+                Body        = rule.Body,
+                Image       = rule.Image,
+                AccentColor = _rulesAccent,
+            });
+        }
+    }
+
+    private void AddScoring()
+    {
+        IReadOnlyList<GuidebookDatabase.DispositionBand> bands = _database.DispositionBands;
+        if (bands.Count == 0) return;
+
+        var sb = new StringBuilder();
+        if (!string.IsNullOrEmpty(_database.ScoringIntro))
+            sb.Append(_database.ScoringIntro).Append("\n\n");
+
+        sb.Append("<b>SCORE").Append(PosStatus).Append("STATUS").Append(PosAction).Append("ACTION</b>\n");
+        foreach (GuidebookDatabase.DispositionBand band in bands)
+        {
+            string range = band.MinScore == band.MaxScore ? band.MinScore.ToString() : $"{band.MinScore}-{band.MaxScore}";
+            sb.Append(range).Append(PosStatus).Append(band.Status).Append(PosAction).Append(band.Action).Append('\n');
+        }
+
+        bool wroteCostHeader = false;
+        foreach (GuidebookDatabase.CategoryStyle style in _database.Categories)
+        {
+            if (!HasUnlockedEntry(style.Category)) continue;
+            if (!wroteCostHeader)
+            {
+                sb.Append("\n<b>POINTS PER ANOMALY</b>\n");
+                wroteCostHeader = true;
+            }
+            sb.Append(style.DisplayName).Append(PosRight).Append('+').Append(AnomalyController.GetAnomalyPointCost(style.Category)).Append('\n');
+        }
+
+        if (!string.IsNullOrEmpty(_database.DispositionWarning))
+            sb.Append("\n<b>WARNING:</b> ").Append(_database.DispositionWarning);
+
+        _faces.Add(new GuidebookFaceContent
+        {
+            Header      = _database.ScoringHeader,
+            Title       = _database.ScoringTitle,
+            Body        = sb.ToString(),
+            AccentColor = _rulesAccent,
+        });
+    }
+
+    private void AddSections()
+    {
+        int sectionNumber = 0;
+        var sectionEntries = new List<GuidebookDatabase.AnomalyEntry>();
+
+        foreach (GuidebookDatabase.CategoryStyle style in _database.Categories)
+        {
+            sectionEntries.Clear();
+            foreach (GuidebookDatabase.AnomalyEntry entry in _database.Entries)
+                if (GuidebookDatabase.GetCategory(entry) == style.Category && IsUnlocked(entry.AnomalyTypeName))
+                    sectionEntries.Add(entry);
+
+            if (sectionEntries.Count == 0) continue;
+
+            // Intro must sit on a back face (odd index) so the section opens as a spread.
+            if (_faces.Count % 2 == 0) _faces.Add(NotesFace());
+
+            sectionNumber++;
+            int   cost   = AnomalyController.GetAnomalyPointCost(style.Category);
+            Color accent = Accent(style.TabColor);
+            string costText = cost == 1 ? "+1 POINT" : $"+{cost} POINTS";
+
+            int introIndex = _faces.Count;
+            _tabs.Add((introIndex, style.TabLabel, style.TabColor));
+            _faces.Add(default); // filled below once anomaly page numbers are known
+
+            var contents = new StringBuilder();
+            foreach (GuidebookDatabase.AnomalyEntry entry in sectionEntries)
+            {
+                contents.Append(ListMarker).Append(entry.DisplayName).Append(PosRight).Append(_faces.Count + 1).Append("</indent>\n");
+
+                string body = entry.Description;
+                if (!string.IsNullOrEmpty(entry.HowToDetect))
+                    body += "\n\n<b>HOW TO DETECT</b>\n" + entry.HowToDetect;
+
+                _faces.Add(new GuidebookFaceContent
+                {
+                    Header      = style.DisplayName.ToUpperInvariant(),
+                    Title       = entry.DisplayName.ToUpperInvariant(),
+                    Image       = entry.Illustration,
+                    Badge       = $"{costText} TO RISK SCORE",
+                    Body        = body,
+                    AccentColor = accent,
+                    IsNew       = !s_seenAnomalies.Contains(entry.AnomalyTypeName),
+                });
+                _shownAnomalies.Add(entry.AnomalyTypeName);
+            }
+
+            var intro = new StringBuilder();
+            if (!string.IsNullOrEmpty(style.Intro)) intro.Append(style.Intro).Append("\n\n");
+            if (!string.IsNullOrEmpty(style.Tools)) intro.Append("<b>TOOLS</b>\n").Append(style.Tools).Append("\n\n");
+            intro.Append("<b>IN THIS SECTION</b>").Append(PosRight).Append("<b>PAGE</b>\n").Append(contents);
+
+            _faces[introIndex] = new GuidebookFaceContent
+            {
+                Header      = $"SECTION {sectionNumber}",
+                Title       = style.DisplayName.ToUpperInvariant(),
+                Badge       = $"{costText} PER CONFIRMED ANOMALY",
+                Body        = intro.ToString(),
+                AccentColor = accent,
+            };
+        }
+    }
+
+    private GuidebookFaceContent NotesFace() => new GuidebookFaceContent
+    {
+        Header      = _database.NotesHeader,
+        AccentColor = _rulesAccent,
+        IsBlank     = true,
+    };
+
+    // ── Layout ────────────────────────────────────────────────────────────────
+
+    private void LayoutSheets()
+    {
+        int sheetCount = _faces.Count / 2;
+
+        while (_sheetPool.Count < sheetCount)
+        {
+            GuidebookSheet sheet = Instantiate(_sheetPrefab, _sheetParent);
+            sheet.name = $"Sheet {_sheetPool.Count:00}";
+            _sheetPool.Add(sheet);
+        }
+
+        _activeSheets.Clear();
+        for (int i = 0; i < _sheetPool.Count; i++)
+        {
+            GuidebookSheet sheet = _sheetPool[i];
+            bool used = i < sheetCount;
+            sheet.gameObject.SetActive(used);
+            if (!used) continue;
+
+            sheet.Front.Apply(_faces[i * 2]);
+            sheet.Back.Apply(_faces[i * 2 + 1]);
+            _activeSheets.Add(sheet);
+        }
+    }
+
+    private void LayoutTabs()
+    {
+        if (_tabPrefab == null) return;
+
+        while (_tabPool.Count < _tabs.Count)
+            _tabPool.Add(Instantiate(_tabPrefab, _sheetParent));
+
+        int slots = Mathf.Max(1, _tabSlotCount);
+        for (int i = 0; i < _tabPool.Count; i++)
+        {
+            GuidebookSectionTab tab = _tabPool[i];
+            bool used = i < _tabs.Count;
+            tab.gameObject.SetActive(used);
+            if (!used) continue;
+
+            (int faceIndex, string label, Color color) = _tabs[i];
+            int sheetIndex = faceIndex / 2;
+            int target     = faceIndex % 2 == 1 ? sheetIndex + 1 : sheetIndex;
+
+            Transform t = tab.transform;
+            t.SetParent(_activeSheets[sheetIndex].TabAnchor, false);
+            t.localPosition = _tabFirstSlot + _tabSlotStep * (i % slots);
+            t.localRotation = Quaternion.Euler(_tabLocalEuler);
+            tab.name = $"Tab - {label}";
+            tab.Bind(_pageController, target, label, color);
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    // Rich-text column stops shared by the scoring table and section contents.
+    private const string PosStatus  = "<pos=20%>";
+    private const string PosAction  = "<pos=48%>";
+    private const string PosRight   = "<pos=86%>";
+    // Dash bullet with a hanging indent; the line must close with </indent>.
+    private const string ListMarker = "-<indent=1.1em>";
+
+    private static readonly Regex s_numberedItem = new Regex(@"^(\d+\.)\s+(.*)$");
+
+    // Gap between paragraphs / sections (a blank line in the source text): a full empty line.
+    private const string ParagraphBreak = "\n\n";
+    // Gap between consecutive list items: a short empty line, so items read as separate entries.
+    private const string ListItemBreak  = "\n<size=50%>\n</size>";
+
+    /// <summary>
+    /// Final typography pass for every page body:
+    /// "1. text" and "- text" lines get a hanging indent so wrapped lines align with the item
+    /// text instead of running back under the number. Blank lines become full paragraph gaps and
+    /// consecutive list items get a smaller gap between them.
+    /// </summary>
+    private static string FormatBody(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return body;
+
+        string[] lines = body.Replace("\r", "").Trim('\n').Split('\n');
+        var isListItem = new bool[lines.Length];
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i].TrimStart();
+            Match m = s_numberedItem.Match(line);
+            if (m.Success)
+            {
+                lines[i] = $"{m.Groups[1].Value}<indent=1.6em>{m.Groups[2].Value}</indent>";
+                isListItem[i] = true;
+            }
+            else if (line.StartsWith("- "))
+            {
+                lines[i] = ListMarker + line.Substring(2) + "</indent>";
+                isListItem[i] = true;
+            }
+            else
+            {
+                lines[i] = line;
+                isListItem[i] = line.StartsWith(ListMarker);
+            }
+        }
+
+        var sb = new StringBuilder();
+        for (int i = 0; i < lines.Length; i++)
+        {
+            bool blank = lines[i].Length == 0;
+            if (blank)
+            {
+                // Collapse runs of blank lines into one paragraph gap.
+                while (i + 1 < lines.Length && lines[i + 1].Length == 0) i++;
+                if (i + 1 < lines.Length) sb.Append(ParagraphBreak).Append(lines[++i]);
+                continue;
+            }
+
+            if (sb.Length > 0)
+                sb.Append(isListItem[i] && i > 0 && isListItem[i - 1] ? ListItemBreak : "\n");
+            sb.Append(lines[i]);
+        }
+        return sb.ToString();
+    }
+    private Color Accent(Color tabColor)
+    {
+        Color c = Color.Lerp(tabColor, Color.black, _accentDarken);
+        c.a = 1f;
+        return c;
+    }
+
+    private bool HasUnlockedEntry(AnomalyCategory category)
+    {
+        foreach (GuidebookDatabase.AnomalyEntry entry in _database.Entries)
+            if (GuidebookDatabase.GetCategory(entry) == category && IsUnlocked(entry.AnomalyTypeName))
+                return true;
+        return false;
+    }
+
+    private static bool IsUnlocked(string typeName) =>
+        !string.IsNullOrEmpty(typeName)
+        && (AnomalyUnlockManager.Instance == null || AnomalyUnlockManager.Instance.IsAnomalyUnlocked(typeName));
+
+    private string ComputeUnlockSignature()
+    {
+        var sb = new StringBuilder();
+        foreach (GuidebookDatabase.AnomalyEntry entry in _database.Entries)
+            if (entry != null && IsUnlocked(entry.AnomalyTypeName))
+                sb.Append(entry.AnomalyTypeName).Append('|');
+        return sb.ToString();
+    }
+}

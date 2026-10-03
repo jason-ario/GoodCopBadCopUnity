@@ -119,10 +119,7 @@ Shader "GoodCopBadCop/WorldSpaceUILit"
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            half Diffuse(half3 n, half3 l)
-            {
-                return saturate((dot(n, l) + _Wrap) / (1.0h + _Wrap));
-            }
+            #include "WorldSpaceUILighting.hlsl"
 
             Varyings vert(Attributes IN)
             {
@@ -134,7 +131,7 @@ Shader "GoodCopBadCop/WorldSpaceUILit"
                 OUT.positionCS = pos.positionCS;
                 OUT.positionWS = pos.positionWS;
                 // UI quads face the viewer along canvas -Z.
-                OUT.normalWS   = TransformObjectToWorldNormal(float3(0, 0, -1));
+                OUT.normalWS   = WorldSpaceUINormal();
                 OUT.uv         = TRANSFORM_TEX(IN.uv, _MainTex);
                 OUT.color      = IN.color * _Color;
                 OUT.fogFactor  = ComputeFogFactor(pos.positionCS.z);
@@ -159,50 +156,8 @@ Shader "GoodCopBadCop/WorldSpaceUILit"
                     clip(albedo.a - 0.001);
                 #endif
 
-                half3 n = normalize(IN.normalWS);
-                if (_BackfaceFlip > 0.5h)
-                    n = IS_FRONT_VFACE(face, n, -n);
-
-                InputData inputData = (InputData)0;
-                inputData.positionWS = IN.positionWS;
-                inputData.normalWS   = n;
-                inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionCS);
-                half4 shadowMask = half4(1, 1, 1, 1);
-
-                // Ambient
-                half3 lighting = max(SampleSH(n) * _AmbientStrength, 0);
-
-                // Main light
-                Light mainLight = GetMainLight(TransformWorldToShadowCoord(IN.positionWS));
-                half mainShadow = lerp(1.0h, mainLight.shadowAttenuation, _ShadowStrength);
-                lighting += mainLight.color * (Diffuse(n, mainLight.direction) * mainLight.distanceAttenuation * mainShadow);
-
-                // Additional lights
-                #if defined(_ADDITIONAL_LIGHTS) || defined(_ADDITIONAL_LIGHTS_VERTEX)
-                    half3 extra = 0;
-                    uint pixelLightCount = GetAdditionalLightsCount();
-
-                    #if USE_CLUSTER_LIGHT_LOOP
-                    for (uint lightIndex = 0; lightIndex < min(URP_FP_DIRECTIONAL_LIGHTS_COUNT, MAX_VISIBLE_LIGHTS); lightIndex++)
-                    {
-                        CLUSTER_LIGHT_LOOP_SUBTRACTIVE_LIGHT_CHECK
-                        Light l = GetAdditionalLight(lightIndex, IN.positionWS, shadowMask);
-                        half s = lerp(1.0h, l.shadowAttenuation, _ShadowStrength);
-                        extra += l.color * (Diffuse(n, l.direction) * l.distanceAttenuation * s);
-                    }
-                    #endif
-
-                    LIGHT_LOOP_BEGIN(pixelLightCount)
-                        Light l = GetAdditionalLight(lightIndex, IN.positionWS, shadowMask);
-                        half s = lerp(1.0h, l.shadowAttenuation, _ShadowStrength);
-                        extra += l.color * (Diffuse(n, l.direction) * l.distanceAttenuation * s);
-                    LIGHT_LOOP_END
-
-                    lighting += extra * _AdditionalLightStrength;
-                #endif
-
-                lighting = max(lighting, _MinLight.rgb);
-                lighting = lerp(lighting, half3(1, 1, 1), _Emission);
+                half3 n = WorldSpaceUIFaceNormal(IN.normalWS, IS_FRONT_VFACE(face, true, false));
+                half3 lighting = WorldSpaceUILighting(IN.positionWS, n, IN.positionCS);
 
                 half3 color = albedo.rgb * lighting;
                 color = MixFog(color, IN.fogFactor);

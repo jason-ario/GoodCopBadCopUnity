@@ -1,0 +1,263 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e123e276ffa9914cb7edf9b9f36cdf6, type: 3}
+  m_Name: GuidebookDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::GuidebookDatabase
+  _rulesTabLabel: RULES
+  _rulesTabColor: {r: 0.82, g: 0.78, b: 0.66, a: 1}
+  _rulePages:
+  - Header: GUIDEBOOK
+    Title: DO YOUR DUTY
+    Body: 'Examine each subject and decide their fate.
+
+
+      1. Compare the ID card with the application form.
+
+      2. Inspect the subject and take their vitals.
+
+      3. Tick every confirmed anomaly on the exam checklist.
+
+      4. Add up the Conversion Risk Score and stamp the verdict it calls for.
+
+
+      Work with your partner. Two sets of eyes are better than one.'
+    Image: {fileID: -463632864, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+  - Header: VERDICT
+    Title: PASS
+    Body: 'The subject is clear, or their Conversion Risk Score is low.
+
+
+      Stamp PASS and send them through. Passing an infected subject is a serious protocol violation.'
+    Image: {fileID: -855298285791758126, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+  - Header: VERDICT
+    Title: QUARANTINE
+    Body: 'Symptoms are present but still reversible.
+
+
+      Quarantine lets us cure the symptoms and stops the subject from fully mutating, unless they are already past the point of no return.'
+    Image: {fileID: -323710152, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+  - Header: VERDICT
+    Title: ELIMINATE
+    Body: 'Reserved for subjects who pose an immediate and uncontainable threat.
+
+
+      Only use lethal force when the Conversion Risk Score is critical. Unjustified use is a protocol breach subject to review.'
+    Image: {fileID: 0}
+  _scoringHeader: CONVERSION RISK PROTOCOL
+  _scoringTitle: FINAL DISPOSITION
+  _scoringIntro: Every confirmed anomaly adds points to the subject's Conversion Risk Score. Add up the ticked checklist items, then apply the verdict for the total.
+  _dispositionBands:
+  - MinScore: 0
+    MaxScore: 2
+    Status: Low
+    Action: PASS
+  - MinScore: 3
+    MaxScore: 4
+    Status: Elevated
+    Action: Officer discretion
+  - MinScore: 5
+    MaxScore: 7
+    Status: High
+    Action: QUARANTINE
+  - MinScore: 8
+    MaxScore: 10
+    Status: Critical
+    Action: ELIMINATE
+  _dispositionWarning: Your stamp is final. Officers are accountable for every verdict.
+  _categories:
+  - Category: 0
+    DisplayName: Documentation
+    TabLabel: DOCS
+    TabColor: {r: 0.47, g: 0.62, b: 0.8, a: 1}
+    Intro: Paperwork that does not add up.
+    Tools: ID card, application form, computer records
+  - Category: 3
+    DisplayName: Physical Mutations
+    TabLabel: PHYSICAL
+    TabColor: {r: 0.82, g: 0.4, b: 0.36, a: 1}
+    Intro: Visible changes to the subject's body. Some only show under UV light.
+    Tools: Your eyes, UV flashlight
+  - Category: 1
+    DisplayName: Vitals
+    TabLabel: VITALS
+    TabColor: {r: 0.5, g: 0.72, b: 0.48, a: 1}
+    Intro: Signs of infection in the subject's body functions.
+    Tools: Forehead thermometer, Geiger scanner
+  - Category: 2
+    DisplayName: Behavior
+    TabLabel: BEHAVIOR
+    TabColor: {r: 0.9, g: 0.72, b: 0.34, a: 1}
+    Intro: Unusual conduct during the interview.
+    Tools: Observation
+  - Category: 4
+    DisplayName: Supernatural
+    TabLabel: OCCULT
+    TabColor: {r: 0.62, g: 0.5, b: 0.78, a: 1}
+    Intro: Phenomena in the booth with no natural explanation.
+    Tools: Booth camera, room thermometer
+  _entries:
+  - AnomalyTypeName: NameWrongAnomaly
+    DisplayName: Wrong Name
+    Illustration: {fileID: 21300000, guid: b154a0fe7dc6d2d47a5c49fef41049fc, type: 3}
+    Description: The name on the subject's documents does not match their stated identity.
+    HowToDetect: Cross-reference the ID card, the application form and the system record. Any discrepancy counts.
+  - AnomalyTypeName: BirthDateWrongAnomaly
+    DisplayName: Wrong Date of Birth
+    Illustration: {fileID: 21300000, guid: d4464100e89f4b74bbb51127e36a0404, type: 3}
+    Description: The date of birth printed on the document does not match official records on file.
+    HowToDetect: Cross-reference the ID card with the application form and the system entry.
+  - AnomalyTypeName: ExpirationDateAnomaly
+    DisplayName: Expired Document
+    Illustration: {fileID: 21300000, guid: 7f5b95e9b0c18d64abfbe5b4105929a5, type: 3}
+    Description: The document's expiration date has passed or appears to have been altered.
+    HowToDetect: Check the expiration date carefully against today's date.
+  - AnomalyTypeName: IDNumberWrongAnomaly
+    DisplayName: Wrong ID Number
+    Illustration: {fileID: 0}
+    Description: The ID number on the card does not match the number on the application form or in the system record.
+    HowToDetect: Compare every digit. A single swapped number counts.
+  - AnomalyTypeName: InvalidEntryReasonAnomaly
+    DisplayName: Invalid Entry Reason
+    Illustration: {fileID: 21300000, guid: c3c8450c3c71839469019997a37c2d57, type: 3}
+    Description: The stated reason for entry is incomplete, contradictory, or not permitted under current regulations.
+    HowToDetect: Read the reason on the application form against current entry regulations.
+  - AnomalyTypeName: MissingDocumentAnomaly
+    DisplayName: Missing Documents
+    Illustration: {fileID: 0}
+    Description: One or more required documents are absent from the subject's file.
+    HowToDetect: Refusal to present a document is not an exemption.
+  - AnomalyTypeName: FakeIdAnomaly
+    DisplayName: Fake ID
+    Illustration: {fileID: 0}
+    Description: The subject is presenting a forged or entirely fabricated identity document.
+    HowToDetect: Look for inconsistencies in print quality, layout and data fields.
+  - AnomalyTypeName: RandomTumorAnomaly
+    DisplayName: Tumors
+    Illustration: {fileID: 21300000, guid: 9515377da6541254a8650677c28fd32a, type: 3}
+    Description: One or more irregular growths emerge at random locations across the body surface.
+    HowToDetect: Growths may be partially hidden under clothing. Inspect carefully.
+  - AnomalyTypeName: RandomTentacleAnomaly
+    DisplayName: Tentacles
+    Illustration: {fileID: 21300000, guid: f585745618360da49ae7ada74bf36e9e, type: 3}
+    Description: Large tentacles begin erupting from the subject's body.
+    HowToDetect: Inspect the whole body, front and back.
+  - AnomalyTypeName: BlackEyesAnomaly
+    DisplayName: Blackened Eyes
+    Illustration: {fileID: 21300000, guid: 374efc914510a5647a1d7df80c598cbf, type: 3}
+    Description: The eye and surrounding area are pitch black.
+    HowToDetect: Look the subject in the eyes.
+  - AnomalyTypeName: LesionAnomaly
+    DisplayName: Lesions
+    Illustration: {fileID: 21300000, guid: 7d430fbfe958cb247a2480ab590c9818, type: 3}
+    Description: Boils and scabs erupt on the subject's skin. A clear sign of infection.
+    HowToDetect: Inspect exposed skin closely.
+  - AnomalyTypeName: BlueVeinsAnomaly
+    DisplayName: Blue Veins
+    Illustration: {fileID: 21300000, guid: c633bafa017c0a44a9f4ec2bb896ddfb, type: 3}
+    Description: Blue veins that are only revealed under UV light.
+    HowToDetect: Switch the flashlight to UV mode and sweep it over the subject.
+  - AnomalyTypeName: ExtraLimbAnomaly
+    DisplayName: Extra Limbs
+    Illustration: {fileID: 21300000, guid: 02d2b5a24c2db0d45b69dd4ed23d00f4, type: 3}
+    Description: Additional limbs sprout from random locations on the body.
+    HowToDetect: Inspect thoroughly.
+  - AnomalyTypeName: VomitAnomaly
+    DisplayName: Vomiting
+    Illustration: {fileID: 21300000, guid: 018ec8837af1d16478917c5204da36f9, type: 3}
+    Description: The subject vomits without warning during the session.
+    HowToDetect: It comes and goes, about once or twice a minute. Keep watching.
+  - AnomalyTypeName: TwitchingAnomaly
+    DisplayName: Twitching
+    Illustration: {fileID: 21300000, guid: 33f65b02f470cb64ea5a30c728712406, type: 3}
+    Description: Sudden, involuntary muscle twitches at unpredictable intervals.
+    HowToDetect: Look for repeated isolated jerks with no apparent trigger.
+  - AnomalyTypeName: HighRadiationAnomaly
+    DisplayName: High Radiation
+    Illustration: {fileID: 21300000, guid: 2ca540b61e8598e469af8cfb0f7aaf5d, type: 3}
+    Description: The subject emits elevated radiation levels.
+    HowToDetect: Scan with the Geiger scanner. An infected subject reads around 85.
+  - AnomalyTypeName: HighTemperatureAnomaly
+    DisplayName: High Temperature
+    Illustration: {fileID: 21300000, guid: 8d7b7f1878fe9c340a75434bd000640d, type: 3}
+    Description: Body temperature far outside the normal range.
+    HowToDetect: "Use the forehead thermometer. An infected subject reads around 45.5 \xB0C."
+  - AnomalyTypeName: LaughingAnomaly
+    DisplayName: Laughing
+    Illustration: {fileID: 21300000, guid: cffa3b7ed83b9a34087052b9a00aeda9, type: 3}
+    Description: The subject breaks into uncontrollable laughter with no apparent cause.
+    HowToDetect: 
+  - AnomalyTypeName: DizzyAnomaly
+    DisplayName: Dizziness
+    Illustration: {fileID: 21300000, guid: bd2c30342b0d0c542a4afb9687d2b7d3, type: 3}
+    Description: The subject staggers, sways or stumbles as though disoriented, despite no recorded physical impairment.
+    HowToDetect: 
+  - AnomalyTypeName: ViolentAnomaly
+    DisplayName: Aggression
+    Illustration: {fileID: 21300000, guid: b62f01c301177a94b8ce6f4a3128d12e, type: 3}
+    Description: The subject displays aggressive or threatening behaviour toward personnel or surroundings.
+    HowToDetect: 
+  - AnomalyTypeName: ParanoidAnomaly
+    DisplayName: Paranoia
+    Illustration: {fileID: 21300000, guid: df6d328ff8516904c82a45cf470bb811, type: 3}
+    Description: The subject repeatedly glances over their shoulder, checks surroundings, or reacts to stimuli that are not present.
+    HowToDetect: 
+  - AnomalyTypeName: DistractedAnomaly
+    DisplayName: Distracted
+    Illustration: {fileID: 21300000, guid: b1811edf1210d884999a3ffbc1a80c86, type: 3}
+    Description: The subject appears confused and easily distracted. May trail off mid-conversation.
+    HowToDetect: 
+  - AnomalyTypeName: HyperactiveAnomaly
+    DisplayName: Hyperactive
+    Illustration: {fileID: 21300000, guid: 1394818c338c5e245888d32ffb4adf68, type: 3}
+    Description: The subject fidgets constantly, paces erratically, or moves unnaturally fast.
+    HowToDetect: 
+  - AnomalyTypeName: FearfulAnomaly
+    DisplayName: Fearful
+    Illustration: {fileID: 21300000, guid: ba1737a4df9d69444ac5d1ae876a6759, type: 3}
+    Description: The subject exhibits extreme and unexplained fear.
+    HowToDetect: 
+  - AnomalyTypeName: FlickeringLightsAnomaly
+    DisplayName: Flickering Lights
+    Illustration: {fileID: 21300000, guid: eef266bd32b515c479e3e96155b09f3d, type: 3}
+    Description: The booth lights flicker and cut out while the subject is present.
+    HowToDetect: 
+  - AnomalyTypeName: NotShowingInCameraAnomaly
+    DisplayName: Not On Camera
+    Illustration: {fileID: 21300000, guid: 27aba45ef5e2fa242a0e0d1e36835792, type: 3}
+    Description: The subject does not appear on the camera feed, even when confirmed to be in frame.
+    HowToDetect: Check the monitor while the subject is in the booth.
+  - AnomalyTypeName: GlitchingAnomaly
+    DisplayName: Glitching
+    Illustration: {fileID: 21300000, guid: 06dc57002a1ff7d48b30ac4e6465be6f, type: 3}
+    Description: The subject's body visually distorts or corrupts, as if their physical form is unstable.
+    HowToDetect: 
+  - AnomalyTypeName: DisembodiedVoicesAnomaly
+    DisplayName: Disembodied Voices
+    Illustration: {fileID: 21300000, guid: 2c16cfd572c81324caae6c61b602db08, type: 3}
+    Description: Whispers or voices are audible in the booth with no identifiable source.
+    HowToDetect: Audio may be intermittent. Do not dismiss it as equipment error.
+  - AnomalyTypeName: InsectSwarmAnomaly
+    DisplayName: Insect Swarm
+    Illustration: {fileID: 21300000, guid: b7c14185b0d20664b9e97e54a0409687, type: 3}
+    Description: A cockroach swarm appears in the booth shortly after the subject arrives.
+    HowToDetect: The swarm will not appear until the subject is present.
+  - AnomalyTypeName: RoomTemperatureDropAnomaly
+    DisplayName: Cold Room
+    Illustration: {fileID: 21300000, guid: 16747112603a8444eb8efae017ca8bfa, type: 3}
+    Description: Room temperature drops sharply, about 15 degrees below baseline, while the subject is present.
+    HowToDetect: Check the room thermometer, not just the subject's body.
+  - AnomalyTypeName: DeadSilenceAnomaly
+    DisplayName: Dead Silence
+    Illustration: {fileID: 21300000, guid: 43a4242b3aa8d774ea03400d1770c0a9, type: 3}
+    Description: All ambient sound ceases while the subject is in the booth.
+    HowToDetect: Complete silence with no technical cause.
+  _notesHeader: FIELD NOTES

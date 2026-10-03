@@ -1,10 +1,10 @@
 using UnityEngine;
 
 /// <summary>
-/// HUD icon for the guidebook. Manages a notification badge (!) that activates
-/// when new tasks are assigned — either via BetweenShiftTaskManager (night phase)
-/// or directly via TaskRegistry (any system, any time) — and deactivates
-/// once the player views the Tasks tab.
+/// HUD icon for the guidebook. Manages a notification badge (!) that activates when new tasks
+/// are assigned (via <see cref="TaskRegistry"/>) or when new anomaly pages are unlocked in the
+/// guidebook (via <see cref="AnomalyUnlockManager.OnAnomalyUnlocked"/>), and deactivates once
+/// the player opens the guidebook.
 /// </summary>
 public class GuidebookIcon : MonoBehaviour
 {
@@ -23,14 +23,14 @@ public class GuidebookIcon : MonoBehaviour
     private void OnEnable()
     {
         TaskRegistry.OnTasksAdded += ShowNotification;
-        GuidebookTabController.OnTasksTabViewed += HideNotification;
+        AnomalyUnlockManager.OnAnomalyUnlocked += HandleAnomalyUnlocked;
         GuidebookController.OnGuidebookOpened += HideNotification;
     }
 
     private void OnDisable()
     {
         TaskRegistry.OnTasksAdded -= ShowNotification;
-        GuidebookTabController.OnTasksTabViewed -= HideNotification;
+        AnomalyUnlockManager.OnAnomalyUnlocked -= HandleAnomalyUnlocked;
         GuidebookController.OnGuidebookOpened -= HideNotification;
     }
 
@@ -44,7 +44,18 @@ public class GuidebookIcon : MonoBehaviour
             SFXController.Instance.Play(_taskAddedSound);
     }
 
-    /// <summary>Deactivates the notification badge once the player has viewed the Tasks tab.</summary>
+    /// <summary>
+    /// New guidebook pages are available. Silent — a whole category unlocks at once, so a sound
+    /// per anomaly would stack.
+    /// </summary>
+    private void HandleAnomalyUnlocked(string _)
+    {
+        if (this == null) return; // static event can outlive a scene reload
+        if (_notificationBadge != null)
+            _notificationBadge.SetActive(true);
+    }
+
+    /// <summary>Deactivates the notification badge once the player opens the guidebook.</summary>
     private void HideNotification()
     {
         if (_notificationBadge != null)

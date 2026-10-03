@@ -37,7 +37,15 @@ public class GuidebookController : MonoBehaviour
 
     private GameObject _deactivatedHeldObject;
 
+    private GuidebookPageController _pageController;
+
     public bool IsOpen { get; private set; }
+
+    /// <summary>The guidebook controller of the player who most recently opened their guidebook locally.</summary>
+    public static GuidebookController Local { get; private set; }
+
+    /// <summary>Page controller on the first-person (arms) guidebook.</summary>
+    public GuidebookPageController PageController => _pageController;
 
     private void Awake()
     {
@@ -46,7 +54,10 @@ public class GuidebookController : MonoBehaviour
         _movementController  = GetComponent<PlayerMovementController>();
 
         if (_guidebookObject != null)
+        {
+            _pageController = _guidebookObject.GetComponent<GuidebookPageController>();
             _guidebookObject.SetActive(false);
+        }
 
         if (_bodyGuidebookObject != null)
             _bodyGuidebookObject.SetActive(false);
@@ -89,6 +100,12 @@ public class GuidebookController : MonoBehaviour
     {
         if (IsOpen) return;
         IsOpen = true;
+        Local = this;
+
+        // Enable page input before activation so the builder's OnEnable sees the local copy.
+        if (_pageController != null)
+            _pageController.InputEnabled = true;
+
         OnGuidebookOpened?.Invoke();
 
         // Deactivate held object without dropping or despawning it.
@@ -129,6 +146,10 @@ public class GuidebookController : MonoBehaviour
 
         if (_guidebookObject != null)
             _guidebookObject.SetActive(false);
+
+        // Disable after deactivation so the builder's OnDisable still marks pages as read.
+        if (_pageController != null)
+            _pageController.InputEnabled = false;
 
         // Notify all clients to hide the body-space guidebook mesh.
         _animationController.SetGuidebookOpen(false);
