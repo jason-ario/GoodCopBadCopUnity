@@ -30,17 +30,45 @@ public class StackOfFolders : Interactable
         if (!IsSpawned) return;
 
         if (IsServer)
-            _isInteractable.Value = value;
+            WriteInteractableServer(value);
         else
             SetInteractableServerRpc(value);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SetInteractableServerRpc(bool value) => _isInteractable.Value = value;
+    private void SetInteractableServerRpc(bool value) => WriteInteractableServer(value);
+
+    /// <summary>
+    /// Server-only write of <see cref="_isInteractable"/>. The stack is only ever tutorial-locked
+    /// on Day 1; any lock request past Day 1 is rejected and logged with its call stack.
+    /// </summary>
+    private void WriteInteractableServer(bool value)
+    {
+        if (!value && TutorialGateRules.IsPastDay1)
+        {
+            Debug.LogWarning($"[StackOfFolders] Rejected lock of '{name}' on Day {TutorialGateRules.CurrentDay} — the folder stack is never locked after Day 1. Caller:\n{System.Environment.StackTrace}", this);
+            value = true;
+        }
+
+        _isInteractable.Value = value;
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // Self-heal for resumed saves: never start Day 2+ with a tutorial-locked stack.
+        if (IsServer && TutorialGateRules.IsPastDay1 && !_isInteractable.Value)
+            _isInteractable.Value = true;
+    }
 
     public override void Interact(PlayerInteractionController player)
     {
-        if (!_isInteractable.Value) return;
+        if (!_isInteractable.Value)
+        {
+            Debug.Log($"[StackOfFolders] Interact ignored — stack is locked (Day {TutorialGateRules.CurrentDay}).", this);
+            return;
+        }
 
         base.Interact(player);
 

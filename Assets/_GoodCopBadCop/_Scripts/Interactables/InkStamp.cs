@@ -60,6 +60,10 @@ public class InkStamp : Interactable, IPickupSlot
         {
             _isPlaced.Value = true;
             SpawnInkStamp();
+
+            // Self-heal for resumed saves: never start Day 2+ with a tutorial-locked slot.
+            if (TutorialGateRules.IsPastDay1 && !_slotInteractable.Value)
+                _slotInteractable.Value = true;
         }
         else
         {
@@ -100,6 +104,9 @@ public class InkStamp : Interactable, IPickupSlot
 
     private void ApplySlotInteractable(bool value)
     {
+        if (!value)
+            Debug.Log($"[InkStamp] '{name}' slot collider disabled (Day {TutorialGateRules.CurrentDay}).", this);
+
         Collider col = GetComponent<Collider>();
         if (col != null) col.enabled = value;
     }
@@ -190,13 +197,30 @@ public class InkStamp : Interactable, IPickupSlot
         if (!IsSpawned) return;
 
         if (IsServer)
-            _slotInteractable.Value = value;
+            WriteSlotInteractableServer(value);
         else
             SetSlotInteractableServerRpc(value);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SetSlotInteractableServerRpc(bool value) => _slotInteractable.Value = value;
+    private void SetSlotInteractableServerRpc(bool value) => WriteSlotInteractableServer(value);
+
+    /// <summary>
+    /// Server-only write of <see cref="_slotInteractable"/>. Stamp slots are only ever
+    /// tutorial-locked on Day 1 — from Day 2 onward they must always be usable, so any
+    /// lock request past Day 1 is rejected and logged with its call stack so the caller
+    /// can be identified.
+    /// </summary>
+    private void WriteSlotInteractableServer(bool value)
+    {
+        if (!value && TutorialGateRules.IsPastDay1)
+        {
+            Debug.LogWarning($"[InkStamp] Rejected lock of '{name}' on Day {TutorialGateRules.CurrentDay} — stamp slots are never locked after Day 1. Caller:\n{System.Environment.StackTrace}", this);
+            value = true;
+        }
+
+        _slotInteractable.Value = value;
+    }
 
     /// <summary>
     /// Permanently disables interaction with both this slot and the spawned stamp pickup on all clients.

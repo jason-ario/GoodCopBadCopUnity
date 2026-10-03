@@ -47,6 +47,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private BoothWaitingNotification boothWaitingNotification;
     [SerializeField] private BoothWaitingNotification mailDeliveryNotification;
     [SerializeField] private BoothWaitingNotification radiationAlertNotification;
+    [SerializeField] private BoothWaitingNotification lowHealthAlertNotification;
     [SerializeField] private DeathScreenUI deathScreenUI;
     [SerializeField] private GameObject _endDayPopup;
     [SerializeField] private EndDayPopupUI _endDayPopupUI;
@@ -761,6 +762,24 @@ public class UIController : MonoBehaviour
     {
         if (radiationAlertNotification != null)
             radiationAlertNotification.Hide();
+    }
+
+    /// <summary>
+    /// Shows the bottom-centre low-health alert, using the same looping reveal-and-fade style as
+    /// the radiation and shipment notifications. Driven by <see cref="LowHealthAlertUI"/>; keeps
+    /// resurfacing until <see cref="HideLowHealthAlert"/> is called.
+    /// </summary>
+    public void ShowLowHealthAlert(string message = "Health low. Find a way to heal.")
+    {
+        if (lowHealthAlertNotification != null)
+            lowHealthAlertNotification.Show(message, loop: true);
+    }
+
+    /// <summary>Hides the low-health alert notification.</summary>
+    public void HideLowHealthAlert()
+    {
+        if (lowHealthAlertNotification != null)
+            lowHealthAlertNotification.Hide();
     }
 
     /// <summary>Shows the death screen after the given delay in seconds.</summary>

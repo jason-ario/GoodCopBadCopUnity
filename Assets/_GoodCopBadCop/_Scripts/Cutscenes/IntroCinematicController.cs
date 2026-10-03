@@ -6,10 +6,12 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Plays a short, skippable intro story sequence — plain white text centered over a black
 /// screen — the first time the game is started in this application session. Runs while the
-/// screen fader is already fully black, before the player spawns in and the screen unfades.
+/// screen fader is already fully black, before the screen unfades. The server spawns players
+/// just before this starts, so the local player's controls are locked for its duration.
 ///
 /// This is purely local/client-side: each connected player reveals and advances through the
-/// lines independently by pressing E, clicking, or a gamepad button, mirroring the skip/advance
+/// lines independently — and reveals into gameplay as soon as they finish, never waiting on
+/// another player — by pressing E, clicking, or a gamepad button, mirroring the skip/advance
 /// convention used elsewhere in the dialogue system — the first input completes the typewriter
 /// reveal for that line, a further input advances to the next line.
 ///
@@ -52,6 +54,17 @@ public class IntroCinematicController : MonoBehaviour
     private bool _awaitingInput;
     private bool _advanceRequested;
 
+    /// <summary>True while the intro cinematic panel is showing on this client.</summary>
+    public bool IsPlaying { get; private set; }
+
+    /// <summary>
+    /// True once this cinematic has locked the local player's controls. The server spawns
+    /// players before the cinematic starts (so no player has to wait for another to finish
+    /// reading), which means the local player object can appear mid-cinematic — its input must
+    /// stay locked until this player finishes, or E/click presses would leak into gameplay.
+    /// </summary>
+    private PlayerInstance _lockedPlayer;
+
     private void Awake()
     {
         Instance = this;
@@ -62,6 +75,12 @@ public class IntroCinematicController : MonoBehaviour
 
     private void Update()
     {
+        if (IsPlaying && _lockedPlayer == null && PlayerInstance.Instance != null)
+        {
+            _lockedPlayer = PlayerInstance.Instance;
+            _lockedPlayer.OpenedUIPanel();
+        }
+
         if (!_awaitingInput || _advanceRequested) return;
 
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
@@ -104,11 +123,19 @@ public class IntroCinematicController : MonoBehaviour
         _hasPlayed = true;
 
         panelRoot.SetActive(true);
+        IsPlaying = true;
 
         foreach (string line in storyLines)
             yield return StartCoroutine(ShowLineAndWait(line));
 
         panelRoot.SetActive(false);
+        IsPlaying = false;
+
+        if (_lockedPlayer != null)
+        {
+            _lockedPlayer.ClosedUIPanel();
+            _lockedPlayer = null;
+        }
     }
 
     private IEnumerator ShowLineAndWait(string line)

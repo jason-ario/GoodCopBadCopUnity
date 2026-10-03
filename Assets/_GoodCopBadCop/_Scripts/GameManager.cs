@@ -174,6 +174,20 @@ public class GameManager : NetworkBehaviour
         // MainMenuController.FadeOutCutsceneMusic below) so it doesn't cut off abruptly.
         MainMenuController.Instance.TransitionToGameplay();
 
+        // Spawn everyone as soon as the server's screen is black — BEFORE the server's own intro
+        // cinematic. The cinematic is per-player and self-paced, so the spawn/reveal signal must
+        // never wait on the host reading it; otherwise every client's fade-out would be gated on
+        // the host finishing. Each client's local player input is locked by
+        // IntroCinematicController while its own cinematic is still showing.
+        if (IsServer)
+        {
+            SpawnAllPlayersAtLobby();
+            IsTransitioningToLobby = false;
+            // Signal all clients (including self) that all players are spawned
+            // and it is safe to start the reveal.
+            LobbySpawnCompleteClientRpc();
+        }
+
         // Plays the intro story cinematic while the screen is still black. Local/client-side
         // only (no network sync needed) and a no-op after the first time it has played this
         // application session — see IntroCinematicController.PlayIfNeeded.
@@ -184,18 +198,11 @@ public class GameManager : NetworkBehaviour
         // the intro cutscene above — stop it now that the intro cutscene has finished.
         MainMenuController.Instance.StopMainMenuMusic();
 
-        if (IsServer)
-        {
-            SpawnAllPlayersAtLobby();
-            IsTransitioningToLobby = false;
-            // Signal all clients (including self) that all players are spawned
-            // and it is safe to start the reveal.
-            LobbySpawnCompleteClientRpc();
-        }
-
         // All clients — including the server-as-host — wait for the server's spawn-complete
         // signal before calling FadeOut. This prevents the camera from switching mid-fade
-        // on non-server clients whose spawn RPC arrives after their fade completes.
+        // on non-server clients whose spawn RPC arrives after their fade completes. The signal
+        // is sent before the cinematic, so it has normally already arrived by the time a
+        // player finishes reading — each player reveals at their own pace.
         yield return new WaitUntil(() => _lobbyRevealReady);
         _lobbyRevealReady = false;
 

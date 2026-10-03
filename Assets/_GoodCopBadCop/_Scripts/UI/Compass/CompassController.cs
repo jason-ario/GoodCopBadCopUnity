@@ -22,7 +22,7 @@ public class CompassController : MonoBehaviour
         { CompassMarkerCategory.Fence,    new Color(0.60f, 0.65f, 0.70f) }, // steel gray
         { CompassMarkerCategory.Blood,    new Color(0.42f, 0.02f, 0.03f) }, // dark red (distinct from bright-red Enemy)
         { CompassMarkerCategory.Enemy,    new Color(1.00f, 0.10f, 0.10f) }, // bright red
-        { CompassMarkerCategory.BreachMutant, new Color(0.90f, 0.76f, 0.58f) }, // light brown
+        { CompassMarkerCategory.BreachMutant, new Color(1.00f, 0.10f, 0.10f) }, // bright red (same as Enemy — both are "kill this")
     };
 
     [Header("Layout")]
