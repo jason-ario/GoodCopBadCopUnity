@@ -10,6 +10,14 @@ public struct GuidebookFaceContent
     public string Badge;
     public string Body;
     public Sprite Image;
+    /// <summary>Optional row of illustrations drawn side by side in the image slot (replaces <see cref="Image"/>).</summary>
+    public Sprite[] ImageRow;
+    /// <summary>Fixed image slot height; 0 = automatic (whatever space the body doesn't need).</summary>
+    public float  ImageHeight;
+    /// <summary>Optional printed copy of the HUD integrity panel, drawn in the image slot (replaces images).</summary>
+    public GuidebookIntegrityPanel IntegrityPanel;
+    /// <summary>Optional illustrated rows (icon + label + text) printed below the body.</summary>
+    public GuidebookIconItem[] IconList;
     public Color  AccentColor;
     public int    PageNumber;   // 0 = hide footer
     public bool   IsNew;
@@ -58,7 +66,58 @@ public class GuidebookFaceView : MonoBehaviour
 
     private static readonly Color DefaultAccent = new Color(0.45f, 0.08f, 0.06f, 1f);
 
+    [Header("Integrity Panel")]
+    [Tooltip("Width of the printed HUD integrity panel as a fraction of the image slot width.")]
+    [SerializeField, Range(0.3f, 1f)] private float _panelWidthFraction = 0.8f;
+
     private GuidebookChartView _chart;
+    private GuidebookIntegrityPanelView _panel;
+    private GuidebookIconListView _iconList;
+
+    /// <summary>Runtime sibling of the body, sized and anchored like it.</summary>
+    private GuidebookIconListView GetOrCreateIconList()
+    {
+        if (_iconList != null || _body == null || _image == null) return _iconList;
+
+        RectTransform bodyRect = _body.rectTransform;
+        var go = new GameObject("Icon List", typeof(RectTransform));
+        go.layer = _body.gameObject.layer;
+
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(bodyRect.parent, false);
+        rt.SetSiblingIndex(bodyRect.GetSiblingIndex() + 1);
+        rt.anchorMin = bodyRect.anchorMin;
+        rt.anchorMax = bodyRect.anchorMax;
+        rt.pivot     = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(bodyRect.anchoredPosition.x, 0f);
+        rt.sizeDelta = new Vector2(bodyRect.rect.width, 0f);
+
+        _iconList = go.AddComponent<GuidebookIconListView>();
+        _iconList.Configure(_body, _image.material, _body.color);
+        return _iconList;
+    }
+
+    /// <summary>Runtime sibling of the image, centred in the image slot.</summary>
+    private GuidebookIntegrityPanelView GetOrCreatePanel()
+    {
+        if (_panel != null || _image == null) return _panel;
+
+        RectTransform src = _image.rectTransform;
+        var go = new GameObject("Integrity Panel", typeof(RectTransform));
+        go.layer = _image.gameObject.layer;
+
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(src.parent, false);
+        rt.SetSiblingIndex(src.GetSiblingIndex() + 1);
+        rt.anchorMin = src.anchorMin;
+        rt.anchorMax = src.anchorMax;
+        rt.pivot     = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(src.anchoredPosition.x, 0f);
+
+        _panel = go.AddComponent<GuidebookIntegrityPanelView>();
+        _panel.Configure(_body, _image.material);
+        return _panel;
+    }
 
     /// <summary>
     /// The chart lives in a runtime child of the Layout, sized and anchored like the body, so the
@@ -99,20 +158,52 @@ public class GuidebookFaceView : MonoBehaviour
 
         float cursor = _contentTop;
 
-        bool hasImage = !content.IsBlank && content.Image != null;
+        bool hasPanel = !content.IsBlank && content.IntegrityPanel != null && _image != null;
+        bool hasRow   = !content.IsBlank && !hasPanel && HasAny(content.ImageRow);
+        bool hasImage = !content.IsBlank && !hasPanel && (content.Image != null || hasRow);
         bool hasBadge = !content.IsBlank && !string.IsNullOrEmpty(content.Badge);
         bool hasChart = !content.IsBlank && content.HasChart;
+        bool hasList  = !content.IsBlank && content.IconList != null && content.IconList.Length > 0;
+        bool fitBody  = hasChart || hasList;
         string body   = content.IsBlank ? BuildNotesLines() : content.Body;
+
+        GuidebookIntegrityPanelView panel = hasPanel ? GetOrCreatePanel() : _panel;
+        if (panel != null)
+        {
+            if (hasPanel)
+            {
+                float width = _image.rectTransform.sizeDelta.x * _panelWidthFraction;
+                PlaceTop((RectTransform)panel.transform, cursor, 0f);
+                panel.Build(content.IntegrityPanel, width);
+                cursor -= GuidebookIntegrityPanelView.HeightFor(width) + _gap * 1.5f;
+            }
+            else
+            {
+                panel.Clear();
+            }
+        }
 
         if (_image != null)
         {
-            _image.gameObject.SetActive(hasImage);
+            _image.gameObject.SetActive(hasImage && !hasRow);
+            if (!hasRow) HideImageRow();
+
             if (hasImage)
             {
-                float imageHeight = ImageHeightFor(cursor, hasBadge, body);
-                _image.sprite = content.Image;
-                _image.preserveAspect = true;
-                PlaceTop(_image.rectTransform, cursor, imageHeight);
+                float imageHeight = content.ImageHeight > 0f
+                    ? content.ImageHeight
+                    : ImageHeightFor(cursor, hasBadge, body);
+
+                if (hasRow)
+                {
+                    imageHeight = LayoutImageRow(content.ImageRow, cursor, imageHeight);
+                }
+                else
+                {
+                    _image.sprite = content.Image;
+                    _image.preserveAspect = true;
+                    PlaceTop(_image.rectTransform, cursor, imageHeight);
+                }
                 cursor -= imageHeight + _gap;
             }
         }
@@ -132,14 +223,29 @@ public class GuidebookFaceView : MonoBehaviour
         {
             SetText(_body, body);
             float bodyHeight = Mathf.Max(0f, cursor - _bodyBottom);
-            if (hasChart)
+            if (fitBody)
             {
                 bodyHeight = string.IsNullOrEmpty(body)
                     ? 0f
                     : Mathf.Min(bodyHeight, _body.GetPreferredValues(body, _body.rectTransform.rect.width, 10000f).y + 4f);
             }
             PlaceTop(_body.rectTransform, cursor, bodyHeight);
-            if (hasChart && bodyHeight > 0f) cursor -= bodyHeight + _gap * 1.5f;
+            if (fitBody && bodyHeight > 0f) cursor -= bodyHeight + _gap * 1.5f;
+        }
+
+        GuidebookIconListView list = hasList ? GetOrCreateIconList() : _iconList;
+        if (list != null)
+        {
+            if (hasList)
+            {
+                PlaceTop((RectTransform)list.transform, cursor, 0f);
+                float used = list.Build(content.IconList, Mathf.Max(0f, cursor - _bodyBottom));
+                cursor -= used + _gap * 1.5f;
+            }
+            else
+            {
+                list.Clear();
+            }
         }
 
         GuidebookChartView chart = hasChart ? GetOrCreateChart() : _chart;
@@ -159,6 +265,74 @@ public class GuidebookFaceView : MonoBehaviour
         SetText(_footer, content.PageNumber > 0 ? $"- {content.PageNumber} -" : null);
 
         if (_newStamp != null) _newStamp.SetActive(content.IsNew && !content.IsBlank);
+    }
+
+    /// <summary>
+    /// Image slot height this face would pick automatically for <paramref name="content"/>.
+    /// Lets the builder give a group of pages one shared (smallest) image height.
+    /// </summary>
+    public float MeasureImageHeight(in GuidebookFaceContent content)
+    {
+        string body = content.IsBlank ? null : content.Body;
+        return ImageHeightFor(_contentTop, !string.IsNullOrEmpty(content.Badge), body);
+    }
+
+    private static bool HasAny(Sprite[] sprites)
+    {
+        if (sprites == null) return false;
+        foreach (Sprite s in sprites) if (s != null) return true;
+        return false;
+    }
+
+    private readonly System.Collections.Generic.List<Image> _rowImages = new System.Collections.Generic.List<Image>();
+
+    /// <summary>
+    /// Lays the sprites out side by side across the image slot's width (equal cells, <see cref="_gap"/>
+    /// apart) using runtime copies of <see cref="_image"/>, so they share its lit material.
+    /// Returns the row height actually used (no taller than the sprites need at that cell width).
+    /// </summary>
+    private float LayoutImageRow(Sprite[] sprites, float top, float maxHeight)
+    {
+        RectTransform src = _image.rectTransform;
+        float width = src.sizeDelta.x;
+        int   count = sprites.Length;
+        float cellWidth = (width - _gap * (count - 1)) / count;
+
+        float needed = 0f;
+        foreach (Sprite s in sprites)
+            if (s != null && s.rect.width > 0f)
+                needed = Mathf.Max(needed, cellWidth * s.rect.height / s.rect.width);
+        float height = Mathf.Min(maxHeight, needed > 0f ? needed : maxHeight);
+
+        while (_rowImages.Count < count)
+        {
+            Image copy = Instantiate(_image, src.parent);
+            copy.name = $"Image Row {_rowImages.Count}";
+            copy.transform.SetSiblingIndex(src.GetSiblingIndex() + 1 + _rowImages.Count);
+            _rowImages.Add(copy);
+        }
+
+        float left = src.anchoredPosition.x - width * 0.5f + cellWidth * 0.5f;
+        for (int i = 0; i < _rowImages.Count; i++)
+        {
+            Image img = _rowImages[i];
+            bool used = i < count && sprites[i] != null;
+            img.gameObject.SetActive(used);
+            if (!used) continue;
+
+            img.sprite = sprites[i];
+            img.preserveAspect = true;
+            RectTransform rt = img.rectTransform;
+            rt.anchoredPosition = new Vector2(left + i * (cellWidth + _gap), top);
+            rt.sizeDelta = new Vector2(cellWidth, height);
+        }
+        return height;
+    }
+
+    private void HideImageRow()
+    {
+        foreach (Image img in _rowImages)
+            if (img != null) img.gameObject.SetActive(false);
     }
 
     /// <summary>

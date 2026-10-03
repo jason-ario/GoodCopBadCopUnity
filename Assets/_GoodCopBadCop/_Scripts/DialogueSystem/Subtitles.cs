@@ -136,7 +136,8 @@ public class Subtitles : MonoBehaviour
     {
         if (textReveal == null || string.IsNullOrEmpty(originalText)) return;
 
-        string wrappedText = WrapText(originalText, maxCharactersPerLine);
+        // [[keyword]] markup -> bold/yellow/link-tagged rich text; TMPWobbleText animates the link range.
+        string wrappedText = WrapText(DialogueKeywordMarkup.Apply(originalText), maxCharactersPerLine);
         string colorHex = ColorUtility.ToHtmlStringRGB(lastDisplayColor);
         string formattedText = $"<color=#{colorHex}>{wrappedText}</color>";
 
@@ -153,7 +154,8 @@ public class Subtitles : MonoBehaviour
 
     private string WrapText(string text, int maxChars)
     {
-        if (string.IsNullOrEmpty(text) || text.Length <= maxChars)
+        // Measure rendered length only, so rich-text tags (keyword emphasis) don't cause early wraps.
+        if (string.IsNullOrEmpty(text) || DialogueKeywordMarkup.VisibleLength(text) <= maxChars)
             return text;
 
         StringBuilder sb = new StringBuilder();
@@ -162,7 +164,8 @@ public class Subtitles : MonoBehaviour
 
         foreach (string word in words)
         {
-            if (currentLineLength + word.Length + 1 > maxChars)
+            int wordLength = DialogueKeywordMarkup.VisibleLength(word);
+            if (currentLineLength + wordLength + 1 > maxChars)
             {
                 sb.Append('\n');
                 currentLineLength = 0;
@@ -174,7 +177,7 @@ public class Subtitles : MonoBehaviour
             }
 
             sb.Append(word);
-            currentLineLength += word.Length;
+            currentLineLength += wordLength;
         }
 
         return sb.ToString();

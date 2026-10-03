@@ -6,7 +6,7 @@ using UnityEngine;
 /// Single source of truth for every piece of guidebook content.
 ///
 /// <see cref="GuidebookBuilder"/> reads this asset each time the guidebook opens and lays the
-/// content out onto pooled sheets: rule pages first, then the scoring/disposition page, then one
+/// content out onto pooled sheets: rule pages first, then the scoring/disposition page, then the Checkpoint Integrity pages, then one
 /// section per <see cref="AnomalyCategory"/> that has at least one unlocked anomaly.
 ///
 /// Anomaly entries never store a category or a verdict:
@@ -38,6 +38,16 @@ public class GuidebookDatabase : ScriptableObject
 
         [Tooltip("Optional illustration. When empty the body text fills the space.")]
         public Sprite Image;
+
+        [Tooltip("Optional row of illustrations shown side by side. Replaces Image when set.")]
+        public Sprite[] ImageRow;
+
+        [Tooltip("Draws the printed HUD Checkpoint Integrity panel (see the database's Integrity Panel) " +
+                 "in the image slot instead of Image / Image Row.")]
+        public bool ShowIntegrityPanel;
+
+        [Tooltip("Optional illustrated rows (icon, bold label, text) printed below the body.")]
+        public GuidebookIconItem[] IconList;
     }
 
     [Serializable]
@@ -91,6 +101,15 @@ public class GuidebookDatabase : ScriptableObject
     // Inspector fields
     // -------------------------------------------------------------------------
 
+    [Header("Checkpoint Integrity Section (after Rules & Scoring)")]
+    [SerializeField] private string _integrityTabLabel = "INTEGRITY";
+    [SerializeField] private Color  _integrityTabColor = new Color(0.55f, 0.66f, 0.42f, 1f);
+    [Tooltip("Pages of the Checkpoint Integrity section. " + IntegrityMaxDeductionToken +
+             " in a body is replaced with the live maximum payout deduction (e.g. 50).")]
+    [SerializeField] private RulePage[] _integrityPages = DefaultIntegrityPages();
+    [Tooltip("Art and example values for the HUD panel copy on pages with Show Integrity Panel.")]
+    [SerializeField] private GuidebookIntegrityPanel _integrityPanel = new GuidebookIntegrityPanel();
+
     [Header("Rules Section")]
     [SerializeField] private string _rulesTabLabel = "RULES";
     [SerializeField] private Color  _rulesTabColor = new Color(0.82f, 0.78f, 0.66f, 1f);
@@ -119,6 +138,14 @@ public class GuidebookDatabase : ScriptableObject
     // Public API
     // -------------------------------------------------------------------------
 
+    /// <summary>Placeholder in integrity page bodies for the live maximum payout deduction percentage.</summary>
+    public const string IntegrityMaxDeductionToken = "{MAX_DEDUCTION}";
+
+    public string IntegrityTabLabel => _integrityTabLabel;
+    public Color  IntegrityTabColor => _integrityTabColor;
+    public IReadOnlyList<RulePage> IntegrityPages => _integrityPages;
+    public GuidebookIntegrityPanel IntegrityPanel => _integrityPanel;
+
     public string RulesTabLabel => _rulesTabLabel;
     public Color  RulesTabColor => _rulesTabColor;
     public IReadOnlyList<RulePage> RulePages => _rulePages;
@@ -133,6 +160,40 @@ public class GuidebookDatabase : ScriptableObject
     public IReadOnlyList<AnomalyEntry>  Entries    => _entries;
 
     public string NotesHeader => _notesHeader;
+
+    /// <summary>
+    /// Starting content for the Checkpoint Integrity section. Only used while the asset has no
+    /// serialized <c>_integrityPages</c> yet; after that the asset's (Inspector-edited) copy wins.
+    /// </summary>
+    private static RulePage[] DefaultIntegrityPages() => new[]
+    {
+        new RulePage
+        {
+            Header = "CHECKPOINT INTEGRITY",
+            Title  = "KEEP THE YARD CLEAN",
+            Body   = IntegrityBody,
+            ShowIntegrityPanel = true,
+        },
+        new RulePage
+        {
+            Header = "CHECKPOINT INTEGRITY",
+            Title  = "CHORES",
+            Body   = IntegrityChoresBody,
+            IconList = new[]
+            {
+                new GuidebookIconItem { Label = "TRASH & GORE",     Text = "Bag it, then throw the bag in the dumpster." },
+                new GuidebookIconItem { Label = "GRAFFITI & BLOOD", Text = "Scrub it away with the mop." },
+                new GuidebookIconItem { Label = "FENCES",           Text = "Repair broken fences with the hammer." },
+            },
+        },
+    };
+
+    public const string IntegrityChoresBody = "Clear every mess to keep integrity at 100%.";
+
+    public const string IntegrityBody =
+        "Your pay is multiplied by the checkpoint's integrity, shown on this panel. Below 100%, the difference is " +
+        "deducted from your earnings, up to " + IntegrityMaxDeductionToken + "%. " +
+        "The counters show what's left to clean; your compass marks every mess.";
 
     /// <summary>
     /// Resolves the category of an anomaly entry from its C# base class.

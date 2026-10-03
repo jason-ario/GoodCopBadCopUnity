@@ -64,6 +64,9 @@ public class CheckpointIntegrityService : MonoBehaviour
     /// <summary>Upper bound of <see cref="IntegrityScore"/> — used by HUD bars to normalise the fill amount.</summary>
     public float MaxScore => _maxScore;
 
+    /// <summary>Lower bound of <see cref="IntegrityScore"/> — the payout multiplier when the booth is fully neglected.</summary>
+    public float MinScore => _minScore;
+
     /// <summary>
     /// Whether the integrity system is actively tracking graffiti/trash/fence state and applying
     /// a payout multiplier. Starts disabled — Day 1 leaves the score pinned at

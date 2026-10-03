@@ -11,7 +11,8 @@ using UnityEngine;
 /// Book order:
 /// <list type="number">
 ///   <item>Rule pages (How to play, Pass, Quarantine, Kill, …).</item>
-///   <item>Scoring &amp; disposition page (Conversion Risk Protocol table + live point costs).</item>
+///   <item>Scoring &amp; disposition page (Conversion Risk Protocol table).</item>
+///   <item>Checkpoint Integrity pages (HUD panel + payout effect, then illustrated chores).</item>
 ///   <item>One section per category with ≥1 unlocked anomaly: intro page, then one page per anomaly.</item>
 /// </list>
 ///
@@ -59,6 +60,7 @@ public class GuidebookBuilder : MonoBehaviour
     private readonly List<GuidebookFaceContent> _faces = new List<GuidebookFaceContent>();
     private readonly List<(int faceIndex, string label, Color color)> _tabs =
         new List<(int, string, Color)>();
+    private readonly List<List<int>> _imageGroups = new List<List<int>>();
 
     private string _builtSignature;
 
@@ -102,9 +104,11 @@ public class GuidebookBuilder : MonoBehaviour
         _faces.Clear();
         _tabs.Clear();
         _shownAnomalies.Clear();
+        _imageGroups.Clear();
 
         AddRules();
         AddScoring();
+        AddIntegrity();
         AddSections();
 
         if (_faces.Count % 2 == 1) _faces.Add(NotesFace());
@@ -120,27 +124,99 @@ public class GuidebookBuilder : MonoBehaviour
             _faces[i] = f;
         }
 
+        EqualizeImageHeights();
         LayoutSheets();
         LayoutTabs();
+    }
+
+    /// <summary>
+    /// Adds authored pages (rules / integrity). Pages with a single illustration are recorded as one
+    /// group so <see cref="EqualizeImageHeights"/> can give them all the same image size.
+    /// </summary>
+    private void AddAuthoredPages(IReadOnlyList<GuidebookDatabase.RulePage> pages, Color accent,
+                                  System.Func<string, string> bodyFilter = null)
+    {
+        var group = new List<int>();
+        foreach (GuidebookDatabase.RulePage page in pages)
+        {
+            bool hasRow   = page.ImageRow != null && page.ImageRow.Length > 0;
+            bool hasPanel = page.ShowIntegrityPanel && _database.IntegrityPanel != null;
+            if (page.Image != null && !hasRow && !hasPanel) group.Add(_faces.Count);
+
+            _faces.Add(new GuidebookFaceContent
+            {
+                Header      = page.Header,
+                Title       = page.Title,
+                Body        = bodyFilter != null ? bodyFilter(page.Body) : page.Body,
+                Image       = page.Image,
+                ImageRow    = hasRow ? page.ImageRow : null,
+                IntegrityPanel = hasPanel ? _database.IntegrityPanel : null,
+                IconList    = page.IconList != null && page.IconList.Length > 0 ? page.IconList : null,
+                AccentColor = accent,
+            });
+        }
+        if (group.Count > 1) _imageGroups.Add(group);
+    }
+
+    /// <summary>
+    /// Each group's pages use the smallest automatic image height among them, so the illustrations
+    /// are the same size regardless of how much text each page has. Must run after <see cref="FormatBody"/>.
+    /// </summary>
+    private void EqualizeImageHeights()
+    {
+        if (_imageGroups.Count == 0) return;
+        EnsureSheetPool(1);
+        GuidebookFaceView probe = _sheetPool[0].Front;
+        if (probe == null) return;
+
+        foreach (List<int> group in _imageGroups)
+        {
+            float height = float.MaxValue;
+            foreach (int index in group)
+                height = Mathf.Min(height, probe.MeasureImageHeight(_faces[index]));
+
+            foreach (int index in group)
+            {
+                GuidebookFaceContent f = _faces[index];
+                f.ImageHeight  = height;
+                _faces[index]  = f;
+            }
+        }
+    }
+
+    private void AddIntegrity()
+    {
+        IReadOnlyList<GuidebookDatabase.RulePage> pages = _database.IntegrityPages;
+        if (pages.Count == 0) return;
+
+        // Open the section as a spread, like the anomaly sections.
+        if (_faces.Count % 2 == 0) _faces.Add(NotesFace());
+        _tabs.Add((_faces.Count, _database.IntegrityTabLabel, _database.IntegrityTabColor));
+        Color  accent       = Accent(_database.IntegrityTabColor);
+        string maxDeduction = MaxIntegrityDeductionPercent().ToString();
+
+        AddAuthoredPages(pages, accent,
+            body => body?.Replace(GuidebookDatabase.IntegrityMaxDeductionToken, maxDeduction));
+    }
+
+    /// <summary>Largest share of a payout the integrity multiplier can take away, in whole percent.</summary>
+    private static int MaxIntegrityDeductionPercent()
+    {
+        CheckpointIntegrityService service = CheckpointIntegrityService.Instance;
+        if (service == null || service.MaxScore <= 0f) return 50;
+        return Mathf.RoundToInt((1f - service.MinScore / service.MaxScore) * 100f);
     }
 
     private void AddRules()
     {
         IReadOnlyList<GuidebookDatabase.RulePage> rules = _database.RulePages;
-        if (rules.Count > 0)
-            _tabs.Add((0, _database.RulesTabLabel, _database.RulesTabColor));
+        if (rules.Count == 0) return;
 
-        foreach (GuidebookDatabase.RulePage rule in rules)
-        {
-            _faces.Add(new GuidebookFaceContent
-            {
-                Header      = rule.Header,
-                Title       = rule.Title,
-                Body        = rule.Body,
-                Image       = rule.Image,
-                AccentColor = _rulesAccent,
-            });
-        }
+        // Like every other section, open Rules as a spread when something precedes it.
+        if (_faces.Count > 0 && _faces.Count % 2 == 0) _faces.Add(NotesFace());
+        _tabs.Add((_faces.Count, _database.RulesTabLabel, _database.RulesTabColor));
+
+        AddAuthoredPages(rules, _rulesAccent);
     }
 
     private void AddScoring()
@@ -163,29 +239,12 @@ public class GuidebookBuilder : MonoBehaviour
             disposition.Rows.Add(new[] { range, Upper(band.Status), Upper(band.Action) });
         }
 
-        // Live point costs for every category the player can currently meet.
-        var points = new GuidebookTable
-        {
-            Caption      = "POINTS PER CONFIRMED ANOMALY",
-            ColumnWidths = new[] { 3.1f, 0.9f },
-            Alignments   = new[] { TMPro.TextAlignmentOptions.MidlineLeft, TMPro.TextAlignmentOptions.Center },
-        };
-        points.Rows.Add(new[] { "CATEGORY", "POINTS" });
-        foreach (GuidebookDatabase.CategoryStyle style in _database.Categories)
-        {
-            if (!HasUnlockedEntry(style.Category)) continue;
-            points.Rows.Add(new[] { Upper(style.DisplayName), $"+{AnomalyController.GetAnomalyPointCost(style.Category)}" });
-        }
-
-        var tables = new List<GuidebookTable> { disposition };
-        if (points.Rows.Count > 1) tables.Add(points);
-
         _faces.Add(new GuidebookFaceContent
         {
             Header      = _database.ScoringHeader,
             Title       = _database.ScoringTitle,
             Body        = _database.ScoringIntro,
-            Tables      = tables.ToArray(),
+            Tables      = new[] { disposition },
             Callout     = string.IsNullOrEmpty(_database.DispositionWarning)
                               ? null
                               : "<b>WARNING:</b> " + _database.DispositionWarning,
@@ -268,16 +327,20 @@ public class GuidebookBuilder : MonoBehaviour
 
     // ── Layout ────────────────────────────────────────────────────────────────
 
-    private void LayoutSheets()
+    private void EnsureSheetPool(int count)
     {
-        int sheetCount = _faces.Count / 2;
-
-        while (_sheetPool.Count < sheetCount)
+        while (_sheetPool.Count < count)
         {
             GuidebookSheet sheet = Instantiate(_sheetPrefab, _sheetParent);
             sheet.name = $"Sheet {_sheetPool.Count:00}";
             _sheetPool.Add(sheet);
         }
+    }
+
+    private void LayoutSheets()
+    {
+        int sheetCount = _faces.Count / 2;
+        EnsureSheetPool(sheetCount);
 
         _activeSheets.Clear();
         for (int i = 0; i < _sheetPool.Count; i++)
@@ -301,6 +364,15 @@ public class GuidebookBuilder : MonoBehaviour
             _tabPool.Add(Instantiate(_tabPrefab, _sheetParent));
 
         int slots = Mathf.Max(1, _tabSlotCount);
+        // More tabs than slots: tighten the spacing so they all fit in the authored span
+        // instead of wrapping onto (and overlapping) the first slots.
+        Vector3 step = _tabSlotStep;
+        if (_tabs.Count > slots && slots > 1)
+        {
+            step  = _tabSlotStep * (slots - 1) / (_tabs.Count - 1);
+            slots = _tabs.Count;
+        }
+
         for (int i = 0; i < _tabPool.Count; i++)
         {
             GuidebookSectionTab tab = _tabPool[i];
@@ -314,7 +386,7 @@ public class GuidebookBuilder : MonoBehaviour
 
             Transform t = tab.transform;
             t.SetParent(_activeSheets[sheetIndex].TabAnchor, false);
-            t.localPosition = _tabFirstSlot + _tabSlotStep * (i % slots);
+            t.localPosition = _tabFirstSlot + step * (i % slots);
             t.localRotation = Quaternion.Euler(_tabLocalEuler);
             tab.name = $"Tab - {label}";
             tab.Bind(_pageController, target, label, color);
@@ -391,14 +463,6 @@ public class GuidebookBuilder : MonoBehaviour
         Color c = Color.Lerp(tabColor, Color.black, _accentDarken);
         c.a = 1f;
         return c;
-    }
-
-    private bool HasUnlockedEntry(AnomalyCategory category)
-    {
-        foreach (GuidebookDatabase.AnomalyEntry entry in _database.Entries)
-            if (GuidebookDatabase.GetCategory(entry) == category && IsUnlocked(entry.AnomalyTypeName))
-                return true;
-        return false;
     }
 
     private static bool IsUnlocked(string typeName) =>

@@ -83,6 +83,23 @@ public class PerimiterFence : NetworkBehaviour
     [Tooltip("Particle system prefab spawned at the contact point when a mutant hits this fence.")]
     [SerializeField] private ParticleSystem _mutantHitParticlePrefab;
 
+    [Tooltip("One-shot effect (smoke plume + sparks) spawned at the base of the fence when a player's hammer " +
+             "fully repairs it. Spawned so its local X runs along the fence and +Y points up. Any Box-shaped " +
+             "ParticleSystem in it has its shape X scale stretched to the segment's width.")]
+    [SerializeField] private GameObject _repairCompleteVfxPrefab;
+
+    [Tooltip("Vertical offset (metres) applied to the repair VFX spawn point above the collider's base.")]
+    [SerializeField] private float _repairVfxHeightOffset = 0.1f;
+
+    [Header("Repair Punch")]
+    [Tooltip("Local-scale punch applied to the repaired (state 0) mesh root when the fence is fixed. " +
+             "Relative to its current scale; Y-heavy so the fence 'pops' upward from its base.")]
+    [SerializeField] private Vector3 _repairPunchScale = new Vector3(0.06f, 0.18f, 0.06f);
+    [SerializeField] private float _repairPunchDuration = 0.45f;
+    [SerializeField] private int _repairPunchVibrato = 7;
+    [Range(0f, 1f)]
+    [SerializeField] private float _repairPunchElasticity = 0.6f;
+
 
     // ── Networked state ────────────────────────────────────────────────────────
 
@@ -99,6 +116,15 @@ public class PerimiterFence : NetworkBehaviour
     // ── Local state ────────────────────────────────────────────────────────────
 
     private NavMeshObstacle _navMeshObstacle;
+
+    /// <summary>Physical fence collider on this GameObject; used to locate the fence base for repair VFX.</summary>
+    private BoxCollider _boxCollider;
+
+    /// <summary>
+    /// Set when <see cref="PlayRepairCompleteFeedbackClientRpc"/> arrives before the replicated health
+    /// has switched this client to the repaired mesh, so the punch plays on the right mesh once it does.
+    /// </summary>
+    private bool _pendingRepairPunch;
 
     /// <summary>
     /// Optional HighlightPlus outline shown while this segment is broken and
@@ -196,6 +222,7 @@ public class PerimiterFence : NetworkBehaviour
     private void Awake()
     {
         _navMeshObstacle = GetComponent<NavMeshObstacle>();
+        _boxCollider = GetComponent<BoxCollider>();
         ApplyNavMeshObstacleState(0);
 
         _highlightEffect = GetComponent<HighlightEffect>();
@@ -275,6 +302,13 @@ public class PerimiterFence : NetworkBehaviour
         _fallbackHealth = UninitializedHealth;
 
         ApplyHealthState(current, force: true);
+
+        // Repair feedback RPC beat the health replication here — punch now that the fixed mesh is live.
+        if (_pendingRepairPunch)
+        {
+            _pendingRepairPunch = false;
+            if (IsRepaired) PlayRepairPunch();
+        }
 
         if (!_initialized || _audioSource == null) return;
 
@@ -522,6 +556,83 @@ public class PerimiterFence : NetworkBehaviour
             target = _maxHealth;
 
         SetHealthServer(target);
+
+        // Hammer-only celebration. Deliberately NOT driven from OnHealthChanged: save/day restores
+        // (FenceRepairTask → SetDamageLevelServer) also heal fences and must not puff smoke everywhere.
+        if (IsRepaired)
+            PlayRepairCompleteFeedbackClientRpc();
+    }
+
+    // ── Repair feedback ────────────────────────────────────────────────────────
+
+    [ClientRpc]
+    private void PlayRepairCompleteFeedbackClientRpc()
+    {
+        SpawnRepairVfx();
+
+        // The RPC and the health NetworkVariable can land in either order on clients. If the fixed
+        // mesh isn't active yet, defer the punch to OnHealthChanged so it plays on the visible mesh.
+        if (IsRepaired) PlayRepairPunch();
+        else _pendingRepairPunch = true;
+    }
+
+    private void PlayRepairPunch()
+    {
+        if (_damageStateMeshRoots == null || _damageStateMeshRoots.Length == 0 || _damageStateMeshRoots[0] == null)
+            return;
+
+        // Punch the pristine mesh root, never this transform (it carries the NavMeshObstacle).
+        Transform target = _damageStateMeshRoots[0].transform;
+        target.DOComplete();
+        target.DOPunchScale(Vector3.Scale(target.localScale, _repairPunchScale),
+            _repairPunchDuration, _repairPunchVibrato, _repairPunchElasticity);
+    }
+
+    private void SpawnRepairVfx()
+    {
+        if (_repairCompleteVfxPrefab == null) return;
+
+        Vector3 basePoint = transform.position;
+        Vector3 along = transform.right;
+        float width = 0f;
+
+        if (_boxCollider != null)
+        {
+            Vector3 c = _boxCollider.center;
+            Vector3 s = _boxCollider.size;
+            basePoint = transform.TransformPoint(new Vector3(c.x, c.y - s.y * 0.5f, c.z));
+
+            // The fence runs along whichever horizontal collider axis is longer.
+            Vector3 scale = transform.lossyScale;
+            float xLen = Mathf.Abs(s.x * scale.x);
+            float zLen = Mathf.Abs(s.z * scale.z);
+            if (zLen > xLen) { along = transform.forward; width = zLen; }
+            else width = xLen;
+        }
+
+        basePoint.y += _repairVfxHeightOffset;
+        along = Vector3.ProjectOnPlane(along, Vector3.up);
+        if (along.sqrMagnitude < 0.0001f) along = Vector3.right;
+
+        // LookRotation(cross(along, up), up) yields local X == along, local Y == world up.
+        Quaternion rotation = Quaternion.LookRotation(Vector3.Cross(along.normalized, Vector3.up), Vector3.up);
+        GameObject instance = Instantiate(_repairCompleteVfxPrefab, basePoint, rotation);
+
+        float maxLifetime = 0f;
+        foreach (ParticleSystem ps in instance.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            if (width > 0f)
+            {
+                ParticleSystem.ShapeModule shape = ps.shape;
+                if (shape.enabled && shape.shapeType == ParticleSystemShapeType.Box)
+                    shape.scale = new Vector3(width, shape.scale.y, shape.scale.z);
+            }
+
+            ParticleSystem.MainModule main = ps.main;
+            maxLifetime = Mathf.Max(maxLifetime, main.startDelay.constantMax + main.duration + main.startLifetime.constantMax);
+        }
+
+        Destroy(instance, Mathf.Max(0.5f, maxLifetime));
     }
 
     /// <summary>

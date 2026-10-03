@@ -50,7 +50,8 @@ public static class DialogueHistoryManager
     {
         if (string.IsNullOrWhiteSpace(text)) return;
 
-        var entry = new DialogueEntry(speakerType, speakerName, text);
+        // Keep [[keyword]] emphasis readable in the log (static bold/yellow, no brackets).
+        var entry = new DialogueEntry(speakerType, speakerName, DialogueKeywordMarkup.Apply(text));
         _history.Add(entry);
         OnEntryAdded?.Invoke(entry);
     }

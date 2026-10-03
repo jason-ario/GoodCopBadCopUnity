@@ -12,6 +12,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e123e276ffa9914cb7edf9b9f36cdf6, type: 3}
   m_Name: GuidebookDatabase
   m_EditorClassIdentifier: Assembly-CSharp::GuidebookDatabase
+  _integrityTabLabel: INTEGRITY
+  _integrityTabColor: {r: 0.55, g: 0.66, b: 0.42, a: 1}
+  _integrityPages:
+  - Header: CHECKPOINT INTEGRITY
+    Title: KEEP THE YARD CLEAN
+    Body: Your pay is multiplied by the checkpoint's integrity, shown on this panel. Below 100%, the difference is deducted from your earnings, up to {MAX_DEDUCTION}%. The counters show what's left to clean; your compass marks every mess.
+    Image: {fileID: 0}
+    ImageRow: []
+    ShowIntegrityPanel: 1
+    IconList: []
+  - Header: CHECKPOINT INTEGRITY
+    Title: CHORES
+    Body: Clear every mess to keep integrity at 100%.
+    Image: {fileID: 0}
+    ImageRow: []
+    ShowIntegrityPanel: 0
+    IconList:
+    - Icon: {fileID: -4951775590767879967, guid: ae1438395e5421249abb1c629fff1041, type: 3}
+      Label: TRASH & GORE
+      Text: Bag it, then throw the bag in the dumpster.
+    - Icon: {fileID: -1115895461, guid: ae1438395e5421249abb1c629fff1041, type: 3}
+      Label: GRAFFITI & BLOOD
+      Text: Scrub it away with the mop.
+    - Icon: {fileID: 2009374943, guid: ae1438395e5421249abb1c629fff1041, type: 3}
+      Label: FENCES
+      Text: Repair broken fences with the hammer.
+  _integrityPanel:
+    Background: {fileID: 21300000, guid: 2ec3c41ced71e4b48a17e0aca6ea789b, type: 3}
+    FenceIcon: {fileID: 21300000, guid: a911635ef8c4f48fdbd6bd2114a77f7d, type: 3}
+    TrashIcon: {fileID: 21300000, guid: dd5c124578bb0452791112367d9a7efb, type: 3}
+    GraffitiIcon: {fileID: 21300000, guid: d6ef0dc9fbe4542d1ac89e235e4135b9, type: 3}
+    Percent: 70
+    FenceCount: 1
+    TrashCount: 2
+    GraffitiCount: 1
   _rulesTabLabel: RULES
   _rulesTabColor: {r: 0.82, g: 0.78, b: 0.66, a: 1}
   _rulePages:
@@ -30,7 +65,13 @@ MonoBehaviour:
 
 
       Work with your partner. Two sets of eyes are better than one.'
-    Image: {fileID: -463632864, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+    Image: {fileID: 0}
+    ImageRow:
+    - {fileID: -855298285791758126, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+    - {fileID: -463632864, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+    - {fileID: -323710152, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+    ShowIntegrityPanel: 0
+    IconList: []
   - Header: VERDICT
     Title: PASS
     Body: 'The subject is clear, or their Conversion Risk Score is low.
@@ -41,20 +82,29 @@ MonoBehaviour:
 
       <b>Infection spreads.</b> Every passing day, subjects grow more infected. Your verdicts decide how quickly it happens.'
     Image: {fileID: -855298285791758126, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+    ImageRow: []
+    ShowIntegrityPanel: 0
+    IconList: []
   - Header: VERDICT
     Title: QUARANTINE
     Body: 'Symptoms are present but still reversible.
 
 
       Quarantine cures the symptoms and resets the subject''s infection, unless they are already past the point of no return. Subjects you pass keep worsening day after day.'
-    Image: {fileID: -323710152, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+    Image: {fileID: -463632864, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+    ImageRow: []
+    ShowIntegrityPanel: 0
+    IconList: []
   - Header: VERDICT
     Title: ELIMINATE
     Body: 'Reserved for subjects who pose an immediate and uncontainable threat.
 
 
       Only use lethal force when the Conversion Risk Score is critical. Unjustified use is a protocol breach subject to review.'
-    Image: {fileID: 0}
+    Image: {fileID: -323710152, guid: 1b7cadd447ee480468c0d0af4c2d070d, type: 3}
+    ImageRow: []
+    ShowIntegrityPanel: 0
+    IconList: []
   _scoringHeader: CONVERSION RISK PROTOCOL
   _scoringTitle: FINAL DISPOSITION
   _scoringIntro: Every confirmed anomaly adds points to the subject's Conversion Risk Score. Add up the ticked checklist items, then apply the verdict for the total.
@@ -125,7 +175,7 @@ MonoBehaviour:
     HowToDetect: Check the expiration date carefully against today's date.
   - AnomalyTypeName: IDNumberWrongAnomaly
     DisplayName: Wrong ID Number
-    Illustration: {fileID: 0}
+    Illustration: {fileID: 21300000, guid: 56ee8c5a21e2d9c409beec4d54d8d1a9, type: 3}
     Description: The ID number on the card does not match the number on the application form or in the system record.
     HowToDetect: Compare every digit. A single swapped number counts.
   - AnomalyTypeName: InvalidEntryReasonAnomaly
@@ -135,7 +185,7 @@ MonoBehaviour:
     HowToDetect: Read the reason on the application form against current entry regulations.
   - AnomalyTypeName: MissingDocumentAnomaly
     DisplayName: Missing Documents
-    Illustration: {fileID: 0}
+    Illustration: {fileID: 21300000, guid: 85ec7fd22cbe6e049908acfb1d7ece0c, type: 3}
     Description: One or more required documents are absent from the subject's file.
     HowToDetect: Refusal to present a document is not an exemption.
   - AnomalyTypeName: FakeIdAnomaly
