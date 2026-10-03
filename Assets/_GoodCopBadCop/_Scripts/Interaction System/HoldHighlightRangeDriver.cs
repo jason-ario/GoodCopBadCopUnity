@@ -52,8 +52,8 @@ public sealed class HoldHighlightRangeDriver : MonoBehaviour
         if (_tracked.Count == 0) return;
 
         Camera cam = Camera.main;
-        if (cam == null) return;
-        Vector3 viewer = cam.transform.position;
+        Vector3 viewer = cam != null ? cam.transform.position : Vector3.zero;
+        float time = Time.time;
 
         // Snapshot: range changes run OnHighlight/OnStopHighlight overrides that may release holds.
         _snapshot.Clear();
@@ -68,7 +68,8 @@ public sealed class HoldHighlightRangeDriver : MonoBehaviour
                 continue;
             }
 
-            interactable.UpdateHoldHighlightRange(viewer);
+            if (cam != null) interactable.UpdateHoldHighlightRange(viewer);
+            interactable.UpdateHoldHighlightPulse(time);
         }
     }
 }

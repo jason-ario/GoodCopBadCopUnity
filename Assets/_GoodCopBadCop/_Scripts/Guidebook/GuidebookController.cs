@@ -9,7 +9,7 @@ using UnityEngine.InputSystem;
 /// HUD and takes over the Back button (Escape / click closes the book; the exit prompt next to it
 /// shows the Tab / View key).
 /// On close: reverses all of the above. The book is also put away automatically when a cutscene
-/// or dialogue the player is in ends.
+/// or dialogue the player is in starts or ends (it may still be reopened during one).
 /// The body guidebook mesh (<see cref="_bodyGuidebookObject"/>) is activated on all clients
 /// via <see cref="PlayerAnimationController.SetGuidebookOpen"/> so other players can see it.
 /// </summary>
@@ -42,6 +42,7 @@ public class GuidebookController : MonoBehaviour
 
     private GuidebookPageController _pageController;
 
+    private PlayerInstance _playerInstance;
     private bool _wasInCutsceneOrDialogue;
     private bool _hidHud;
     private UnityEngine.Events.UnityAction _backButtonAction;
@@ -102,11 +103,31 @@ public class GuidebookController : MonoBehaviour
     private void OnEnable()
     {
         _animationController.OnGuidebookOpenChanged += OnBodyGuidebookOpenChanged;
+
+        _playerInstance = GetComponentInParent<PlayerInstance>();
+        if (_playerInstance != null)
+            _playerInstance.OnCutsceneStateChanged += OnCutsceneStateChanged;
     }
 
     private void OnDisable()
     {
         _animationController.OnGuidebookOpenChanged -= OnBodyGuidebookOpenChanged;
+
+        if (_playerInstance != null)
+            _playerInstance.OnCutsceneStateChanged -= OnCutsceneStateChanged;
+    }
+
+    /// <summary>
+    /// Puts the book away the moment a cutscene or dialogue starts. Both entry paths
+    /// (<see cref="DialogueChoiceSystem"/> and <see cref="ScriptedDialogueRunner"/>) raise this
+    /// before applying their own lock / Back button, so the full close here can't undo them.
+    /// Without this the dialogue camera merely hides the book while it stays "open", leaving
+    /// its Back button and exit prompt on screen.
+    /// </summary>
+    private void OnCutsceneStateChanged(bool inCutscene)
+    {
+        if (!inCutscene || !IsOpen) return;
+        CloseGuidebook();
     }
 
     private void Update()

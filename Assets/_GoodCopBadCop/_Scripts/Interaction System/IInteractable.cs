@@ -87,6 +87,18 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     [Tooltip("Seconds to fade a persistent highlight in / out when crossing its visible range.")]
     [SerializeField, Min(0f)] private float holdHighlightFadeDuration = 0.5f;
 
+    [Header("Persistent Highlight Pulse")]
+    [Tooltip("Full pulse cycles per second for persistent (objective) highlights. 0 = no pulse (fixed). Hover never pulses.")]
+    [SerializeField, Min(0f)] private float holdHighlightPulseSpeed = 0.6f;
+    [Tooltip("Lowest outline/glow intensity in the pulse, as a fraction of the authored intensity (1 = no visible pulse).")]
+    [SerializeField, Range(0.05f, 1f)] private float holdHighlightPulseMinIntensity = 0.35f;
+
+    // Authored effect intensities, scaled by the pulse and restored when the hold ends.
+    private bool _authoredIntensityCached;
+    private float _authoredOutline;
+    private float _authoredGlow;
+    private bool _pulseApplied;
+
     /// <summary>Extra distance past the range before an in-range glow fades out, so it doesn't flicker at the boundary.</summary>
     private const float HoldRangeHysteresis = 1f;
 
@@ -182,6 +194,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         highlightEffect.enabled = true;
         highlightEffect.highlighted = false;
         CacheAuthoredFade();
+        CacheAuthoredIntensity();
 
         if (!string.IsNullOrEmpty(highlightNameFilter))
             highlightEffect.effectNameFilter = highlightNameFilter;
@@ -259,6 +272,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         else if (!hasHold && hadHold)
         {
             HoldHighlightRangeDriver.Untrack(this);
+            RestoreAuthoredIntensity();
         }
 
         if (IsHoldHighlightVisible == wasVisible) return;
@@ -280,6 +294,52 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
         if (IsHoldHighlightVisible == wasVisible) return;
         ApplyHoldHighlightVisual(true);
+    }
+
+    /// <summary>
+    /// Called each frame by <see cref="HoldHighlightRangeDriver"/> while a hold is claimed. Gently pulses
+    /// the outline (and glow, if authored) between <see cref="holdHighlightPulseMinIntensity"/> and the
+    /// authored intensity so objective call-outs read differently from the steady hover highlight.
+    /// All objects share one phase (driven by <paramref name="time"/>) so multiple objectives breathe together.
+    /// Intensities stay above zero, so HighlightPlus never rebuilds its materials mid-pulse.
+    /// </summary>
+    public void UpdateHoldHighlightPulse(float time)
+    {
+        if (highlightEffect == null) return;
+
+        if (!IsHoldHighlightActive || holdHighlightPulseSpeed <= 0f)
+        {
+            RestoreAuthoredIntensity();
+            return;
+        }
+
+        CacheAuthoredIntensity();
+
+        float wave = 0.5f + 0.5f * Mathf.Sin(time * holdHighlightPulseSpeed * Mathf.PI * 2f);
+        float intensity = Mathf.Lerp(holdHighlightPulseMinIntensity, 1f, wave);
+
+        if (_authoredOutline > 0f) highlightEffect.outline = _authoredOutline * intensity;
+        if (_authoredGlow > 0f) highlightEffect.glow = _authoredGlow * intensity;
+        _pulseApplied = true;
+    }
+
+    private void CacheAuthoredIntensity()
+    {
+        if (_authoredIntensityCached || highlightEffect == null) return;
+
+        _authoredOutline = highlightEffect.outline;
+        _authoredGlow = highlightEffect.glow;
+        _authoredIntensityCached = true;
+    }
+
+    /// <summary>Puts the authored outline/glow back so hover renders at its normal, steady intensity.</summary>
+    private void RestoreAuthoredIntensity()
+    {
+        if (!_pulseApplied || highlightEffect == null) return;
+
+        highlightEffect.outline = _authoredOutline;
+        highlightEffect.glow = _authoredGlow;
+        _pulseApplied = false;
     }
 
     private bool ComputeHoldInRange(bool fallback)
