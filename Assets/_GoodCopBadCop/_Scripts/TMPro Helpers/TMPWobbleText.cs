@@ -5,36 +5,70 @@ using UnityEngine;
 [RequireComponent(typeof(TextMeshProUGUI))]
 public class TMPWobbleText : MonoBehaviour
 {
+    /// <summary>
+    /// Motion settings for one emphasis style. Motion is stepped (snaps to a new random pose
+    /// <see cref="stepRate"/> times per second, each glyph on its own offset clock), so the text
+    /// trembles and twitches instead of floating smoothly.
+    /// </summary>
+    [System.Serializable]
+    public class EmphasisStyle
+    {
+        [Tooltip("Tremor offset as a fraction of font size. Keep small; it's a nervous twitch, not a wave.")]
+        public float jitter = 0.012f;
+        [Tooltip("New tremor poses per second. Higher = more wiry and agitated.")]
+        public float stepRate = 14f;
+        [Tooltip("Max random tilt per glyph per step (degrees).")]
+        public float rotationJitter = 2f;
+        [Tooltip("Chance per glyph per step of a sudden larger twitch.")]
+        [Range(0f, 1f)] public float twitchChance = 0.015f;
+        [Tooltip("Twitch offset as a fraction of font size.")]
+        public float twitchAmount = 0.04f;
+        [Tooltip("Jitter multiplier at the moment a glyph is typed in, settling to 1.")]
+        public float settleBoost = 2.5f;
+        [Tooltip("Seconds for a freshly typed glyph to settle.")]
+        public float settleDuration = 0.15f;
+        [Tooltip("Chance per glyph per step of briefly darkening, like a failing bulb.")]
+        [Range(0f, 1f)] public float flickerChance = 0f;
+        [Tooltip("How much a flicker darkens the glyph (0 = none, 1 = black).")]
+        [Range(0f, 1f)] public float flickerDarken = 0.5f;
+    }
+
     [SerializeField] private TMPWobbleProfile profile;
     [SerializeField] private bool playOnEnable = true;
 
-    [Header("Keyword Emphasis")]
-    [Tooltip("Animate characters inside <link=\"kw\"> (authored as [[phrase]], see DialogueKeywordMarkup). " +
-             "Runs independently of the base wobble profile.")]
-    [SerializeField] private bool animateKeywords = true;
-    [Tooltip("Height of the travelling wave, as a fraction of font size.")]
-    [SerializeField] private float keywordWaveHeight = 0.07f;
-    [SerializeField] private float keywordWaveSpeed = 6f;
-    [Tooltip("Phase offset between neighbouring characters (radians); makes the wave travel through the phrase.")]
-    [SerializeField] private float keywordWavePhaseStep = 0.55f;
-    [Tooltip("Extra scale at the peak of the pulse (0.08 = 8% bigger).")]
-    [SerializeField] private float keywordPulseScale = 0.06f;
-    [SerializeField] private float keywordPulseSpeed = 3.5f;
-    [Tooltip("Colour the shimmer band blends toward as it sweeps across the phrase.")]
-    [SerializeField] private Color keywordShimmerColor = new Color(1f, 0.97f, 0.8f, 1f);
-    [SerializeField, Range(0f, 1f)] private float keywordShimmerStrength = 0.6f;
-    [SerializeField] private float keywordShimmerSpeed = 1.2f;
-    [Tooltip("Scale a keyword character starts at when it is typed in, settling back to 1.")]
-    [SerializeField] private float keywordPopScale = 1.6f;
-    [SerializeField] private float keywordPopDuration = 0.18f;
+    [Header("Emphasis ([[keyword]] / {{menace}}, see DialogueKeywordMarkup)")]
+    [Tooltip("Animate characters inside <link=\"kw\"> and <link=\"menace\">. Runs independently of the base wobble profile.")]
+    [SerializeField] private bool animateEmphasis = true;
+    [Tooltip("[[keyword]]: tutorial wording. Uneasy, low-amplitude tremor.")]
+    [SerializeField] private EmphasisStyle keywordStyle = new EmphasisStyle();
+    [Tooltip("{{menace}}: threatening wording. Harsh shake, twitches, flicker.")]
+    [SerializeField] private EmphasisStyle menaceStyle = new EmphasisStyle
+    {
+        jitter = 0.022f,
+        stepRate = 24f,
+        rotationJitter = 5f,
+        twitchChance = 0.05f,
+        twitchAmount = 0.08f,
+        settleBoost = 3f,
+        settleDuration = 0.2f,
+        flickerChance = 0.06f,
+        flickerDarken = 0.55f,
+    };
 
     /// <summary>
     /// Global switch for the Text Wobble accessibility setting. When <c>false</c>, every
     /// <see cref="TMPWobbleText"/> instance stops animating and its mesh is reset to the
     /// non-wobbled layout, regardless of individual <see cref="StartWobble"/>/<see cref="StopWobble"/> calls.
-    /// Keyword emphasis keeps its static bold/colour styling but stops moving.
+    /// Emphasised words keep their static bold/colour styling but stop moving.
     /// </summary>
     public static bool GlobalWobbleEnabled { get; set; } = true;
+
+    private struct EmphasisRange
+    {
+        public int Start;   // source-string index (inclusive)
+        public int End;     // source-string index (exclusive)
+        public bool Menace;
+    }
 
     private TextMeshProUGUI tmp;
     private bool isPlaying;
@@ -45,9 +79,9 @@ public class TMPWobbleText : MonoBehaviour
     private float[] randomPhaseX;
     private float[] randomPhaseY;
 
-    // Keyword emphasis state (source-string index ranges, robust to the typewriter's partial strings).
-    private string keywordScanText;
-    private readonly List<Vector2Int> keywordRanges = new List<Vector2Int>();
+    // Emphasis state (source-string index ranges, robust to the typewriter's partial strings).
+    private string emphasisScanText;
+    private readonly List<EmphasisRange> emphasisRanges = new List<EmphasisRange>();
     private readonly List<float> charAppearTimes = new List<float>();
 
     private void Awake()
@@ -75,16 +109,16 @@ public class TMPWobbleText : MonoBehaviour
         if (tmp == null || !tmp.enabled)
             return;
 
-        if (animateKeywords)
+        if (animateEmphasis)
             TrackCharacterAppearance(tmp.textInfo != null ? tmp.textInfo.characterCount : 0);
 
         string currentText = tmp.text ?? string.Empty;
         bool baseActive = isPlaying && profile != null;
-        bool keywordsActive = animateKeywords && ScanKeywords(currentText);
+        bool emphasisActive = animateEmphasis && ScanEmphasis(currentText);
 
-        if (!baseActive && !keywordsActive)
+        if (!baseActive && !emphasisActive)
         {
-            // Emphasis was drawn last frame but the keyword is gone; restore the clean mesh once.
+            // Emphasis was drawn last frame but is gone now; restore the clean mesh once.
             if (meshDirtyFromUs)
             {
                 tmp.ForceMeshUpdate();
@@ -115,7 +149,7 @@ public class TMPWobbleText : MonoBehaviour
             RegenerateRandomOffsets();
         }
 
-        ApplyWobble(baseActive, keywordsActive);
+        ApplyWobble(baseActive, emphasisActive);
     }
 
     public void SetProfile(TMPWobbleProfile newProfile, bool restartSeeds = true)
@@ -173,39 +207,54 @@ public class TMPWobbleText : MonoBehaviour
     }
 
     /// <summary>
-    /// Finds every <c>&lt;link="kw"&gt;</c> span in <paramref name="text"/> as source-index ranges.
+    /// Finds every keyword/menace link span in <paramref name="text"/> as source-index ranges.
     /// An unclosed span (typewriter mid-phrase) runs to the end of the string. Cached per text.
     /// </summary>
-    private bool ScanKeywords(string text)
+    private bool ScanEmphasis(string text)
     {
-        if (ReferenceEquals(text, keywordScanText) || text == keywordScanText)
-            return keywordRanges.Count > 0;
+        if (ReferenceEquals(text, emphasisScanText) || text == emphasisScanText)
+            return emphasisRanges.Count > 0;
 
-        keywordScanText = text;
-        keywordRanges.Clear();
+        emphasisScanText = text;
+        emphasisRanges.Clear();
+        ScanLinkId(text, DialogueKeywordMarkup.KeywordOpenTag, false);
+        ScanLinkId(text, DialogueKeywordMarkup.MenaceOpenTag, true);
+        return emphasisRanges.Count > 0;
+    }
 
+    private void ScanLinkId(string text, string openTag, bool menace)
+    {
         int search = 0;
         while (true)
         {
-            int open = text.IndexOf(DialogueKeywordMarkup.OpenLinkTag, search, System.StringComparison.Ordinal);
-            if (open < 0) break;
+            int open = text.IndexOf(openTag, search, System.StringComparison.Ordinal);
+            if (open < 0) return;
 
-            int start = open + DialogueKeywordMarkup.OpenLinkTag.Length;
+            int start = open + openTag.Length;
             int close = text.IndexOf(DialogueKeywordMarkup.CloseLinkTag, start, System.StringComparison.Ordinal);
-            int end = close < 0 ? text.Length : close;
-            keywordRanges.Add(new Vector2Int(start, end));
+            emphasisRanges.Add(new EmphasisRange { Start = start, End = close < 0 ? text.Length : close, Menace = menace });
 
-            if (close < 0) break;
+            if (close < 0) return;
             search = close + DialogueKeywordMarkup.CloseLinkTag.Length;
         }
+    }
 
-        return keywordRanges.Count > 0;
+    /// <summary>Returns the style for a source index, or null if it isn't emphasised.</summary>
+    private EmphasisStyle GetEmphasisStyle(int sourceIndex)
+    {
+        for (int i = 0; i < emphasisRanges.Count; i++)
+        {
+            EmphasisRange r = emphasisRanges[i];
+            if (sourceIndex >= r.Start && sourceIndex < r.End)
+                return r.Menace ? menaceStyle : keywordStyle;
+        }
+        return null;
     }
 
     /// <summary>
-    /// Records when each character first appeared so keyword characters can pop in as they're typed.
+    /// Records when each character first appeared so emphasised glyphs can jolt as they're typed.
     /// The typewriter only ever grows a prefix, so existing indices stay stable; a shrink means new text.
-    /// Text that arrives all at once (not typed) gets no pop.
+    /// Text that arrives all at once (not typed) gets no settle jolt.
     /// </summary>
     private void TrackCharacterAppearance(int charCount)
     {
@@ -217,17 +266,22 @@ public class TMPWobbleText : MonoBehaviour
             charAppearTimes.Add(appearTime);
     }
 
-    private bool IsKeywordSourceIndex(int sourceIndex)
+    /// <summary>Deterministic, allocation-free hash to [0, 1).</summary>
+    private static float Hash01(int a, int b, int salt)
     {
-        for (int i = 0; i < keywordRanges.Count; i++)
+        unchecked
         {
-            if (sourceIndex >= keywordRanges[i].x && sourceIndex < keywordRanges[i].y)
-                return true;
+            uint h = (uint)a * 0x8DA6B343u ^ (uint)b * 0xD8163841u ^ (uint)salt * 0xCB1AB31Fu;
+            h ^= h >> 13;
+            h *= 0x5BD1E995u;
+            h ^= h >> 15;
+            return (h & 0xFFFFFFu) / 16777216f;
         }
-        return false;
     }
 
-    private void ApplyWobble(bool baseActive, bool keywordsActive)
+    private static float HashSigned(int a, int b, int salt) => Hash01(a, b, salt) * 2f - 1f;
+
+    private void ApplyWobble(bool baseActive, bool emphasisActive)
     {
         tmp.ForceMeshUpdate();
 
@@ -238,7 +292,6 @@ public class TMPWobbleText : MonoBehaviour
 
         float baseTime = baseActive ? Time.time * profile.speed : 0f;
         float fontSize = tmp.fontSize;
-        Color32 shimmer = keywordShimmerColor;
         bool colorsChanged = false;
 
         for (int charIndex = 0; charIndex < charCount; charIndex++)
@@ -247,8 +300,8 @@ public class TMPWobbleText : MonoBehaviour
             if (!charInfo.isVisible)
                 continue;
 
-            bool isKeyword = keywordsActive && IsKeywordSourceIndex(charInfo.index);
-            if (!baseActive && !isKeyword)
+            EmphasisStyle style = emphasisActive ? GetEmphasisStyle(charInfo.index) : null;
+            if (!baseActive && style == null)
                 continue;
 
             int meshIndex = charInfo.materialReferenceIndex;
@@ -271,39 +324,41 @@ public class TMPWobbleText : MonoBehaviour
                 offset += new Vector3(x + noiseX, y + noiseY, 0f);
             }
 
-            if (isKeyword)
-            {
-                // Travelling wave + breathing scale + pop-in, all around the glyph centre.
-                float wave = Mathf.Sin(now * keywordWaveSpeed - charIndex * keywordWavePhaseStep);
-                offset.y += wave * keywordWaveHeight * fontSize;
-
-                float pulse = 1f + keywordPulseScale * (0.5f + 0.5f * Mathf.Sin(now * keywordPulseSpeed));
-                float popT = keywordPopDuration > 0f ? Mathf.Clamp01((now - charAppearTimes[charIndex]) / keywordPopDuration) : 1f;
-                float pop = Mathf.LerpUnclamped(keywordPopScale, 1f, 1f - (1f - popT) * (1f - popT) * (1f - popT));
-                float scale = pulse * pop;
-
-                Vector3 center = (vertices[vertexIndex + 0] + vertices[vertexIndex + 2]) * 0.5f;
-                for (int v = 0; v < 4; v++)
-                    vertices[vertexIndex + v] = center + (vertices[vertexIndex + v] - center) * scale + offset;
-
-                // Shimmer band sweeping left-to-right across the phrase.
-                float band = Mathf.Sin(now * keywordShimmerSpeed * Mathf.PI * 2f - charIndex * 0.45f);
-                float blend = Mathf.Clamp01(band) * keywordShimmerStrength;
-                if (blend > 0f)
-                {
-                    Color32[] colors = textInfo.meshInfo[meshIndex].colors32;
-                    for (int v = 0; v < 4; v++)
-                    {
-                        Color32 c = colors[vertexIndex + v];
-                        colors[vertexIndex + v] = Color32.Lerp(c, new Color32(shimmer.r, shimmer.g, shimmer.b, c.a), blend);
-                    }
-                    colorsChanged = true;
-                }
-            }
-            else
+            if (style == null)
             {
                 for (int v = 0; v < 4; v++)
                     vertices[vertexIndex + v] += offset;
+                continue;
+            }
+
+            // Each glyph snaps to a new pose on its own offset clock, so they never move in unison.
+            int step = Mathf.FloorToInt(now * style.stepRate + Hash01(charIndex, 0, 9));
+
+            float sinceAppear = now - charAppearTimes[charIndex];
+            float settleT = style.settleDuration > 0f ? Mathf.Clamp01(sinceAppear / style.settleDuration) : 1f;
+            float settle = Mathf.Lerp(style.settleBoost, 1f, settleT);
+
+            float amp = style.jitter * fontSize * settle;
+            offset += new Vector3(HashSigned(charIndex, step, 1), HashSigned(charIndex, step, 2), 0f) * amp;
+
+            if (Hash01(charIndex, step, 3) < style.twitchChance)
+                offset += new Vector3(HashSigned(charIndex, step, 4), HashSigned(charIndex, step, 5), 0f) * (style.twitchAmount * fontSize);
+
+            Quaternion tilt = Quaternion.Euler(0f, 0f, HashSigned(charIndex, step, 6) * style.rotationJitter * settle);
+            Vector3 center = (vertices[vertexIndex + 0] + vertices[vertexIndex + 2]) * 0.5f;
+            for (int v = 0; v < 4; v++)
+                vertices[vertexIndex + v] = center + tilt * (vertices[vertexIndex + v] - center) + offset;
+
+            if (style.flickerChance > 0f && Hash01(charIndex, step, 7) < style.flickerChance)
+            {
+                float keep = 1f - style.flickerDarken;
+                Color32[] colors = textInfo.meshInfo[meshIndex].colors32;
+                for (int v = 0; v < 4; v++)
+                {
+                    Color32 c = colors[vertexIndex + v];
+                    colors[vertexIndex + v] = new Color32((byte)(c.r * keep), (byte)(c.g * keep), (byte)(c.b * keep), c.a);
+                }
+                colorsChanged = true;
             }
         }
 

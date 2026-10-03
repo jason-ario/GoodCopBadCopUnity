@@ -62,8 +62,23 @@ public class CheckpointIntegrityBar : StatBar
     private Outline[] _squareOutlines;
     private Color _panelAuthoredColor = Color.white;
     private bool _isInitialized;
+    private bool _isPreview;
 
     private void Awake() => Initialize();
+
+    /// <summary>
+    /// Turns this instance into a static display copy (e.g. the guidebook's printed panel): it no
+    /// longer hides itself or listens to <see cref="CheckpointIntegrityService"/>. Call before the
+    /// copy is first enabled, then use <see cref="ShowPreview"/>.
+    /// </summary>
+    public void MarkAsPreview() => _isPreview = true;
+
+    /// <summary>Renders a fixed normalized score (0-1) with the HUD's colors. Preview copies only.</summary>
+    public void ShowPreview(float normalizedScore)
+    {
+        _isPreview = true;
+        UpdateIntegrityDisplay(Mathf.Clamp01(normalizedScore), 1f);
+    }
 
     private void Initialize()
     {
@@ -90,6 +105,7 @@ public class CheckpointIntegrityBar : StatBar
 
     private void OnEnable()
     {
+        if (_isPreview) return;
         // Day 1 keeps the integrity system disabled, so the bar has nothing meaningful to show
         // yet — hide immediately rather than displaying a static 100% bar. Day_01 calls
         // CheckpointIntegrityService.SetEnabled(true) and Show() together right when the

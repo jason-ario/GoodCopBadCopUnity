@@ -37,6 +37,8 @@ public class GuidebookChartView : MonoBehaviour
     private const float CaptionGap  = 4f;
     private const float TableGap    = 14f;
     private const float MinRowScale = 0.6f;
+    // Rows may grow past their nominal height to use leftover page space.
+    private const float MaxRowScale = 1.4f;
 
     private float _rowHeight      = 34f;
     private float _headerHeight   = 34f;
@@ -99,7 +101,7 @@ public class GuidebookChartView : MonoBehaviour
         if (calloutHeight > 0f && tableCount > 0) fixedHeight += TableGap;
 
         float rowScale = rowsHeight > 0f
-            ? Mathf.Clamp((availableHeight - fixedHeight) / rowsHeight, MinRowScale, 1f)
+            ? Mathf.Clamp((availableHeight - fixedHeight) / rowsHeight, MinRowScale, MaxRowScale)
             : 1f;
 
         float y = 0f;

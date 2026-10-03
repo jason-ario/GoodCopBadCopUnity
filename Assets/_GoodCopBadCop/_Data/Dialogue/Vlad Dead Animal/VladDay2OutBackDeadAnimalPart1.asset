@@ -12,10 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
   m_Name: VladDay2OutBackDeadAnimalPart1
   m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 0
   nodes:
   - type: 0
-    npcLine: There's been a lot of these popping up since the incident.
+    npcLine: There's been a lot of these popping up {{since the incident}}.
     animationTrigger: TalkPoint
     cameraTrigger: DeadAnimal
     wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
     choices: []

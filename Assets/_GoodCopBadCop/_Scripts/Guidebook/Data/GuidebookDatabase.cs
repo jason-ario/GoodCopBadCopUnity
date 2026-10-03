@@ -107,7 +107,7 @@ public class GuidebookDatabase : ScriptableObject
     [Tooltip("Pages of the Checkpoint Integrity section. " + IntegrityMaxDeductionToken +
              " in a body is replaced with the live maximum payout deduction (e.g. 50).")]
     [SerializeField] private RulePage[] _integrityPages = DefaultIntegrityPages();
-    [Tooltip("Art and example values for the HUD panel copy on pages with Show Integrity Panel.")]
+    [Tooltip("Example state of the HUD panel copy on pages with Show Integrity Panel (the art is copied from the scene's HUD).")]
     [SerializeField] private GuidebookIntegrityPanel _integrityPanel = new GuidebookIntegrityPanel();
 
     [Header("Rules Section")]
@@ -191,9 +191,9 @@ public class GuidebookDatabase : ScriptableObject
     public const string IntegrityChoresBody = "Clear every mess to keep integrity at 100%.";
 
     public const string IntegrityBody =
-        "Your pay is multiplied by the checkpoint's integrity, shown on this panel. Below 100%, the difference is " +
-        "deducted from your earnings, up to " + IntegrityMaxDeductionToken + "%. " +
-        "The counters show what's left to clean; your compass marks every mess.";
+        "Your pay is multiplied by the checkpoint's integrity, shown on this panel.\n\n" +
+        "Below 100%, the difference is deducted from your earnings, up to " + IntegrityMaxDeductionToken + "%.\n\n" +
+        "The counters show what's left to clean. Your compass marks every mess.";
 
     /// <summary>
     /// Resolves the category of an anomaly entry from its C# base class.

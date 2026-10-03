@@ -68,7 +68,82 @@ public class GuidebookFaceView : MonoBehaviour
 
     [Header("Integrity Panel")]
     [Tooltip("Width of the printed HUD integrity panel as a fraction of the image slot width.")]
-    [SerializeField, Range(0.3f, 1f)] private float _panelWidthFraction = 0.8f;
+    [SerializeField, Range(0.3f, 1f)] private float _panelWidthFraction = 0.85f;
+
+    [Header("Spreading Sparse Pages")]
+    [Tooltip("Text-only pages: largest extra paragraph spacing (TMP units, 100 = 1 em) used to fill the page.")]
+    [SerializeField, Min(0f)] private float _maxParagraphSpread = 90f;
+    [Tooltip("Chart / list pages: largest extra gap inserted between blocks to use leftover space.")]
+    [SerializeField, Min(0f)] private float _maxBlockSpread = 60f;
+
+    private readonly System.Collections.Generic.List<System.Collections.Generic.List<RectTransform>> _blocks =
+        new System.Collections.Generic.List<System.Collections.Generic.List<RectTransform>>();
+    private float _authoredParagraphSpacing = float.NaN;
+
+    private void AddBlock(RectTransform rt)
+    {
+        _blocks.Add(new System.Collections.Generic.List<RectTransform> { rt });
+    }
+
+    private void AddRowBlock()
+    {
+        var block = new System.Collections.Generic.List<RectTransform>();
+        foreach (Image img in _rowImages)
+            if (img != null && img.gameObject.activeSelf) block.Add(img.rectTransform);
+        _blocks.Add(block);
+    }
+
+    /// <summary>
+    /// Moves blocks down so the leftover space is shared evenly between the gaps between blocks
+    /// and the space at the bottom (each gap grows by at most <see cref="_maxBlockSpread"/>).
+    /// </summary>
+    private void SpreadBlocks(float leftover)
+    {
+        int count = _blocks.Count;
+        if (count < 2 || leftover <= 0f) return;
+
+        float extra = Mathf.Min(leftover / count, _maxBlockSpread);
+        for (int i = 1; i < count; i++)
+            foreach (RectTransform rt in _blocks[i])
+            {
+                if (rt == null) continue;
+                Vector2 pos = rt.anchoredPosition;
+                pos.y -= extra * i;
+                rt.anchoredPosition = pos;
+            }
+    }
+
+    private void ResetBodySpacing()
+    {
+        if (float.IsNaN(_authoredParagraphSpacing)) _authoredParagraphSpacing = _body.paragraphSpacing;
+        _body.paragraphSpacing = _authoredParagraphSpacing;
+    }
+
+    /// <summary>
+    /// Raises the body's paragraph spacing (space after each line break) until the text nearly
+    /// fills <paramref name="height"/>, so short text-only pages read as a full page.
+    /// </summary>
+    private void SpreadBodyToFill(string body, float height)
+    {
+        if (string.IsNullOrEmpty(body) || height <= 0f || body.IndexOf('\n') < 0) return;
+
+        float width  = _body.rectTransform.rect.width;
+        float target = height * 0.94f;
+        if (_body.GetPreferredValues(body, width, 10000f).y >= target) return;
+
+        float lo = _authoredParagraphSpacing, hi = _authoredParagraphSpacing + _maxParagraphSpread;
+        _body.paragraphSpacing = hi;
+        if (_body.GetPreferredValues(body, width, 10000f).y <= target) return; // capped
+
+        for (int i = 0; i < 8; i++)
+        {
+            float mid = (lo + hi) * 0.5f;
+            _body.paragraphSpacing = mid;
+            if (_body.GetPreferredValues(body, width, 10000f).y <= target) lo = mid;
+            else hi = mid;
+        }
+        _body.paragraphSpacing = lo;
+    }
 
     private GuidebookChartView _chart;
     private GuidebookIntegrityPanelView _panel;
@@ -167,15 +242,26 @@ public class GuidebookFaceView : MonoBehaviour
         bool fitBody  = hasChart || hasList;
         string body   = content.IsBlank ? BuildNotesLines() : content.Body;
 
+        // Every element placed below is recorded as a block so leftover page space can be
+        // spread between them afterwards (instead of everything bunching up at the top).
+        _blocks.Clear();
+        float blockBottom = cursor;
+
         GuidebookIntegrityPanelView panel = hasPanel ? GetOrCreatePanel() : _panel;
         if (panel != null)
         {
             if (hasPanel)
             {
                 float width = _image.rectTransform.sizeDelta.x * _panelWidthFraction;
-                PlaceTop((RectTransform)panel.transform, cursor, 0f);
-                panel.Build(content.IntegrityPanel, width);
-                cursor -= GuidebookIntegrityPanelView.HeightFor(width) + _gap * 1.5f;
+                var panelRect = (RectTransform)panel.transform;
+                PlaceTop(panelRect, cursor, 0f);
+                float used = panel.Build(content.IntegrityPanel, width);
+                if (used > 0f)
+                {
+                    AddBlock(panelRect);
+                    blockBottom = cursor - used;
+                    cursor = blockBottom - _gap * 1.5f;
+                }
             }
             else
             {
@@ -197,14 +283,17 @@ public class GuidebookFaceView : MonoBehaviour
                 if (hasRow)
                 {
                     imageHeight = LayoutImageRow(content.ImageRow, cursor, imageHeight);
+                    AddRowBlock();
                 }
                 else
                 {
                     _image.sprite = content.Image;
                     _image.preserveAspect = true;
                     PlaceTop(_image.rectTransform, cursor, imageHeight);
+                    AddBlock(_image.rectTransform);
                 }
-                cursor -= imageHeight + _gap;
+                blockBottom = cursor - imageHeight;
+                cursor = blockBottom - _gap;
             }
         }
 
@@ -215,13 +304,16 @@ public class GuidebookFaceView : MonoBehaviour
             {
                 _badge.color = accent;
                 PlaceTop(_badge.rectTransform, cursor, _badgeHeight);
-                cursor -= _badgeHeight + _gap;
+                AddBlock(_badge.rectTransform);
+                blockBottom = cursor - _badgeHeight;
+                cursor = blockBottom - _gap;
             }
         }
 
         if (_body != null)
         {
             SetText(_body, body);
+            ResetBodySpacing();
             float bodyHeight = Mathf.Max(0f, cursor - _bodyBottom);
             if (fitBody)
             {
@@ -229,8 +321,18 @@ public class GuidebookFaceView : MonoBehaviour
                     ? 0f
                     : Mathf.Min(bodyHeight, _body.GetPreferredValues(body, _body.rectTransform.rect.width, 10000f).y + 4f);
             }
+            else if (!content.IsBlank && !hasImage)
+            {
+                // Text-only pages: open the paragraphs up so the text fills the page.
+                SpreadBodyToFill(body, bodyHeight);
+            }
             PlaceTop(_body.rectTransform, cursor, bodyHeight);
-            if (fitBody && bodyHeight > 0f) cursor -= bodyHeight + _gap * 1.5f;
+            if (fitBody && bodyHeight > 0f)
+            {
+                AddBlock(_body.rectTransform);
+                blockBottom = cursor - bodyHeight;
+                cursor = blockBottom - _gap * 1.5f;
+            }
         }
 
         GuidebookIconListView list = hasList ? GetOrCreateIconList() : _iconList;
@@ -238,9 +340,12 @@ public class GuidebookFaceView : MonoBehaviour
         {
             if (hasList)
             {
-                PlaceTop((RectTransform)list.transform, cursor, 0f);
+                var listRect = (RectTransform)list.transform;
+                PlaceTop(listRect, cursor, 0f);
                 float used = list.Build(content.IconList, Mathf.Max(0f, cursor - _bodyBottom));
-                cursor -= used + _gap * 1.5f;
+                AddBlock(listRect);
+                blockBottom = cursor - used;
+                cursor = blockBottom - _gap * 1.5f;
             }
             else
             {
@@ -253,14 +358,19 @@ public class GuidebookFaceView : MonoBehaviour
         {
             if (hasChart)
             {
-                PlaceTop((RectTransform)chart.transform, cursor, 0f);
-                chart.Build(content.Tables, content.Callout, Mathf.Max(0f, cursor - _bodyBottom));
+                var chartRect = (RectTransform)chart.transform;
+                PlaceTop(chartRect, cursor, 0f);
+                float used = chart.Build(content.Tables, content.Callout, Mathf.Max(0f, cursor - _bodyBottom));
+                AddBlock(chartRect);
+                blockBottom = cursor - used;
             }
             else
             {
                 chart.Clear();
             }
         }
+
+        if (fitBody) SpreadBlocks(blockBottom - _bodyBottom);
 
         SetText(_footer, content.PageNumber > 0 ? $"- {content.PageNumber} -" : null);
 

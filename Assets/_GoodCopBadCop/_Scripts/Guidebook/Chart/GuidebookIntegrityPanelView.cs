@@ -2,63 +2,41 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-/// <summary>
-/// Art and example values for the printed copy of the HUD's Checkpoint Integrity panel
-/// (<see cref="CheckpointIntegrityBar"/> + maintenance rows) shown on the guidebook's integrity page.
-/// </summary>
+/// <summary>Example state shown by the guidebook's printed copy of the HUD Checkpoint Integrity panel.</summary>
 [Serializable]
 public class GuidebookIntegrityPanel
 {
-    [Tooltip("Panel frame (the HUD uses 'HUD/Slice/Tasks panel'). Drawn 9-sliced.")]
-    public Sprite Background;
-    public Sprite FenceIcon;
-    public Sprite TrashIcon;
-    public Sprite GraffitiIcon;
-
-    [Header("Example State")]
-    [Range(0, 100)] public int Percent = 70;
-    [Min(0)] public int FenceCount    = 1;
-    [Min(0)] public int TrashCount    = 2;
-    [Min(0)] public int GraffitiCount = 1;
+    [Range(0, 100)] public int Percent = 100;
+    [Min(0)] public int FenceCount;
+    [Min(0)] public int TrashCount;
+    [Min(0)] public int GraffitiCount;
 }
 
 /// <summary>
-/// Redraws the HUD's Checkpoint Integrity panel on a guidebook face: frame, title, percentage,
-/// ten integrity squares and the fence / trash / graffiti counters. Laid out in the HUD's own
-/// 300 x 136 units and scaled to the requested width. Images reuse the face illustration's lit
-/// material and text reuses the body font's lit material, so the panel is lit like the page.
+/// Prints the real HUD Checkpoint Integrity panel onto a guidebook face. The first build copies the
+/// scene's <see cref="CheckpointIntegrityBar"/> panel (frame, fonts, squares, counters), strips its
+/// live-data behaviours, and swaps every material for a lit one (images: the face illustration's lit
+/// material; text: the page font's lit material re-pointed at each font's atlas), so it looks like
+/// the HUD but is lit like the page. The copy's own <see cref="CheckpointIntegrityBar"/> renders the
+/// example score with the HUD's colors via <see cref="CheckpointIntegrityBar.ShowPreview"/>.
 /// Created at runtime by <see cref="GuidebookFaceView"/>.
 /// </summary>
 [RequireComponent(typeof(RectTransform))]
 public class GuidebookIntegrityPanelView : MonoBehaviour
 {
-    // HUD reference layout (CheckpointIntegrityPanel in the Player HUD).
-    private const float RefWidth  = 300f;
-    private const float RefHeight = 136f;
-    private const int   Squares   = 10;
-
-    private static readonly Color TitleColor    = new Color(0.906f, 0.78f, 0.58f, 1f);
-    private static readonly Color BarBackColor  = new Color(0f, 0f, 0f, 0.55f);
-    private static readonly Color GoodColor     = new Color(0.75f, 0.82f, 0.25f, 1f);
-    private static readonly Color WarningColor  = new Color(1f, 0.85f, 0.1f, 1f);
-    private static readonly Color CriticalColor = new Color(0.9f, 0.12f, 0.1f, 1f);
-    private static readonly Color EmptyGood     = new Color(0.18f, 0.19f, 0.08f, 1f);
-    private static readonly Color EmptyWarning  = new Color(0.24f, 0.19f, 0.04f, 1f);
-    private static readonly Color EmptyCritical = new Color(0.26f, 0.05f, 0.04f, 1f);
-    private static readonly Color PanelWarning  = new Color(1f, 0.88f, 0.6f, 1f);
-    private static readonly Color PanelCritical = new Color(0.85f, 0.38f, 0.34f, 1f);
-
-    private readonly List<Image>           _images = new List<Image>();
-    private readonly List<TextMeshProUGUI> _texts  = new List<TextMeshProUGUI>();
-    private int _imageCursor;
-    private int _textCursor;
+    private static readonly Dictionary<(TMP_FontAsset, Material), Material> s_litFontMaterials =
+        new Dictionary<(TMP_FontAsset, Material), Material>();
 
     private TMP_Text _style;
     private Material _imageMaterial;
-    private float    _scale = 1f;
-    private float    _width;
+
+    private RectTransform          _copy;
+    private CheckpointIntegrityBar _bar;
+    private TMP_Text _fenceCount, _trashCount, _graffitiCount;
+    private bool _searched;
 
     private RectTransform Rect => (RectTransform)transform;
 
@@ -68,147 +46,144 @@ public class GuidebookIntegrityPanelView : MonoBehaviour
         _imageMaterial = imageMaterial;
     }
 
-    /// <summary>Height the panel takes at <paramref name="width"/>.</summary>
-    public static float HeightFor(float width) => width * RefHeight / RefWidth;
+    public void Clear() => gameObject.SetActive(false);
 
-    public void Clear()
-    {
-        _imageCursor = _textCursor = 0;
-        HideUnused();
-        gameObject.SetActive(false);
-    }
-
-    public void Build(GuidebookIntegrityPanel panel, float width)
+    /// <summary>Shows the panel at <paramref name="width"/>; returns its height (0 if there is no HUD panel to copy).</summary>
+    public float Build(GuidebookIntegrityPanel state, float width)
     {
         gameObject.SetActive(true);
-        _imageCursor = _textCursor = 0;
-        _width = width;
-        _scale = width / RefWidth;
-        Rect.sizeDelta = new Vector2(width, HeightFor(width));
-
-        float n = Mathf.Clamp01(panel.Percent / 100f);
-        Color fill  = n >= 0.9f ? GoodColor : n >= 0.6f ? WarningColor : CriticalColor;
-        Color empty = n >= 0.9f ? EmptyGood : n >= 0.6f ? EmptyWarning : EmptyCritical;
-        Color tint  = n >= 0.9f ? Color.white : n >= 0.6f ? PanelWarning : PanelCritical;
-
-        // Frame
-        Image frame = PlaceImage(panel.Background, 0f, 0f, RefWidth, RefHeight, tint);
-        frame.type = panel.Background != null && panel.Background.border.sqrMagnitude > 0f
-            ? Image.Type.Sliced : Image.Type.Simple;
-        frame.pixelsPerUnitMultiplier = 1f / Mathf.Max(0.01f, _scale);
-
-        // Title + score bar
-        PlaceText("CHECKPOINT INTEGRITY", 12f, 10f, RefWidth - 24f, 26f, 21f, TitleColor, TextAlignmentOptions.Center);
-        PlaceText($"{panel.Percent}%", 14f, 40f, 58f, 34f, 22f, n >= 0.9f ? Color.white : fill, TextAlignmentOptions.MidlineLeft);
-
-        const float barX = 76f, barY = 47f, barW = 208f, barH = 20f, sq = 12f, pad = 5f;
-        PlaceImage(null, barX, barY, barW, barH, BarBackColor);
-        int filled = Mathf.RoundToInt(n * Squares);
-        float step = (barW - pad * 2f - sq) / (Squares - 1);
-        for (int i = 0; i < Squares; i++)
-            PlaceImage(null, barX + pad + i * step, barY + (barH - sq) * 0.5f, sq, sq, i < filled ? fill : empty);
-
-        // Maintenance counters (HUD order: fence, trash, graffiti)
-        const float rowY = 86f, icon = 26f, countW = 22f, groupGap = 34f;
-        float groupW = icon + 6f + countW;
-        float x = (RefWidth - (groupW * 3f + groupGap * 2f)) * 0.5f;
-        PlaceCounter(panel.FenceIcon,    panel.FenceCount,    x, rowY, icon, countW); x += groupW + groupGap;
-        PlaceCounter(panel.TrashIcon,    panel.TrashCount,    x, rowY, icon, countW); x += groupW + groupGap;
-        PlaceCounter(panel.GraffitiIcon, panel.GraffitiCount, x, rowY, icon, countW);
-
-        HideUnused();
-    }
-
-    private void PlaceCounter(Sprite sprite, int count, float x, float y, float icon, float countW)
-    {
-        Image img = PlaceImage(sprite, x, y, icon, icon, TitleColor);
-        img.preserveAspect = true;
-        PlaceText(count.ToString(), x + icon + 6f, y, countW, icon, 18f, TitleColor, TextAlignmentOptions.MidlineLeft);
-    }
-
-    // ── Elements (positions in HUD reference units, top-left origin) ─────────
-
-    private Image PlaceImage(Sprite sprite, float x, float y, float w, float h, Color color)
-    {
-        Image img;
-        if (_imageCursor < _images.Count)
+        if (!EnsureCopy())
         {
-            img = _images[_imageCursor];
+            gameObject.SetActive(false);
+            return 0f;
         }
-        else
-        {
-            img = CreateChild("Panel Image").AddComponent<Image>();
-            img.raycastTarget = false;
-            _images.Add(img);
-        }
-        _imageCursor++;
 
-        img.material       = _imageMaterial;
-        img.sprite         = sprite;
-        img.type           = Image.Type.Simple;
-        img.preserveAspect = false;
-        img.color          = color;
-        img.gameObject.SetActive(true);
-        Place(img.rectTransform, x, y, w, h);
-        return img;
+        Vector2 size = _copy.rect.size;
+        float scale = size.x > 0f ? width / size.x : 1f;
+        _copy.localScale = new Vector3(scale, scale, 1f);
+        Rect.sizeDelta = new Vector2(width, size.y * scale);
+
+        SetCount(_fenceCount,    state.FenceCount);
+        SetCount(_trashCount,    state.TrashCount);
+        SetCount(_graffitiCount, state.GraffitiCount);
+        if (_bar != null) _bar.ShowPreview(state.Percent / 100f);
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(_copy);
+        return size.y * scale;
     }
 
-    private void PlaceText(string value, float x, float y, float w, float h, float size, Color color,
-                           TextAlignmentOptions align)
+    private static void SetCount(TMP_Text text, int count)
     {
-        TextMeshProUGUI text;
-        if (_textCursor < _texts.Count)
-        {
-            text = _texts[_textCursor];
-        }
-        else
-        {
-            text = CreateChild("Panel Text").AddComponent<TextMeshProUGUI>();
-            text.raycastTarget = false;
-            text.richText = true;
-            text.textWrappingMode = TextWrappingModes.NoWrap;
-            text.overflowMode = TextOverflowModes.Overflow;
-            text.margin = Vector4.zero;
-            _texts.Add(text);
-        }
-        _textCursor++;
-
-        if (_style != null)
-        {
-            text.font = _style.font;
-            text.fontSharedMaterial = _style.fontSharedMaterial;
-        }
-        text.text = $"<b>{value}</b>";
-        text.alignment = align;
-        text.color = color;
-        text.enableAutoSizing = true;
-        text.fontSizeMax = size * _scale;
-        text.fontSizeMin = size * _scale * 0.5f;
-        text.fontSize = size * _scale;
-        text.gameObject.SetActive(true);
-        Place(text.rectTransform, x, y, w, h);
+        if (text != null) text.text = count.ToString();
     }
 
-    private void Place(RectTransform rt, float x, float y, float w, float h)
+    // ── Copy ──────────────────────────────────────────────────────────────────
+
+    private bool EnsureCopy()
     {
-        rt.anchoredPosition = new Vector2(x * _scale - _width * 0.5f, -y * _scale);
-        rt.sizeDelta = new Vector2(w * _scale, h * _scale);
+        if (_copy != null) return true;
+        if (_searched) return false;
+        _searched = true;
+
+        CheckpointIntegrityBar source = FindFirstObjectByType<CheckpointIntegrityBar>(FindObjectsInactive.Include);
+        if (source == null)
+        {
+            Debug.LogWarning("[GuidebookIntegrityPanelView] No CheckpointIntegrityBar in the scene to copy; the guidebook panel is hidden.", this);
+            return false;
+        }
+
+        // Instantiate under an inactive holder so no Awake/OnEnable runs before the copy is cleaned up.
+        var holder = new GameObject("Integrity Panel Holder", typeof(RectTransform));
+        holder.SetActive(false);
+        holder.transform.SetParent(transform, false);
+
+        GameObject copy = Instantiate(source.gameObject, holder.transform, false);
+        copy.name = "HUD Panel Copy";
+        copy.SetActive(true);
+
+        StripBehaviours(copy);
+        _bar = copy.GetComponent<CheckpointIntegrityBar>();
+        if (_bar != null) _bar.MarkAsPreview();
+
+        int layer = gameObject.layer;
+        foreach (Transform t in copy.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer;
+
+        foreach (Graphic g in copy.GetComponentsInChildren<Graphic>(true))
+        {
+            g.raycastTarget = false;
+            if (g is TMP_Text text) text.fontSharedMaterial = LitFontMaterial(text.font);
+            else if (_imageMaterial != null) g.material = _imageMaterial;
+        }
+
+        // Counters: always show every row (the HUD may hide finished categories).
+        _fenceCount    = FindCount(copy.transform, "Fence Row");
+        _trashCount    = FindCount(copy.transform, "Trash Row");
+        _graffitiCount = FindCount(copy.transform, "Graffiti Row");
+
+        _copy = (RectTransform)copy.transform;
+        Vector2 hudSize = ((RectTransform)source.transform).rect.size; // may be stretched by the HUD layout
+        _copy.SetParent(transform, false);
+        _copy.anchorMin = _copy.anchorMax = new Vector2(0.5f, 1f);
+        _copy.pivot = new Vector2(0.5f, 1f);
+        _copy.sizeDelta = hudSize;
+        _copy.anchoredPosition = Vector2.zero;
+        _copy.localRotation = Quaternion.identity;
+        Destroy(holder);
+        return true;
     }
 
-    private GameObject CreateChild(string childName)
+    /// <summary>Removes gameplay/HUD scripts, keeping UI graphics, layout and mesh effects.</summary>
+    private static void StripBehaviours(GameObject root)
     {
-        var go = new GameObject(childName, typeof(RectTransform));
-        go.layer = gameObject.layer;
-        var rt = (RectTransform)go.transform;
-        rt.SetParent(transform, false);
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
-        rt.pivot = new Vector2(0f, 1f);
-        return go;
+        foreach (MonoBehaviour mb in root.GetComponentsInChildren<MonoBehaviour>(true))
+        {
+            if (mb == null || mb is UIBehaviour || mb is CheckpointIntegrityBar) continue;
+            DestroyImmediate(mb);
+        }
+        foreach (Canvas c in root.GetComponentsInChildren<Canvas>(true)) c.overrideSorting = false;
     }
 
-    private void HideUnused()
+    private static TMP_Text FindCount(Transform root, string rowName)
     {
-        for (int i = _imageCursor; i < _images.Count; i++) _images[i].gameObject.SetActive(false);
-        for (int i = _textCursor; i < _texts.Count; i++) _texts[i].gameObject.SetActive(false);
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (t.name != rowName) continue;
+            t.gameObject.SetActive(true);
+            Transform count = t.Find("Count");
+            return count != null ? count.GetComponent<TMP_Text>() : null;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The page font's lit material re-pointed at <paramref name="font"/>'s atlas, so HUD fonts
+    /// (e.g. Antonio) keep their look but respond to scene lighting like the page text.
+    /// </summary>
+    private Material LitFontMaterial(TMP_FontAsset font)
+    {
+        Material lit = _style != null ? _style.fontSharedMaterial : null;
+        if (font == null || lit == null) return font != null ? font.material : lit;
+        if (_style.font == font) return lit;
+
+        if (s_litFontMaterials.TryGetValue((font, lit), out Material cached) && cached != null) return cached;
+
+        Material src = font.material;
+        var m = new Material(lit) { name = $"{font.name} Lit (Guidebook)" };
+        m.SetTexture(ShaderUtilities.ID_MainTex, src.GetTexture(ShaderUtilities.ID_MainTex));
+        CopyFloat(src, m, ShaderUtilities.ID_GradientScale);
+        CopyFloat(src, m, ShaderUtilities.ID_TextureWidth);
+        CopyFloat(src, m, ShaderUtilities.ID_TextureHeight);
+        CopyFloat(src, m, ShaderUtilities.ID_WeightNormal);
+        CopyFloat(src, m, ShaderUtilities.ID_WeightBold);
+        CopyFloat(src, m, ShaderUtilities.ID_ScaleRatio_A);
+        CopyFloat(src, m, ShaderUtilities.ID_ScaleRatio_B);
+        CopyFloat(src, m, ShaderUtilities.ID_ScaleRatio_C);
+        s_litFontMaterials[(font, lit)] = m;
+        return m;
+    }
+
+    private static void CopyFloat(Material from, Material to, int id)
+    {
+        if (from.HasProperty(id) && to.HasProperty(id)) to.SetFloat(id, from.GetFloat(id));
     }
 }
