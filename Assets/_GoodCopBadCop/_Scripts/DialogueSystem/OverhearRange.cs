@@ -18,6 +18,33 @@ public static class OverhearRange
     public static bool IsLocalPlayerConversationParticipant =>
         ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode;
 
+    /// <summary>
+    /// Resolves who the local player is currently in a conversation with: the active scripted
+    /// speaker (<see cref="ScriptedDialogueRunner.ActiveDialogueSpeakerNetId"/>) in scripted mode,
+    /// otherwise the current booth suspect while in booth dialogue-choice mode. Returns false
+    /// when the local player isn't a participant or the partner can't be resolved.
+    /// </summary>
+    public static bool TryGetLocalConversationPartner(out SpeakingInteraction partner)
+    {
+        partner = null;
+
+        if (ScriptedDialogueRunner.IsScriptedModeActive)
+        {
+            ulong netId = ScriptedDialogueRunner.ActiveDialogueSpeakerNetId;
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            if (netId != 0 && nm != null && nm.SpawnManager != null &&
+                nm.SpawnManager.SpawnedObjects.TryGetValue(netId, out var netObj) && netObj != null)
+                partner = netObj.GetComponent<SpeakingInteraction>();
+        }
+        else if (DialogueChoiceSystem.IsInDialogueMode &&
+                 SuspectController.Instance != null && SuspectController.Instance.CurrentSuspect != null)
+        {
+            partner = SuspectController.Instance.CurrentSuspect.Speaking;
+        }
+
+        return partner != null;
+    }
+
     /// <summary>True when the local player is within <see cref="Distance"/> of <paramref name="position"/>.</summary>
     public static bool IsLocalPlayerWithin(Vector3 position)
     {

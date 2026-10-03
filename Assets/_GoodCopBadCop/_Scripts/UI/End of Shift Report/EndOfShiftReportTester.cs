@@ -9,6 +9,7 @@ public class EndOfShiftReportTester : MonoBehaviour
 
     private static readonly string[] FirstNames = { "Olga", "Dmitri", "Boris", "Anya", "Yuri", "Irina", "Pavel", "Katya", "Sergei", "Nadia" };
     private static readonly string[] LastNames = { "Petrova", "Volkov", "Ivanov", "Sokolova", "Morozov", "Orlova", "Popov", "Lebedeva", "Kozlov", "Novikova" };
+    private static readonly string[] FakeAnomalyNames = { "Black Eyes", "Blue Veins", "Heart Rate", "Expiration Date", "Extra Limb", "Twitching", "Laughing", "High Radiation", "Name Wrong", "Glitching" };
 
     [ContextMenu("Test Report")]
     public void TestReport()
@@ -38,17 +39,39 @@ public class EndOfShiftReportTester : MonoBehaviour
                 ? $"{data.FirstName} {data.LastName}".Trim()
                 : $"{FirstNames[i % FirstNames.Length]} {LastNames[(i * 3) % LastNames.Length]}";
 
+            int caught = notAssessed ? ShiftSubjectResult.NotAssessed : Random.Range(0, total + 1);
+            ShiftAnomalyResult[] anomalies = new ShiftAnomalyResult[total];
+            ShiftAnomalyCategory flagged = ShiftAnomalyCategory.None;
+            for (int a = 0; a < total; a++)
+            {
+                ShiftAnomalyCategory category = ShiftAnomalyCategories.All[Random.Range(0, ShiftAnomalyCategories.All.Length)];
+                bool wasCaught = !notAssessed && a < caught;
+                anomalies[a] = new ShiftAnomalyResult
+                {
+                    Name = FakeAnomalyNames[Random.Range(0, FakeAnomalyNames.Length)],
+                    Category = category,
+                    Caught = wasCaught
+                };
+                if (wasCaught)
+                    flagged |= category;
+            }
+            if (!notAssessed && Random.value < 0.35f)
+                flagged |= ShiftAnomalyCategories.All[Random.Range(0, ShiftAnomalyCategories.All.Length)];
+
             subjects.Add(new ShiftSubjectResult
             {
                 SubjectName = name,
-                AnomaliesCaught = notAssessed ? ShiftSubjectResult.NotAssessed : Random.Range(0, total + 1),
+                AnomaliesCaught = caught,
                 AnomaliesTotal = total,
                 CouponsEarned = notAssessed ? 0 : Random.Range(3, 16),
                 Verdict = verdict,
                 SuspectAssetName = data != null ? data.name : string.Empty,
                 IDNumber = data != null && !string.IsNullOrEmpty(data.IDNumber) ? data.IDNumber : Random.Range(1000000, 9999999).ToString(),
                 HasIntegrity = true,
-                IntegrityAtProcessing = Random.Range(0.6f, 1f)
+                IntegrityAtProcessing = Random.Range(0.6f, 1f),
+                HasBreakdown = true,
+                FlaggedCategories = flagged,
+                Anomalies = anomalies
             });
         }
 

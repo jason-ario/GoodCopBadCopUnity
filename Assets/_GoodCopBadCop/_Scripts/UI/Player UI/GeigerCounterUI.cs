@@ -79,6 +79,44 @@ public class GeigerCounterUI : MonoBehaviour
     private float _previousRadiation;
     private float _lastRadiationTime = float.NegativeInfinity;
     private bool _isFull;
+    private bool _isPreview;
+
+    // ── Preview (static display copies, e.g. the guidebook) ────────────────────
+
+    /// <summary>
+    /// Turns this instance into a static display copy: it no longer follows any player or animates.
+    /// Call before the copy is first enabled, then use <see cref="ShowPreview"/>.
+    /// </summary>
+    public void MarkAsPreview() => _isPreview = true;
+
+    /// <summary>
+    /// Renders fixed readings with the HUD's colors. Preview copies only.
+    /// </summary>
+    /// <param name="normalizedRadiation">Accumulated radiation (0-1): arc fill, colour and readout.</param>
+    /// <param name="exposureRate01">Needle position (0 = resting, 1 = pegged).</param>
+    /// <param name="maxRadiation">Radiation units at 100%, for the readout.</param>
+    public void ShowPreview(float normalizedRadiation, float exposureRate01, float maxRadiation)
+    {
+        _isPreview = true;
+        float normalized = Mathf.Clamp01(normalizedRadiation);
+
+        _currentAngle = _targetAngle = Mathf.Lerp(minNeedleAngle, maxNeedleAngle, Mathf.Clamp01(exposureRate01));
+        if (needle != null)
+            needle.localRotation = Quaternion.Euler(0f, 0f, _currentAngle);
+
+        if (arcFillImage != null)
+        {
+            arcFillImage.fillAmount = normalized;
+            arcFillImage.color      = Color.Lerp(arcColorLow, arcColorHigh, normalized);
+        }
+
+        if (radiationValueText != null)
+            radiationValueText.text = string.Format(valueFormat, normalized * maxRadiation) + valueSuffix;
+
+        // No damage effects on a printed copy.
+        if (crackedGlassImage != null) crackedGlassImage.gameObject.SetActive(false);
+        if (shakeWobble != null) shakeWobble.enabled = false;
+    }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -98,11 +136,14 @@ public class GeigerCounterUI : MonoBehaviour
 
     private void OnEnable()
     {
+        if (_isPreview) return;
         SubscribeTo(SpectateManager.HudSubject);
     }
 
     private void Update()
     {
+        if (_isPreview) return;
+
         // Compare against the current PlayerInstance rather than just checking for a null
         // PlayerRadiation: death/respawn keeps the old (corpse) PlayerInstance alive instead of
         // destroying it (see PlayerInstance.DetachFromPlayerObject), so a cached PlayerRadiation

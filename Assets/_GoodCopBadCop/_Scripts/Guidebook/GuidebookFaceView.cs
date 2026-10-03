@@ -16,6 +16,10 @@ public struct GuidebookFaceContent
     public float  ImageHeight;
     /// <summary>Optional printed copy of the HUD integrity panel, drawn in the image slot (replaces images).</summary>
     public GuidebookIntegrityPanel IntegrityPanel;
+    /// <summary>Optional printed copy of a HUD element (health bar / Geiger counter), drawn in the image slot (replaces images).</summary>
+    public GuidebookHudArt HudArt;
+    /// <summary>Readings shown by <see cref="HudArt"/>.</summary>
+    public GuidebookSurvivalExample HudExample;
     /// <summary>Optional illustrated rows (icon + label + text) printed below the body.</summary>
     public GuidebookIconItem[] IconList;
     public Color  AccentColor;
@@ -69,6 +73,12 @@ public class GuidebookFaceView : MonoBehaviour
     [Header("Integrity Panel")]
     [Tooltip("Width of the printed HUD integrity panel as a fraction of the image slot width.")]
     [SerializeField, Range(0.3f, 1f)] private float _panelWidthFraction = 0.85f;
+
+    [Header("HUD Art (health bar / Geiger counter)")]
+    [Tooltip("Largest width of a printed HUD element as a fraction of the image slot width.")]
+    [SerializeField, Range(0.3f, 1f)] private float _hudArtWidthFraction = 0.85f;
+    [Tooltip("Largest height of a printed HUD element (Layout units); tall art like the Geiger counter is scaled to fit.")]
+    [SerializeField, Min(40f)] private float _hudArtMaxHeight = 230f;
 
     [Header("Spreading Sparse Pages")]
     [Tooltip("Text-only pages: largest extra paragraph spacing (TMP units, 100 = 1 em) used to fill the page.")]
@@ -148,6 +158,29 @@ public class GuidebookFaceView : MonoBehaviour
     private GuidebookChartView _chart;
     private GuidebookIntegrityPanelView _panel;
     private GuidebookIconListView _iconList;
+    private GuidebookHudArtView _hudArt;
+
+    /// <summary>Runtime sibling of the image, centred in the image slot.</summary>
+    private GuidebookHudArtView GetOrCreateHudArt()
+    {
+        if (_hudArt != null || _image == null) return _hudArt;
+
+        RectTransform src = _image.rectTransform;
+        var go = new GameObject("HUD Art", typeof(RectTransform));
+        go.layer = _image.gameObject.layer;
+
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(src.parent, false);
+        rt.SetSiblingIndex(src.GetSiblingIndex() + 1);
+        rt.anchorMin = src.anchorMin;
+        rt.anchorMax = src.anchorMax;
+        rt.pivot     = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(src.anchoredPosition.x, 0f);
+
+        _hudArt = go.AddComponent<GuidebookHudArtView>();
+        _hudArt.Configure(_body, _image.material);
+        return _hudArt;
+    }
 
     /// <summary>Runtime sibling of the body, sized and anchored like it.</summary>
     private GuidebookIconListView GetOrCreateIconList()
@@ -234,8 +267,9 @@ public class GuidebookFaceView : MonoBehaviour
         float cursor = _contentTop;
 
         bool hasPanel = !content.IsBlank && content.IntegrityPanel != null && _image != null;
-        bool hasRow   = !content.IsBlank && !hasPanel && HasAny(content.ImageRow);
-        bool hasImage = !content.IsBlank && !hasPanel && (content.Image != null || hasRow);
+        bool hasHud   = !content.IsBlank && !hasPanel && content.HudArt != GuidebookHudArt.None && _image != null;
+        bool hasRow   = !content.IsBlank && !hasPanel && !hasHud && HasAny(content.ImageRow);
+        bool hasImage = !content.IsBlank && !hasPanel && !hasHud && (content.Image != null || hasRow);
         bool hasBadge = !content.IsBlank && !string.IsNullOrEmpty(content.Badge);
         bool hasChart = !content.IsBlank && content.HasChart;
         bool hasList  = !content.IsBlank && content.IconList != null && content.IconList.Length > 0;
@@ -266,6 +300,28 @@ public class GuidebookFaceView : MonoBehaviour
             else
             {
                 panel.Clear();
+            }
+        }
+
+        GuidebookHudArtView hudArt = hasHud ? GetOrCreateHudArt() : _hudArt;
+        if (hudArt != null)
+        {
+            if (hasHud)
+            {
+                float width = _image.rectTransform.sizeDelta.x * _hudArtWidthFraction;
+                var hudRect = (RectTransform)hudArt.transform;
+                PlaceTop(hudRect, cursor, 0f);
+                float used = hudArt.Build(content.HudArt, content.HudExample, width, _hudArtMaxHeight);
+                if (used > 0f)
+                {
+                    AddBlock(hudRect);
+                    blockBottom = cursor - used;
+                    cursor = blockBottom - _gap * 1.5f;
+                }
+            }
+            else
+            {
+                hudArt.Clear();
             }
         }
 

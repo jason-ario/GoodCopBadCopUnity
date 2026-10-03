@@ -6,7 +6,8 @@ using UnityEngine;
 /// Single source of truth for every piece of guidebook content.
 ///
 /// <see cref="GuidebookBuilder"/> reads this asset each time the guidebook opens and lays the
-/// content out onto pooled sheets: rule pages first, then the scoring/disposition page, then the Checkpoint Integrity pages, then one
+/// content out onto pooled sheets: rule pages first, then the scoring/disposition page, then the Checkpoint Integrity pages,
+/// then the Survival pages (health, radiation), then one
 /// section per <see cref="AnomalyCategory"/> that has at least one unlocked anomaly.
 ///
 /// Anomaly entries never store a category or a verdict:
@@ -45,6 +46,10 @@ public class GuidebookDatabase : ScriptableObject
         [Tooltip("Draws the printed HUD Checkpoint Integrity panel (see the database's Integrity Panel) " +
                  "in the image slot instead of Image / Image Row.")]
         public bool ShowIntegrityPanel;
+
+        [Tooltip("Draws a printed copy of a HUD element (health bar / Geiger counter, see the database's " +
+                 "Survival Example) in the image slot instead of Image / Image Row.")]
+        public GuidebookHudArt HudArt;
 
         [Tooltip("Optional illustrated rows (icon, bold label, text) printed below the body.")]
         public GuidebookIconItem[] IconList;
@@ -110,6 +115,14 @@ public class GuidebookDatabase : ScriptableObject
     [Tooltip("Example state of the HUD panel copy on pages with Show Integrity Panel (the art is copied from the scene's HUD).")]
     [SerializeField] private GuidebookIntegrityPanel _integrityPanel = new GuidebookIntegrityPanel();
 
+    [Header("Survival Section (after Checkpoint Integrity)")]
+    [SerializeField] private string _survivalTabLabel = "SURVIVAL";
+    [SerializeField] private Color  _survivalTabColor = new Color(0.78f, 0.45f, 0.38f, 1f);
+    [Tooltip("Pages of the Survival section (health, radiation).")]
+    [SerializeField] private RulePage[] _survivalPages = DefaultSurvivalPages();
+    [Tooltip("Example readings of the HUD copies on pages with Hud Art (the art is copied from the scene's HUD).")]
+    [SerializeField] private GuidebookSurvivalExample _survivalExample = new GuidebookSurvivalExample();
+
     [Header("Rules Section")]
     [SerializeField] private string _rulesTabLabel = "RULES";
     [SerializeField] private Color  _rulesTabColor = new Color(0.82f, 0.78f, 0.66f, 1f);
@@ -145,6 +158,11 @@ public class GuidebookDatabase : ScriptableObject
     public Color  IntegrityTabColor => _integrityTabColor;
     public IReadOnlyList<RulePage> IntegrityPages => _integrityPages;
     public GuidebookIntegrityPanel IntegrityPanel => _integrityPanel;
+
+    public string SurvivalTabLabel => _survivalTabLabel;
+    public Color  SurvivalTabColor => _survivalTabColor;
+    public IReadOnlyList<RulePage> SurvivalPages => _survivalPages;
+    public GuidebookSurvivalExample SurvivalExample => _survivalExample;
 
     public string RulesTabLabel => _rulesTabLabel;
     public Color  RulesTabColor => _rulesTabColor;
@@ -194,6 +212,39 @@ public class GuidebookDatabase : ScriptableObject
         "Your pay is multiplied by the checkpoint's integrity, shown on this panel.\n\n" +
         "Below 100%, the difference is deducted from your earnings, up to " + IntegrityMaxDeductionToken + "%.\n\n" +
         "The counters show what's left to clean. Your compass marks every mess.";
+
+    /// <summary>
+    /// Starting content for the Survival section. Only used while the asset has no serialized
+    /// <c>_survivalPages</c> yet; after that the asset's (Inspector-edited) copy wins.
+    /// </summary>
+    private static RulePage[] DefaultSurvivalPages() => new[]
+    {
+        new RulePage
+        {
+            Header = "SURVIVAL",
+            Title  = "STAY ALIVE",
+            Body   = SurvivalHealthBody,
+            HudArt = GuidebookHudArt.HealthBar,
+        },
+        new RulePage
+        {
+            Header = "SURVIVAL",
+            Title  = "RADIATION",
+            Body   = SurvivalRadiationBody,
+            HudArt = GuidebookHudArt.GeigerCounter,
+        },
+    };
+
+    public const string SurvivalHealthBody =
+        "This bar shows your health. Injuries and radiation wear it down.\n\n" +
+        "If your health reaches 0%, you die.\n\n" +
+        "Eat food or smoke a cigarette to restore health. Your health resets at the start of the next day.";
+
+    public const string SurvivalRadiationBody =
+        "The Geiger counter shows your radiation. The needle reacts to how fast you are being exposed; " +
+        "the meter and reading show how much you have absorbed.\n\n" +
+        "When your radiation is high, your health declines. The higher it climbs, the faster you lose health.\n\n" +
+        "Take radiation pills to bring your radiation down. Your radiation resets at the start of the next day.";
 
     /// <summary>
     /// Resolves the category of an anomaly entry from its C# base class.

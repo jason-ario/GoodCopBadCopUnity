@@ -89,15 +89,49 @@ public class ShiftReportSubjectRow : MonoBehaviour
     [SerializeField] private float popOvershoot = 1.6f;
     [SerializeField] private float stampStartScale = 1.9f;
 
+    [Header("Details")]
+    [Tooltip("Button covering the row. Clicking it opens the subject detail popup once the report has finished revealing.")]
+    [SerializeField] private Button detailsButton;
+
     private bool _isKilled;
     private bool _hasVerdictIcon;
     private bool _hasStampLabel;
 
     public bool IsKilled => _isKilled;
+    public int Index { get; private set; }
+    public ShiftSubjectResult Subject { get; private set; }
+
+    /// <summary>Raised when the player clicks this row while details are enabled.</summary>
+    public event Action<ShiftReportSubjectRow> DetailsRequested;
 
     private void Awake()
     {
         EnsureCanvasGroup();
+
+        if (detailsButton != null)
+        {
+            detailsButton.onClick.RemoveListener(HandleDetailsClicked);
+            detailsButton.onClick.AddListener(HandleDetailsClicked);
+        }
+    }
+
+    private void HandleDetailsClicked()
+    {
+        DetailsRequested?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Rows stay non-interactive during the reveal (a click there means "skip"), and become
+    /// clickable once the report hands control back to the player.
+    /// </summary>
+    public void SetDetailsInteractable(bool interactable)
+    {
+        EnsureCanvasGroup();
+        canvasGroup.interactable = interactable;
+        canvasGroup.blocksRaycasts = interactable;
+
+        if (detailsButton != null)
+            detailsButton.interactable = interactable;
     }
 
     private void EnsureCanvasGroup()
@@ -115,6 +149,9 @@ public class ShiftReportSubjectRow : MonoBehaviour
     {
         VerdictStyle style = StyleFor(subject.Verdict);
         _isKilled = subject.Verdict == ShiftSubjectVerdict.Killed;
+        Index = index;
+        Subject = subject;
+        SetDetailsInteractable(false);
 
         if (indexText != null)
             indexText.text = (index + 1).ToString("00");
@@ -186,7 +223,7 @@ public class ShiftReportSubjectRow : MonoBehaviour
     }
 
     /// <summary>Center-crops the texture so it fills the photo box without stretching.</summary>
-    private static Rect CoverUv(Texture texture, Vector2 boxSize)
+    public static Rect CoverUv(Texture texture, Vector2 boxSize)
     {
         if (texture == null || boxSize.x <= 0f || boxSize.y <= 0f || texture.height == 0)
             return new Rect(0f, 0f, 1f, 1f);
@@ -204,7 +241,7 @@ public class ShiftReportSubjectRow : MonoBehaviour
         return new Rect(0f, (1f - h) * 0.5f, 1f, h);
     }
 
-    private static string FormatId(string id)
+    public static string FormatId(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
             return "ID ----";

@@ -13,6 +13,7 @@ using UnityEngine;
 ///   <item>Rule pages (How to play, Pass, Quarantine, Kill, …).</item>
 ///   <item>Scoring &amp; disposition page (Conversion Risk Protocol table).</item>
 ///   <item>Checkpoint Integrity pages (HUD panel + payout effect, then illustrated chores).</item>
+///   <item>Survival pages (HUD health bar, then HUD Geiger counter).</item>
 ///   <item>One section per category with ≥1 unlocked anomaly: intro page, then one page per anomaly.</item>
 /// </list>
 ///
@@ -109,6 +110,7 @@ public class GuidebookBuilder : MonoBehaviour
         AddRules();
         AddScoring();
         AddIntegrity();
+        AddSurvival();
         AddSections();
 
         if (_faces.Count % 2 == 1) _faces.Add(NotesFace());
@@ -141,7 +143,8 @@ public class GuidebookBuilder : MonoBehaviour
         {
             bool hasRow   = page.ImageRow != null && page.ImageRow.Length > 0;
             bool hasPanel = page.ShowIntegrityPanel && _database.IntegrityPanel != null;
-            if (page.Image != null && !hasRow && !hasPanel) group.Add(_faces.Count);
+            bool hasHud   = !hasPanel && page.HudArt != GuidebookHudArt.None;
+            if (page.Image != null && !hasRow && !hasPanel && !hasHud) group.Add(_faces.Count);
 
             _faces.Add(new GuidebookFaceContent
             {
@@ -151,6 +154,8 @@ public class GuidebookBuilder : MonoBehaviour
                 Image       = page.Image,
                 ImageRow    = hasRow ? page.ImageRow : null,
                 IntegrityPanel = hasPanel ? _database.IntegrityPanel : null,
+                HudArt      = hasHud ? page.HudArt : GuidebookHudArt.None,
+                HudExample  = hasHud ? _database.SurvivalExample : null,
                 IconList    = page.IconList != null && page.IconList.Length > 0 ? page.IconList : null,
                 AccentColor = accent,
             });
@@ -197,6 +202,17 @@ public class GuidebookBuilder : MonoBehaviour
 
         AddAuthoredPages(pages, accent,
             body => body?.Replace(GuidebookDatabase.IntegrityMaxDeductionToken, maxDeduction));
+    }
+
+    /// <summary>Survival section (health bar page, Geiger counter page), opened as a spread with its own tab.</summary>
+    private void AddSurvival()
+    {
+        IReadOnlyList<GuidebookDatabase.RulePage> pages = _database.SurvivalPages;
+        if (pages == null || pages.Count == 0) return;
+
+        if (_faces.Count % 2 == 0) _faces.Add(NotesFace());
+        _tabs.Add((_faces.Count, _database.SurvivalTabLabel, _database.SurvivalTabColor));
+        AddAuthoredPages(pages, Accent(_database.SurvivalTabColor));
     }
 
     /// <summary>Largest share of a payout the integrity multiplier can take away, in whole percent.</summary>

@@ -428,10 +428,13 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             // Fires locally on every client (this NetworkVariable callback runs on ALL peers),
             // so the tutorial overlay pops up for everyone the very first time the "Follow the
             // trail" task ever becomes active — never again on subsequent days/triggers.
+            // Closing it immediately chains the "Radiation Alert" overlay (going off-trail
+            // raises radiation, which damages you; take radiation pills to bring it down).
             if (!_hasShownFollowTrailTutorial)
             {
                 _hasShownFollowTrailTutorial = true;
-                TutorialOverlay.Instance?.ShowFollowTrailTutorial();
+                TutorialOverlay.Instance?.ShowFollowTrailTutorial(
+                    () => TutorialOverlay.Instance?.ShowRadiationTutorial());
             }
         }
         else

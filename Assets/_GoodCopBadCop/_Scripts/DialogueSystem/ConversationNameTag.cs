@@ -1,5 +1,4 @@
 using TMPro;
-using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -129,23 +128,7 @@ public class ConversationNameTag : MonoBehaviour
     /// <summary>Shows the partner's name before their first line, when it can be resolved.</summary>
     private void TrySeedFromPartner()
     {
-        SpeakingInteraction speaking = null;
-
-        if (ScriptedDialogueRunner.IsScriptedModeActive)
-        {
-            ulong netId = ScriptedDialogueRunner.ActiveDialogueSpeakerNetId;
-            var nm = NetworkManager.Singleton;
-            if (netId != 0 && nm != null && nm.SpawnManager != null &&
-                nm.SpawnManager.SpawnedObjects.TryGetValue(netId, out var netObj))
-                speaking = netObj.GetComponent<SpeakingInteraction>();
-        }
-        else if (DialogueChoiceSystem.IsInDialogueMode &&
-                 SuspectController.Instance != null && SuspectController.Instance.CurrentSuspect != null)
-        {
-            speaking = SuspectController.Instance.CurrentSuspect.Speaking;
-        }
-
-        if (speaking != null)
+        if (OverhearRange.TryGetLocalConversationPartner(out SpeakingInteraction speaking))
             Apply(speaking.SpeakerName, Color.white);
     }
 

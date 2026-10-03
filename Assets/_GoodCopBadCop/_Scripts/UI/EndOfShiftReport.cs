@@ -60,6 +60,8 @@ public class EndOfShiftReportUI : MonoBehaviour
     [SerializeField] private GameObject emptyState;
     [Tooltip("Seconds to ease the scroll view down to a newly revealed row.")]
     [SerializeField] private float autoScrollDuration = 0.25f;
+    [Tooltip("Optional popup opened by clicking a row once the reveal is finished. Shows that subject's caught / missed anomalies.")]
+    [SerializeField] private ShiftReportSubjectDetailPopup detailPopup;
 
     [Header("Summary")]
     [SerializeField] private CanvasGroup summaryHeader;
@@ -187,6 +189,9 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     public void HideAll()
     {
+        if (detailPopup != null)
+            detailPopup.CloseImmediate();
+
         SetGroupAlpha(dimmer, 0f);
 
         if (paper != null)
@@ -437,10 +442,32 @@ public class EndOfShiftReportUI : MonoBehaviour
             ShiftReportSubjectRow clone = Instantiate(rowTemplate, rowTemplate.transform.parent);
             clone.name = $"{rowTemplate.name} {_rows.Count + 1:00}";
             clone.Hide();
+            clone.DetailsRequested += OnRowDetailsRequested;
             _rows.Add(clone);
         }
 
         return _rows[index];
+    }
+
+    /// <summary>Makes every bound row clickable (or not). Only enabled once the reveal is over.</summary>
+    private void SetRowDetailsInteractable(bool interactable)
+    {
+        bool canOpen = interactable && detailPopup != null;
+        int count = _data != null ? _data.Subjects.Count : 0;
+        for (int i = 0; i < _rows.Count; i++)
+        {
+            if (_rows[i] != null)
+                _rows[i].SetDetailsInteractable(canOpen && i < count);
+        }
+    }
+
+    private void OnRowDetailsRequested(ShiftReportSubjectRow row)
+    {
+        // Only after the reveal and before Continue — never competes with skip or the transition.
+        if (detailPopup == null || row == null || !_affordanceShown || _continuePressed)
+            return;
+
+        detailPopup.Open(row.Index, row.Subject);
     }
 
     /// <summary>Eases the scroll view to the bottom so the newest row stays in view.</summary>
@@ -696,6 +723,7 @@ public class EndOfShiftReportUI : MonoBehaviour
             continueButton.SetActive(true);
 
         SetContinueInteractable(true);
+        SetRowDetailsInteractable(true);
     }
 
     private Button GetContinueButton()
@@ -725,6 +753,9 @@ public class EndOfShiftReportUI : MonoBehaviour
 
         StopAllReportRoutines();
         SetContinueInteractable(false);
+        SetRowDetailsInteractable(false);
+        if (detailPopup != null)
+            detailPopup.CloseImmediate();
 
         // Only a non-host sees a "waiting for host" label — the host is the one doing the work.
         bool isHost = GlobalHostVariables.Instance == null || GlobalHostVariables.Instance.IsServer;

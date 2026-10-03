@@ -38,6 +38,9 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject checkpointIntegrityTutorialScreen;
     [SerializeField] private GameObject dailyFaxTutorialScreen;
     [SerializeField] private GameObject followTrailTutorialScreen;
+    [Tooltip("Day 2 'Radiation Alert' screen, shown right after the Follow Trail screen closes. " +
+             "Falls back to a child named 'Radiation Tutorial' under the screens container.")]
+    [SerializeField] private GameObject radiationTutorialScreen;
 
     [Header("Settings")]
     [Tooltip("Seconds the player must hold R to close the overlay.")]
@@ -177,6 +180,21 @@ public class TutorialOverlay : MonoBehaviour
     /// animal dialogue).
     /// </summary>
     public void ShowFollowTrailTutorial(Action onComplete = null) => ShowScreen(followTrailTutorialScreen, onComplete);
+
+    /// <summary>
+    /// Shows the "Radiation Alert" tutorial overlay — explains that straying off the trail
+    /// raises radiation, high radiation causes damage, and radiation pills bring it back down.
+    /// Chained directly after <see cref="ShowFollowTrailTutorial"/> closes (Day 2).
+    /// </summary>
+    public void ShowRadiationTutorial(Action onComplete = null)
+    {
+        if (radiationTutorialScreen == null && screensContainer != null)
+        {
+            Transform found = screensContainer.Find("Radiation Tutorial");
+            if (found != null) radiationTutorialScreen = found.gameObject;
+        }
+        ShowScreen(radiationTutorialScreen, onComplete);
+    }
 
     /// <summary>
     /// Triggers the slide-out animation and deactivates the overlay after the animation completes.

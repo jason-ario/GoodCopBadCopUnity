@@ -2170,7 +2170,7 @@ public class SuspectController : NetworkBehaviour
             _reportRecordedFor = suspectCharacter;
             ShiftManager.Instance?.RecordSubjectResult(BuildSubjectResult(
                 suspectCharacter, _symptomsFound, _symptomsTotal, couponsIssued,
-                ToSubjectVerdict(folder.StampType)));
+                ToSubjectVerdict(folder.StampType), folder.GetCheckedCategoryNames()));
         }
 
         switch (folder.StampType)
@@ -2213,10 +2213,13 @@ public class SuspectController : NetworkBehaviour
 
     /// <summary>
     /// Builds one end-of-shift report entry, capturing the subject's identity (for the ID photo and
-    /// ID number) and the checkpoint integrity at this exact moment. Server only.
+    /// ID number), the checkpoint integrity at this exact moment, and the per-anomaly breakdown for
+    /// the report's detail popup. <paramref name="checkedCategories"/> is null when the paperwork was
+    /// never assessed (killed / fled). Server only.
     /// </summary>
     private static ShiftSubjectResult BuildSubjectResult(
-        SuspectCharacter character, int anomaliesCaught, int anomaliesTotal, int coupons, ShiftSubjectVerdict verdict)
+        SuspectCharacter character, int anomaliesCaught, int anomaliesTotal, int coupons, ShiftSubjectVerdict verdict,
+        HashSet<string> checkedCategories = null)
     {
         SuspectData data = character != null ? character.Data : null;
 
@@ -2224,7 +2227,7 @@ public class SuspectController : NetworkBehaviour
         integrity.Recalculate();
         float integrityPercent = integrity.MaxScore > 0f ? integrity.IntegrityScore / integrity.MaxScore : 1f;
 
-        return new ShiftSubjectResult
+        var result = new ShiftSubjectResult
         {
             SubjectName = GetSubjectDisplayName(character),
             AnomaliesCaught = anomaliesCaught,
@@ -2237,6 +2240,10 @@ public class SuspectController : NetworkBehaviour
             HasIntegrity = true,
             IntegrityAtProcessing = Mathf.Clamp01(integrityPercent)
         };
+
+        AnomalyController anomalies = character != null ? character.AnomalyController : null;
+        result.CaptureBreakdown(anomalies != null ? anomalies.activeAnomalies : null, checkedCategories);
+        return result;
     }
 
     
