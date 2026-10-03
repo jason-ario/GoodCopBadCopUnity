@@ -108,6 +108,7 @@ GameObject:
   - component: {fileID: 2609041704838751066}
   - component: {fileID: 6514236334952385266}
   - component: {fileID: 6195579456987455285}
+  - component: {fileID: 8184388001281175673}
   m_Layer: 17
   m_Name: Mutation Exam Paper
   m_TagString: Untagged
@@ -143,12 +144,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2046019031
+  GlobalObjectIdHash: 1951689380
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 1
   SpawnWithObservers: 1
@@ -172,21 +175,29 @@ MonoBehaviour:
   itemsThatCanInteractWith: []
   interactText: Mutation Exam Page
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinIntensity: 0.35
   itemData: {fileID: 11400000, guid: ec85f3739100c4140b72a52cf0618638, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
   insideThisFolder: {fileID: 0}
-  _checklistItems:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 5433313532473490089}
   pageAnimator: {fileID: 4748860156081436253}
   isRippedOut: 0
   container: {fileID: 0}
+  checklistItemPrefab: {fileID: 0}
+  checklistItemsParent: {fileID: 0}
+  checklistItemStartLocalPosition: {x: -0.016, y: -0.478, z: 0.019}
+  checklistItemSpacingY: 0.1397143
+  checklistTotalSlotCount: 7
+  checklistItemLocalRotationEuler: {x: 0, y: 0, z: 90}
+  checklistItemLocalScale: {x: 0.08675341, y: 0.930651, z: 0.09206503}
   _checklistCamera: {fileID: 0}
   _paperRenderer: {fileID: 0}
   _renderTextureTemplate: {fileID: 0}
   _drawAnimationDuration: 0.85
+  _useRenderTextureSystem: 1
 --- !u!114 &5368318159825244251
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -520,7 +531,7 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 33
+  rmsCount: 11
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFXTriggerMode: 0
@@ -571,6 +582,18 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 1
   AutoSetKinematicOnDespawn: 1
+--- !u!114 &8184388001281175673
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 597383063050032403}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
 --- !u!1 &6430019601398571735
 GameObject:
   m_ObjectHideFlags: 0
@@ -819,7 +842,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -933,17 +956,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9e4a5cab0321609498e5ea4775f14383, type: 3}
---- !u!114 &5433313532473490089 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 6502734348436088401, guid: 9e4a5cab0321609498e5ea4775f14383, type: 3}
-  m_PrefabInstance: {fileID: 1250131188063149304}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3f9ad7ce293516e4184d14f7a9e7dd7e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ChecklistItem
 --- !u!4 &6457348652885852289 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5243394833657093241, guid: 9e4a5cab0321609498e5ea4775f14383, type: 3}
