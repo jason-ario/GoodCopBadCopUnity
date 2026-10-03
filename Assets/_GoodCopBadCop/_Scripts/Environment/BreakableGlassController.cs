@@ -62,6 +62,12 @@ public class BreakableGlassController : MonoBehaviour
     [Tooltip("Sound played each time the mutant lands an intermediate hit on the glass.")]
     [SerializeField] private AudioClip _hitClip;
 
+    [Tooltip("Additional sound layered on top of _hitClip when the glass is damaged but not fully broken.")]
+    [SerializeField] private AudioClip _partialBreakClip;
+
+    [Tooltip("Volume scale for the partial break clip.")]
+    [SerializeField] [Range(0f, 2f)] private float _partialBreakVolume = 1f;
+
     [Tooltip("Sound played when the glass fully shatters.")]
     [SerializeField] private AudioClip _smashClip;
 
@@ -582,6 +588,9 @@ public class BreakableGlassController : MonoBehaviour
     {
         if (_audioSource != null && _hitClip != null)
             _audioSource.PlayOneShot(_hitClip, _hitVolume);
+
+        if (_audioSource != null && _partialBreakClip != null && _hits > 0 && _hits < _maxHits)
+            _audioSource.PlayOneShot(_partialBreakClip, _partialBreakVolume);
 
         var target = _shakeTarget != null
             ? _shakeTarget
