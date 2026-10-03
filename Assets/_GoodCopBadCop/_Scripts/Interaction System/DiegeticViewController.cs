@@ -228,7 +228,7 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// redundant RPC (the original RPC from <see cref="PickableObject.OnEquipped"/> already
     /// handles all other clients).
     /// </summary>
-    private static void ReapplyHeldItemAnimatorState(PlayerInteractionController player)
+    internal static void ReapplyHeldItemAnimatorState(PlayerInteractionController player)
     {
         if (player == null) return;
         PlayerPickupController pickup = player.GetComponent<PlayerPickupController>();

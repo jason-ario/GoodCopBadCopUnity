@@ -59,6 +59,13 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
     private PlayerInteractionController _interactingPlayer;
 
     /// <summary>
+    /// Local first-person arms, local body mesh, and other players' body meshes hidden while the
+    /// bed view is open — mirrors <see cref="DiegeticViewController"/> (tool locker) so nothing
+    /// occludes the bed camera. Purely local visibility; restored in <see cref="RestorePlayerVisibility"/>.
+    /// </summary>
+    private readonly System.Collections.Generic.List<GameObject> _hiddenPlayerObjects = new();
+
+    /// <summary>
     /// Tracks the tutorial objective overlay row shown once <see cref="CanSleep"/> first becomes
     /// true for the current cycle. Day 1 drives its own scripted go-to-bed sequence (a world-space
     /// arrow/marker, see Day_01.ShowGoToBedMarker), so this row is only added on days other than
@@ -261,6 +268,8 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         if (_bedCamera != null)
             _bedCamera.gameObject.SetActive(false);
 
+        RestorePlayerVisibility();
+
         PlayerInteractionController localController = PlayerInstance.Instance?.PlayerInteractionController;
         if (localController != null)
         {
@@ -336,6 +345,9 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         if (_bedCamera != null)
             _bedCamera.gameObject.SetActive(true);
 
+        // Make the player (and any other players) invisible locally, same as the tool locker view.
+        HidePlayerVisibility(player);
+
         UIController.Instance.ShowCursor();
         UIController.Instance.ShowBackButton(OnCancelEndDay);
 
@@ -358,12 +370,62 @@ public class BunkBedInteractable : Interactable, IHeldItemPassthrough
         if (_bedCamera != null)
             _bedCamera.gameObject.SetActive(false);
 
+        RestorePlayerVisibility(_interactingPlayer);
+
         if (_interactingPlayer != null)
         {
             _interactingPlayer.SetSuspectCamMode(false);
             _interactingPlayer.playerMovementController.SetCanControl(true);
             _interactingPlayer = null;
         }
+    }
+
+    /// <summary>
+    /// Hides the local player's arms and body ("Art") plus every other connected player's body,
+    /// using the same hierarchy paths as <see cref="DiegeticViewController"/>. Local-only toggle.
+    /// </summary>
+    private void HidePlayerVisibility(PlayerInteractionController player)
+    {
+        RestorePlayerVisibility();
+
+        HideIfActive(player.transform.Find("CinemachineCamera/Arms_Socket/Player_Arms"));
+        HideIfActive(player.transform.Find("Art"));
+
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null) return;
+
+        NetworkObject localPlayerObject = player.GetComponent<NetworkObject>();
+        foreach (var client in networkManager.ConnectedClientsList)
+        {
+            NetworkObject playerObject = client.PlayerObject;
+            if (playerObject == null || playerObject == localPlayerObject) continue;
+            HideIfActive(playerObject.transform.Find("Art"));
+        }
+    }
+
+    private void HideIfActive(Transform target)
+    {
+        if (target == null || !target.gameObject.activeSelf) return;
+        target.gameObject.SetActive(false);
+        _hiddenPlayerObjects.Add(target.gameObject);
+    }
+
+    /// <summary>
+    /// Restores everything hidden by <see cref="HidePlayerVisibility"/>. When arms were re-enabled,
+    /// re-applies the held item's arm animator bool (Unity resets Animator params on re-activation).
+    /// </summary>
+    private void RestorePlayerVisibility(PlayerInteractionController player = null)
+    {
+        if (_hiddenPlayerObjects.Count == 0) return;
+
+        foreach (GameObject obj in _hiddenPlayerObjects)
+            if (obj != null)
+                obj.SetActive(true);
+
+        _hiddenPlayerObjects.Clear();
+
+        DiegeticViewController.ReapplyHeldItemAnimatorState(
+            player != null ? player : PlayerInstance.Instance?.PlayerInteractionController);
     }
 
     // ─── Popup callbacks ─────────────────────────────────────────────────────
