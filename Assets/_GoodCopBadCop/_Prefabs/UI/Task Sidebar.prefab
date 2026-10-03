@@ -2836,12 +2836,23 @@ MonoBehaviour:
   - {fileID: 2745711245406712937}
   - {fileID: 3037276099665009620}
   - {fileID: 4926482938165743301}
-  emptySquareColor: {r: 0.18, g: 0.19, b: 0.08, a: 1}
   goodColor: {r: 1, g: 1, b: 1, a: 1}
   warningColor: {r: 1, g: 0.85, b: 0.1, a: 1}
   criticalColor: {r: 0.9, g: 0.12, b: 0.1, a: 1}
   warningThreshold: 0.7
   criticalThreshold: 0.6
+  emptyGoodColor: {r: 0.18, g: 0.19, b: 0.08, a: 1}
+  emptyWarningColor: {r: 0.24, g: 0.19, b: 0.04, a: 1}
+  emptyCriticalColor: {r: 0.26, g: 0.05, b: 0.04, a: 1}
+  filledOutlineDarken: 0.25
+  filledOutlineAlpha: 0.9
+  emptyOutlineGoodColor: {r: 0.55, g: 0.59, b: 0.17, a: 0.8}
+  emptyOutlineWarningColor: {r: 0.62, g: 0.5, b: 0.12, a: 0.8}
+  emptyOutlineCriticalColor: {r: 0.6, g: 0.16, b: 0.12, a: 0.8}
+  panelBackground: {fileID: 0}
+  panelGoodTint: {r: 1, g: 1, b: 1, a: 1}
+  panelWarningTint: {r: 1, g: 0.88, b: 0.6, a: 1}
+  panelCriticalTint: {r: 0.85, g: 0.38, b: 0.34, a: 1}
   lowIntegrityWobble: {fileID: 0}
   shakeThreshold: 0.6
   minShakeIntensity: 0.4
@@ -2978,14 +2989,14 @@ RectTransform:
   m_GameObject: {fileID: 9001157336946856158}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.80202, y: 0.80202, z: 0.80202}
+  m_LocalScale: {x: 0.8014203, y: 0.8014203, z: 0.8014203}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 6743967394345020771}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 6.7, y: -35.6}
+  m_AnchoredPosition: {x: 6.7239, y: -35.611}
   m_SizeDelta: {x: 82, y: 38}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &5766342523161565177
@@ -3018,8 +3029,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 0%
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
-  m_sharedMaterial: {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 7def4ff6d5768a24e856fa62108aa0a4, type: 2}
+  m_sharedMaterial: {fileID: -4542494337416189931, guid: 7def4ff6d5768a24e856fa62108aa0a4, type: 2}
   m_fontSharedMaterials:
   - {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
   m_fontMaterial: {fileID: 0}
