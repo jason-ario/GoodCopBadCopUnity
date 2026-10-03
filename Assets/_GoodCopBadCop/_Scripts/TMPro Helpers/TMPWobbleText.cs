@@ -5,61 +5,21 @@ using UnityEngine;
 [RequireComponent(typeof(TextMeshProUGUI))]
 public class TMPWobbleText : MonoBehaviour
 {
-    /// <summary>
-    /// Motion settings for one emphasis style. Motion is stepped (snaps to a new random pose
-    /// <see cref="stepRate"/> times per second, each glyph on its own offset clock), so the text
-    /// trembles and twitches instead of floating smoothly.
-    /// </summary>
-    [System.Serializable]
-    public class EmphasisStyle
-    {
-        [Tooltip("Tremor offset as a fraction of font size. Keep small; it's a nervous twitch, not a wave.")]
-        public float jitter = 0.012f;
-        [Tooltip("New tremor poses per second. Higher = more wiry and agitated.")]
-        public float stepRate = 14f;
-        [Tooltip("Max random tilt per glyph per step (degrees).")]
-        public float rotationJitter = 2f;
-        [Tooltip("Chance per glyph per step of a sudden larger twitch.")]
-        [Range(0f, 1f)] public float twitchChance = 0.015f;
-        [Tooltip("Twitch offset as a fraction of font size.")]
-        public float twitchAmount = 0.04f;
-        [Tooltip("Jitter multiplier at the moment a glyph is typed in, settling to 1.")]
-        public float settleBoost = 2.5f;
-        [Tooltip("Seconds for a freshly typed glyph to settle.")]
-        public float settleDuration = 0.15f;
-        [Tooltip("Chance per glyph per step of briefly darkening, like a failing bulb.")]
-        [Range(0f, 1f)] public float flickerChance = 0f;
-        [Tooltip("How much a flicker darkens the glyph (0 = none, 1 = black).")]
-        [Range(0f, 1f)] public float flickerDarken = 0.5f;
-    }
-
     [SerializeField] private TMPWobbleProfile profile;
     [SerializeField] private bool playOnEnable = true;
 
-    [Header("Emphasis ([[keyword]] / {{menace}}, see DialogueKeywordMarkup)")]
-    [Tooltip("Animate characters inside <link=\"kw\"> and <link=\"menace\">. Runs independently of the base wobble profile.")]
+    [Header("Dialogue Emphasis (see DialogueKeywordMarkup / DialogueEmphasisLibrary)")]
+    [Tooltip("Animate characters inside <link=\"emph:id\"> using that id's DialogueEmphasisProfile. " +
+             "Runs independently of the base wobble profile.")]
     [SerializeField] private bool animateEmphasis = true;
-    [Tooltip("[[keyword]]: tutorial wording. Uneasy, low-amplitude tremor.")]
-    [SerializeField] private EmphasisStyle keywordStyle = new EmphasisStyle();
-    [Tooltip("{{menace}}: threatening wording. Harsh shake, twitches, flicker.")]
-    [SerializeField] private EmphasisStyle menaceStyle = new EmphasisStyle
-    {
-        jitter = 0.022f,
-        stepRate = 24f,
-        rotationJitter = 5f,
-        twitchChance = 0.05f,
-        twitchAmount = 0.08f,
-        settleBoost = 3f,
-        settleDuration = 0.2f,
-        flickerChance = 0.06f,
-        flickerDarken = 0.55f,
-    };
+    [Tooltip("Scales every emphasis profile's motion on this text (1 = as authored).")]
+    [SerializeField, Range(0f, 2f)] private float emphasisIntensity = 1f;
 
     /// <summary>
     /// Global switch for the Text Wobble accessibility setting. When <c>false</c>, every
     /// <see cref="TMPWobbleText"/> instance stops animating and its mesh is reset to the
     /// non-wobbled layout, regardless of individual <see cref="StartWobble"/>/<see cref="StopWobble"/> calls.
-    /// Emphasised words keep their static bold/colour styling but stop moving.
+    /// Emphasised words keep their static colour/bold/italic styling but stop moving.
     /// </summary>
     public static bool GlobalWobbleEnabled { get; set; } = true;
 
@@ -67,7 +27,7 @@ public class TMPWobbleText : MonoBehaviour
     {
         public int Start;   // source-string index (inclusive)
         public int End;     // source-string index (exclusive)
-        public bool Menace;
+        public DialogueEmphasisProfile Profile;
     }
 
     private TextMeshProUGUI tmp;
@@ -207,8 +167,9 @@ public class TMPWobbleText : MonoBehaviour
     }
 
     /// <summary>
-    /// Finds every keyword/menace link span in <paramref name="text"/> as source-index ranges.
-    /// An unclosed span (typewriter mid-phrase) runs to the end of the string. Cached per text.
+    /// Finds every <c>&lt;link="emph:id"&gt;</c> span in <paramref name="text"/> as source-index ranges
+    /// paired with that id's profile. An unclosed span (typewriter mid-phrase) runs to the end of the
+    /// string. Unknown ids are ignored. Cached per text.
     /// </summary>
     private bool ScanEmphasis(string text)
     {
@@ -217,36 +178,47 @@ public class TMPWobbleText : MonoBehaviour
 
         emphasisScanText = text;
         emphasisRanges.Clear();
-        ScanLinkId(text, DialogueKeywordMarkup.KeywordOpenTag, false);
-        ScanLinkId(text, DialogueKeywordMarkup.MenaceOpenTag, true);
-        return emphasisRanges.Count > 0;
-    }
 
-    private void ScanLinkId(string text, string openTag, bool menace)
-    {
+        if (text.IndexOf(DialogueKeywordMarkup.LinkPrefix, System.StringComparison.Ordinal) < 0)
+            return false;
+
+        var library = DialogueEmphasisLibrary.Instance;
+        if (library == null)
+            return false;
+
+        string prefix = DialogueKeywordMarkup.LinkPrefix;
         int search = 0;
         while (true)
         {
-            int open = text.IndexOf(openTag, search, System.StringComparison.Ordinal);
-            if (open < 0) return;
+            int open = text.IndexOf(prefix, search, System.StringComparison.Ordinal);
+            if (open < 0) break;
 
-            int start = open + openTag.Length;
+            int idStart = open + prefix.Length;
+            int idEnd = text.IndexOf("\">", idStart, System.StringComparison.Ordinal);
+            if (idEnd < 0) break; // tag itself not fully present yet
+
+            int start = idEnd + 2;
             int close = text.IndexOf(DialogueKeywordMarkup.CloseLinkTag, start, System.StringComparison.Ordinal);
-            emphasisRanges.Add(new EmphasisRange { Start = start, End = close < 0 ? text.Length : close, Menace = menace });
 
-            if (close < 0) return;
+            DialogueEmphasisProfile p = library.Get(text.Substring(idStart, idEnd - idStart));
+            if (p != null)
+                emphasisRanges.Add(new EmphasisRange { Start = start, End = close < 0 ? text.Length : close, Profile = p });
+
+            if (close < 0) break;
             search = close + DialogueKeywordMarkup.CloseLinkTag.Length;
         }
+
+        return emphasisRanges.Count > 0;
     }
 
-    /// <summary>Returns the style for a source index, or null if it isn't emphasised.</summary>
-    private EmphasisStyle GetEmphasisStyle(int sourceIndex)
+    /// <summary>Returns the profile for a source index, or null if it isn't emphasised.</summary>
+    private DialogueEmphasisProfile GetEmphasisProfile(int sourceIndex)
     {
         for (int i = 0; i < emphasisRanges.Count; i++)
         {
             EmphasisRange r = emphasisRanges[i];
             if (sourceIndex >= r.Start && sourceIndex < r.End)
-                return r.Menace ? menaceStyle : keywordStyle;
+                return r.Profile;
         }
         return null;
     }
@@ -300,7 +272,7 @@ public class TMPWobbleText : MonoBehaviour
             if (!charInfo.isVisible)
                 continue;
 
-            EmphasisStyle style = emphasisActive ? GetEmphasisStyle(charInfo.index) : null;
+            DialogueEmphasisProfile style = emphasisActive ? GetEmphasisProfile(charInfo.index) : null;
             if (!baseActive && style == null)
                 continue;
 
@@ -336,27 +308,34 @@ public class TMPWobbleText : MonoBehaviour
 
             float sinceAppear = now - charAppearTimes[charIndex];
             float settleT = style.settleDuration > 0f ? Mathf.Clamp01(sinceAppear / style.settleDuration) : 1f;
-            float settle = Mathf.Lerp(style.settleBoost, 1f, settleT);
+            float motion = Mathf.Lerp(style.settleBoost, 1f, settleT) * emphasisIntensity;
 
-            float amp = style.jitter * fontSize * settle;
-            offset += new Vector3(HashSigned(charIndex, step, 1), HashSigned(charIndex, step, 2), 0f) * amp;
+            float amp = style.jitter * fontSize * motion;
+            offset += new Vector3(HashSigned(charIndex, step, 1) * style.jitterAxes.x,
+                                  HashSigned(charIndex, step, 2) * style.jitterAxes.y, 0f) * amp;
 
             if (Hash01(charIndex, step, 3) < style.twitchChance)
-                offset += new Vector3(HashSigned(charIndex, step, 4), HashSigned(charIndex, step, 5), 0f) * (style.twitchAmount * fontSize);
+            {
+                float twitch = style.twitchAmount * fontSize * emphasisIntensity;
+                offset += new Vector3(HashSigned(charIndex, step, 4) * style.twitchAxes.x,
+                                      HashSigned(charIndex, step, 5) * style.twitchAxes.y, 0f) * twitch;
+            }
 
-            Quaternion tilt = Quaternion.Euler(0f, 0f, HashSigned(charIndex, step, 6) * style.rotationJitter * settle);
+            Quaternion tilt = Quaternion.Euler(0f, 0f, HashSigned(charIndex, step, 6) * style.rotationJitter * motion);
             Vector3 center = (vertices[vertexIndex + 0] + vertices[vertexIndex + 2]) * 0.5f;
             for (int v = 0; v < 4; v++)
                 vertices[vertexIndex + v] = center + tilt * (vertices[vertexIndex + v] - center) + offset;
 
             if (style.flickerChance > 0f && Hash01(charIndex, step, 7) < style.flickerChance)
             {
-                float keep = 1f - style.flickerDarken;
+                float keep = 1f - style.flickerAmount;
                 Color32[] colors = textInfo.meshInfo[meshIndex].colors32;
                 for (int v = 0; v < 4; v++)
                 {
                     Color32 c = colors[vertexIndex + v];
-                    colors[vertexIndex + v] = new Color32((byte)(c.r * keep), (byte)(c.g * keep), (byte)(c.b * keep), c.a);
+                    colors[vertexIndex + v] = style.flickerFadesAlpha
+                        ? new Color32(c.r, c.g, c.b, (byte)(c.a * keep))
+                        : new Color32((byte)(c.r * keep), (byte)(c.g * keep), (byte)(c.b * keep), c.a);
                 }
                 colorsChanged = true;
             }
