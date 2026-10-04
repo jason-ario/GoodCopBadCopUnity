@@ -14,6 +14,8 @@ public class CaseFileController : Interactable
     [SerializeField] private Transform lookPos;
     [SerializeField] private GameObject caseFileUI;
     
+    protected override string DefaultInteractVerb => "Open";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

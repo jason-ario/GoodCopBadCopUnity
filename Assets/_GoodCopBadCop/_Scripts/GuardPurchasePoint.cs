@@ -103,6 +103,12 @@ public class GuardPurchasePoint : Interactable
             ShiftManager.Instance.OnDayStart -= OnDayStart;
     }
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        return _guardPurchased.Value ? "Inspect" : "Hire guard";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         if (!_unlocked.Value) return;

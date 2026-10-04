@@ -127,6 +127,8 @@ public class MailSortBin : Interactable
         return _depositTarget != null ? _depositTarget.position : transform.position;
     }
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Sort";
+
     /// <summary>
     /// Called by <see cref="PlayerInteractionController"/> on the local client when the player
     /// interacts with this bin while holding a <see cref="MailPackageItem"/> (its PickableItemData

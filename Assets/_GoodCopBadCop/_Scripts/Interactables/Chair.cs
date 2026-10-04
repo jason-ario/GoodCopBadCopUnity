@@ -39,6 +39,8 @@ public class Chair : Interactable
         standingPos.transform.parent = null;
     }
 
+    protected override string DefaultInteractVerb => "Sit";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

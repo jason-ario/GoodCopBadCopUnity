@@ -10,6 +10,8 @@ public class Guard : Interactable
         base.Awake();
     }
 
+    protected override string DefaultInteractVerb => "Talk";
+
     /// <summary>
     /// Picks a random blurb and delegates speaking to the SpeakingInteraction component.
     /// Ignored while the guard is still finishing a previous statement.

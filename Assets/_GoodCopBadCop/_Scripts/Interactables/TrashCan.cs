@@ -29,6 +29,8 @@ public class TrashCan : Interactable
         return base.CanInteractWithItem(item) || item is FolderController;
     }
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Throw away";
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         base.InteractWithItem(playerInteractionController, item);

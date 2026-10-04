@@ -109,6 +109,8 @@ public class FuseSlot : Interactable
     public override bool CanInteractWithItem(PickableObject item)
         => !IsFilled && item is FusePickup;
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Insert fuse";
+
     /// <summary>Interact key (empty-handed) on a filled slot extracts the fuse.</summary>
     public override void Interact(PlayerInteractionController player)
     {

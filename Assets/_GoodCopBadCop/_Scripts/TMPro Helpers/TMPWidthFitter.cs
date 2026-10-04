@@ -44,6 +44,9 @@ public class TMPWidthFitter : MonoBehaviour
         ForceUpdateWidth();
     }
 
+    /// <summary>Extra width added to each horizontal side of the measured text.</summary>
+    public float HorizontalPadding => horizontalPadding;
+
     /// <summary>Sets the horizontal padding and immediately refreshes the width.</summary>
     public void SetHorizontalPadding(float padding)
     {

@@ -291,6 +291,8 @@ public class JunkItem : Interactable
     /// <summary>No Interact-key prompt — junk is collected with LMB / RT (see <see cref="Interact"/>).</summary>
     public override bool ShowsInteractPrompt(PlayerInteractionController player) => false;
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject heldItem) => "Collect";
+
     /// <summary>
     /// LMB / RT while holding a compatible item (TrashBag) — collects this junk item into the bag.
     /// Shows a "Trash is full" toast when the bag is full.

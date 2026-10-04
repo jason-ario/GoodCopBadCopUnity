@@ -94,6 +94,8 @@ public class ElectricPanelController : Interactable
 
     // ─── Interactable override ────────────────────────────────────────────────
 
+    protected override string DefaultInteractVerb => "Open";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

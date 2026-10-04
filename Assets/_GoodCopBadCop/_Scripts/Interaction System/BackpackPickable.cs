@@ -158,6 +158,14 @@ public class BackpackPickable : PickableObject
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        bool holdingOther = player != null && player.pickupController != null
+            && player.pickupController.HeldObject != null && player.pickupController.HeldObject != this;
+        return holdingOther ? "Store item" : base.GetInteractVerb(player);
+    }
+
     /// <summary>
     /// Tap Interact empty-handed → standard pickup via base class.
     /// Tap Interact while holding an item → store held item.

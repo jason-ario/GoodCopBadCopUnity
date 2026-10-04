@@ -109,6 +109,8 @@ public class CoinSlotPanel : Interactable
 
     // ── InteractWithItem ──────────────────────────────────────────────────────
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Insert coin";
+
     /// <summary>
     /// Called via left-click while holding a Kill Coin.
     /// The Kill Coin PickableItemData must be listed in itemsThatCanInteractWith on the prefab.

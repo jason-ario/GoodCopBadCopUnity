@@ -6,6 +6,8 @@ using UnityEngine;
 /// </summary>
 public class TrailDestinationInteractable : Interactable
 {
+    protected override string DefaultInteractVerb => "Inspect";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

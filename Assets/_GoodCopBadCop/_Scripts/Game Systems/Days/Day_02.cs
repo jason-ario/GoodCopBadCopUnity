@@ -773,9 +773,36 @@ public class Day_02 : DayBase, IDailyTask
         // ── Phase 5: Vlad returns to the yard and settles in ───────────────────
         yield return new WaitForSeconds(_vladExitDelay);
 
+        // The booth door's NavMeshObstacle blocks Vlad's path out of the booth whenever it's
+        // closed, so if a player shut it during the tool locker talk he can't path back to the
+        // yard. Force it open and keep it open until he's out and settled.
+        bool doorWasClosed = _boothDoor != null && _boothDoor.IsDoorClosed;
+        Coroutine holdDoor = StartCoroutine(HoldBoothDoorOpen());
+
+        // Give the NavMeshObstacle carving a moment to clear before Vlad computes his path.
+        if (doorWasClosed)
+            yield return new WaitForSeconds(0.25f);
+
         yield return StartCoroutine(SettleVladInYard(_spawnedVlad));
+        StopCoroutine(holdDoor);
 
         Debug.Log("[Day_02] Opening sequence complete — Vlad has settled in the yard.");
+    }
+
+    /// <summary>
+    /// Forces <see cref="_boothDoor"/> open and re-opens it if a player closes it, until stopped.
+    /// Used while Vlad walks out of the booth after the tool locker dialogue. Server-side only.
+    /// </summary>
+    private IEnumerator HoldBoothDoorOpen()
+    {
+        if (_boothDoor == null) yield break;
+
+        while (true)
+        {
+            if (_boothDoor.IsDoorClosed)
+                _boothDoor.ForceOpen(openedIn: true);
+            yield return null;
+        }
     }
 
     // -------------------------------------------------------------------------

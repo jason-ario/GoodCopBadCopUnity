@@ -36,6 +36,12 @@ public class MiniFridge : Interactable
         _isOpen.OnValueChanged -= OnFridgeStateChanged;
     }
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        return _isOpen.Value ? "Close" : "Open";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

@@ -74,8 +74,13 @@ public abstract class CollectableContainer : Interactable
 
     // ── Interact (no held item) ───────────────────────────────────────────────
 
+    protected override string DefaultInteractVerb => "Call HQ";
+
+    /// <summary>Interact only calls HQ once the container is full and no collector is en route.</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) => IsFull && !IsAwaitingPickup;
+
     /// <summary>
-    /// When the player left-clicks without a held item and the container is full,
+    /// When the player presses Interact and the container is full,
     /// calls HQ for pickup.
     /// </summary>
     public override void Interact(PlayerInteractionController player)

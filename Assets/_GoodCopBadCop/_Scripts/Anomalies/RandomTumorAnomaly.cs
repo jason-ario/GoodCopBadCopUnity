@@ -7,6 +7,11 @@ public class RandomTumorAnomaly : PhysicalAnomaly
     [SerializeField] private GameObject[] tumors;
     [SerializeField] private Transform[] parentBones;
 
+    [Tooltip("Minimum number of tumors shown when the anomaly activates.")]
+    [SerializeField, Min(1)] private int minActiveTumors = 1;
+    [Tooltip("Maximum number of tumors shown when the anomaly activates (clamped to the tumor count).")]
+    [SerializeField, Min(1)] private int maxActiveTumors = 3;
+
     private void Awake()
     {
         InitializeTumors();
@@ -48,8 +53,13 @@ public class RandomTumorAnomaly : PhysicalAnomaly
     /// </summary>
     public int[] PickActiveIndices()
     {
+        if (tumors.Length == 0)
+            return Array.Empty<int>();
+
         int[] indices = BuildShuffledIndices();
-        int count = Random.Range(1, tumors.Length + 1);
+        int max = Mathf.Clamp(maxActiveTumors, 1, tumors.Length);
+        int min = Mathf.Clamp(minActiveTumors, 1, max);
+        int count = Random.Range(min, max + 1);
         int[] activeIndices = new int[count];
         Array.Copy(indices, activeIndices, count);
         return activeIndices;

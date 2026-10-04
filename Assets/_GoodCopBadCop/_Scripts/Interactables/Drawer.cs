@@ -189,6 +189,12 @@ public class Drawer : Interactable
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        return isOpen.Value ? "Close" : "Open";
+    }
+
     /// <summary>
     /// Interact key press grabs the drawer; the drag loop in Update releases it when the key is let go.
     /// </summary>

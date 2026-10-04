@@ -82,6 +82,26 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// while the player's hands are full); the press itself is still forwarded to <see cref="Interact"/>.
     /// </summary>
     public virtual bool ShowsInteractPrompt(PlayerInteractionController player) => true;
+    [Tooltip("Action name shown next to the Interact key on the reticle (e.g. \"Open\", \"Talk\"). Leave empty to use the script's default verb.")]
+    [SerializeField] protected string interactVerb;
+
+    /// <summary>Script default for the reticle's Interact action name when <see cref="interactVerb"/> is empty.</summary>
+    protected virtual string DefaultInteractVerb => "Use";
+
+    /// <summary>
+    /// Action name shown next to the Interact key icon (e.g. "[E] Pick up"). Override for
+    /// state-dependent verbs (Open / Close). The Inspector <see cref="interactVerb"/> wins when set.
+    /// </summary>
+    public virtual string GetInteractVerb(PlayerInteractionController player)
+        => string.IsNullOrEmpty(interactVerb) ? DefaultInteractVerb : interactVerb;
+
+    /// <summary>
+    /// Action name shown next to the LMB / RT icon when <paramref name="item"/> can be used on this
+    /// target (see <see cref="CanInteractWithItem"/>), e.g. "Insert fuse", "Collect".
+    /// </summary>
+    public virtual string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Use";
+
+
 
     /// <summary>
     /// Only highlight children whose names contain this string.

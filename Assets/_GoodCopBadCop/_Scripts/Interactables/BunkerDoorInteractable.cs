@@ -25,6 +25,12 @@ public class BunkerDoorInteractable : Interactable
 
     // ─── Interactable override ────────────────────────────────────────────────
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        return _bunkerDoor != null && _bunkerDoor.IsOpen ? "Close" : "Turn wheel";
+    }
+
     /// <summary>
     /// If the door is open, slams it shut. Otherwise opens the wheel diegetic view on the
     /// player's side of the door, provided no other player is currently occupying it.

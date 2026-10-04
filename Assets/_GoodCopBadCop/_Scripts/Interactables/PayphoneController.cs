@@ -8,6 +8,8 @@ public class PayphoneController : Interactable
         base.Awake();
         GetComponent<HighlightEffect>().effectNameFilter = "Friendphone";
     }
+    protected override string DefaultInteractVerb => "Call";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

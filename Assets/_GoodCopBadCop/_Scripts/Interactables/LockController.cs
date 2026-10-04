@@ -113,6 +113,10 @@ public class LockController : Interactable
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
+    protected override string DefaultInteractVerb => "Inspect";
+
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Unlock";
+
     /// <summary>
     /// Called when the player interacts with the padlock without holding the required key.
     /// Plays the locked-shake feedback.

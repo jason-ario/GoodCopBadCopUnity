@@ -112,6 +112,13 @@ public class GateStartShiftController : Interactable
             _introComplete.Value = day != 1;
     }
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        if (IsDayOneIntroPending()) return "Start shift";
+        return _gateOpen.Value ? "Close" : "Open";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         if (!HasCampaignStarted)

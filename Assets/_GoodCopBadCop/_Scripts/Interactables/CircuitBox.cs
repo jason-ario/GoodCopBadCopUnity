@@ -11,6 +11,12 @@ public class CircuitBox : Interactable
 
     private bool _isOpened = false;
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        return _isOpened ? "Close" : "Open";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

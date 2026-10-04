@@ -458,6 +458,13 @@ public class FolderController : PickableObject
         HandOffPoint.SetPendingVerdictFolder(folder);
     }
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item)
+    {
+        string itemName = item != null && item.ItemData != null ? item.ItemData.name : null;
+        if (itemName != null && itemName.StartsWith("Stamp_")) return "Stamp";
+        return "Add to folder";
+    }
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
     {
         // Block all item interactions while the folder is being held by any player.

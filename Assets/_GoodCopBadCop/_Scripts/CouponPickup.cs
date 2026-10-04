@@ -72,6 +72,8 @@ public class CouponPickup : Interactable
 
     // ── Interaction ──────────────────────────────────────────────────────────
 
+    protected override string DefaultInteractVerb => "Take";
+
     /// <summary>
     /// Triggered by the local player via E or left-click. Disables the component
     /// immediately to prevent double-firing during the server round-trip, then

@@ -157,6 +157,8 @@ public class DumpsterInteractable : CollectableContainer
 
     // ── Interact-based deposit (holding a TrashBag) ──────────────────────────
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Throw in";
+
     /// <summary>
     /// Called by <see cref="PlayerInteractionController"/> on the local client when the player
     /// interacts with the dumpster while holding a <see cref="TrashBag"/> (the Trash Bag

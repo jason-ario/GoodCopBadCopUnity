@@ -138,6 +138,8 @@ public class Lever : Interactable
         CheckShutterThreshold();
     }
 
+    protected override string DefaultInteractVerb => "Pull";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

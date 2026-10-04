@@ -117,6 +117,8 @@ public class ToolsLocker : Interactable, ILockable
     [ContextMenu("Open")]
     public void ForceOpen() => OpenLockerServerRpc();
 
+    protected override string DefaultInteractVerb => "Open";
+
     public override void Interact(PlayerInteractionController player)
     {
         if (_isLocked.Value)

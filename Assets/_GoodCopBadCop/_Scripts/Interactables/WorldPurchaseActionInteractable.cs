@@ -190,6 +190,8 @@ public class WorldPurchaseActionInteractable : Interactable
 
     // ─── Interactable override ─────────────────────────────────────────────────
 
+    protected override string DefaultInteractVerb => "Buy";
+
     /// <summary>Opens the purchase popup when the player clicks or presses E on this object.</summary>
     public override void Interact(PlayerInteractionController player)
     {

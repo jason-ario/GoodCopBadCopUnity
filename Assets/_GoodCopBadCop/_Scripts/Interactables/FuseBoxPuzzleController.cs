@@ -142,6 +142,12 @@ public class FuseBoxPuzzleController : Interactable
 
     // ── Door interaction ──────────────────────────────────────────────────────
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        return _doorOpen.Value ? "Close" : "Open";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

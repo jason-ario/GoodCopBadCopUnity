@@ -462,9 +462,12 @@ public class PlayerInteractionController : NetworkBehaviour
                     PickableObject heldForUse = _playerPickupController.HeldObject;
                     bool canUseHeldItem = heldForUse != null && interactable.CanInteractWithItem(heldForUse);
 
-                    bool showKey = holdVerb != null || canUseHeldItem || interactable.ShowsInteractPrompt(this);
+                    bool showKey = canUseHeldItem || interactable.ShowsInteractPrompt(this);
+                    string actionVerb = canUseHeldItem
+                        ? interactable.GetItemUseVerb(this, heldForUse)
+                        : interactable.GetInteractVerb(this);
 
-                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint, holdVerb, canUseHeldItem);
+                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint, holdVerb, canUseHeldItem, actionVerb);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }
@@ -521,7 +524,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 {
                     // Aim-shown ghost commits on the Interact key (see TryPlaceHeldObjectAtGhost) â€” show its icon.
                     if (aimGhostRequested)
-                        reticle.SetInteractState(true, placementBoard.AimHoverText, true);
+                        reticle.SetInteractState(true, placementBoard.AimHoverText, true, actionVerb: "Place");
                     else
                         reticle.SetInteractState(false);
                     reticle.SetTooFarState(false);
@@ -575,7 +578,7 @@ public class PlayerInteractionController : NetworkBehaviour
             if (_playerPickupController.IsHoldingObject)
             {
                 if (nearbyAimGhostRequested)
-                    reticle.SetInteractState(true, nearbyBoard.AimHoverText, true);
+                    reticle.SetInteractState(true, nearbyBoard.AimHoverText, true, actionVerb: "Place");
                 else
                     reticle.SetInteractState(false);
                 reticle.SetTooFarState(false);

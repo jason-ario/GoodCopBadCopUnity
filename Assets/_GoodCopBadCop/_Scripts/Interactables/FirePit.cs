@@ -146,6 +146,11 @@ public class FirePit : Interactable, IIgnitable
 
     // ── Interactable overrides ─────────────────────────────────────────────────
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Light";
+
+    /// <summary>Interact does nothing on the fire pit — it's lit with a held match (LMB / RT).</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) => false;
+
     /// <summary>
     /// Called by <see cref="PlayerInteractionController"/> when the local player
     /// uses a compatible item (e.g. a <see cref="Match"/>) on this fire pit.

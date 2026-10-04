@@ -1592,6 +1592,8 @@ public class PickableObject : Interactable
     public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
         player.pickupController == null || player.pickupController.HeldObject == null;
 
+    protected override string DefaultInteractVerb => "Pick up";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

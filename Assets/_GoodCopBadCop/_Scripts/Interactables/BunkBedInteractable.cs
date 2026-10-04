@@ -318,6 +318,8 @@ public class BunkBedInteractable : Interactable
 
     // ─── IInteractable ───────────────────────────────────────────────────────
 
+    protected override string DefaultInteractVerb => "Sleep";
+
     /// <summary>Always opens the bed view. Popup content depends on whether sleeping is allowed.</summary>
     public override void Interact(PlayerInteractionController player)
     {

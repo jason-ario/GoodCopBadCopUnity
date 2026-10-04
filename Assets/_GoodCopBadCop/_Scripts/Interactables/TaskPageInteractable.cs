@@ -12,6 +12,8 @@ public class TaskPageInteractable : Interactable
     [Tooltip("The diegetic view controller that opens the close-up camera view.")]
     [SerializeField] private TaskPageDiegeticController _diegeticController;
 
+    protected override string DefaultInteractVerb => "Read";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

@@ -266,6 +266,15 @@ public class Telephone : Interactable
 
     // ── Interaction ──────────────────────────────────────────────────────────
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        if (_isRinging.Value && !_isGrabbed.Value) return "Answer";
+        if (!_isGrabbed.Value) return "Pick up";
+        if (player != null && _grabbingClientId.Value == player.OwnerClientId) return "Hang up";
+        return "Use";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

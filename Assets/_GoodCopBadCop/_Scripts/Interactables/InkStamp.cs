@@ -244,6 +244,10 @@ public class InkStamp : Interactable, IPickupSlot
     /// </summary>
     public static event System.Action<InkStamp> OnAnyStampPickedUp;
 
+    protected override string DefaultInteractVerb => "Take stamp";
+
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Put back";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

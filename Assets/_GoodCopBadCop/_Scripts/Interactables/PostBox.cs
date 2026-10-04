@@ -19,6 +19,8 @@ public class PostBox : CollectableContainer
         base.Awake();
     }
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Deposit";
+
     /// <summary>
     /// Called by PlayerInteractionController when the player left-clicks the PostBox
     /// while holding a MutantBit. Despawns the bit and deposits it into the container.

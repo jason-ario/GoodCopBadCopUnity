@@ -14,6 +14,8 @@ public class Paper : PickableObject
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
     }
     
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Draw";
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         if (item.ItemData.name == "RedPencil")

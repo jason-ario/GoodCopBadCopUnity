@@ -225,6 +225,12 @@ public class TimecardMachine : Interactable
         EnableClockIn();
     }
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        return _clockOutArmed.Value ? "Clock out" : "Clock in";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         // Clock-out takes priority. In the normal flow the two flags are mutually

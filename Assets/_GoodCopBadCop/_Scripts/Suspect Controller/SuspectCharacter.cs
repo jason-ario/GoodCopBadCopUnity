@@ -1607,6 +1607,16 @@ public class SuspectCharacter : Interactable
     public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
         _junkItem == null || !_junkItem.IsCollectible.Value;
 
+    protected override string DefaultInteractVerb => "Talk";
+
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item)
+    {
+        if (_junkItem != null && _junkItem.IsCollectible.Value) return "Collect";
+        if (item is Vaccine) return "Vaccinate";
+        if (item != null && item.ItemData != null && item.ItemData.name == "Shotgun") return "Shoot";
+        return "Use";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         // A collectible body is junk — collecting it is item-on-target use (LMB / RT with a trash

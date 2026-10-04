@@ -197,6 +197,8 @@ public class Flashlight : PickableObject
         CycleFlashlightServerRpc();
     }
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Recharge";
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         base.InteractWithItem(playerInteractionController, item);

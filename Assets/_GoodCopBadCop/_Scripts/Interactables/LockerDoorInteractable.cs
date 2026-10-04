@@ -87,6 +87,12 @@ public class LockerDoorInteractable : Interactable
         _isOpen.OnValueChanged -= OnOpenStateChanged;
     }
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+    {
+        if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
+        return _predictedOpen ? "Close" : "Open";
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

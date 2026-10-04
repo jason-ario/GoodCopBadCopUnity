@@ -55,6 +55,8 @@ public class Thermometer : PickableObject
         }
     }
 
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Recharge";
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         base.InteractWithItem(playerInteractionController, item);

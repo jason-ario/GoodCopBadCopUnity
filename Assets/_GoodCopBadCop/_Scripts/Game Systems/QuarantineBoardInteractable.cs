@@ -12,6 +12,8 @@ public class QuarantineBoardInteractable : Interactable
     [Tooltip("The diegetic view controller that opens the close-up camera view.")]
     [SerializeField] private QuarantineBoardDiegeticController _diegeticController;
 
+    protected override string DefaultInteractVerb => "Inspect";
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
