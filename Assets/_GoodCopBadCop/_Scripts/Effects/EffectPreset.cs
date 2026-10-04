@@ -13,7 +13,13 @@ namespace GoodCopBadCop.Effects
         /// Post-processing pulse (see <see cref="DamageVignetteView"/>): colored Vignette plus optional
         /// chromatic aberration, saturation, lens distortion, and a screen color wash.
         /// </summary>
-        Vignette
+        Vignette,
+        /// <summary>
+        /// Edge glitch after post-processing (see <see cref="GlitchEffectView"/>): warping, band tearing,
+        /// RGB split and a tinted glow around the screen borders. Uses tint, opacity (peak intensity),
+        /// duration, opacity curve and the Glitch settings.
+        /// </summary>
+        Glitch
     }
 
     [Serializable]
@@ -46,6 +52,16 @@ namespace GoodCopBadCop.Effects
         [Tooltip("How strongly the screen tint is applied. 0 disables the color wash.")]
         [SerializeField, Range(0f, 1f)] private float screenTintAmount;
 
+        [Header("Glitch (Glitch mode only)")]
+        [Tooltip("How far the glitch band reaches in from the screen edges.")]
+        [SerializeField, Range(0.05f, 1f)] private float glitchEdgeWidth = 0.45f;
+        [Tooltip("Noise warping and pulsing pull at the edges.")]
+        [SerializeField, Range(0f, 1f)] private float glitchWarpStrength = 0.6f;
+        [Tooltip("Horizontal band tearing and RGB split.")]
+        [SerializeField, Range(0f, 1f)] private float glitchTearStrength = 0.6f;
+        [Tooltip("Tinted glow strength at the edges.")]
+        [SerializeField, Range(0f, 1f)] private float glitchGlowStrength = 0.55f;
+
         public bool Enabled => enabled;
         public EFullscreenEffectMode Mode => mode;
         public Sprite OverlaySprite => overlaySprite;
@@ -60,6 +76,10 @@ namespace GoodCopBadCop.Effects
         public float LensDistortion => lensDistortion;
         public Color ScreenTint => screenTint;
         public float ScreenTintAmount => screenTintAmount;
+        public float GlitchEdgeWidth => glitchEdgeWidth;
+        public float GlitchWarpStrength => glitchWarpStrength;
+        public float GlitchTearStrength => glitchTearStrength;
+        public float GlitchGlowStrength => glitchGlowStrength;
 
         public static FullscreenEffectSettings Disabled()
         {

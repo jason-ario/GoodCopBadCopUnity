@@ -40,7 +40,7 @@ public class SuspectCharacter : Interactable
     private bool _isReplacement;
     [SerializeField] Collider interactionCollider;
 
-    [Tooltip("When assigned, direct interaction (LMB / E) opens a simple 3-choice world " +
+    [Tooltip("When assigned, direct interaction (Interact key) opens a simple 3-choice world " +
              "conversation instead of the no-op fallthrough below. Used for scene-placed " +
              "suspects that are talked to directly rather than through the booth/interrogation " +
              "flow (e.g. the Day 1 Suspect_Soldier). Leave null for normal booth suspects.")]
@@ -53,7 +53,7 @@ public class SuspectCharacter : Interactable
     /// </summary>
     public void SetWorldDialogue(SuspectWorldDialogue dialogue) => worldDialogue = dialogue;
 
-    [Tooltip("When true, direct interaction (LMB / E) is consumed as a no-op — no intro dialogue " +
+    [Tooltip("When true, direct interaction (Interact key) is consumed as a no-op — no intro dialogue " +
              "request and no SuspectWorldDialogue question conversation are started. Junk collection " +
              "and rejoining an already-active scripted dialogue still work; only the intro/question " +
              "dialogue paths below are skipped. Check this in the Inspector for suspects that should " +
@@ -102,7 +102,7 @@ public class SuspectCharacter : Interactable
 
     /// <summary>
     /// Server-written hard lock on ALL direct interaction with this living suspect: the reticle
-    /// can't target them, no highlight, and Interact/InteractAlternate are no-ops (no intro, no
+    /// can't target them, no highlight, and Interact is a no-op (no intro, no
     /// question choices, no scripted-dialogue rejoin). Stronger than
     /// <see cref="_dialogueInteractionDisabled"/>. Junk collection after death is unaffected.
     /// Networked so late joiners read the same state. Used for Day 1's tutorial Vlad.
@@ -1603,14 +1603,16 @@ public class SuspectCharacter : Interactable
         base.Highlight(highlight);
     }
 
+    /// <summary>A collectible body is junk: no Interact-key prompt (collected with LMB / RT + trash bag).</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
+        _junkItem == null || !_junkItem.IsCollectible.Value;
+
     public override void Interact(PlayerInteractionController player)
     {
-        // Route to junk collection when the body is collectible (JunkItem enabled on death).
+        // A collectible body is junk — collecting it is item-on-target use (LMB / RT with a trash
+        // bag, routed through InteractWithItem). The Interact key does nothing here.
         if (_junkItem != null && _junkItem.IsCollectible.Value)
-        {
-            _junkItem.Interact(player);
             return;
-        }
 
         // Hard-locked suspects (e.g. Day 1 tutorial Vlad) ignore every direct interaction path.
         if (_interactionLocked.Value)
@@ -1821,6 +1823,15 @@ public class SuspectCharacter : Interactable
 
     private void ApplyJunkPickupState()
     {
+        // Remember the living-character interaction setup (first time only) so a reusable body
+        // (a guard soldier slot) can be restored by ResetDeathStateForReuse.
+        if (!_hasPreJunkInteraction)
+        {
+            _hasPreJunkInteraction = true;
+            _preJunkInteractText = interactText;
+            _preJunkItemsThatCanInteractWith = itemsThatCanInteractWith;
+        }
+
         SetCanInteract(true);
         interactText = JunkItem.DefaultInteractText;
 
@@ -2073,10 +2084,69 @@ public class SuspectCharacter : Interactable
     /// </summary>
     private void DisableLegsAnimators()
     {
+        _deathVisualsApplied = true;
+
         foreach (LegsAnimator legsAnimator in GetComponentsInChildren<LegsAnimator>(true))
         {
+            if (legsAnimator.enabled)
+                _legsAnimatorsDisabledOnDeath.Add(legsAnimator);
+
             legsAnimator.enabled = false;
         }
+    }
+
+    // Reuse after death (guard soldier slots)
+
+    private bool _deathVisualsApplied;
+    private readonly System.Collections.Generic.List<LegsAnimator> _legsAnimatorsDisabledOnDeath =
+        new System.Collections.Generic.List<LegsAnimator>();
+    private bool _hasPreJunkInteraction;
+    private string _preJunkInteractText;
+    private PickableItemData[] _preJunkItemsThatCanInteractWith;
+
+    /// <summary>
+    /// Brings a dead body back to its living, idle state so the same GameObject can be reused —
+    /// e.g. a <c>GuardPurchasePoint</c>'s soldier slot, whose single soldier object is reactivated
+    /// for every newly purchased guard. Undoes everything a guard death changes: the dead flag,
+    /// blood explosion, "Die" animator state, disabled leg IK, fire, and the "Collect Junk"
+    /// interaction label/items. Local only: call it on every peer (driven by replicated state)
+    /// while the GameObject is active. No-op on a body that never died on this peer.
+    /// </summary>
+    public void ResetDeathStateForReuse()
+    {
+        if (!_isDead && !_deathVisualsApplied && !_hasPreJunkInteraction)
+            return;
+
+        _isDead = false;
+        _deathVisualsApplied = false;
+
+        if (bloodExplosion != null)
+            bloodExplosion.SetActive(false);
+
+        if (animator != null && animator.isActiveAndEnabled)
+        {
+            animator.Rebind();
+            animator.Update(0f);
+        }
+
+        foreach (LegsAnimator legsAnimator in _legsAnimatorsDisabledOnDeath)
+        {
+            if (legsAnimator != null)
+                legsAnimator.enabled = true;
+        }
+        _legsAnimatorsDisabledOnDeath.Clear();
+
+        if (_setOnFire != null)
+            _setOnFire.Extinguish();
+
+        if (_hasPreJunkInteraction)
+        {
+            interactText = _preJunkInteractText;
+            itemsThatCanInteractWith = _preJunkItemsThatCanInteractWith;
+            _hasPreJunkInteraction = false;
+        }
+
+        SetCanInteract(true);
     }
 
     public void AimAtPlayer()

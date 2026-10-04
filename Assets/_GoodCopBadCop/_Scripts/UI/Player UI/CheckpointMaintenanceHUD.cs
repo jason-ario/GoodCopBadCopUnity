@@ -3,14 +3,13 @@ using UnityEngine;
 /// <summary>
 /// Drives the maintenance rows inside the HUD's Checkpoint Integrity panel — three
 /// <see cref="MaintenanceTaskRow"/> rows each showing a single number: how many broken fence
-/// segments, pieces of trash/gore, and unscrubbed graffiti/blood pieces are currently outstanding.
+/// segments, pieces of trash/gore, and unscrubbed graffiti pieces are currently outstanding.
 ///
 /// Counts include items that belong to an active task as well as ones that don't:
 ///   - Fences: every authored segment currently broken in the world
 ///     (<see cref="FenceRepairTask.BrokenFenceCount"/>), not only the active repair round.
 ///   - Trash: <see cref="TakeOutTrashTask"/> total minus deposited (in-bounds items only).
-///   - Graffiti: graffiti pieces + in-bounds blood splatters counted by <see cref="CleanBloodTask"/>,
-///     minus scrubbed.
+///   - Graffiti: graffiti pieces minus scrubbed. Blood splatters are cosmetic and never counted.
 ///
 /// After Day 1 these cleanup categories become optional (see <see cref="CleanupTaskGating"/>):
 /// they no longer occupy a slot on the mandatory "CURRENT ORDERS" task list and no longer block
@@ -29,7 +28,7 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
     [Tooltip("Row showing the number of trash/gore items still to deposit.")]
     [SerializeField] private MaintenanceTaskRow _trashRow;
 
-    [Tooltip("Row showing the number of graffiti pieces + in-bounds blood splatters still to scrub.")]
+    [Tooltip("Row showing the number of graffiti pieces still to scrub.")]
     [SerializeField] private MaintenanceTaskRow _graffitiRow;
 
     [Tooltip("Seconds between polled refreshes (catches world changes that raise no event).")]
@@ -51,17 +50,15 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
     }
 
     /// <summary>
-    /// Combined graffiti + counted blood progress, used for the graffiti row. Blood only contributes
-    /// what <see cref="CleanBloodTask"/> has registered, which is limited to in-bounds splatters
-    /// (plus any out-of-bounds splatter credited as a bonus once scrubbed).
+    /// Graffiti progress, used for the graffiti row and Checkpoint Integrity's graffiti category.
+    /// Blood splatters are cosmetic and never counted.
     /// </summary>
-    public static void GetGraffitiAndBloodCounts(out int scrubbed, out int total)
+    public static void GetGraffitiCounts(out int scrubbed, out int total)
     {
         CleanGraffitiTask graffiti = CleanGraffitiTask.Instance;
-        CleanBloodTask blood = CleanBloodTask.Instance;
 
-        scrubbed = (graffiti != null ? graffiti.ScrubbedCount : 0) + (blood != null ? blood.ScrubbedCount : 0);
-        total    = (graffiti != null ? graffiti.TotalGraffitiCount : 0) + (blood != null ? blood.TotalCount : 0);
+        scrubbed = graffiti != null ? graffiti.ScrubbedCount : 0;
+        total    = graffiti != null ? graffiti.TotalGraffitiCount : 0;
     }
 
     /// <summary>Broken fence segments currently in the world (task-tracked or not).</summary>
@@ -78,10 +75,10 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
         return trash != null ? Mathf.Max(0, trash.TotalCount - trash.DepositedCount) : 0;
     }
 
-    /// <summary>Counted graffiti + blood pieces not yet scrubbed.</summary>
+    /// <summary>Graffiti pieces not yet scrubbed.</summary>
     public static int GetOutstandingGraffitiCount()
     {
-        GetGraffitiAndBloodCounts(out int scrubbed, out int total);
+        GetGraffitiCounts(out int scrubbed, out int total);
         return Mathf.Max(0, total - scrubbed);
     }
 
@@ -92,7 +89,6 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
         TakeOutTrashTask.OnProgressChanged    += Refresh;
         TakeOutTrashTask.OnAllItemsDeposited  += Refresh;
         CleanGraffitiTask.OnProgressChanged   += Refresh;
-        CleanBloodTask.OnProgressChanged      += Refresh;
 
         _pollTimer = 0f;
         Refresh();
@@ -105,7 +101,6 @@ public class CheckpointMaintenanceHUD : MonoBehaviour
         TakeOutTrashTask.OnProgressChanged    -= Refresh;
         TakeOutTrashTask.OnAllItemsDeposited  -= Refresh;
         CleanGraffitiTask.OnProgressChanged   -= Refresh;
-        CleanBloodTask.OnProgressChanged      -= Refresh;
     }
 
     private void Update()

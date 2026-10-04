@@ -3506,7 +3506,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 4294967295
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 795ab1f41a8fd4142859110cee203fd7, type: 2}
+  - {fileID: 2100000, guid: 7c3e9a1f5b2d4e6a8f0c1b2d3e4f5a6b, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -6653,7 +6653,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 4294967295
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 795ab1f41a8fd4142859110cee203fd7, type: 2}
+  - {fileID: 2100000, guid: 7c3e9a1f5b2d4e6a8f0c1b2d3e4f5a6b, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -8139,6 +8139,7 @@ MonoBehaviour:
   reticle: {fileID: 0}
   playerAnimationController: {fileID: 6460359851244041616}
   objectPlacerLerpSpeed: 10
+  holdInteractDuration: 0.5
   onlyAllowedInteractable: {fileID: 0}
 --- !u!114 &6845953909524944592
 MonoBehaviour:
@@ -8181,6 +8182,7 @@ MonoBehaviour:
   deathCamera: {fileID: 6875769014329330890}
   spectateCamera: {fileID: 7191204140556434343}
   deathUIDelay: 2
+  returnToDeathScreenDelay: 1
   _deathStinger: {fileID: 8300000, guid: b3db94b317dd0154e85fa0ccac97658c, type: 3}
 --- !u!114 &7541639783584628704
 MonoBehaviour:
@@ -8278,7 +8280,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   camera: {fileID: 5356956456531027514}
   renderCamera: {fileID: 2394760599302704364}
-  smokingNearClipPlane: 0
+  smokingNearClipPlane: 0.01
   nearClipPlaneLerpDuration: 0.2
   normalNoiseSettings: {fileID: 11400000, guid: 46965f9cbaf525742a6da4c2172a99cd, type: 2}
   rumbleNoiseSettings: {fileID: 11400000, guid: b241f91b9ccf8ff489abf204b30d3112, type: 2}
@@ -9120,6 +9122,8 @@ MonoBehaviour:
   goreLandingSound: {fileID: 0}
   corpseJunkItem: {fileID: 0}
   corpseJunkInteractionCollider: {fileID: 0}
+  fitCorpseColliderToPose: 1
+  corpseColliderPadding: 0.3
   canAggro: 0
   aggroTarget: {fileID: 0}
   deathBehaviour: 0
@@ -10057,7 +10061,7 @@ MonoBehaviour:
   holdHighlightVisibleRange: 50
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
-  holdHighlightPulseMinIntensity: 0.35
+  holdHighlightPulseMinOpacity: 0.4
   _destroyOnCollect: 0
   _kickable: 0
   _burnable: 0

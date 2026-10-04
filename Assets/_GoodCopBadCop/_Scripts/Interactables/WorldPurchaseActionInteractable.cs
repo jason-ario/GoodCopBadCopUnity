@@ -21,12 +21,11 @@ using UnityEngine.Events;
 /// (see BreakableGlassController.ShowRepairInteractable), which is why availability is also mirrored
 /// locally in <see cref="_availableLocal"/>.
 ///
-/// Implements <see cref="IHeldItemPassthrough"/> so the purchase popup still opens even while
-/// the player is holding an item (e.g. a package or tool), instead of the held item silently
-/// swallowing the click/E-press.
+/// The purchase popup is opened by the Interact key (E / gamepad West), which works whether
+/// or not the player is holding an item (e.g. a package or tool).
 /// </summary>
 [RequireComponent(typeof(ShopItem))]
-public class WorldPurchaseActionInteractable : Interactable, IHeldItemPassthrough
+public class WorldPurchaseActionInteractable : Interactable
 {
     [Header("Zoom Camera")]
     [Tooltip("Optional CinemachineCamera that blends in to frame this object during purchase. Leave empty to skip.")]

@@ -7,7 +7,7 @@ using UnityEngine;
 /// Requires a <see cref="NetworkObject"/> on this GameObject (Interactable is a NetworkBehaviour).
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class QuarantineBoardInteractable : Interactable, IHeldItemPassthrough
+public class QuarantineBoardInteractable : Interactable
 {
     [Tooltip("The diegetic view controller that opens the close-up camera view.")]
     [SerializeField] private QuarantineBoardDiegeticController _diegeticController;

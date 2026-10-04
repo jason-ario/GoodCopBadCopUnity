@@ -12,7 +12,12 @@ namespace GoodCopBadCop.Settings
     /// persisted backing (<see cref="ISettingsModel"/>) but previously had no runtime effect.
     /// Quality Preset adjusts global <see cref="QualitySettings"/> knobs directly (the project
     /// only defines a single "PC" quality tier, so presets are expressed as knob values rather
-    /// than named tiers). Brightness/Film Grain drive overrides on the always-on global Volume
+    /// than named tiers). Presets intentionally never touch LOD settings (lodBias /
+    /// maximumLODLevel): LODGroups are authored against the project tier's lodBias, and
+    /// overriding it at runtime made objects cull much closer than in the editor.
+    /// Shadow distance/cascades are set on the active URP asset (URP ignores the QualitySettings
+    /// equivalents) and restored on dispose so Editor play sessions don't dirty the asset.
+    /// Brightness/Film Grain drive overrides on the always-on global Volume
     /// identified by <see cref="GraphicsPreferencesVolumeAnchor"/>.
     /// </summary>
     public sealed class GraphicsPreferencesApplier : IInitializable, IDisposable
@@ -29,6 +34,10 @@ namespace GoodCopBadCop.Settings
         private FilmGrain filmGrain;
         private float filmGrainMaxIntensity = DefaultFilmGrainIntensity;
 
+        private UniversalRenderPipelineAsset urpAsset;
+        private float originalShadowDistance;
+        private int originalShadowCascadeCount;
+
         public GraphicsPreferencesApplier(ISettingsModel model, GraphicsPreferencesVolumeAnchor volumeAnchor)
         {
             this.model = model;
@@ -37,6 +46,7 @@ namespace GoodCopBadCop.Settings
 
         public void Initialize()
         {
+            CacheRenderPipelineDefaults();
             model.QualityPreset.Subscribe(ApplyQualityPreset).AddTo(ref disposables);
 
             Volume volume = volumeAnchor != null ? volumeAnchor.Volume : null;
@@ -73,6 +83,7 @@ namespace GoodCopBadCop.Settings
         public void Dispose()
         {
             disposables.Dispose();
+            RestoreRenderPipelineDefaults();
         }
 
         private void ApplyBrightness(float value)
@@ -95,47 +106,77 @@ namespace GoodCopBadCop.Settings
             filmGrain.intensity.value = isEnabled ? filmGrainMaxIntensity : 0f;
         }
 
-        private static void ApplyQualityPreset(EQualityPreset preset)
+        private void CacheRenderPipelineDefaults()
         {
+            urpAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            if (urpAsset == null)
+            {
+                return;
+            }
+
+            originalShadowDistance = urpAsset.shadowDistance;
+            originalShadowCascadeCount = urpAsset.shadowCascadeCount;
+        }
+
+        // The URP asset is a project asset: runtime edits would persist in the Editor, so restore them.
+        private void RestoreRenderPipelineDefaults()
+        {
+            if (urpAsset == null)
+            {
+                return;
+            }
+
+            urpAsset.shadowDistance = originalShadowDistance;
+            urpAsset.shadowCascadeCount = originalShadowCascadeCount;
+        }
+
+        private void ApplyQualityPreset(EQualityPreset preset)
+        {
+            float shadowDistance;
+            int shadowCascades;
+
             switch (preset)
             {
                 case EQualityPreset.Low:
-                    QualitySettings.shadowDistance = 15f;
+                    shadowDistance = 20f;
+                    shadowCascades = 1;
                     QualitySettings.globalTextureMipmapLimit = 2;
-                    QualitySettings.lodBias = 0.5f;
                     QualitySettings.anisotropicFiltering = AnisotropicFiltering.Disable;
                     QualitySettings.particleRaycastBudget = 64;
-                    QualitySettings.softParticles = false;
                     QualitySettings.realtimeReflectionProbes = false;
                     break;
                 case EQualityPreset.Medium:
-                    QualitySettings.shadowDistance = 25f;
+                    shadowDistance = 35f;
+                    shadowCascades = 1;
                     QualitySettings.globalTextureMipmapLimit = 1;
-                    QualitySettings.lodBias = 0.8f;
                     QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
                     QualitySettings.particleRaycastBudget = 128;
-                    QualitySettings.softParticles = false;
                     QualitySettings.realtimeReflectionProbes = false;
                     break;
                 case EQualityPreset.High:
-                    QualitySettings.shadowDistance = 40f;
+                    shadowDistance = 50f;
+                    shadowCascades = 1;
                     QualitySettings.globalTextureMipmapLimit = 0;
-                    QualitySettings.lodBias = 1f;
                     QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
                     QualitySettings.particleRaycastBudget = 256;
-                    QualitySettings.softParticles = true;
                     QualitySettings.realtimeReflectionProbes = true;
                     break;
                 case EQualityPreset.Ultra:
                 default:
-                    QualitySettings.shadowDistance = 60f;
+                    shadowDistance = 70f;
+                    shadowCascades = 2;
                     QualitySettings.globalTextureMipmapLimit = 0;
-                    QualitySettings.lodBias = 1.5f;
                     QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
                     QualitySettings.particleRaycastBudget = 512;
-                    QualitySettings.softParticles = true;
                     QualitySettings.realtimeReflectionProbes = true;
                     break;
+            }
+
+            // URP ignores QualitySettings.shadowDistance/shadowCascades; they live on the pipeline asset.
+            if (urpAsset != null)
+            {
+                urpAsset.shadowDistance = shadowDistance;
+                urpAsset.shadowCascadeCount = shadowCascades;
             }
         }
     }

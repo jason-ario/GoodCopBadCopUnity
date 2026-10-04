@@ -8,15 +8,24 @@ namespace GoodCopBadCop.EnvironmentSystem
     /// rain is enabled (RainEffectController toggles the GameObject). Each strike briefly enables a
     /// directional light, brightens the current skybox (via a runtime material clone, never the asset)
     /// and boosts trilight ambient colors, then restores everything.
+    /// The flash is suppressed while the local camera is indoors (bunker), as reported by
+    /// <see cref="IndoorAmbienceAdapter"/>. The light never casts shadows: random-direction shadows
+    /// jumping on every flicker read as screen shake.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LightningEffect : MonoBehaviour
     {
         [Header("Light")]
         [SerializeField] private Light flashLight;
-        [SerializeField] private float peakIntensity = 4f;
+        [SerializeField] private float peakIntensity = 1.2f;
         [Tooltip("Random pitch (X angle) range for the flash direction, in degrees.")]
         [SerializeField] private Vector2 pitchRange = new Vector2(25f, 60f);
+
+        [Header("Indoors")]
+        [Tooltip("Provides the indoor blend for the local camera. Auto-found if not assigned.")]
+        [SerializeField] private IndoorAmbienceAdapter indoorAdapter;
+        [Tooltip("Thunder volume multiplier while fully indoors (muffled bleed-through).")]
+        [SerializeField, Range(0f, 1f)] private float thunderVolumeIndoors = 0.35f;
 
         [Header("Timing")]
         [Tooltip("Seconds between strikes (min, max).")]
@@ -24,20 +33,24 @@ namespace GoodCopBadCop.EnvironmentSystem
         [Tooltip("Delay before the very first strike after rain starts (min, max).")]
         [SerializeField] private Vector2 initialDelay = new Vector2(3f, 8f);
         [Tooltip("Number of flickers per strike (min, max inclusive).")]
-        [SerializeField] private Vector2Int flickersPerStrike = new Vector2Int(1, 3);
+        [SerializeField] private Vector2Int flickersPerStrike = new Vector2Int(1, 2);
+        [Tooltip("Rise time of a single flicker (min, max). Avoids an instant on/off strobe.")]
+        [SerializeField] private Vector2 flickerAttack = new Vector2(0.06f, 0.12f);
         [Tooltip("Duration of a single flicker's decay (min, max).")]
-        [SerializeField] private Vector2 flickerDuration = new Vector2(0.06f, 0.18f);
+        [SerializeField] private Vector2 flickerDuration = new Vector2(0.35f, 0.7f);
         [Tooltip("Dark gap between flickers within one strike (min, max).")]
-        [SerializeField] private Vector2 flickerGap = new Vector2(0.04f, 0.12f);
+        [SerializeField] private Vector2 flickerGap = new Vector2(0.15f, 0.35f);
+        [Tooltip("Relative strength of follow-up flickers after the first (min, max).")]
+        [SerializeField] private Vector2 followUpStrength = new Vector2(0.3f, 0.6f);
 
         [Header("Skybox")]
         [SerializeField] private bool flashSkybox = true;
         [Tooltip("Multiplier applied to skybox _Exposure (or _Tint/_SkyTint/_Color) at the flash peak.")]
-        [SerializeField] private float skyboxPeakMultiplier = 4f;
+        [SerializeField] private float skyboxPeakMultiplier = 1.6f;
 
         [Header("Ambient")]
         [SerializeField] private bool flashAmbient = true;
-        [SerializeField] private Color ambientFlashColor = new Color(0.55f, 0.6f, 0.75f, 1f);
+        [SerializeField] private Color ambientFlashColor = new Color(0.18f, 0.2f, 0.26f, 1f);
 
         [Header("Thunder (optional)")]
         [SerializeField] private AudioSource thunderSource;
@@ -70,6 +83,22 @@ namespace GoodCopBadCop.EnvironmentSystem
         {
             flashLight = GetComponent<Light>();
         }
+
+        private void Awake()
+        {
+            if (indoorAdapter == null)
+            {
+                indoorAdapter = FindAnyObjectByType<IndoorAmbienceAdapter>();
+            }
+
+            if (flashLight != null)
+            {
+                flashLight.shadows = LightShadows.None;
+            }
+        }
+
+        /// <summary>0 when the local camera is fully indoors, 1 when fully outdoors.</summary>
+        private float OutdoorVisibility => indoorAdapter != null ? 1f - indoorAdapter.IndoorBlend : 1f;
 
         private void OnEnable()
         {
@@ -131,14 +160,22 @@ namespace GoodCopBadCop.EnvironmentSystem
             int flickers = Random.Range(flickersPerStrike.x, flickersPerStrike.y + 1);
             for (int i = 0; i < flickers; i++)
             {
-                // First flicker is the strongest; follow-ups are a bit weaker.
-                float strength = i == 0 ? 1f : Random.Range(0.4f, 0.85f);
-                float duration = Random.Range(flickerDuration.x, flickerDuration.y);
+                // First flicker is the strongest; follow-ups are noticeably weaker.
+                float strength = i == 0 ? 1f : Random.Range(followUpStrength.x, followUpStrength.y);
+                float attack = Mathf.Max(0.01f, Random.Range(flickerAttack.x, flickerAttack.y));
+                float duration = Mathf.Max(0.01f, Random.Range(flickerDuration.x, flickerDuration.y));
+
+                // Smooth rise, then smooth decay, so there is no hard on/off strobe.
+                for (float t = 0f; t < attack; t += Time.deltaTime)
+                {
+                    ApplyFlash(strength * Mathf.SmoothStep(0f, 1f, t / attack) * OutdoorVisibility);
+                    yield return null;
+                }
 
                 for (float t = 0f; t < duration; t += Time.deltaTime)
                 {
-                    float k = 1f - t / duration;
-                    ApplyFlash(strength * k * k);
+                    float k = 1f - Mathf.SmoothStep(0f, 1f, t / duration);
+                    ApplyFlash(strength * k * OutdoorVisibility);
                     yield return null;
                 }
 
@@ -297,7 +334,8 @@ namespace GoodCopBadCop.EnvironmentSystem
             if (clip != null && thunderSource != null && thunderSource.isActiveAndEnabled)
             {
                 thunderSource.pitch = Random.Range(thunderPitch.x, thunderPitch.y);
-                thunderSource.PlayOneShot(clip, Random.Range(thunderVolume.x, thunderVolume.y));
+                float indoorGain = Mathf.Lerp(thunderVolumeIndoors, 1f, OutdoorVisibility);
+                thunderSource.PlayOneShot(clip, Random.Range(thunderVolume.x, thunderVolume.y) * indoorGain);
             }
         }
     }

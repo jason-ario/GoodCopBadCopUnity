@@ -16,6 +16,7 @@ Properties {
 	_OutlineGradientData("Outline Gradient Data", Vector) = (0.5, 1.0, 0, 0)
 	_Padding("Padding", Float) = 0
 	_Pixelation("Pixelation", Float) = 0
+	_HPOutlineOpacity("Outline Opacity", Float) = 1 // GoodCopBadCop: uniform opacity multiplier (objective pulse)
 }
 SubShader
 	{
@@ -65,6 +66,7 @@ SubShader
 			half _OutlineSharpness;
 			half _Padding;
 			int _Pixelation;
+			half _HPOutlineOpacity;
 
 			half4 _DashData;
 			#define DASH_WIDTH _DashData.x
@@ -167,6 +169,10 @@ SubShader
 				color.a = pow(color.a, _OutlineSharpness);
 
 				color = lerp(color, _Debug, 1.0 - color.a);
+
+				// GoodCopBadCop: applied last, after saturate/sharpness, so it fades opacity
+				// uniformly without changing the outline's apparent thickness or color.
+				color.a *= _HPOutlineOpacity;
 
             	return color;
 			}

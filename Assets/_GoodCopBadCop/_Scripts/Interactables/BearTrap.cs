@@ -139,10 +139,19 @@ public class BearTrap : PickableObject
     // Interaction Overrides
 
     /// <summary>
-    /// E key: arms the trap when it is placed and not yet armed.
+    /// Hold Interact arms the trap when it is placed and not yet armed. Tap Interact picks it up (inherited).
+    /// </summary>
+    public override string GetHoldInteractVerb(PlayerInteractionController player)
+    {
+        if (IsHeld || _isArmed.Value || _isTriggered) return null;
+        return "arm";
+    }
+
+    /// <summary>
+    /// Hold Interact: arms the trap when it is placed and not yet armed.
     /// Has no effect while the trap is held, already armed, or currently triggered.
     /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player)
+    public override void InteractHold(PlayerInteractionController player)
     {
         if (IsHeld || _isArmed.Value || _isTriggered) return;
         ArmTrapServerRpc();

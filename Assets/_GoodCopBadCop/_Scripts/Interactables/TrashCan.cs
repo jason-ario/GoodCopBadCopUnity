@@ -7,6 +7,7 @@ public class TrashCan : Interactable
     private const string DocumentationTutorialIncompleteMessage =
         "Can't throw away yet";
     private const string SupplyBoxNotEmptyMessage = "Empty the box first";
+    private const string FolderNotEmptyMessage = "Empty the folder first";
 
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip throwTrashSound;
@@ -16,9 +17,27 @@ public class TrashCan : Interactable
         //throw trash
     }
 
+    /// <summary>Interact does nothing here — items are thrown away with LMB (InteractWithItem).</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) => false;
+
+    /// <summary>
+    /// Folders are accepted by type (no inspector list entry needed); non-empty ones are
+    /// rejected with a notification in <see cref="InteractWithItem"/>, like supply boxes.
+    /// </summary>
+    public override bool CanInteractWithItem(PickableObject item)
+    {
+        return base.CanInteractWithItem(item) || item is FolderController;
+    }
+
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         base.InteractWithItem(playerInteractionController, item);
+
+        if (item is FolderController folder && !folder.IsEmpty())
+        {
+            UIController.Instance?.ShowErrorNotification(FolderNotEmptyMessage);
+            return;
+        }
 
         if (item is SupplyBox supplyBox)
         {

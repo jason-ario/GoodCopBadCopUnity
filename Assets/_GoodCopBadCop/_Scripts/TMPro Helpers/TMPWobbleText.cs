@@ -42,7 +42,6 @@ public class TMPWobbleText : MonoBehaviour
     // Emphasis state (source-string index ranges, robust to the typewriter's partial strings).
     private string emphasisScanText;
     private readonly List<EmphasisRange> emphasisRanges = new List<EmphasisRange>();
-    private readonly List<float> charAppearTimes = new List<float>();
 
     private void Awake()
     {
@@ -61,16 +60,12 @@ public class TMPWobbleText : MonoBehaviour
     private void OnDisable()
     {
         StopWobble(false);
-        charAppearTimes.Clear();
     }
 
     private void LateUpdate()
     {
         if (tmp == null || !tmp.enabled)
             return;
-
-        if (animateEmphasis)
-            TrackCharacterAppearance(tmp.textInfo != null ? tmp.textInfo.characterCount : 0);
 
         string currentText = tmp.text ?? string.Empty;
         bool baseActive = isPlaying && profile != null;
@@ -223,21 +218,6 @@ public class TMPWobbleText : MonoBehaviour
         return null;
     }
 
-    /// <summary>
-    /// Records when each character first appeared so emphasised glyphs can jolt as they're typed.
-    /// The typewriter only ever grows a prefix, so existing indices stay stable; a shrink means new text.
-    /// Text that arrives all at once (not typed) gets no settle jolt.
-    /// </summary>
-    private void TrackCharacterAppearance(int charCount)
-    {
-        if (charCount < charAppearTimes.Count)
-            charAppearTimes.Clear();
-
-        float appearTime = charAppearTimes.Count == 0 && charCount > 1 ? float.NegativeInfinity : Time.unscaledTime;
-        while (charAppearTimes.Count < charCount)
-            charAppearTimes.Add(appearTime);
-    }
-
     /// <summary>Deterministic, allocation-free hash to [0, 1).</summary>
     private static float Hash01(int a, int b, int salt)
     {
@@ -260,11 +240,9 @@ public class TMPWobbleText : MonoBehaviour
         TMP_TextInfo textInfo = tmp.textInfo;
         int charCount = textInfo.characterCount;
         float now = Time.unscaledTime;
-        TrackCharacterAppearance(charCount);
 
         float baseTime = baseActive ? Time.time * profile.speed : 0f;
         float fontSize = tmp.fontSize;
-        bool colorsChanged = false;
 
         for (int charIndex = 0; charIndex < charCount; charIndex++)
         {
@@ -303,47 +281,21 @@ public class TMPWobbleText : MonoBehaviour
                 continue;
             }
 
-            // Each glyph snaps to a new pose on its own offset clock, so they never move in unison.
-            int step = Mathf.FloorToInt(now * style.stepRate + Hash01(charIndex, 0, 9));
-
-            float sinceAppear = now - charAppearTimes[charIndex];
-            float settleT = style.settleDuration > 0f ? Mathf.Clamp01(sinceAppear / style.settleDuration) : 1f;
-            float motion = Mathf.Lerp(style.settleBoost, 1f, settleT) * emphasisIntensity;
-
-            float amp = style.jitter * fontSize * motion;
-            offset += new Vector3(HashSigned(charIndex, step, 1) * style.jitterAxes.x,
-                                  HashSigned(charIndex, step, 2) * style.jitterAxes.y, 0f) * amp;
-
-            if (Hash01(charIndex, step, 3) < style.twitchChance)
+            // Simple tremor: each glyph snaps to a small new offset on its own clock. No tilt,
+            // no twitch, no colour changes, so the phrase keeps one flat colour.
+            if (style.jitter > 0f && style.stepRate > 0f)
             {
-                float twitch = style.twitchAmount * fontSize * emphasisIntensity;
-                offset += new Vector3(HashSigned(charIndex, step, 4) * style.twitchAxes.x,
-                                      HashSigned(charIndex, step, 5) * style.twitchAxes.y, 0f) * twitch;
+                int step = Mathf.FloorToInt(now * style.stepRate + Hash01(charIndex, 0, 9));
+                float amp = style.jitter * fontSize * emphasisIntensity;
+                offset += new Vector3(HashSigned(charIndex, step, 1) * style.jitterAxes.x,
+                                      HashSigned(charIndex, step, 2) * style.jitterAxes.y, 0f) * amp;
             }
 
-            Quaternion tilt = Quaternion.Euler(0f, 0f, HashSigned(charIndex, step, 6) * style.rotationJitter * motion);
-            Vector3 center = (vertices[vertexIndex + 0] + vertices[vertexIndex + 2]) * 0.5f;
             for (int v = 0; v < 4; v++)
-                vertices[vertexIndex + v] = center + tilt * (vertices[vertexIndex + v] - center) + offset;
-
-            if (style.flickerChance > 0f && Hash01(charIndex, step, 7) < style.flickerChance)
-            {
-                float keep = 1f - style.flickerAmount;
-                Color32[] colors = textInfo.meshInfo[meshIndex].colors32;
-                for (int v = 0; v < 4; v++)
-                {
-                    Color32 c = colors[vertexIndex + v];
-                    colors[vertexIndex + v] = style.flickerFadesAlpha
-                        ? new Color32(c.r, c.g, c.b, (byte)(c.a * keep))
-                        : new Color32((byte)(c.r * keep), (byte)(c.g * keep), (byte)(c.b * keep), c.a);
-                }
-                colorsChanged = true;
-            }
+                vertices[vertexIndex + v] += offset;
         }
 
-        tmp.UpdateVertexData(colorsChanged
-            ? TMP_VertexDataUpdateFlags.Vertices | TMP_VertexDataUpdateFlags.Colors32
-            : TMP_VertexDataUpdateFlags.Vertices);
+        tmp.UpdateVertexData(TMP_VertexDataUpdateFlags.Vertices);
         meshDirtyFromUs = true;
     }
 }

@@ -526,10 +526,10 @@ public class DailySuspectManager : MonoBehaviour
     /// </summary>
     /// <summary>
     /// Demo-only override, driven by <see cref="DayBase.ForceEarlyFullMutants"/> /
-    /// <see cref="DayBase.ForcedFullMutantCount"/> on the active day. Picks 1–2 random suspects
-    /// the player has already seen in a previous shift (<see cref="SuspectRecord.daysShown"/> &gt; 0)
-    /// and who were never sent to quarantine (<see cref="SuspectRecord.quarantinedOnDay"/> &lt; 0),
-    /// forces their infection score to the fully-mutated threshold via
+    /// <see cref="DayBase.ForcedFullMutantCount"/> on the active day. Guarantees 1–2 full mutants in
+    /// today's lineup whenever any eligible suspect exists, preferring suspects the player has already
+    /// seen and never quarantined (see <see cref="SelectForcedFullMutantCandidates"/> for the fallback
+    /// tiers), forces their infection score to the fully-mutated threshold via
     /// <see cref="SuspectRunRecords.ForceFullMutation"/>, and inserts each into today's lineup at a
     /// random slot — mirroring <see cref="InjectDoppelgangerSlots"/>. Must run after mutant-intruder
     /// and doppelganger injection (so slot indices are stable) and before
@@ -548,38 +548,21 @@ public class DailySuspectManager : MonoBehaviour
             return;
         }
 
-        List<SuspectRecord> candidates = new List<SuspectRecord>();
-        foreach (SuspectRecord record in runRecords.Records)
-        {
-            if (record == null || record.SuspectData == null) continue;
-            if (record.isKilled || record.isReplacement) continue;
-            if (record.daysShown <= 0) continue;                              // must have been seen previously
-            if (record.quarantinedOnDay >= 0) continue;                       // must never have been quarantined
-            if (record.IsFullyMutated || record.isLegacyMutant) continue;     // already eligible on its own
-            if (record.infectionScore < activeDay.ForcedFullMutantMinScore) continue; // not infected enough yet
-            if (record.SuspectData.fullMutantDialogue == null) continue;
-            if (record.SuspectData.CharacterPrefab == null) continue;
-            if (runRecords.IsFullMutantInstanceActive(record.SuspectData)) continue;
-            if (shiftSuspects.Contains(record.SuspectData)) continue;         // avoid a duplicate same-day appearance
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+        int desiredCount = Mathf.Clamp(activeDay.ForcedFullMutantCount, 1, 2);
+        List<SuspectRecord> chosenRecords = SelectForcedFullMutantCandidates(runRecords, activeDay, currentDay, desiredCount);
 
-            candidates.Add(record);
-        }
-
-        if (candidates.Count == 0)
+        if (chosenRecords.Count == 0)
         {
-            Debug.Log("[DailySuspectManager] ForceEarlyFullMutants enabled but no eligible previously-seen, never-quarantined suspects were found.");
+            Debug.LogWarning("[DailySuspectManager] ForceEarlyFullMutants enabled but no living, non-quarantined suspect with a fullMutantDialogue was available — none injected.");
             return;
         }
 
-        int desiredCount = Mathf.Clamp(activeDay.ForcedFullMutantCount, 1, 2);
-        int injected = 0;
+        if (chosenRecords.Count < desiredCount)
+            Debug.LogWarning($"[DailySuspectManager] ForceEarlyFullMutants wanted {desiredCount} but only {chosenRecords.Count} suspect(s) could be forced.");
 
-        while (injected < desiredCount && candidates.Count > 0)
+        foreach (SuspectRecord chosen in chosenRecords)
         {
-            int pick = UnityEngine.Random.Range(0, candidates.Count);
-            SuspectRecord chosen = candidates[pick];
-            candidates.RemoveAt(pick);
-
             runRecords.ForceFullMutation(chosen.SuspectData);
 
             int insertIndex = UnityEngine.Random.Range(0, shiftSuspects.Count + 1);
@@ -590,9 +573,75 @@ public class DailySuspectManager : MonoBehaviour
             ShiftReplacementSlotsAfterInsert(insertIndex);
             ShiftHashSetIndicesAfterInsert(insertIndex, _fullMutantSlotIndices);
 
-            injected++;
             Debug.Log($"[DailySuspectManager] Demo override — forced '{chosen.SuspectData.name}' into today's lineup as an early full mutant (slot {insertIndex}).");
         }
+    }
+
+    /// <summary>
+    /// Picks up to <paramref name="desiredCount"/> suspects for <see cref="InjectForcedFullMutantSlots"/>,
+    /// relaxing the criteria tier by tier so the scripted beat still happens when the preferred
+    /// pool is empty (common on Day 3: the most-infected seen suspects are exactly the ones the
+    /// player quarantined or killed).
+    ///
+    /// Hard requirements for every tier: alive, not a replacement, has a fullMutantDialogue and a
+    /// CharacterPrefab, no live full-mutant instance elsewhere, not already in today's draw, and
+    /// not currently serving a quarantine.
+    ///
+    ///   Tier 0 — seen before, never quarantined, score ≥ ForcedFullMutantMinScore (random pick).
+    ///   Tier 1 — seen before, never quarantined, any score (highest score first).
+    ///   Tier 2 — seen before, quarantine finished (highest score first).
+    ///   Tier 3 — never seen (highest score first), last resort so the beat is never skipped.
+    /// </summary>
+    private List<SuspectRecord> SelectForcedFullMutantCandidates(SuspectRunRecords runRecords, DayBase activeDay, int currentDay, int desiredCount)
+    {
+        var tiers = new List<SuspectRecord>[4];
+        for (int t = 0; t < tiers.Length; t++) tiers[t] = new List<SuspectRecord>();
+
+        foreach (SuspectRecord record in runRecords.Records)
+        {
+            if (record == null || record.SuspectData == null) continue;
+            if (record.isKilled || record.isReplacement) continue;
+            if (record.SuspectData.fullMutantDialogue == null) continue;
+            if (record.SuspectData.CharacterPrefab == null) continue;
+            if (runRecords.IsFullMutantInstanceActive(record.SuspectData)) continue;
+            if (shiftSuspects.Contains(record.SuspectData)) continue;
+            if (record.IsOnQuarantineCooldown(currentDay)) continue;
+            if (runRecords.GetRemainingQuarantineDays(record, currentDay) > 0) continue;
+
+            bool seen = record.daysShown > 0;
+            bool neverQuarantined = record.quarantinedOnDay < 0;
+
+            if (!seen)
+                tiers[3].Add(record);
+            else if (!neverQuarantined)
+                tiers[2].Add(record);
+            else if (record.infectionScore >= activeDay.ForcedFullMutantMinScore)
+                tiers[0].Add(record);
+            else
+                tiers[1].Add(record);
+        }
+
+        for (int t = 1; t < tiers.Length; t++)
+            tiers[t].Sort((a, b) => b.infectionScore.CompareTo(a.infectionScore));
+
+        var chosen = new List<SuspectRecord>(desiredCount);
+
+        for (int t = 0; t < tiers.Length && chosen.Count < desiredCount; t++)
+        {
+            List<SuspectRecord> pool = tiers[t];
+            while (chosen.Count < desiredCount && pool.Count > 0)
+            {
+                int pick = t == 0 ? UnityEngine.Random.Range(0, pool.Count) : 0;
+                SuspectRecord record = pool[pick];
+                pool.RemoveAt(pick);
+                chosen.Add(record);
+
+                if (t > 0)
+                    Debug.Log($"[DailySuspectManager] ForceEarlyFullMutants fallback tier {t} — picked '{record.SuspectData.name}' (score {record.infectionScore}, daysShown {record.daysShown}, quarantinedOnDay {record.quarantinedOnDay}).");
+            }
+        }
+
+        return chosen;
     }
 
     private void InjectFullMutantSlots()

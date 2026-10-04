@@ -214,21 +214,26 @@ public class ReviveManager : NetworkBehaviour
                 dead.Add(client.ClientId);
         }
 
-        SyncList(_playerClientIds, players);
-        SyncList(_deadPlayerClientIds, dead);
+        bool playersChanged = SyncList(_playerClientIds, players);
+        bool deadChanged = SyncList(_deadPlayerClientIds, dead);
+
+        if (playersChanged || deadChanged)
+            Debug.Log($"[ReviveManager] Roster updated — players: [{string.Join(", ", players)}], dead: [{string.Join(", ", dead)}].");
     }
 
-    private static void SyncList(NetworkList<ulong> target, System.Collections.Generic.List<ulong> source)
+    /// <summary>Copies <paramref name="source"/> into <paramref name="target"/>. Returns true when it changed.</summary>
+    private static bool SyncList(NetworkList<ulong> target, System.Collections.Generic.List<ulong> source)
     {
         bool same = target.Count == source.Count;
         for (int i = 0; same && i < source.Count; i++)
             same = target[i] == source[i];
         if (same)
-            return;
+            return false;
 
         target.Clear();
         foreach (ulong id in source)
             target.Add(id);
+        return true;
     }
 
     private bool RevivePlayerServer(ulong clientId, bool isNewDay)

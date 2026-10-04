@@ -10,7 +10,7 @@ using UnityEngine;
 ///   Active     — player drives the monitor with the joystick.
 ///   TurningOff — player exited; camera/UI torn down immediately, monitor lerps back to idle.
 /// </summary>
-public class XRayJoystickController : Interactable, IHeldItemPassthrough
+public class XRayJoystickController : Interactable
 {
     [Header("X-Ray Camera")]
     [Tooltip("The X Ray Camera GameObject to activate while the player is in control.")]

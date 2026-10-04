@@ -5,11 +5,13 @@ using UnityEngine;
 
 public class PlayerCameraController : MonoBehaviour
 {
+    private const float MinNearClipPlane = 0.01f;
+
     [SerializeField] private CinemachineCamera camera;
     [Tooltip("The actual render Camera driven by the CinemachineCamera above. Currently unused for near clip tightening (CinemachineBrain overwrites it from the vcam's Lens every frame), kept for other camera lookups.")]
     [SerializeField] private Camera renderCamera;
-    [Tooltip("Near clip plane distance to use while the player is holding a close-up item near the camera (smoking, drinking pills, etc).")]
-    [SerializeField] private float smokingNearClipPlane = 0f;
+    [Tooltip("Near clip plane distance to use while the player is holding a close-up item near the camera (smoking, drinking pills, etc). Must be > 0 — a zero near plane produces a degenerate projection and the camera stops rendering.")]
+    [SerializeField, Min(MinNearClipPlane)] private float smokingNearClipPlane = 0.01f;
     [Tooltip("Seconds to ease the near clip plane between its default and tightened values.")]
     [SerializeField] private float nearClipPlaneLerpDuration = 0.2f;
     [SerializeField] NoiseSettings normalNoiseSettings;
@@ -381,7 +383,7 @@ public class PlayerCameraController : MonoBehaviour
             _nearClipPlaneCached = true;
         }
 
-        float target = tightened ? smokingNearClipPlane : _defaultNearClipPlane;
+        float target = Mathf.Max(MinNearClipPlane, tightened ? smokingNearClipPlane : _defaultNearClipPlane);
 
         _nearClipPlaneTween?.Kill();
         _nearClipPlaneTween = DOTween.To(
@@ -400,7 +402,7 @@ public class PlayerCameraController : MonoBehaviour
     private void SetLensNearClipPlane(float value)
     {
         LensSettings lens = camera.Lens;
-        lens.NearClipPlane = value;
+        lens.NearClipPlane = Mathf.Max(MinNearClipPlane, value);
         camera.Lens = lens;
     }
 

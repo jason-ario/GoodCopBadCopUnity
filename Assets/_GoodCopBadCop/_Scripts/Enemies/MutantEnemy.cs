@@ -162,9 +162,8 @@ public class MutantEnemy : NetworkBehaviour
 
     [Tooltip("Networked blood-decal prefabs (must have a NetworkObject + GraffitiInteractable) spawned " +
              "under EVERY gore piece dropped in a death burst, whether or not it lands inside the Trash " +
-             "Task's yard. Registered with CleanBloodTask, which counts in-bounds splatters (required on " +
-             "Day 1, and shown under graffiti in Checkpoint Integrity) and treats out-of-bounds ones as " +
-             "bonus-only. All must be registered as Network Prefabs in the " +
+             "Task's yard. Handed to CleanBloodTask as cosmetic blood (mop-able, never counted toward " +
+             "any task or Checkpoint Integrity). All must be registered as Network Prefabs in the " +
              "NetworkManager. Leave empty to disable gore blood splatters entirely.")]
     [SerializeField] private GameObject[] yardBloodDecalPrefabs;
 
@@ -196,6 +195,17 @@ public class MutantEnemy : NetworkBehaviour
              "from DisableColliders() so junk pickup still works after the corpse's other colliders are " +
              "disabled. Required (on the Interactable layer) when corpseJunkItem is assigned.")]
     [SerializeField] private Collider corpseJunkInteractionCollider;
+
+    [Tooltip("When the corpse becomes collectible, replace corpseJunkInteractionCollider with a trigger box " +
+             "fitted to the body's current skeletal pose (see CorpseInteractionColliderFitter). The authored " +
+             "collider is shaped for the standing body, so a lying corpse (especially a quadruped like the " +
+             "horse) was hard to target. Falls back to the authored collider when there are no skinned bones.")]
+    [SerializeField] private bool fitCorpseColliderToPose = true;
+
+    [Tooltip("World-space padding (m) added around the corpse's bones by the fitted interaction box, to reach " +
+             "from the joint centres out to the body surface.")]
+    [Min(0f)]
+    [SerializeField] private float corpseColliderPadding = 0.3f;
 
 
     [Header("Aggro Target")]
@@ -376,6 +386,29 @@ public class MutantEnemy : NetworkBehaviour
     private float _patrolWaitTimer;
     private PerimiterFence _fenceTarget;
     private DoorController _doorTarget;
+
+    // Lose-interest state (server only)
+    /// <summary>Seconds accumulated while stuck at an unreachable target (door banging / settled partial path).</summary>
+    private float _frustrationTime;
+    /// <summary>Target the frustration timer is counting against; switching targets resets it.</summary>
+    private object _frustrationTarget;
+    /// <summary>
+    /// Players/soldiers this mutant gave up on, mapped to the next Time.time their reachability may be
+    /// re-checked. Ignored by targeting until reachable again and within renotice radius.
+    /// </summary>
+    private readonly Dictionary<Transform, float> _lostInterestTargets = new Dictionary<Transform, float>();
+    /// <summary>True once this mutant gave up on its aggroTarget (e.g. the booth); it then patrols the yard instead.</summary>
+    private bool _aggroLostInterest;
+    /// <summary>True while patrolling around <see cref="_giveUpPatrolCenter"/> after losing interest.</summary>
+    private bool _hasGiveUpPatrol;
+    private Vector3 _giveUpPatrolCenter;
+    /// <summary>Until this Time.time, lost-interest targets are re-noticed at any distance (set when hurt).</summary>
+    private float _provokedUntil;
+    private NavMeshPath _reachabilityPath;
+    private const float LostInterestRecheckInterval = 1f;
+    private const float ProvokedDuration = 6f;
+
+    private bool IsAggroActive => _isAggroed && aggroTarget != null && !_aggroLostInterest;
 
     /// <summary>
     /// When true, the Chase branch of <see cref="ChaseLoop"/> re-targets whichever living
@@ -667,6 +700,11 @@ public class MutantEnemy : NetworkBehaviour
         _spawnPosition = transform.position;
         _isAggroed = canAggro && aggroTarget != null && (_forceAggro || UnityEngine.Random.value < data.aggroChance);
 
+        _aggroLostInterest = false;
+        _hasGiveUpPatrol = false;
+        _lostInterestTargets.Clear();
+        ResetFrustration();
+
         _chaseScreamTimer = UnityEngine.Random.Range(_chaseScreamIntervalMin, _chaseScreamIntervalMax);
 
         StartCoroutine(ChaseLoop());
@@ -730,7 +768,10 @@ public class MutantEnemy : NetworkBehaviour
 
             // Mutants always use their default (Humanoid) agent type. During a breach the
             // MutantBreachManager disables perimeter-fence carving so paths run through fence lines.
-            bool assaulting = _currentTarget != null || (_isAggroed && aggroTarget != null);
+            bool assaulting = _currentTarget != null || IsAggroActive;
+
+            if (_currentTarget == null && !IsAggroActive)
+                ResetFrustration();
 
             if (assaulting)
                 UpdateStuckWatchdog(_currentTarget != null ? _currentTarget.position : aggroTarget.position, retargetInterval);
@@ -785,6 +826,7 @@ public class MutantEnemy : NetworkBehaviour
 
                 if (distanceToTarget <= data.attackRange)
                 {
+                    ResetFrustration();
                     TryAttack();
                 }
                 else if (!_agent.pathPending
@@ -799,9 +841,26 @@ public class MutantEnemy : NetworkBehaviour
                         : null;
 
                     if (pathBlocker != null)
+                    {
                         _fenceTarget = pathBlocker;
+                    }
                     else
+                    {
                         TryBangBlockingDoorTowardTarget(_currentTarget);
+
+                        // Stuck at the end of a partial path (player sealed in the booth): build
+                        // frustration and eventually give up on this player and patrol the yard.
+                        if (IsSettledAtPartialPathEnd()
+                            && AccumulateFrustration(_currentTarget, retargetInterval))
+                        {
+                            LoseInterestInCurrentTarget();
+                        }
+                    }
+                }
+                else if (!_agent.pathPending)
+                {
+                    // Reachable again (path complete) — still a real chase, not a siege.
+                    ResetFrustration();
                 }
             }
             else
@@ -817,7 +876,7 @@ public class MutantEnemy : NetworkBehaviour
                     _agent.stoppingDistance = data.stoppingDistance;
                 }
 
-                if (_isAggroed && aggroTarget != null)
+                if (_isAggroed && aggroTarget != null && !_aggroLostInterest)
                 {
                     // ── Aggro ──────────────────────────────────────────────────
 
@@ -849,6 +908,9 @@ public class MutantEnemy : NetworkBehaviour
                         _agent.stoppingDistance = data.fenceStopDistance;
                         SetAgentDestination(GetFenceApproachPoint(_fenceTarget, aggroTarget.position), _fenceTarget);
 
+                        // Breaking a fence is real progress, not a siege at a sealed door.
+                        ResetFrustration();
+
                         if (IsFenceTargetInRange())
                             TryAttackFence();
                     }
@@ -861,7 +923,12 @@ public class MutantEnemy : NetworkBehaviour
 
                         float distToDoor = Vector3.Distance(transform.position, _doorTarget.transform.position);
                         if (distToDoor <= data.attackRange)
+                        {
                             TryBangDoor(_doorTarget);
+
+                            if (AccumulateFrustration(aggroTarget, retargetInterval))
+                                LoseInterestInAggroTarget();
+                        }
                     }
                     else
                     {
@@ -879,8 +946,19 @@ public class MutantEnemy : NetworkBehaviour
                                          && _agent.remainingDistance <= _agent.stoppingDistance + 0.5f;
 
                         if (agentSettled)
+                        {
                             _doorTarget = FindNearestBlockingDoor();
+
+                            // No door to bang either — still stuck against the wall, so count it.
+                            if (_doorTarget == null && AccumulateFrustration(aggroTarget, retargetInterval))
+                                LoseInterestInAggroTarget();
+                        }
                     }
+                }
+                else if (_hasGiveUpPatrol)
+                {
+                    // ── Give-up Patrol (lost interest in the booth) ────────────
+                    UpdatePatrol();
                 }
                 else if (data.enablePatrol)
                 {
@@ -931,13 +1009,176 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     private void TrySetPatrolDestination()
     {
+        var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = NavMesh.AllAreas };
+
+        if (_hasGiveUpPatrol)
+        {
+            // Roam the yard around the abandoned target (the booth), staying off its doorstep
+            // so the player has a real window to step out.
+            float minDist = data.giveUpPatrolMinDistance;
+            float maxDist = Mathf.Max(minDist + 1f, data.giveUpPatrolMaxDistance);
+            for (int attempt = 0; attempt < 6; attempt++)
+            {
+                Vector2 dir = UnityEngine.Random.insideUnitCircle.normalized;
+                if (dir.sqrMagnitude < 0.01f) dir = Vector2.right;
+                Vector3 offset = new Vector3(dir.x, 0f, dir.y) * UnityEngine.Random.Range(minDist, maxDist);
+
+                if (!NavMesh.SamplePosition(_giveUpPatrolCenter + offset, out NavMeshHit giveUpHit, 4f, filter))
+                    continue;
+
+                Vector3 flat = giveUpHit.position - _giveUpPatrolCenter;
+                flat.y = 0f;
+                if (flat.sqrMagnitude < minDist * minDist * 0.8f)
+                    continue;
+
+                if (!IsPointReachable(giveUpHit.position, 1.5f))
+                    continue;
+
+                _agent.SetDestination(giveUpHit.position);
+                return;
+            }
+            // Fall through to a regular spawn-anchored waypoint if the yard sampling failed.
+        }
+
         Vector3 randomOffset = UnityEngine.Random.insideUnitSphere * data.patrolRadius;
         randomOffset.y = 0f;
         Vector3 candidate = _spawnPosition + randomOffset;
 
-        var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = NavMesh.AllAreas };
         if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, data.patrolRadius, filter))
             _agent.SetDestination(hit.position);
+    }
+
+    // ── Lose Interest ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// True when the agent has walked as far as its partial path allows (e.g. up against the
+    /// booth wall/door with the player sealed inside) and is no longer closing the distance.
+    /// </summary>
+    private bool IsSettledAtPartialPathEnd()
+    {
+        return _agent.hasPath
+            && !_agent.pathPending
+            && _agent.pathStatus != NavMeshPathStatus.PathComplete
+            && _agent.remainingDistance <= _agent.stoppingDistance + 1.5f;
+    }
+
+    /// <summary>
+    /// Adds <paramref name="dt"/> to the frustration timer for <paramref name="target"/> (switching
+    /// targets restarts it). Returns true once <see cref="MutantEnemyData.loseInterestDelay"/> is hit.
+    /// </summary>
+    private bool AccumulateFrustration(object target, float dt)
+    {
+        if (!data.enableLoseInterest || target == null)
+            return false;
+
+        if (!ReferenceEquals(target, _frustrationTarget))
+        {
+            _frustrationTarget = target;
+            _frustrationTime = 0f;
+        }
+
+        _frustrationTime += dt;
+        return _frustrationTime >= data.loseInterestDelay;
+    }
+
+    private void ResetFrustration()
+    {
+        _frustrationTime = 0f;
+        _frustrationTarget = null;
+    }
+
+    /// <summary>
+    /// Gives up on the unreachable chase target (player in the booth): ignores it until it is
+    /// reachable again and close by, drops any booth aggro, and starts patrolling the yard.
+    /// </summary>
+    private void LoseInterestInCurrentTarget()
+    {
+        if (_currentTarget == null)
+            return;
+
+        _lostInterestTargets[_currentTarget] = Time.time + LostInterestRecheckInterval;
+        BeginGiveUpPatrol(_currentTarget.position);
+        _currentTarget = null;
+
+        // Otherwise the aggro branch would march straight back to the booth door next tick.
+        if (_isAggroed && aggroTarget != null)
+            _aggroLostInterest = true;
+    }
+
+    /// <summary>Gives up on the fixed aggro target (the booth) and starts patrolling the yard around it.</summary>
+    private void LoseInterestInAggroTarget()
+    {
+        _aggroLostInterest = true;
+        BeginGiveUpPatrol(aggroTarget != null ? aggroTarget.position : transform.position);
+    }
+
+    private void BeginGiveUpPatrol(Vector3 center)
+    {
+        ResetFrustration();
+        _hasGiveUpPatrol = true;
+        _giveUpPatrolCenter = center;
+        _doorTarget = null;
+        _fenceTarget = null;
+        _patrolWaiting = false;
+        _agent.stoppingDistance = data.stoppingDistance;
+        if (_knockbackCoroutine == null)
+            _agent.isStopped = false;
+        _agent.ResetPath();
+        InvalidateDestination();
+        ResetStuckWatchdog();
+        TrySetPatrolDestination();
+    }
+
+    /// <summary>
+    /// Whether a target this mutant gave up on should still be ignored. It is re-noticed once it
+    /// is reachable again (e.g. left the booth) and within <see cref="MutantEnemyData.renoticeRadius"/>
+    /// — or at any distance while <see cref="_provokedUntil"/> is active (the mutant was just hurt).
+    /// Reachability is re-checked at most every <see cref="LostInterestRecheckInterval"/> seconds.
+    /// </summary>
+    private bool IsIgnoredLostInterestTarget(Transform target, float sqrDist)
+    {
+        if (!_lostInterestTargets.TryGetValue(target, out float nextCheck))
+            return false;
+
+        bool provoked = Time.time < _provokedUntil;
+        if (!provoked && sqrDist > data.renoticeRadius * data.renoticeRadius)
+            return true;
+
+        if (Time.time < nextCheck)
+            return true;
+
+        if (IsPointReachable(target.position, 1.5f))
+        {
+            _lostInterestTargets.Remove(target);
+            return false;
+        }
+
+        _lostInterestTargets[target] = Time.time + LostInterestRecheckInterval;
+        return true;
+    }
+
+    /// <summary>
+    /// True when a complete NavMesh path exists from this mutant to <paramref name="point"/> and
+    /// ends within <paramref name="tolerance"/> metres of it.
+    /// </summary>
+    private bool IsPointReachable(Vector3 point, float tolerance)
+    {
+        if (_agent == null || !_agent.isOnNavMesh)
+            return false;
+
+        _reachabilityPath ??= new NavMeshPath();
+        var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = _agent.areaMask };
+        if (!NavMesh.CalculatePath(_agent.nextPosition, point, filter, _reachabilityPath)
+            || _reachabilityPath.status != NavMeshPathStatus.PathComplete)
+            return false;
+
+        Vector3[] corners = _reachabilityPath.corners;
+        if (corners.Length == 0)
+            return false;
+
+        Vector3 end = corners[corners.Length - 1];
+        end.y = point.y = 0f;
+        return (end - point).sqrMagnitude <= tolerance * tolerance;
     }
 
     // ── Fence Assault ──────────────────────────────────────────────────────────
@@ -1543,7 +1784,7 @@ public class MutantEnemy : NetworkBehaviour
         // Skipped in breach charge mode and whenever a player is being chased — ChaseLoop's Chase
         // branch already handles fence-smashing toward the dynamic player target every retarget
         // tick, and this block would otherwise fight it by picking fences toward the fixed aggroTarget.
-        if (!_breachChargeMode && _currentTarget == null && _isAggroed && aggroTarget != null)
+        if (!_breachChargeMode && _currentTarget == null && IsAggroActive)
         {
             if (_fenceTarget == null)
             {
@@ -1677,7 +1918,7 @@ public class MutantEnemy : NetworkBehaviour
                 continue;
 
             float sqrDist = (soldier.transform.position - transform.position).sqrMagnitude;
-            if (sqrDist < nearestSqrDist)
+            if (sqrDist < nearestSqrDist && !IsIgnoredLostInterestTarget(soldier.transform, sqrDist))
             {
                 nearestSqrDist = sqrDist;
                 nearest = soldier.transform;
@@ -1723,7 +1964,8 @@ public class MutantEnemy : NetworkBehaviour
                 continue;
 
             float sqrDist = (client.PlayerObject.transform.position - transform.position).sqrMagnitude;
-            if (sqrDist < nearestSqrDist)
+            if (sqrDist < nearestSqrDist
+                && !IsIgnoredLostInterestTarget(client.PlayerObject.transform, sqrDist))
             {
                 nearestSqrDist = sqrDist;
                 nearest = client.PlayerObject.transform;
@@ -2105,6 +2347,9 @@ public class MutantEnemy : NetworkBehaviour
 
         _health -= amount;
 
+        // Getting hurt re-notices any player we gave up on, at any distance, if they're reachable.
+        _provokedUntil = Time.time + ProvokedDuration;
+
         SpawnHitParticleClientRpc(hitPoint);
 
         if (_health <= 0f)
@@ -2330,8 +2575,8 @@ public class MutantEnemy : NetworkBehaviour
     /// Server-side spawn of a networked blood-decal splatter under a gore piece the instant it's
     /// dropped, raycast downward from just above <paramref name="originPosition"/> to find the
     /// ground. Every splatter is handed to <see cref="CleanBloodTask.RegisterBloodSplatter"/>,
-    /// which decides by position whether it is REQUIRED (inside the checkpoint) or only credited
-    /// as a bonus when mopped (outside it). Called for every gore piece in a death burst
+    /// which treats it as cosmetic (mop-able, never counted, swept on day start). Called for every
+    /// gore piece in a death burst
     /// (see <see cref="SpawnGoreBurst"/>). No-op when <see cref="yardBloodDecalPrefabs"/> is empty.
     /// </summary>
     private void SpawnGoreBloodDecal(Vector3 originPosition)
@@ -2372,9 +2617,8 @@ public class MutantEnemy : NetworkBehaviour
 
         decalNetObj.Spawn(destroyWithScene: true);
 
-        // Always register with the mop task, wherever it landed — CleanBloodTask makes the
-        // counted-vs-bonus decision by position itself (in-bounds blood is required on Day 1 and
-        // feeds the graffiti row of Checkpoint Integrity; out-of-bounds blood is bonus-only).
+        // Hand to CleanBloodTask so it claims the scrub callback (otherwise mopping would credit
+        // graffiti) and sweeps the decal on the next day start. Blood is cosmetic — never counted.
         CleanBloodTask.Instance?.RegisterBloodSplatter(decalNetObj);
 
         SpawnBloodParticleClientRpc(groundPoint, rotation);
@@ -2598,9 +2842,18 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     private void Die(bool killedByFire)
     {
+        // _isDead is set first and makes every later TakeDamage a no-op and ends ChaseLoop. So
+        // nothing after this line may abort the death: a mid-sequence exception used to leave a
+        // "zombie" — dead on the server (unhittable, counted as cleared by the breach) but still
+        // standing, solid and un-ragdolled on every screen. Core corpse state therefore runs
+        // first, and every side effect is isolated through RunDeathStep.
         _isDead = true;
-        _agent.ResetPath();
-        _agent.enabled = false;
+        RunDeathStep("stop agent", () =>
+        {
+            if (_agent.isOnNavMesh)
+                _agent.ResetPath();
+            _agent.enabled = false;
+        });
         _networkSpeed.Value = 0f;
 
         bool permanentDeath = !fleeInsteadOfDie || killedByFire;
@@ -2615,58 +2868,72 @@ public class MutantEnemy : NetworkBehaviour
             return;
         }
 
+        // ── Core corpse state (must always happen) ─────────────────────────────
+
         // Stop chase music on all clients before the death sequence plays.
-        StopChaseMusicClientRpc();
-
-        // Notify any scripted task systems (e.g. KillMutantTask) that this enemy died.
-        OnAnyMutantKilled?.Invoke();
-        OnRemovedFromPlay?.Invoke();
-
-        // Attempt to drop a MutantBit if the night phase is active.
-        MutantThreat.Instance?.TryDropBitAt(transform.position);
-
-        // Pop a burst of gore pieces out of the mutant's body on a permanent kill.
-        SpawnDeathGoreBurst();
+        RunDeathStep("stop chase music", StopChaseMusicClientRpc);
 
         // Disable this mutant's colliders on death so the corpse no longer blocks movement,
         // navigation, or weapon hits. Applied locally (server) and broadcast to all clients.
-        DisableColliders();
-        DisableCollidersClientRpc();
+        RunDeathStep("disable colliders", () => { DisableColliders(); DisableCollidersClientRpc(); });
 
         // Disable this mutant's leg animator(s) on death so procedural leg IK stops fighting
         // the death pose/ragdoll. Applied locally (server) and broadcast to all clients.
-        DisableLegsAnimators();
-        DisableLegsAnimatorsClientRpc();
+        RunDeathStep("disable legs animators", () => { DisableLegsAnimators(); DisableLegsAnimatorsClientRpc(); });
 
         // Disable this mutant's FLookAnimator on death so it stops turning its head/spine
-        // toward the chase target once dead. Applied locally (server) and broadcast to all
-        // clients.
-        DisableLookAnimator();
-        DisableLookAnimatorClientRpc();
+        // toward the chase target once dead. Applied locally (server) and broadcast to all clients.
+        RunDeathStep("disable look animator", () => { DisableLookAnimator(); DisableLookAnimatorClientRpc(); });
 
         // Enable ragdoll physics (and disable the Animator driving the rig) on death so the
         // corpse falls naturally instead of playing a canned death animation. Applied locally
         // (server) and broadcast to all clients. Runs after DisableColliders() above so the
         // ragdoll's own colliders (disabled by that blanket pass) end up enabled again.
-        EnableRagdoll();
-        EnableRagdollClientRpc();
+        RunDeathStep("enable ragdoll", () => { EnableRagdoll(); EnableRagdollClientRpc(); });
+
+        if (deathBehaviour == DeathBehaviour.PlayAnimation)
+            RunDeathStep("death animation", TriggerDeathAnimationClientRpc);
+
+        RunDeathStep("death sound", () => PlayDeathSoundClientRpc(PickDeathFallbackIndex()));
+
+        // ── Side effects (isolated — a failure here must not resurrect a zombie) ─
+
+        // Notify any scripted task systems (e.g. KillMutantTask) that this enemy died.
+        RunDeathStep("OnAnyMutantKilled", () => OnAnyMutantKilled?.Invoke());
+        RunDeathStep("OnRemovedFromPlay", () => OnRemovedFromPlay?.Invoke());
+
+        // Attempt to drop a MutantBit if the night phase is active.
+        RunDeathStep("mutant bit drop", () => MutantThreat.Instance?.TryDropBitAt(transform.position));
+
+        // Pop a burst of gore pieces out of the mutant's body on a permanent kill.
+        RunDeathStep("gore burst", SpawnDeathGoreBurst);
 
         if (deathBehaviour == DeathBehaviour.PlayAnimation)
         {
             // The corpse persists (never despawned — see DespawnAfterDelay comment below),
             // so let it be collected as junk, matching what happens to the gore it dropped.
-            EnableCorpseJunkPickup();
-
-            TriggerDeathAnimationClientRpc();
-            PlayDeathSoundClientRpc(PickDeathFallbackIndex());
+            RunDeathStep("corpse junk pickup", EnableCorpseJunkPickup);
             //StartCoroutine(DespawnAfterDelay(deathAnimationDuration));
         }
-        else
+        else if (IsSpawned)
         {
-            PlayDeathSoundClientRpc(PickDeathFallbackIndex());
+            NetworkObject.Despawn();
+        }
+    }
 
-            if (IsSpawned)
-                NetworkObject.Despawn();
+    /// <summary>
+    /// Runs one step of <see cref="Die"/>, logging (instead of propagating) any exception so a
+    /// single failing subsystem can't abort the rest of the death sequence.
+    /// </summary>
+    private void RunDeathStep(string label, Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[MutantEnemy] Die() step '{label}' failed on '{name}': {e}", this);
         }
     }
 
@@ -2740,6 +3007,19 @@ public class MutantEnemy : NetworkBehaviour
 
         if (corpseJunkInteractionCollider != null)
             corpseJunkInteractionCollider.enabled = true;
+
+        if (fitCorpseColliderToPose && corpseJunkInteractionCollider != null)
+        {
+            // Runs on every peer (server + EnableCorpseJunkPickupClientRpc). The interact ray is
+            // local, so each client fits to the pose it actually renders.
+            GameObject colliderOwner = corpseJunkInteractionCollider.gameObject;
+            if (!colliderOwner.TryGetComponent(out CorpseInteractionColliderFitter fitter))
+                fitter = colliderOwner.AddComponent<CorpseInteractionColliderFitter>();
+
+            BoxCollider fitted = fitter.Begin(corpseJunkInteractionCollider, corpseColliderPadding);
+            if (fitted != null)
+                corpseJunkInteractionCollider = fitted; // keeps DisableColliders() excluding the live collider
+        }
     }
 
     /// <summary>

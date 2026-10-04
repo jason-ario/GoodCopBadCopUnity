@@ -108,9 +108,6 @@ public class CameraPickup : PickableObject
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    /// <summary>Shows the E-key reticle hint while a polaroid is available to collect.</summary>
-    public override bool ShowInteractHint => _netPolaroidId.Value != 0UL;
-
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void Awake()
@@ -521,10 +518,21 @@ public class CameraPickup : PickableObject
     // ── Photo Extraction ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Called when the player presses E while targeting the placed camera.
-    /// Routes the already-spawned polaroid NetworkObject directly into the player's hands.
+    /// Hold Interact takes the developed polaroid out of the placed camera (empty-handed only).
+    /// Tap Interact picks the camera up (inherited).
     /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player)
+    public override string GetHoldInteractVerb(PlayerInteractionController player)
+    {
+        if (_netPolaroidId.Value == 0UL) return null;
+        if (player.pickupController.HeldObject != null) return null;
+        return "take photo";
+    }
+
+    /// <summary>
+    /// Hold Interact on the placed camera: routes the already-spawned polaroid NetworkObject
+    /// directly into the player's hands.
+    /// </summary>
+    public override void InteractHold(PlayerInteractionController player)
     {
         if (_netPolaroidId.Value == 0UL) return;
         if (player.pickupController.HeldObject != null) return;

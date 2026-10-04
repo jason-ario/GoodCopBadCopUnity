@@ -23,6 +23,9 @@ public class BoothWaitingNotification : MonoBehaviour
     [SerializeField] private CanvasGroup _canvasGroup;
     [SerializeField] private float _displayDuration = 4f;
     [SerializeField] private float _fadeDuration = 0.4f;
+    [Tooltip("CanvasGroup alpha used while the notification is visible (fade-in target).")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _visibleAlpha = 0.8f;
     [Tooltip("Only used in looping mode (see Show(string, loop: true)) — how long the notification stays hidden between fade-out and fade-back-in.")]
     [SerializeField] private float _repeatGapDuration = 4.5f;
 
@@ -58,7 +61,7 @@ public class BoothWaitingNotification : MonoBehaviour
         if (_canvasGroup != null)
         {
             DOTween.Kill(_canvasGroup);
-            _canvasGroup.alpha = 1f;
+            _canvasGroup.alpha = _visibleAlpha;
         }
 
         if (_textReveal != null)
@@ -131,7 +134,7 @@ public class BoothWaitingNotification : MonoBehaviour
         if (_canvasGroup != null)
         {
             DOTween.Kill(_canvasGroup);
-            _canvasGroup.DOFade(1f, _fadeDuration);
+            _canvasGroup.DOFade(_visibleAlpha, _fadeDuration);
         }
 
         if (_textReveal != null)

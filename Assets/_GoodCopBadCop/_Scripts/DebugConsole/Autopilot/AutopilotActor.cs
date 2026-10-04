@@ -176,8 +176,8 @@ namespace GoodCopBadCop.Autopilot
             PlayerInteractionController pic = AutopilotGame.Interaction;
             try
             {
-                if (AutopilotGame.Held != null) target.InteractAlternate(pic);
-                else target.Interact(pic);
+                // Mirrors a tap of the Interact key (world interaction, held item or not).
+                target.Interact(pic);
                 result.Ok();
             }
             catch (Exception e)
@@ -200,15 +200,10 @@ namespace GoodCopBadCop.Autopilot
                     AutopilotGame.Pickup.TryUseObject();
                     result.Ok();
                 }
-                else if (target is IHeldItemPassthrough)
-                {
-                    target.Interact(pic);
-                    result.Ok();
-                }
                 else
                 {
                     result.Fail($"{label}: held '{held.ItemData?.name}' is not in '{target.name}'.itemsThatCanInteractWith " +
-                                "(a player pressing LMB would get 'not compatible').");
+                                "(a player pressing LMB would just use the item in place; world interaction is the Interact key).");
                 }
             }
             catch (Exception e)
@@ -275,8 +270,8 @@ namespace GoodCopBadCop.Autopilot
                 yield break;
             }
 
-            bool holding = AutopilotGame.Held != null;
-            if (useHeld || !holding) _input.PressRightTrigger();
+            // RT = use the held item on the target; West (Interact) = every world interaction.
+            if (useHeld && AutopilotGame.Held != null) _input.PressRightTrigger();
             else _input.Press(GamepadButton.West);
 
             yield return null;

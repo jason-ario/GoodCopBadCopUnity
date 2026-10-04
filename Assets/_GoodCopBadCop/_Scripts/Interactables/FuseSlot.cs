@@ -6,8 +6,8 @@ using UnityEngine;
 /// A slot inside the fuse-box panel that accepts any <see cref="FusePickup"/>.
 ///
 /// Interaction rules:
-///   – Empty slot + player holding a FusePickup  → inserts the fuse (snaps it to the slot).
-///   – Filled slot + empty-handed player          → extracts the fuse (player picks it up).
+///   – Empty slot + player holding a FusePickup  → LMB / RT inserts the fuse (snaps it to the slot).
+///   – Filled slot + empty-handed player          → Interact (E) extracts the fuse (player picks it up).
 ///
 /// The fuse is kept as a live NetworkObject: it is parent-constrained to this slot on all
 /// clients (via <see cref="PickableObject.PlaceInSlotServerRpc"/>) and locked so it cannot be
@@ -21,7 +21,7 @@ using UnityEngine;
 ///   - Set <see cref="Interactable.interactText"/> in the Inspector (e.g. "Insert Fuse").
 /// </summary>
 [RequireComponent(typeof(Collider))]
-public class FuseSlot : Interactable, IHeldItemPassthrough
+public class FuseSlot : Interactable
 {
     // ── Inspector ─────────────────────────────────────────────────────────────
 
@@ -96,29 +96,36 @@ public class FuseSlot : Interactable, IHeldItemPassthrough
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
-    /// <summary>Fuse slots don't show the reticle's key-icon + action-text hint on hover.</summary>
+    /// <summary>Fuse slots don't show the reticle's action-text hint on hover.</summary>
     public override bool ShowInteractHint => false;
 
     /// <summary>
-    /// Routes to insert or extract depending on slot state and what the player is holding:
-    ///   – Empty + holding FusePickup → insert.
-    ///   – Filled + empty-handed      → extract.
+    /// No Interact key icon — the only prompt is the LMB / RT use icon, shown while holding a
+    /// fuse over an empty slot (driven by <see cref="CanInteractWithItem"/>).
     /// </summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) => false;
+
+    /// <summary>An empty slot accepts any held <see cref="FusePickup"/> (LMB / RT).</summary>
+    public override bool CanInteractWithItem(PickableObject item)
+        => !IsFilled && item is FusePickup;
+
+    /// <summary>Interact key (empty-handed) on a filled slot extracts the fuse.</summary>
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
 
-        if (IsFilled)
-        {
-            // Only extract if the player has a free hand.
-            if (!player.pickupController.IsHoldingObject)
-                ExtractFuse(player);
-            return;
-        }
+        if (IsFilled && !player.pickupController.IsHoldingObject)
+            ExtractFuse(player);
+    }
 
-        // Slot is empty — insert only if the player holds a FusePickup.
-        FusePickup fuse = player.pickupController.HeldObject as FusePickup;
-        if (fuse == null) return;
+    /// <summary>LMB / RT while holding a fuse over an empty slot inserts it.</summary>
+    public override void InteractWithItem(PlayerInteractionController player, PickableObject item)
+    {
+        base.InteractWithItem(player, item);
+
+        if (IsFilled) return;
+        FusePickup fuse = item as FusePickup;
+        if (fuse == null || player.pickupController.HeldObject != fuse) return;
 
         // Use the existing PlaceInSlot infrastructure: snaps the fuse to this slot's
         // world transform on all clients and parents it via ParentConstraint.

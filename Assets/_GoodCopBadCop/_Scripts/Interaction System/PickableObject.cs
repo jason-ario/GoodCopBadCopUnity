@@ -737,6 +737,22 @@ public class PickableObject : Interactable
         if (_rb != null) _rb.isKinematic = true;
         _colliderController = GetComponent<PickableColliderController>();
         _restScale = transform.localScale;
+        DisableNetworkScaleSync();
+    }
+
+    /// <summary>
+    /// Pickables never change scale for gameplay — the only scale change is the purely cosmetic,
+    /// locally-driven placement punch. Replicating scale through NetworkTransform let a mid-punch
+    /// value become the authoritative scale (threshold-gated deltas / interpolation snapshots),
+    /// leaving the item permanently inflated after placement. Must run before spawn.
+    /// </summary>
+    private void DisableNetworkScaleSync()
+    {
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt == null) return;
+        nt.SyncScaleX = false;
+        nt.SyncScaleY = false;
+        nt.SyncScaleZ = false;
     }
 
     // -------------------------------------------------------------------------
@@ -760,7 +776,8 @@ public class PickableObject : Interactable
         _scalePunchTween = transform
             .DOPunchScale(Vector3.Scale(_restScale, strengthMultiplier), duration, vibrato, elasticity)
             .SetLink(gameObject)
-            .OnComplete(() => transform.localScale = _restScale);
+            // OnKill (fires on completion too) so any interruption also lands back on rest scale.
+            .OnKill(() => { if (this != null) transform.localScale = _restScale; });
     }
 
     /// <summary>Kills any active scale punch and restores <see cref="RestScale"/>.</summary>
@@ -1568,6 +1585,13 @@ public class PickableObject : Interactable
         OnUnEquip?.Invoke();
     }
     
+    /// <summary>
+    /// Picking up needs a free hand, so only offer the Interact prompt when empty-handed
+    /// (pressing it with full hands still reaches <see cref="Interact"/> and shows "Inventory full").
+    /// </summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
+        player.pickupController == null || player.pickupController.HeldObject == null;
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);

@@ -57,22 +57,52 @@ public class PillBottle : PickableObject, IAmmoProvider
     }
 
     /// <summary>
-    /// Restores the tightened near clip plane and clears drinking anim/animator state if the
-    /// bottle is unequipped or force-stopped mid-drink (e.g. stowed while the coroutine is
-    /// killed by the GameObject deactivating), so the effect never gets stuck engaged.
+    /// Taking a pill is a one-shot action that commits on click. Use-button release (which
+    /// PlayerPickupController delivers as OnStopUse) must NOT cancel the in-progress dose —
+    /// otherwise a normal click kills the coroutine a frame later and the pill never applies.
+    /// Genuine interruptions (unequip, stow, force-clear) go through <see cref="CancelPillUse"/>.
     /// </summary>
     public override void OnStopUse()
     {
-        base.OnStopUse();
+        if (_usePillBottleCoroutine != null) return;
 
-        if (_usePillBottleCoroutine != null)
+        base.OnStopUse();
+    }
+
+    public override void OnUnequip(PlayerPickupController player)
+    {
+        CancelPillUse();
+        base.OnUnequip(player);
+    }
+
+    public override void ForceClearUseState()
+    {
+        base.ForceClearUseState();
+        CancelPillUse();
+    }
+
+    /// <summary>
+    /// Aborts an in-progress dose and restores the tightened near clip plane and drinking
+    /// anim/animator state, so the effect never gets stuck engaged when the bottle is
+    /// unequipped or stowed mid-drink (stow deactivates the GameObject, killing the coroutine).
+    /// </summary>
+    private void CancelPillUse()
+    {
+        if (_usePillBottleCoroutine == null) return;
+
+        StopCoroutine(_usePillBottleCoroutine);
+        _usePillBottleCoroutine = null;
+        isUsing = false;
+
+        if (playerPickupController != null)
         {
-            StopCoroutine(_usePillBottleCoroutine);
-            _usePillBottleCoroutine = null;
+            playerPickupController.PlayerAnimationController.SetAnimBool("TakingPill", false);
+            playerPickupController.PlayerAnimationController.EnableRightArmMask();
         }
 
-        playerPickupController.PlayerAnimationController.SetAnimBool("TakingPill", false);
-        _animator.SetBool("TakePill", false);
+        if (_animator != null)
+            _animator.SetBool("TakePill", false);
+
         SetNearClipPlaneTightened(false);
     }
 

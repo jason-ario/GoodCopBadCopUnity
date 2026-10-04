@@ -214,11 +214,8 @@ public class CompassController : MonoBehaviour
                 return (FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive)
                     || CheckpointIntegrityService.IsEnabled;
             case CompassMarkerCategory.Blood:
-                // Only while a blood-cleanup task is actually asking the player to mop. Blood decals
-                // are also scattered cosmetically (end-of-trail splatters, mutant hits) — showing
-                // those unconditionally put red pips on the pack's location long before any kill
-                // task existed, reading as enemy markers.
-                return CleanBloodTask.Instance != null && CleanBloodTask.Instance.IsActive;
+                // Blood cleanup is retired — splatters are cosmetic and never get a compass pip.
+                return false;
             case CompassMarkerCategory.Enemy:
                 // Enemy pips only exist while a kill task is actually on the HUD task list.
                 return KillMutantTask.IsActiveTask;
@@ -232,19 +229,17 @@ public class CompassController : MonoBehaviour
     }
 
     /// <summary>
-    /// Checkpoint-cleanup markers (blood splatters, trash-task junk) only get a pip while they sit
-    /// inside the <see cref="CheckpointCleanupArea"/>, the same region that decides whether they
-    /// COUNT toward <see cref="CleanBloodTask"/> / <see cref="TakeOutTrashTask"/>. Anything outside
-    /// is optional bonus work and must not be advertised on the compass. Evaluated per frame, so a
-    /// carried item's pip follows it in and out of the region. Booth-mess junk is exempt while
-    /// <see cref="CleanBoothMessTask"/> is active, since that task isn't scoped to the region.
+    /// Trash-task junk markers only get a pip while they sit inside the
+    /// <see cref="CheckpointCleanupArea"/>, the same region that decides whether they COUNT toward
+    /// <see cref="TakeOutTrashTask"/>. Anything outside is optional bonus work and must not be
+    /// advertised on the compass. Evaluated per frame, so a carried item's pip follows it in and
+    /// out of the region. Booth-mess junk is exempt while <see cref="CleanBoothMessTask"/> is
+    /// active, since that task isn't scoped to the region.
     /// </summary>
     private static bool PassesCleanupAreaGate(Transform target, CompassMarkerCategory category)
     {
         switch (category)
         {
-            case CompassMarkerCategory.Blood:
-                return IsInsideCleanupArea(target.position);
             case CompassMarkerCategory.Junk:
                 if (CleanBoothMessTask.Instance != null && CleanBoothMessTask.Instance.IsActive)
                     return true;
@@ -255,7 +250,7 @@ public class CompassController : MonoBehaviour
     }
 
     /// <summary>
-    /// Mirrors <c>CleanBloodTask.CountsTowardCleanup</c>: prefer the scene's
+    /// Prefer the scene's
     /// <see cref="CheckpointCleanupArea"/>, then <see cref="TakeOutTrashTask.CountsTowardCleanup"/>,
     /// and fail open when neither exists so a scene without a region still shows pips.
     /// </summary>

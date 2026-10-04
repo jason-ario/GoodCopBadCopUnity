@@ -20,6 +20,13 @@ public class Telephone : Interactable
     public static event Action OnScriptedCallAnsweredAllClients;
 
     /// <summary>
+    /// Fired on ALL clients (via ClientRpc) when the server calls
+    /// <see cref="NotifyScriptedCallCompleted"/> — i.e. the scripted call's own dialogue has
+    /// finished. Use this to grant follow-up tasks on every client, not just the host.
+    /// </summary>
+    public static event Action OnScriptedCallCompletedAllClients;
+
+    /// <summary>
     /// When true, all incoming calls are silently suppressed — <see cref="TriggerCall"/>
     /// and <see cref="TriggerRandomCall"/> return immediately without ringing.
     /// Set by day-specific controllers (e.g. <see cref="Day_01"/>) that need to keep
@@ -167,6 +174,8 @@ public class Telephone : Interactable
     /// </summary>
     private void Update()
     {
+        ReleaseHandsetIfHolderInactiveServer();
+
         if (_observedHolder == null || !handSet.enabled) return;
 
         bool spectated = IsSpectatedLocally(_observedHolder);
@@ -324,6 +333,22 @@ public class Telephone : Interactable
 
         StartRingingClientRpc();
         _ringTimeoutCoroutine = StartCoroutine(RingTimeoutRoutine());
+    }
+
+    /// <summary>
+    /// Server-only. Broadcasts <see cref="OnScriptedCallCompletedAllClients"/> to every client so
+    /// tasks granted at the end of a scripted call stay in sync across players.
+    /// </summary>
+    public void NotifyScriptedCallCompleted()
+    {
+        if (!IsServer) return;
+        ScriptedCallCompletedClientRpc();
+    }
+
+    [ClientRpc]
+    private void ScriptedCallCompletedClientRpc()
+    {
+        OnScriptedCallCompletedAllClients?.Invoke();
     }
 
     /// <summary>
@@ -549,15 +574,15 @@ public class Telephone : Interactable
     /// <summary>
     /// Plays the grab animation, then streams the HQ voice line before returning
     /// control to the player. The player manually puts the phone down when done.
-    /// For scripted calls (<paramref name="taskIndex"/> == -2) the camera stays in the
-    /// player's normal first-person view instead of cutting to the phone-ear close-up, and
-    /// movement stays locked for the whole call — the caller's own <see cref="ScriptedDialogueRunner"/>
+    /// For scripted calls (<paramref name="taskIndex"/> == -2) the same grab camera move plays,
+    /// the HUD is swapped for the dim phone backdrop, and movement stays locked for the whole
+    /// call — the caller's own <see cref="ScriptedDialogueRunner"/>
     /// sequence handles subtitle/voice presentation and calls <see cref="HangUpCurrentCaller"/>
     /// once it finishes.
     /// </summary>
     private IEnumerator AnswerCallSequence(PlayerInteractionController player, int taskIndex)
     {
-        bool moveCamera = taskIndex != -2;
+        bool isScriptedCall = taskIndex == -2;
 
         player.playerMovementController.SetCanControl(false);
         player.playerMovementController.LookAtTarget(transform);
@@ -565,11 +590,8 @@ public class Telephone : Interactable
         player.playerAnimationController.CamLeftArmRigIKTarget = _ikTarget;
         player.playerAnimationController.LeftArmIKTarget = _ikTarget;
 
-        if (moveCamera)
-        {
-            player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
-            player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
-        }
+        player.playerMovementController.CameraTransform.DOMove(_camera.transform.position, .5f);
+        player.playerMovementController.CameraTransform.DORotate(_camera.transform.rotation.eulerAngles, .5f);
         player.playerAnimationController.EnableLeftArmMask();
         player.playerAnimationController.TurnLeftRigOnAndOff(.2f, .25f);
         player.playerAnimationController.SetAnimBool("HoldingPhone", true);
@@ -581,7 +603,11 @@ public class Telephone : Interactable
 
         yield return new WaitForSeconds(.25f);
 
-        if (moveCamera)
+        // Scripted calls stay on the handset for the whole conversation, so apply the same
+        // holding-camera nudge the HQ Order Screen grab uses (keeps the body out of view).
+        if (isScriptedCall)
+            player.playerMovementController.ResetCameraPos(false, .25f, null, Vector3.forward * _holdingCameraForwardOffset);
+        else
             player.playerMovementController.ResetCameraPos(false, .25f);
 
         yield return new WaitForSeconds(.25f);
@@ -589,10 +615,12 @@ public class Telephone : Interactable
         player.playerAnimationController.LeftArmIKTarget = null;
 
         // Scripted calls (e.g. Day 3's HQ power-outage call) keep movement locked for the whole
-        // conversation — the player stands still holding the phone but keeps free look (no
-        // cutscene camera takeover). Control is restored when the phone is hung up, in
-        // PutPhoneDownSequence, once the caller's own dialogue sequence has finished.
-        if (taskIndex != -2)
+        // conversation and hide the HUD behind the same dim backdrop as the HQ Order Screen.
+        // Control, HUD and backdrop are restored in PutPhoneDownSequence once the caller's own
+        // dialogue sequence has finished and it hangs up.
+        if (isScriptedCall)
+            UIController.Instance?.ShowPhoneCallBackdrop();
+        else
             player.playerMovementController.SetCanControl(true);
 
         // Stream HQ voice line.
@@ -640,6 +668,89 @@ public class Telephone : Interactable
 
         if (_ringAudioSource != null)
             _ringAudioSource.Stop();
+    }
+
+    // ── Inactive holder release (server) ──────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Frees the handset when its holder can no longer put it down themselves:
+    /// they died while holding it, their PlayerObject was replaced/despawned (revive), or they
+    /// disconnected. Without this the phone stayed grabbed by the dead client forever, so no one
+    /// else could pick it up — e.g. to call in backup for that same dead teammate.
+    /// </summary>
+    private void ReleaseHandsetIfHolderInactiveServer()
+    {
+        if (!IsServer || !IsSpawned || !_isGrabbed.Value)
+            return;
+
+        ulong holderId = _grabbingClientId.Value;
+        if (IsHolderActiveServer(holderId))
+            return;
+
+        Debug.Log($"[Telephone] Releasing handset held by client {holderId} — holder is dead, despawned or disconnected.");
+
+        _hangUpLocked = false;
+        _isGrabbed.Value = false;
+        _grabbingClientId.Value = ulong.MaxValue;
+
+        ReleaseForInactiveHolderClientRpc(holderId);
+    }
+
+    private bool IsHolderActiveServer(ulong clientId)
+    {
+        NetworkManager nm = NetworkManager;
+        if (nm == null || !nm.ConnectedClients.TryGetValue(clientId, out NetworkClient client))
+            return false;
+
+        if (client.PlayerObject == null)
+            return false;
+
+        PlayerHealth health = client.PlayerObject.GetComponent<PlayerHealth>();
+        return health == null || !health.IsDead;
+    }
+
+    /// <summary>
+    /// Resets the handset on every peer after the server released it from an inactive holder.
+    /// The (dead) holder gets a local teardown that closes the HQ Order Screen WITHOUT restoring
+    /// movement/interaction/HUD — the death flow owns the player's state from here.
+    /// </summary>
+    [ClientRpc]
+    private void ReleaseForInactiveHolderClientRpc(ulong holderId)
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        bool isLocalHolder = nm != null && nm.LocalClientId == holderId;
+
+        if (!isLocalHolder)
+        {
+            StartCoroutine(ObserverPutDownConstraintSequence());
+            return;
+        }
+
+        StopLocalSequence();
+        bool closeOrderScreen = _localOrderScreenOpen;
+        _localHoldMode = LocalHoldMode.None;
+        _localOrderScreenOpen = false;
+
+        _voiceAudioSource?.Stop();
+
+        handSet.enabled = false;
+        handSet.transform.position = _handsetPos.position;
+        handSet.transform.rotation = _handsetPos.rotation;
+
+        PlayerInteractionController player = nm.LocalClient?.PlayerObject?.GetComponent<PlayerInteractionController>();
+        if (player != null)
+        {
+            player.playerAnimationController.SetAnimBool("HoldingPhone", false);
+            player.playerAnimationController.DisableLeftArmMask();
+            player.playerAnimationController.CamLeftArmRigIKTarget = null;
+            player.playerAnimationController.LeftArmIKTarget = null;
+            player.playerMovementController.CameraTransform.DOKill();
+        }
+
+        if (closeOrderScreen)
+            UIController.Instance?.HideHQOrderScreenOnly();
+        UIController.Instance?.HidePhoneCallBackdrop();
+        UIController.Instance?.HideBackButton();
     }
 
     // ── Regular grab / put-down ───────────────────────────────────────────────
@@ -845,6 +956,7 @@ public class Telephone : Interactable
 
         if (closeOrderScreen)
             UIController.Instance?.CloseHQOrderScreen();
+        UIController.Instance?.HidePhoneCallBackdrop();
         UIController.Instance?.HideBackButton();
     }
 
@@ -940,6 +1052,7 @@ public class Telephone : Interactable
         handSet.transform.rotation = _handsetPos.rotation;
         yield return new WaitForSeconds(.25f);
 
+        UIController.Instance?.HidePhoneCallBackdrop();
         UIController.Instance.CloseHQOrderScreen();
         _localOrderScreenOpen = false;
         // Always hide the back button — it may have been shown for a scripted call hang-up.

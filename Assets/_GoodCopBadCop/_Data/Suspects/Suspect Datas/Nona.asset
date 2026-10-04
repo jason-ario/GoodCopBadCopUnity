@@ -16,8 +16,8 @@ MonoBehaviour:
   LastName: Beridze
   Nickname: 
   Occupation: Census Recorder
-  CharacterDescription: Still, unblinking, smiles at the wrong moments, always knows too much
-  CharacterArc: Late 30s, probably. It is difficult to be certain. Nona has worked as a census recorder for eleven years, quietly cataloguing who lives where, who has moved, who has died. She always knows exactly where to look. She holds eye contact for slightly too long and smiles when people do not finish their sentences, as if she already knows what they were going to say. Nothing she says is technically wrong. Nothing she does is technically alarming. But everyone who passes through leaves with a faint, unexplainable discomfort they cannot put into words.
+  CharacterDescription: Still, unblinking, smiles at the wrong moments, speaks of the State with a radiant, unsettling joy
+  CharacterArc: Late 30s, probably. It is difficult to be certain. Nona has worked as a census recorder for eleven years, quietly cataloguing who lives where, who has moved, who has died. To her it is not a job but a sacrament. The State is her faith, and she believes completely that it cannot err, that it sees everyone, and that it will come to save every citizen who obeys. Since the blast, she has never been happier. She does not ask what the blast was. She only knows the State is finally acting, and every curfew, every checkpoint, every empty apartment is proof that the plan is unfolding exactly as it should. She hums while she fills the gaps in the registry. Every doubt is a heresy she is delighted to report. She holds eye contact for slightly too long and beams when people question the curfew, as if she is already writing their names down. Nothing she says is technically wrong. Nothing she does is technically alarming. But everyone who passes through leaves with a faint, unexplainable discomfort they cannot put into words.
   DateOfBirth: 07/07/1951
   Sex: Female
   EntryPermitExpiryDate: 07 JUL
@@ -35,17 +35,17 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 2426892980417719112, guid: f6bc53fd6529ba64dbccf80b57f37fa7, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Returning to my registered residence.
-    - Completing the evening census route.
-    - Resident returning home before sunset.
+    - Returning to my registered residence, as the State requires. I love that it requires it.
+    - Completing the evening census route. Every name I record is one more the State can save!
+    - Resident returning home before curfew. Curfew is a gift. I am never late for a gift.
     midDaysReasons:
-    - Updating the local registry. Some records need correcting.
-    - Delivering documentation to the district office.
-    - Returning to my apartment. I do not stay out long.
+    - Updating the local registry. So many changes! The State is very busy, and so am I.
+    - Delivering documentation to the district office. They let me carry it myself.
+    - Returning to my apartment. They told us to stay indoors. I have never felt so looked after.
     finalDaysReasons:
-    - All remaining residents must be accounted for. I am one of them.
-    - The records need to be current. I make sure of that.
-    - Going home. The door is always unlocked for me.
+    - All remaining residents must be accounted for. I asked to be counted first. I could not wait.
+    - The records must be perfect for when the State comes for us. It is coming. I can feel it.
+    - Going home. The door is unlocked, as they asked. They may come in whenever they like!
   invalidEntryReasons:
     earlyDaysReasons:
     - Picking up my husband from his shift at the bread factory.
@@ -57,22 +57,22 @@ MonoBehaviour:
     - Meeting the officer from this post. I have forgotten his name.
     finalDaysReasons:
     - Taking my children to the shelter before lockdown.
-    - The records no longer matter. I have stopped keeping them.
-    - Asking the district office who still lives on my street.
+    - The records no longer matter. Nobody is coming to save us.
+    - Leaving before the next order comes. I do not trust what they will ask of us.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Good evening. Here are my documents. Everything is in order, as always.
-    - I have all the correct papers. I filed them myself.
-    - You are new here. I know the names of everyone who has worked this post.
+    - Good evening! Here are my documents. The State asked for them, and I was so happy to bring them.
+    - I have every correct paper. I filled them in twice, just for the joy of it.
+    - You are new! The State chose you for this window. Do you understand how lucky you are?
     dialoguesMidDays:
-    - The registry has some gaps now. That happens in situations like this. I fill them.
-    - I keep very careful records. It helps to know who is left.
-    - Do not worry. I have been through this checkpoint thirty-one times. I know the procedure.
+    - The registry has gaps now. People who did not listen. It is all going exactly as planned.
+    - The radio says not to speculate about the blast. I do not need to! The State is handling it. Is that not wonderful?
+    - Thirty-one times through this checkpoint. Every time it is stricter. Every time I am prouder.
     dialoguesFinalDays:
-    - I counted every checkpoint visit from the beginning. You will want to record that.
-    - I always know when something is ending. It is a useful skill.
-    - Everything in my file is accurate. I double-check.
+    - Some say the State has abandoned us. Abandoned! It has never been closer. I have written their names down.
+    - Something is ending. The State knew about the blast long before we did. Soon it will show us why. I cannot wait.
+    - Everything in my file is accurate. Lying to the State is lying to the only thing keeping us alive.
   uncannyEntryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
@@ -90,35 +90,35 @@ MonoBehaviour:
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Wonderful. Goodbye. I will remember your face.
+    - Wonderful! The State thanks you, and so do I. I will remember your face.
     dialoguesMidDays:
-    - Of course. I knew you would let me through.
+    - Of course! You did as you were instructed. Look how beautifully it all works.
     dialoguesFinalDays:
-    - Thank you. The records appreciate your cooperation.
+    - Thank you! The State sees your obedience. Does it not feel good to be seen?
   exitDialoguesQuarantined:
     lastVerdict: 2
     dialoguesEarlyDays:
-    - That is fine. I will update my own file accordingly.
+    - Oh! If the State wishes it, then it is already right. Thank you.
     dialoguesMidDays:
-    - May I have a pencil? I keep notes.
+    - May I have a pencil? I want to write them a letter of thanks. A long one.
     dialoguesFinalDays:
-    - I expected this. I noted the date and time already.
+    - Chosen! I knew it. I knew they would choose me for something.
   exitDialoguesKilled:
     lastVerdict: 3
     dialoguesEarlyDays:
-    - I see. I will need a moment to update my records.
+    - I see. The State does not make mistakes. I am honoured to be part of the plan.
     dialoguesMidDays:
-    - I had already written this down. I hope that does not trouble you.
+    - Do not hesitate. Hesitation is a kind of disobedience. Go on. They are watching, and they are pleased.
     dialoguesFinalDays:
-    - It is only a name. Names go into the registry. Everything does, eventually.
+    - My name goes back to the State. Everything does, in the end. Is it not beautiful?
   quarantineExitLines:
-  - I will need writing materials. I have twelve entries still pending.
-  - I always behave. It is the people around me who change.
-  - I knew a woman who was quarantined here once. She is not in the records anymore.
+  - I will need writing materials. I have so much gratitude to put down.
+  - Do not look so troubled! The State put me here. That makes it the safest room in the district.
+  - I knew a woman who complained about quarantine. She is not in the records anymore. Order always wins!
   killExitLines:
-  - I updated my own entry this morning. Just in case. It was accurate.
-  - The record outlasts the person. That is the point of a record.
-  - I knew the name of the last person who stood here. Now I will know yours.
+  - I updated my own entry this morning. Just in case. The State loves an accurate record.
+  - Do not grieve for me. To be given an order is to be loved. I have been loved so much.
+  - The person ends. The State continues. Oh, it is all so perfectly arranged.
   voiceAudioClips:
   - {fileID: 8300000, guid: 03a2801751dcbdc41ae67384569e0a84, type: 3}
   - {fileID: 8300000, guid: 339c0ab6ad5f84d46bf06f5892c9d2f9, type: 3}
@@ -133,9 +133,9 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: d71e962d6af69bf4f8e4449472844fc2, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: My evening census route. District eleven, blocks four through nine. Every door answered but two. I noted which two.
-    midDaysAnswer: The district office. I delivered corrections to the registry. There are more corrections every week.
-    finalDaysAnswer: The last addresses on my list. Most of the doors were open. I recorded what I found inside.
+    earlyDaysAnswer: My evening census route! District eleven, blocks four through nine. Every door answered but two. I reported which two. That was the best part.
+    midDaysAnswer: The district office. I brought corrections to the registry, and the names of everyone who questioned the curfew. They thanked me. By name.
+    finalDaysAnswer: The last addresses on my list. The doors were open, as instructed. I recorded what I found inside. Obedient to the end. I was so proud of them.
     mismatchEarlyDaysAnswer: The tram depot. I work the ticket office there. The census forms are only something I help with on Sundays.
     mismatchMidDaysAnswer: The district office. I had to explain why the registry is late. I have been careless with it lately. It happens.
     mismatchFinalDaysAnswer: From the western district. I only moved to this town last month, so I do not know this crossing well.
@@ -144,9 +144,9 @@ MonoBehaviour:
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: No. I keep a record of my own health, as I do for everyone else. There is nothing to enter.
-    midDaysAnswer: I sleep less. Three hours, perhaps four. I use the rest of the night to review old entries.
-    finalDaysAnswer: Only that I remember things very clearly now. Dates. Faces. It is not always comfortable.
+    earlyDaysAnswer: No! I report my own health to the district office every morning, as instructed. It is my favourite part of the day.
+    midDaysAnswer: I sleep less since the blast. Three hours, perhaps four. Who could sleep? The State is doing so much. I listen to every broadcast.
+    finalDaysAnswer: None. If I had any, the State would tell me. And if it does, I will thank it for noticing.
     mismatchEarlyDaysAnswer: My eyes, a little. Faces blur together these days. I could not tell you who sat at this window before you.
     mismatchMidDaysAnswer: No. I sleep very well. My husband makes sure of it. He does not let me work at night.
     mismatchFinalDaysAnswer: Only forgetfulness. I lose names now. Yesterday I could not recall my own block number.
@@ -156,17 +156,17 @@ MonoBehaviour:
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - I have recorded every resident in this district. Some of them do not know that.
-    - You are the fourth officer to work this post. The third one was quieter.
-    - I keep a column for people who look right through me. It is longer than you would think.
+    - I have recorded every resident in this district. The State knows them all now. Is that not a comfort?
+    - You are the fourth officer at this post. The third one asked what really happened the night of the blast. He was not here for long.
+    - People say the State is cold. The State is a mother! And look how hard she is working for us.
     midDays:
-    - The list is shorter than it was. That is normal in an emergency. I have read about this.
-    - A lot of people are getting very honest lately. It makes my job easier.
-    - I wrote your name down. Do not worry. It is only for the registry.
+    - The list is shorter than it was. Those people did not listen. It is all going exactly to plan.
+    - Every window on my street broke inward the night of the blast. Not mine. I had taped them, as instructed. I was so proud.
+    - I wrote your name down. Do not worry! It is a list of the faithful. For now.
     finalDays:
-    - Almost everyone I have recorded in this district is still here. Almost everyone.
-    - The numbers do not lie. People do, but numbers do not.
-    - I never forget a face. It is not a skill I chose. It just happens.
+    - When the State arrives, it will save everyone on the list. I keep the list. I check it every night. It is so close now.
+    - Whatever the blast was, it was permitted. That is what makes it beautiful. Nothing happens here without permission.
+    - Doubt spreads faster than any sickness. I report both. Happily!
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

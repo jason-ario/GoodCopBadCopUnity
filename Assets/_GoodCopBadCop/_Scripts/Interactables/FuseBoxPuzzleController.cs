@@ -21,11 +21,10 @@ using UnityEngine;
 ///   - Assign the fuse-box status <see cref="Light"/> to <see cref="_statusLight"/>.
 ///   - Optionally tune <see cref="_readyColor"/> / <see cref="_notReadyColor"/>.
 ///
-/// Implements <see cref="IHeldItemPassthrough"/> so the door can still be opened/closed
-/// while the player is holding an item (e.g. a fuse) — otherwise LMB/E would route to
-/// <c>TryItemUse</c> instead of toggling the door.
+/// The door is toggled by the Interact key (E / gamepad West), which works whether or not
+/// the player is holding an item (e.g. a fuse).
 /// </summary>
-public class FuseBoxPuzzleController : Interactable, IHeldItemPassthrough
+public class FuseBoxPuzzleController : Interactable
 {
     // ── Door ──────────────────────────────────────────────────────────────────
 

@@ -213,6 +213,16 @@ public class PlayerInventory : NetworkBehaviour
              DialogueChoiceSystem.IsInDialogueMode))
             return;
 
+        // No hotbar input while the player can't move/interact — modal screens (end-of-shift
+        // report, diegetic views, PC, popups) disable control but the legacy wheel/hotkeys
+        // would otherwise still swap items behind them.
+        if (PlayerInstance.Instance != null &&
+            (!PlayerInstance.Instance.CanControl || PlayerInstance.Instance.IsViewingShiftReport))
+            return;
+
+        if (UIController.Instance != null && UIController.Instance.IsPaused)
+            return;
+
         if (!TextInputFocus.IsCapturingKeyboard)
         {
             if (Input.GetKeyDown(KeyCode.Alpha1)) EquipSlot(0);

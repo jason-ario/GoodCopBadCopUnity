@@ -38,7 +38,7 @@ public class RepairPowerThreat : ISystemicThreat
             return _step switch
             {
                 Step.InvestigateFuseBox => "Investigate the fuse box in the power station.",
-                Step.InsertFuses        => "Input the missing fuses into the fuse box.",
+                Step.InsertFuses        => "Find and add the fuses to the fuse box.",
                 Step.PullLever          => "Pull the lever to reactivate the power.",
                 _                       => "The circuit box at the power station has tripped. Go reset it to restore power.",
             };

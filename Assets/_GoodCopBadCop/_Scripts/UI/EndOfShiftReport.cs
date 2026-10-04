@@ -78,7 +78,10 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     [Header("Timing")]
     [SerializeField] private float initialDelay = 0.25f;
-    [SerializeField] private float dimmerFadeDuration = 0.35f;
+    [Tooltip("Seconds the black backdrop takes to fade in. Always completes before the paper appears, even if the player skips.")]
+    [SerializeField] private float dimmerFadeDuration = 0.6f;
+    [Tooltip("Pause on the fully black backdrop before the paper slides in.")]
+    [SerializeField] private float postDimmerDelay = 0.15f;
     [Tooltip("Seconds the paper takes to slide up and fade in.")]
     [SerializeField] private float paperInDuration = 0.45f;
     [SerializeField] private float paperSlideDistance = 60f;
@@ -100,12 +103,21 @@ public class EndOfShiftReportUI : MonoBehaviour
     [Tooltip("Played once when the report opens (also when the reveal is skipped).")]
     [SerializeField] private AudioClip openSound;
     [SerializeField, Range(0f, 1f)] private float openSoundVolume = 0.8f;
-    [Tooltip("Played as each row pops in.")]
-    [SerializeField] private AudioClip rowSound;
+    [Tooltip("Paper sounds played as each row pops in. One is picked at random per row (never the same twice in a row).")]
+    [SerializeField] private AudioClip[] rowSounds;
     [SerializeField, Range(0f, 1f)] private float rowSoundVolume = 0.6f;
     [Tooltip("Played as each verdict is stamped (and the closing stamp).")]
     [SerializeField] private AudioClip stampSound;
     [SerializeField, Range(0f, 1f)] private float stampSoundVolume = 0.7f;
+    [Tooltip("Played when the Shift Summary section appears.")]
+    [SerializeField] private AudioClip summarySound;
+    [SerializeField, Range(0f, 1f)] private float summarySoundVolume = 0.6f;
+    [Tooltip("Played when a row is clicked to open its detail popup.")]
+    [SerializeField] private AudioClip rowClickSound;
+    [SerializeField, Range(0f, 1f)] private float rowClickSoundVolume = 0.6f;
+    [Tooltip("Played when Continue is pressed and the report closes.")]
+    [SerializeField] private AudioClip closeSound;
+    [SerializeField, Range(0f, 1f)] private float closeSoundVolume = 0.8f;
     [Tooltip("Random pitch range so repeated sounds don't feel mechanical.")]
     [SerializeField] private Vector2 soundPitchRange = new Vector2(0.94f, 1.06f);
 
@@ -131,6 +143,8 @@ public class EndOfShiftReportUI : MonoBehaviour
     private bool _affordanceShown;
     private bool _continuePressed;
     private bool _openSoundPlayed;
+    private bool _backdropReady;
+    private int _lastRowSoundIndex = -1;
     private Button _continueButtonComponent;
     private CanvasGroup _paperGroup;
     private Vector2 _paperRestPosition;
@@ -178,6 +192,7 @@ public class EndOfShiftReportUI : MonoBehaviour
         _affordanceShown = false;
         _continuePressed = false;
         _openSoundPlayed = false;
+        _backdropReady = false;
 
         gameObject.SetActive(true);
         CachePaperRest();
@@ -235,6 +250,17 @@ public class EndOfShiftReportUI : MonoBehaviour
     /// </summary>
     private IEnumerator DriveReportRoutine()
     {
+        HideAll();
+        FillHeader();
+
+        // The solid black backdrop always fades in fully before anything else appears. It is not
+        // skippable (skip input is ignored until _backdropReady) and is bounded by its own
+        // duration, so it cannot delay the Continue affordance by more than a second or so.
+        yield return WaitUnscaled(initialDelay);
+        yield return FadeBackdrop(dimmerFadeDuration);
+        yield return WaitUnscaled(postDimmerDelay);
+        _backdropReady = true;
+
         _revealRoutine = StartCoroutine(RevealReportRoutine());
 
         float elapsed = 0f;
@@ -268,7 +294,7 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     private void Update()
     {
-        if (!allowSkipInput || _skipRequested || _affordanceShown)
+        if (!allowSkipInput || !_backdropReady || _skipRequested || _affordanceShown)
             return;
 
         if (AnySkipInputThisFrame())
@@ -300,12 +326,7 @@ public class EndOfShiftReportUI : MonoBehaviour
 
     private IEnumerator RevealReportRoutine()
     {
-        HideAll();
-        FillHeader();
-
-        yield return WaitUnscaled(initialDelay);
-
-        yield return FadeGroup(dimmer, dimmerFadeDuration);
+        SetGroupAlpha(dimmer, 1f);
 
         PlayOpenSound();
 
@@ -332,7 +353,7 @@ public class EndOfShiftReportUI : MonoBehaviour
             row.Show();
             FollowNewestRow();
 
-            PlaySound(rowSound, rowSoundVolume);
+            PlayRowSound();
             yield return row.PopIn(rowPopDuration);
 
             yield return WaitUnscaled(verdictDelay);
@@ -349,6 +370,7 @@ public class EndOfShiftReportUI : MonoBehaviour
             yield return WaitUnscaled(rowInterval);
         }
 
+        PlaySound(summarySound, summarySoundVolume);
         yield return FadeGroup(summaryHeader, summaryLineFadeDuration);
 
         yield return RevealSummaryLine(integrityLine, _data.AverageIntegrity < 0f ? -1 : Mathf.RoundToInt(_data.AverageIntegrity * 100f), FormatIntegrity);
@@ -467,6 +489,7 @@ public class EndOfShiftReportUI : MonoBehaviour
         if (detailPopup == null || row == null || !_affordanceShown || _continuePressed)
             return;
 
+        PlayUISound(rowClickSound, rowClickSoundVolume);
         detailPopup.Open(row.Index, row.Subject);
     }
 
@@ -626,6 +649,28 @@ public class EndOfShiftReportUI : MonoBehaviour
             paper.anchoredPosition = _paperRestPosition;
     }
 
+    /// <summary>
+    /// Fades the black backdrop to fully opaque. Unlike <see cref="FadeGroup"/> it ignores skip
+    /// requests, so the backdrop is always solid before the paper appears.
+    /// </summary>
+    private IEnumerator FadeBackdrop(float duration)
+    {
+        if (dimmer == null)
+            yield break;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            // Ease-in-out so the screen darkens smoothly rather than snapping at either end.
+            dimmer.alpha = t * t * (3f - 2f * t);
+            yield return null;
+        }
+
+        dimmer.alpha = 1f;
+    }
+
     private IEnumerator FadeGroup(CanvasGroup group, float duration)
     {
         if (group == null)
@@ -702,6 +747,27 @@ public class EndOfShiftReportUI : MonoBehaviour
         SFXController.Instance.Play(clip, volume, pitch);
     }
 
+    /// <summary>Picks a random paper sound for a row, avoiding an immediate repeat.</summary>
+    private void PlayRowSound()
+    {
+        if (rowSounds == null || rowSounds.Length == 0)
+            return;
+
+        int index = UnityEngine.Random.Range(0, rowSounds.Length);
+        if (rowSounds.Length > 1 && index == _lastRowSoundIndex)
+            index = (index + 1 + UnityEngine.Random.Range(0, rowSounds.Length - 1)) % rowSounds.Length;
+
+        _lastRowSoundIndex = index;
+        PlaySound(rowSounds[index], rowSoundVolume);
+    }
+
+    /// <summary>Interaction feedback — plays regardless of the reveal's skip state.</summary>
+    private static void PlayUISound(AudioClip clip, float volume)
+    {
+        if (clip != null && SFXController.Instance != null)
+            SFXController.Instance.Play(clip, volume);
+    }
+
     // ----- Continue -----
 
     /// <summary>
@@ -751,6 +817,7 @@ public class EndOfShiftReportUI : MonoBehaviour
 
         _continuePressed = true;
 
+        PlayUISound(closeSound, closeSoundVolume);
         StopAllReportRoutines();
         SetContinueInteractable(false);
         SetRowDetailsInteractable(false);

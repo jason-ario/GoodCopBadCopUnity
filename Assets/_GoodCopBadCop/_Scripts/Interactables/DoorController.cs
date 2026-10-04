@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshObstacle))]
-public class DoorController : Interactable, IMutantPassable, IHeldItemPassthrough
+public class DoorController : Interactable, IMutantPassable
 {
     private NetworkVariable<bool> _doorOpen = new NetworkVariable<bool>(
         false,

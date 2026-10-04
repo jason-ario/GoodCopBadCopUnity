@@ -115,6 +115,17 @@ public class SpectateManager : MonoBehaviour
 
         if (_teammates.Count == 0)
         {
+            // A dead local player has nobody left to watch: hand back to their death screen
+            // instead of leaving them in an empty spectator view. The hidden dev spectator
+            // (no local PlayerInstance) keeps waiting for a target.
+            var local = PlayerInstance.Instance;
+            if (_isSpectating && local != null && local.PlayerHealth != null && local.PlayerHealth.IsDead)
+            {
+                Debug.Log("[SpectateManager] No living teammates left; returning to death screen.");
+                local.ReturnToDeathScreen();
+                return;
+            }
+
             ClearCurrentTarget();
             return;
         }

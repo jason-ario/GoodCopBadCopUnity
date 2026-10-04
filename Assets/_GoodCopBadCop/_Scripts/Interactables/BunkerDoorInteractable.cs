@@ -6,11 +6,11 @@ using UnityEngine;
 /// When the door is closed, opens whichever wheel's diegetic view sits on the interacting
 /// player's side of the door (the nearest wheel to the player wins). When the door is
 /// already open, interacting slams it shut.
-/// Implements <see cref="IHeldItemPassthrough"/> so the interaction triggers even if the
-/// player is holding an item.
+/// Triggered by the Interact key (E / gamepad West), which works whether or not the player
+/// is holding an item.
 /// </summary>
 [RequireComponent(typeof(BunkerDoorController))]
-public class BunkerDoorInteractable : Interactable, IHeldItemPassthrough
+public class BunkerDoorInteractable : Interactable
 {
     [Header("References")]
     [Tooltip("The bunker door controller used to check whether the door is already open, and to open/close it.")]

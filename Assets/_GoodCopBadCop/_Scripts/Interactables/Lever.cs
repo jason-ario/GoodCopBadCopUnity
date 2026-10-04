@@ -1,10 +1,11 @@
 using System.Collections;
 using DG.Tweening;
+using GoodCopBadCop.Input;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class Lever : Interactable, IHeldItemPassthrough
+public class Lever : Interactable
 {
     [SerializeField] private AudioSource leverAudio;
     [SerializeField] private AudioClip leverOnSound;
@@ -101,7 +102,9 @@ public class Lever : Interactable, IHeldItemPassthrough
             animator.enabled = false;
     }
 
-    private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
+    // Interact key (E / ButtonWest) starts the grab (see Interact) and must stay held to keep it.
+    // LMB / RT is reserved for held-item use, so it plays no part here.
+    private bool GrabHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || (Gamepad.current?.buttonWest.isPressed ?? false);
 
     private void Update()
     {
@@ -116,14 +119,14 @@ public class Lever : Interactable, IHeldItemPassthrough
         // Test the current held state instead of relying solely on the one-frame release event.
         // Release events can be missed while focus or pause input is captured; once gameplay
         // resumes, an inactive button must still complete this interaction and restore control.
-        if (!LmbHeld)
+        if (!GrabHeld)
         {
             CommitLever();
             _exitCoroutine = StartCoroutine(ExitLeverView());
             return;
         }
 
-        // Drag while LMB / RT is held — accumulate into _dragT.
+        // Drag while E / ButtonWest is held — accumulate into _dragT.
         // Mouse Y is already a per-frame delta; controller stick is continuous so scale by Time.deltaTime.
         float mouseY = Input.GetAxis("Mouse Y");
         float stickY = Gamepad.current?.rightStick.ReadValue().y ?? 0f;

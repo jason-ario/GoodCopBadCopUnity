@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshObstacle))]
-public class GateController : Interactable, IMutantPassable, IHeldItemPassthrough, ILockable
+public class GateController : Interactable, IMutantPassable, ILockable
 {
     private NetworkVariable<bool> _gateOpen = new NetworkVariable<bool>(
         false,

@@ -129,9 +129,10 @@ public abstract class DayBase : MonoBehaviour
     [Range(1, 2)]
     public int ForcedFullMutantCount = 1;
 
-    [Tooltip("Minimum current infection score (0–100) a previously-seen suspect needs before the " +
-             "ForceEarlyFullMutants override may pick them. Prevents a suspect who was passed with only " +
-             "one or two anomalies from jumping straight to full-mutant form the next day.")]
+    [Tooltip("Preferred minimum infection score (0–100) for a previously-seen suspect to be picked by " +
+             "ForceEarlyFullMutants. Suspects at or above it are picked first; if none qualify, the override " +
+             "falls back to the highest-scoring seen suspects, then ones whose quarantine has ended, then " +
+             "never-seen suspects — so the forced full mutants still appear.")]
     [Range(0, 100)]
     public int ForcedFullMutantMinScore = 45;
 

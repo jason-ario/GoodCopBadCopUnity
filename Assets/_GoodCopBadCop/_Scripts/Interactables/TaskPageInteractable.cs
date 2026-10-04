@@ -7,7 +7,7 @@ using UnityEngine;
 /// Requires a <see cref="NetworkObject"/> on this GameObject (Interactable is a NetworkBehaviour).
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class TaskPageInteractable : Interactable, IHeldItemPassthrough
+public class TaskPageInteractable : Interactable
 {
     [Tooltip("The diegetic view controller that opens the close-up camera view.")]
     [SerializeField] private TaskPageDiegeticController _diegeticController;

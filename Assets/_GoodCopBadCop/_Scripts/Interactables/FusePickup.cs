@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -24,26 +25,58 @@ public class FusePickup : PickableObject
     /// <summary>The color identity of this fuse.</summary>
     public FuseColor FuseColor => _fuseColor;
 
+    // ── "Find the fuses" highlight (local, per client) ───────────────────────
+
+    private static readonly HashSet<FusePickup> s_spawned = new();
+    private static bool s_findHighlightActive;
+
+    /// <summary>True once this fuse has been picked up; it never re-highlights after that.</summary>
+    private bool _pickedUpOnce;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        s_spawned.Clear();
+        s_findHighlightActive = false;
+    }
+
     /// <summary>
-    /// Force-highlights this fuse the moment it spawns (on every client) so players can spot
-    /// it around the power station, and clears the highlight the instant it is picked up.
+    /// Local, every client. Toggles the "find the fuses" highlight on every spawned fuse that
+    /// hasn't been picked up yet. Fuses are NOT highlighted on spawn — <c>Day_03</c> enables this
+    /// only once the fuse box has been investigated, and disables it once every slot is filled.
+    /// Fuses spawned while active pick the state up automatically.
     /// </summary>
+    public static void SetFindHighlightActive(bool active)
+    {
+        if (s_findHighlightActive == active) return;
+        s_findHighlightActive = active;
+
+        foreach (FusePickup fuse in s_spawned)
+            if (fuse != null) fuse.ApplyFindHighlight();
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        SetForceHighlight(true);
+        s_spawned.Add(this);
         OnPickedUpNetworked += ClearHighlightOnPickedUp;
+        ApplyFindHighlight();
     }
 
     public override void OnNetworkDespawn()
     {
         OnPickedUpNetworked -= ClearHighlightOnPickedUp;
+        s_spawned.Remove(this);
         base.OnNetworkDespawn();
     }
 
+    private void ApplyFindHighlight() =>
+        SetForceHighlight(s_findHighlightActive && !_pickedUpOnce && !IsHeld);
+
     private void ClearHighlightOnPickedUp()
     {
+        _pickedUpOnce = true;
         SetForceHighlight(false);
         OnPickedUpNetworked -= ClearHighlightOnPickedUp;
     }

@@ -426,12 +426,26 @@ public class OchoBoothEncounter : NetworkBehaviour
             ShiftManager.Instance.StartCoroutine(PowerRestoredBarkSequence());
         }
 
+        /// <summary>
+        /// The encounter is armed by the player's first-ever kill, so it can land on any day.
+        /// Day 2: Vlad (default megaphone voice) responds. Day 3: Vlad is dead and nobody has
+        /// taken over the megaphone yet, so there is no response at all. Day 4+: the replacement
+        /// megaphone voice (<see cref="MegaphoneDialogueManager.AlternateVoiceClips"/>) responds.
+        /// </summary>
         private IEnumerator PowerRestoredBarkSequence()
         {
-            MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_bark1);
-            yield return new WaitForSeconds(_barkGap);
+            int day = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : 0;
 
-            MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_bark2);
+            if (day != 3)
+            {
+                bool useAlternateVoice = day >= 4;
+
+                MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_bark1, useAlternateVoice);
+                yield return new WaitForSeconds(_barkGap);
+
+                MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_bark2, useAlternateVoice);
+            }
+
             yield return new WaitForSeconds(_finalDelay);
 
             ShiftManager.Instance?.SetNextSuspectReady();

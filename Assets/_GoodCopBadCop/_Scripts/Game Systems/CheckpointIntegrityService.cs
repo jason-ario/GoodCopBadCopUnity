@@ -14,8 +14,8 @@ using UnityEngine;
 /// <see cref="ISystemicThreat"/> in the game (e.g. mutants), since those three represent the
 /// physical state of the booth itself and are the task components actually placed in the scene.
 /// Each is weighted equally by default via <see cref="_graffitiWeight"/>, <see cref="_trashWeight"/>,
-/// and <see cref="_fenceWeight"/>. The graffiti category also pools in every blood splatter counted
-/// by <see cref="CleanBloodTask"/> (in-bounds only), matching the HUD's graffiti row.
+/// and <see cref="_fenceWeight"/>. The graffiti category counts graffiti pieces only — blood
+/// splatters are cosmetic and never affect the score.
 ///
 /// Purely a read-side aggregator: it owns no networked state of its own. Every tracked
 /// threat already replicates its ThreatLevel via NetworkVariable(ReadPermission.Everyone), so
@@ -206,12 +206,10 @@ public class CheckpointIntegrityService : MonoBehaviour
         float weightedTotal = 0f;
         float totalWeight   = 0f;
 
-        // Graffiti category = graffiti pieces + blood splatters counted by CleanBloodTask (in-bounds
-        // only), pooled by count so every mess piece weighs the same — same formula as
-        // CleanGraffitiTask.ThreatLevel, just over the combined set.
-        if ((CleanGraffitiTask.Instance != null || CleanBloodTask.Instance != null) && _graffitiWeight > 0f)
+        // Graffiti category = graffiti pieces only (blood is cosmetic and never counts).
+        if (CleanGraffitiTask.Instance != null && _graffitiWeight > 0f)
         {
-            CheckpointMaintenanceHUD.GetGraffitiAndBloodCounts(out int scrubbed, out int total);
+            CheckpointMaintenanceHUD.GetGraffitiCounts(out int scrubbed, out int total);
             float graffitiCleanliness = total > 0 ? Mathf.Clamp01((float)scrubbed / total) : 1f;
 
             weightedTotal += graffitiCleanliness * _graffitiWeight;

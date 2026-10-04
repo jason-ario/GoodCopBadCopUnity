@@ -53,11 +53,12 @@ public class TrashBagPicker : Interactable
     /// <summary>Always shows the extract hint (key icon + action text) while this dispenser is targeted.</summary>
     public override bool ShowInteractHint => true;
 
-    /// <summary>LMB (empty-handed) grabs a bag — identical to pressing E.</summary>
+    /// <summary>Interact (empty-handed) grabs a bag.</summary>
     public override void Interact(PlayerInteractionController player) => GiveBag(player);
 
-    /// <summary>E grabs a bag — identical to LMB.</summary>
-    public override void InteractAlternate(PlayerInteractionController player) => GiveBag(player);
+    /// <summary>A bag can only be grabbed into a free hand.</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
+        player.pickupController == null || player.pickupController.HeldObject == null;
 
     /// <summary>
     /// Spawns one trash bag and routes it directly into the requesting player's hands.

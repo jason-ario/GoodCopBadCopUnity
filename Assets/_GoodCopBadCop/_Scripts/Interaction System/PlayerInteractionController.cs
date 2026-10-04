@@ -58,9 +58,10 @@ public class PlayerInteractionController : NetworkBehaviour
     public bool CanInteract => _canInteract && !_suspectCamActive;
 
     // â”€â”€ Controller trigger helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // RT  (rightTrigger)  = LMB â€” primary interact / item use
+    // RT  (rightTrigger)  = LMB â€” use the held item (never world interaction)
     // LT  (leftTrigger)   = RMB â€” placement mode hold
     // RB  (rightShoulder) = MMB â€” throw charge / release
+    // X / Square (buttonWest) = Interact key (E) â€” ALL world interaction; see IInteractable.cs
     // InputSystem's default press-point (0.5) converts the analog axes to the
     // wasPressedThisFrame / isPressed / wasReleasedThisFrame digital events we need.
     private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
@@ -69,8 +70,16 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool RmbUp   => RebindableInput.GetMouseButtonUp(GameAction.PlaceObject)   || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
     private bool MmbDown => RebindableInput.GetMouseButtonDown(GameAction.ThrowObject) || (Gamepad.current?.rightShoulder.wasPressedThisFrame  ?? false);
     private bool MmbUp   => RebindableInput.GetMouseButtonUp(GameAction.ThrowObject)   || (Gamepad.current?.rightShoulder.wasReleasedThisFrame ?? false);
-    // E key â€” world interact / alternate interact. buttonWest maps to Xbox X / PlayStation Square.
-    private bool EKeyDown => RebindableInput.GetKeyDown(GameAction.Interact) || (Gamepad.current?.buttonWest.wasPressedThisFrame ?? false);
+    private bool InteractDown => RebindableInput.GetKeyDown(GameAction.Interact) || (Gamepad.current?.buttonWest.wasPressedThisFrame ?? false);
+    private bool InteractHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || (Gamepad.current?.buttonWest.isPressed          ?? false);
+
+    [Header("Hold Interact")]
+    [Tooltip("Seconds the Interact key must be held to trigger an object's secondary hold action (Interactable.InteractHold). Releasing earlier counts as a tap (Interactable.Interact).")]
+    public float holdInteractDuration = 0.5f;
+
+    /// <summary>Object whose hold action is being charged by the currently held Interact key (null when idle).</summary>
+    private Interactable _holdTarget;
+    private float _holdElapsed;
     public Interactable onlyAllowedInteractable;
     bool reticleActive = false;
     public bool ReticleActive => reticleActive;
@@ -147,11 +156,19 @@ public class PlayerInteractionController : NetworkBehaviour
             }
         }
 
-        if (UIController.Instance == null || UIController.Instance.IsPaused) return;
+        if (UIController.Instance == null || UIController.Instance.IsPaused)
+        {
+            CancelHoldInteract();
+            return;
+        }
 
         HandleReticle();
         
-        if (CanInteract == false) return;
+        if (CanInteract == false)
+        {
+            CancelHoldInteract();
+            return;
+        }
         
         if (RmbUp)
         {
@@ -159,29 +176,89 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
 
-        // LMB / RT is the only input that may use or place a held item.
-        // The rebindable Interact key remains reserved for alternate world interaction,
-        // including while an item is being carried.
+        // LMB / RT is ONLY for using the held item (including using it on a target via
+        // InteractWithItem). Empty-handed it does nothing — world interaction is the Interact key.
         // Exception: when the cursor is visible (e.g. notebook draw mode), LMB belongs to the
         // ClickDetector â€” skip TryItemUse so it doesn't double-fire and call OnStartUse again.
-        if (LmbDown)
+        if (LmbDown && _playerPickupController.HeldObject != null && !Cursor.visible)
         {
-            if (_playerPickupController.HeldObject == null)
-                TryWorldInteract();
-            else if (TryPlaceHeldObjectAtGhost())
-            {
-                // Handled: an aim-shown ghost (e.g. a mail cubby's PlacementSlot) was active
-                // and in range, so LMB committed the placement â€” skip TryItemUse below.
-            }
-            else if (!Cursor.visible)
-                TryItemUse();
-        }
-        else if (EKeyDown)
-        {
-            TryWorldInteract(alternate: true);
+            TryItemUse();
         }
 
+        // Interact key (E / West) â€” every world-object interaction, held item or not.
+        if (InteractDown && _holdTarget == null)
+        {
+            TryWorldInteract();
+        }
+
+        UpdateHoldInteract();
+
         HandleThrowInput();
+    }
+
+    /// <summary>
+    /// Advances a pending hold-to-interact (started in <see cref="TryWorldInteract"/> on an object
+    /// with a <see cref="Interactable.GetHoldInteractVerb"/>). Released early → tap
+    /// (<see cref="Interactable.Interact"/>). Held for <see cref="holdInteractDuration"/> →
+    /// <see cref="Interactable.InteractHold"/>. Looking away, leaving range, or the hold action
+    /// becoming unavailable cancels without firing either.
+    /// </summary>
+    private void UpdateHoldInteract()
+    {
+        if (_holdTarget == null) return;
+
+        Interactable target = _holdTarget;
+
+        // lastInteractable is the in-range, highlighted target resolved by HandleReticle this frame.
+        bool stillTargeted = target != null && target == lastInteractable && target.IsInteractable;
+        if (!stillTargeted)
+        {
+            CancelHoldInteract();
+            return;
+        }
+
+        if (!InteractHeld)
+        {
+            CancelHoldInteract();
+            target.Interact(this);
+            ClearReticlePromptAfterInteract();
+            return;
+        }
+
+        if (target.GetHoldInteractVerb(this) == null)
+        {
+            CancelHoldInteract();
+            return;
+        }
+
+        _holdElapsed += Time.deltaTime;
+        float duration = Mathf.Max(0.01f, holdInteractDuration);
+
+        if (_holdElapsed >= duration)
+        {
+            CancelHoldInteract();
+            target.InteractHold(this);
+            ClearReticlePromptAfterInteract();
+            return;
+        }
+
+        if (reticle != null)
+            reticle.SetHoldProgress(_holdElapsed / duration);
+    }
+
+    private void CancelHoldInteract()
+    {
+        _holdTarget = null;
+        _holdElapsed = 0f;
+        if (reticle != null)
+            reticle.SetHoldProgress(0f);
+    }
+
+    private void ClearReticlePromptAfterInteract()
+    {
+        if (reticle == null) return;
+        reticle.SetInteractState(false);
+        reticle.SetTooFarState(false);
     }
     
     /// <summary>
@@ -367,25 +444,27 @@ public class PlayerInteractionController : NetworkBehaviour
                 // used to fall straight into its own logic and `return` without ever touching the
                 // placer. That left ObjectPlacer.Instance.IsActive/IsInRange true from the last
                 // frame the player aimed at the slot, so TryPlaceHeldObjectAtGhost() (checked
-                // before TryItemUse on LMB/E) would commit-drop the held package instead of
-                // forwarding the click to the interactable â€” e.g. a locker door that implements
-                // IHeldItemPassthrough would silently never open while holding a package.
+                // first on the Interact key) would commit-drop the held package instead of
+                // forwarding the press to the interactable â€” e.g. a locker door would silently
+                // never open while holding a package.
                 if (ObjectPlacer.Instance.IsActive)
                     ObjectPlacer.Instance.DeactivatePlacer();
 
                 if (inRange)
                 {
-                    // When holding an item, only E triggers world interact so show [E].
-                    // When empty-handed, LMB picks up / interacts (primary) and E extracts (alternate).
-                    bool isHolding = _playerPickupController.HeldObject != null;
-                    bool isWorldInteract = isHolding ? interactable is not PickableObject : true;
+                    // Interact key prompt: "Hold E to <verb>" when a hold action is available,
+                    // otherwise the bare key icon (plus interactText for ShowInteractHint objects)
+                    // whenever pressing Interact would do something for this player right now.
+                    string holdVerb = interactable.GetHoldInteractVerb(this);
 
-                    // Hide the button tooltip if the interactable requires a specific item
-                    // but the player isn't holding a matching one.
-                    bool showButtonTooltip = interactable.itemsThatCanInteractWith.Length == 0
-                        || (isHolding && interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData));
+                    // Held item usable on this target (LMB / RT → InteractWithItem, e.g. trash bag
+                    // over junk): show the use icon instead of the Interact key.
+                    PickableObject heldForUse = _playerPickupController.HeldObject;
+                    bool canUseHeldItem = heldForUse != null && interactable.CanInteractWithItem(heldForUse);
 
-                    reticle.SetInteractState(true, interactable.interactText, isWorldInteract, showButtonTooltip, interactable.ShowInteractHint);
+                    bool showKey = holdVerb != null || canUseHeldItem || interactable.ShowsInteractPrompt(this);
+
+                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint, holdVerb, canUseHeldItem);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }
@@ -440,8 +519,9 @@ public class PlayerInteractionController : NetworkBehaviour
                 
                 if (_playerPickupController.IsHoldingObject)
                 {
+                    // Aim-shown ghost commits on the Interact key (see TryPlaceHeldObjectAtGhost) â€” show its icon.
                     if (aimGhostRequested)
-                        reticle.SetInteractState(true, placementBoard.AimHoverText);
+                        reticle.SetInteractState(true, placementBoard.AimHoverText, true);
                     else
                         reticle.SetInteractState(false);
                     reticle.SetTooFarState(false);
@@ -495,7 +575,7 @@ public class PlayerInteractionController : NetworkBehaviour
             if (_playerPickupController.IsHoldingObject)
             {
                 if (nearbyAimGhostRequested)
-                    reticle.SetInteractState(true, nearbyBoard.AimHoverText);
+                    reticle.SetInteractState(true, nearbyBoard.AimHoverText, true);
                 else
                     reticle.SetInteractState(false);
                 reticle.SetTooFarState(false);
@@ -758,14 +838,15 @@ public class PlayerInteractionController : NetworkBehaviour
     /// orientation is used instead.
     /// </summary>
     /// <summary>
-    /// Commits the held object into the currently active placement ghost via LMB or the interact
-    /// key, without needing to hold-then-release RMB first. Normal free-surface/board placement
+    /// Commits the held object into the currently active placement ghost via the Interact key,
+    /// without needing to hold-then-release RMB first. Normal free-surface/board placement
     /// only ever commits on RMB release (see <see cref="PlayerPickupController"/>'s Update), which
     /// is fine there since the ghost only appears while RMB is held. Boards that opted into
     /// <see cref="PlacementBoard.ShowGhostWhileAiming"/> (e.g. a mail cubby's <see cref="PlacementSlot"/>)
     /// show their ghost passively just from aiming â€” the player may never hold RMB at all â€” so
-    /// this gives them an equivalent commit path via LMB/E instead. Returns true if the placement
-    /// was committed, so the caller can skip its normal held-item-use handling for this press.
+    /// this gives them an equivalent commit path via the Interact key instead (placing into a slot is
+    /// world interaction, not item use). Returns true if the placement was committed, so the caller
+    /// skips its normal world-interact handling for this press.
     /// </summary>
     private bool TryPlaceHeldObjectAtGhost()
     {
@@ -872,8 +953,9 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Handles Left Click while holding an item: performs item-on-item interactions or
-    /// falls back to using the held item in the world. Never triggers world interact.
+    /// Handles LMB / RT while holding an item: uses it on the targeted interactable when that
+    /// target accepts it (<see cref="Interactable.InteractWithItem"/>), otherwise uses it in place.
+    /// Never triggers world interact â€” that is the Interact key's job (see <see cref="TryWorldInteract"/>).
     /// </summary>
     void TryItemUse()
     {
@@ -899,33 +981,33 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
-        if (interactable.itemsThatCanInteractWith.Contains(pickupController.HeldObject.ItemData))
+        if (interactable.CanInteractWithItem(pickupController.HeldObject))
         {
             interactable.InteractWithItem(this, pickupController.HeldObject);
             _playerPickupController.TryUseObject();
         }
-        else if (interactable is IHeldItemPassthrough)
-        {
-            // This interactable explicitly handles LMB input itself regardless of held item.
-            // Do not call TryUseObject â€” the interactable manages the held-button lifecycle.
-            interactable.Interact(this);
-        }
         else
         {
-            Debug.Log("Held object is not compatible with this interactable");
+            // Not a target for this item — use it in place. World interaction is the Interact key's job.
             _playerPickupController.TryUseObject();
         }
     }
 
     /// <summary>
-    /// Handles E key (and Left Click when empty-handed): interacts with any interactable
-    /// in range â€” pickups, world objects, slots, etc.
-    /// When <paramref name="alternate"/> is true (E key), calls
-    /// <see cref="Interactable.InteractAlternate"/>; otherwise calls
-    /// <see cref="Interactable.Interact"/> (LMB).
+    /// Handles the Interact key (E / gamepad West) â€” every world-object interaction, whether or
+    /// not the player is holding an item. In order:
+    ///   1. Holding an item with an aim-shown placement ghost (e.g. a mail cubby's PlacementSlot)
+    ///      in range â†’ commit the placement.
+    ///   2. Target has a hold action (<see cref="Interactable.GetHoldInteractVerb"/>) â†’ start
+    ///      charging it; <see cref="UpdateHoldInteract"/> resolves tap vs hold.
+    ///   3. Otherwise â†’ <see cref="Interactable.Interact"/> immediately (so press-and-hold drags
+    ///      like levers and drawers grab on the press frame).
     /// </summary>
-    void TryWorldInteract(bool alternate = false)
+    void TryWorldInteract()
     {
+        if (TryPlaceHeldObjectAtGhost())
+            return;
+
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
         // Use the same tie-break/sticky resolution as the reticle highlight (TryGetBestInteractHit)
@@ -941,10 +1023,14 @@ public class PlayerInteractionController : NetworkBehaviour
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
         if (interactable == null || !interactable.IsInteractable) return;
 
-        if (alternate)
-            interactable.InteractAlternate(this);
-        else
-            interactable.Interact(this);
+        if (interactable.GetHoldInteractVerb(this) != null)
+        {
+            _holdTarget = interactable;
+            _holdElapsed = 0f;
+            return;
+        }
+
+        interactable.Interact(this);
 
         reticle.SetInteractState(false);
         reticle.SetTooFarState(false);

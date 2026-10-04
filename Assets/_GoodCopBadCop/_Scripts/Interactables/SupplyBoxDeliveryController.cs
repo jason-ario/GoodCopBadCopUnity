@@ -12,7 +12,7 @@ using UnityEngine;
 ///      <see cref="DayBase.GetSupplyBoxSpawnPointOverride"/> (falling back to
 ///      <see cref="_spawnPoint"/> when the day doesn't provide one).
 ///   3. Spawns the day's configured item prefabs as NetworkObject children of the box contents.
-///   4. Immediately unlocks the box and its contents for pickup.
+///   4. Unlocks the box for pickup. Contents stay locked until the box is opened.
 /// </summary>
 public class SupplyBoxDeliveryController : NetworkBehaviour
 {
@@ -251,11 +251,8 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
         _activeBox.UnlockInteractableNetworked();
         _activeBox.FinalizeDeliveryClientRpc();
 
-        foreach (NetworkObject item in _spawnedItems)
-        {
-            if (item != null && item.TryGetComponent(out PickableObject pickable))
-                pickable.UnlockInteractableNetworked();
-        }
+        // Contents stay locked (set in SpawnItems) — the box is delivered closed, and
+        // SupplyBox.OpenBoxNetworked is the only path that unlocks them.
 
         Debug.Log("[SupplyBoxDeliveryController] Supply box spawned and ready for pickup.", this);
     }

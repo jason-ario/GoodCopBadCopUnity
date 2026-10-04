@@ -200,7 +200,7 @@ public class GuidebookDatabase : ScriptableObject
             IconList = new[]
             {
                 new GuidebookIconItem { Label = "TRASH & GORE",     Text = "Bag it, then throw the bag in the dumpster." },
-                new GuidebookIconItem { Label = "GRAFFITI & BLOOD", Text = "Scrub it away with the mop." },
+                new GuidebookIconItem { Label = "GRAFFITI",         Text = "Scrub it away with the mop." },
                 new GuidebookIconItem { Label = "FENCES",           Text = "Repair broken fences with the hammer." },
             },
         },

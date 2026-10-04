@@ -408,11 +408,13 @@ MonoBehaviour:
   goreLandingSound: {fileID: 8300000, guid: 07384a7fcf4682c41a4016158c6a8899, type: 3}
   corpseJunkItem: {fileID: 3067322814249485463}
   corpseJunkInteractionCollider: {fileID: 4345242163484371791}
+  fitCorpseColliderToPose: 1
+  corpseColliderPadding: 0.3
   canAggro: 1
   aggroTarget: {fileID: 0}
   deathBehaviour: 1
   deathAnimationDuration: 2
-  deathSound: {fileID: 8300000, guid: 6e8803c8c2354e244a10a06f29ae093a, type: 3}
+  deathSound: {fileID: 8300000, guid: 28c417011862f2345947853b0553f52b, type: 3}
   _hurtSounds:
   - {fileID: 8300000, guid: 36806a8c59b08b740adab1e2c5435807, type: 3}
   _chaseSounds:
@@ -1479,6 +1481,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   interactText: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   _destroyOnCollect: 1
   _kickable: 1
   _burnable: 0

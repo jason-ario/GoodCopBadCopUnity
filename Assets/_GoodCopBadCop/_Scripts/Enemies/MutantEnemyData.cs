@@ -52,6 +52,28 @@ public class MutantEnemyData : ScriptableObject
     [Range(0f, 1f)]
     public float aggroChance = 0.25f;
 
+    [Header("Lose Interest")]
+    [Tooltip("When true, a mutant that has been stuck at an unreachable target (e.g. banging on the closed booth " +
+             "door) for Lose Interest Delay seconds gives up and patrols the yard instead.")]
+    public bool enableLoseInterest = true;
+
+    [Tooltip("Seconds of being stuck at an unreachable target (door banging / partial path) before giving up.")]
+    [Min(1f)]
+    public float loseInterestDelay = 5f;
+
+    [Tooltip("After giving up on a player, the mutant only re-notices them once they are reachable again " +
+             "(e.g. left the booth) AND within this distance. Being hurt bypasses the distance check briefly.")]
+    [Min(0f)]
+    public float renoticeRadius = 10f;
+
+    [Tooltip("Minimum distance from the abandoned target (the booth) that give-up patrol waypoints are picked at.")]
+    [Min(0f)]
+    public float giveUpPatrolMinDistance = 8f;
+
+    [Tooltip("Maximum distance from the abandoned target (the booth) that give-up patrol waypoints are picked at.")]
+    [Min(1f)]
+    public float giveUpPatrolMaxDistance = 24f;
+
     [Header("Fence Combat")]
     [Tooltip("Damage dealt to a PerimiterFence per melee hit. Tune alongside the fence's Max Health.")]
     public float fenceDamagePerHit = 15f;

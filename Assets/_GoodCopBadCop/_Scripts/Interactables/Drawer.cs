@@ -1,11 +1,12 @@
 using System;
 using System.Collections;
 using DG.Tweening;
+using GoodCopBadCop.Input;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class Drawer : Interactable, IHeldItemPassthrough
+public class Drawer : Interactable
 {
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip drawerOpenSound;
@@ -149,7 +150,9 @@ public class Drawer : Interactable, IHeldItemPassthrough
             _movementAudioSource.Stop();
     }
 
-    private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
+    // Interact key (E / ButtonWest) starts the grab (see Interact) and must stay held to keep it.
+    // LMB / RT is reserved for held-item use, so it plays no part here.
+    private bool GrabHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || (Gamepad.current?.buttonWest.isPressed ?? false);
 
     // ── Input loop ────────────────────────────────────────────────────────────
 
@@ -171,15 +174,14 @@ public class Drawer : Interactable, IHeldItemPassthrough
         // consumed while paused or while the application was unfocused.
         if (UIController.Instance != null && UIController.Instance.IsPaused) return;
 
-        bool dragHeld = LmbHeld || Input.GetKey(KeyCode.E);
-        if (!dragHeld)
+        if (!GrabHeld)
         {
             CommitDrawer();
             _exitCoroutine = StartCoroutine(ExitDrawerInteraction());
             return;
         }
 
-        // Held → scrub drawer position. Accept both LMB / RT and E so either input can drag.
+        // Held → scrub drawer position.
         _dragT = Mathf.Clamp01(_dragT + ComputeDragDelta());
         ApplyDragPosition();
         SyncDragTIfNeeded();
@@ -188,11 +190,8 @@ public class Drawer : Interactable, IHeldItemPassthrough
     // ── Interaction ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Both E and LMB open the drawer via the same grab sequence.
-    /// The drag loop in Update handles release for both inputs.
+    /// Interact key press grabs the drawer; the drag loop in Update releases it when the key is let go.
     /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player) => Interact(player);
-
     public override void Interact(PlayerInteractionController player)
     {
         if (_isLocked.Value) return;

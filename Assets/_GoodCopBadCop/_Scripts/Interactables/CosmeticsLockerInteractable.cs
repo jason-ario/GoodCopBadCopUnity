@@ -22,7 +22,7 @@ using UnityEngine;
 ///   - Re-enables everything in reverse order, including the player's point light.
 /// </summary>
 [RequireComponent(typeof(BoxCollider))]
-public class CosmeticsLockerInteractable : Interactable, IHeldItemPassthrough
+public class CosmeticsLockerInteractable : Interactable
 {
     [Header("Player Facing")]
     [Tooltip("The player's Y rotation is smoothly rotated to match this transform's forward on open. " +

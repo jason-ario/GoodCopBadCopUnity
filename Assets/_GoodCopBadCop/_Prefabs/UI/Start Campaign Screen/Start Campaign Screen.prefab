@@ -61,10 +61,20 @@ MonoBehaviour:
   inviteCodeText: {fileID: 2836978431222010604}
   inviteCodeSection: {fileID: 5081040640846735645}
   copyInviteCodeButton: {fileID: 0}
+  dayNumberText: {fileID: 0}
+  copiedNotification: {fileID: 0}
+  copiedMessage: Copied to clipboard
+  copiedFontSize: 18
+  copiedOffsetBelowButton: 6
+  copiedFadeInDuration: 0.12
+  copiedHoldDuration: 1.2
+  copiedFadeOutDuration: 0.5
+  copiedDriftDistance: 6
   startButton: {fileID: 5056886014396601992}
   waitForHostText: {fileID: 8838545453537708398}
   readyButton: {fileID: 7697651089164873126}
   readyButtonLabel: {fileID: 5392015677463571877}
+  readyCheckmarkIcon: {fileID: 0}
 --- !u!114 &2266675862256175636
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -81,6 +91,7 @@ MonoBehaviour:
   - {fileID: 5056886014396601992}
   - {fileID: 7697651089164873126}
   - {fileID: 8506686734615832463}
+  _stickDeadzone: 0.5
 --- !u!1 &842730749134218496
 GameObject:
   m_ObjectHideFlags: 0
@@ -466,8 +477,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Game - Day 0
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
-  m_sharedMaterial: {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
+  m_sharedMaterial: {fileID: 7971247120015167934, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -491,8 +502,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 77.9
-  m_fontSizeBase: 77.9
+  m_fontSize: 102
+  m_fontSizeBase: 102
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -514,7 +525,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -550,6 +561,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
 --- !u!1 &4694516605184243119
 GameObject:
   m_ObjectHideFlags: 0
@@ -667,7 +680,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -703,6 +716,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
 --- !u!1 &5081040640846735645
 GameObject:
   m_ObjectHideFlags: 0
@@ -1388,7 +1403,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -1424,6 +1439,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
 --- !u!1 &8084097629999988078
 GameObject:
   m_ObjectHideFlags: 0
@@ -1492,8 +1509,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Start Campaign
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
-  m_sharedMaterial: {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
+  m_sharedMaterial: {fileID: 7971247120015167934, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1517,8 +1534,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 77.9
-  m_fontSizeBase: 77.9
+  m_fontSize: 107.7
+  m_fontSizeBase: 107.7
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1540,7 +1557,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -1576,6 +1593,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
 --- !u!1 &8838545453537708398
 GameObject:
   m_ObjectHideFlags: 0
@@ -1643,8 +1662,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Waiting For Host...
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
-  m_sharedMaterial: {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
+  m_sharedMaterial: {fileID: 7971247120015167934, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1668,8 +1687,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 34.2
-  m_fontSizeBase: 34.2
+  m_fontSize: 42.1
+  m_fontSizeBase: 42.1
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1691,7 +1710,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -1918,20 +1937,24 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_fontSize
-      value: 54.7
+      value: 71.2
       objectReference: {fileID: 0}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_fontAsset
       value: 
-      objectReference: {fileID: 11400000, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+      objectReference: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
+    - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
+      propertyPath: m_fontStyle
+      value: 16
+      objectReference: {fileID: 0}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_fontSizeBase
-      value: 54.7
+      value: 71.2
       objectReference: {fileID: 0}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_sharedMaterial
       value: 
-      objectReference: {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+      objectReference: {fileID: 7971247120015167934, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_hasFontAssetChanged
       value: 0
@@ -2171,20 +2194,24 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_fontSize
-      value: 54.7
+      value: 71.2
       objectReference: {fileID: 0}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_fontAsset
       value: 
-      objectReference: {fileID: 11400000, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+      objectReference: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
+    - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
+      propertyPath: m_fontStyle
+      value: 16
+      objectReference: {fileID: 0}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_fontSizeBase
-      value: 54.7
+      value: 71.2
       objectReference: {fileID: 0}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_sharedMaterial
       value: 
-      objectReference: {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+      objectReference: {fileID: 7971247120015167934, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
     - target: {fileID: 5844606713878597126, guid: 67daf423eccf4e24792782ad312a161e, type: 3}
       propertyPath: m_hasFontAssetChanged
       value: 0

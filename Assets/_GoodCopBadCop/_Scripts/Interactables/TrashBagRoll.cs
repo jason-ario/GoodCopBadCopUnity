@@ -4,12 +4,12 @@ using UnityEngine;
 /// <summary>
 /// A trash bag roll that dispenses individual <see cref="TrashBag"/>s on demand.
 ///
-/// Press E near the roll to extract one bag directly into your hands.
-/// LMB (empty-handed) picks up the roll so it can be carried to a desired location.
+/// Hold Interact near the roll to extract one bag directly into your hands ("Hold E to tear off a bag").
+/// Tap Interact (empty-handed) picks up the roll so it can be carried to a desired location.
 /// After all bags are extracted the roll despawns automatically.
 ///
 /// All extraction logic, networked item count, sound playback, and despawn are inherited
-/// from <see cref="ContainerPickableObject"/>. This class only provides the reticle label.
+/// from <see cref="ContainerPickableObject"/>. This class only provides the reticle labels.
 ///
 /// Prefab requirements:
 ///   - NetworkObject
@@ -26,4 +26,7 @@ public class TrashBagRoll : ContainerPickableObject
 {
     protected override string BuildInteractText(int itemsRemaining)
         => $"Extract Trash Bag ({itemsRemaining} left)";
+
+    /// <summary>Reticle hold prompt: "Hold E to tear off a bag".</summary>
+    protected override string ExtractVerb => "tear off a bag";
 }

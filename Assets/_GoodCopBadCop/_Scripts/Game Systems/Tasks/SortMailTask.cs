@@ -50,7 +50,9 @@ using Random = UnityEngine.Random;
 ///   - Assign _groundLayer to match whatever layer packages should land on inside the crate.
 ///   - Assign _goodsTypePool / _prohibitedCountPerDay to taste.
 ///   - Optionally assign _deliveryTruck (a <see cref="DeliveryTruckController"/>) so the delivery
-///     is preceded by a drive-in cutscene instead of packages appearing instantly.
+///     is preceded by a drive-in cutscene instead of packages appearing instantly. With a truck,
+///     packages spawn pinned inside its crate as it activates (tune the "Crate Ride-Along" area
+///     via the selection gizmo) and are released onto physics once the crate lands.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
@@ -87,6 +89,19 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
              "spawning packages on arrival, idling, then driving off — instead of packages " +
              "appearing immediately on day change.")]
     [SerializeField] private DeliveryTruckController _deliveryTruck;
+
+    [Header("Crate Ride-Along (truck deliveries)")]
+    [Tooltip("Centre of the package area inside the delivery crate, in METRES relative to the crate's pivot " +
+             "and rotation (crate scale is compensated). Y is the height of the lowest package layer's centre.")]
+    [SerializeField] private Vector3 _cratePackageAreaCenter = new Vector3(0f, 0.15f, 0f);
+    [Tooltip("Width (X) and depth (Z) in metres of the area inside the crate packages are randomly placed in.")]
+    [SerializeField] private Vector2 _cratePackageAreaSize = new Vector2(1f, 1f);
+    [Tooltip("Minimum horizontal distance between package centres on the same layer before a new layer is started.")]
+    [SerializeField] private float _cratePackageSpacing = 0.3f;
+    [Tooltip("Vertical step between stacked package layers inside the crate.")]
+    [SerializeField] private float _cratePackageLayerHeight = 0.25f;
+    [Tooltip("Random placement attempts per package before it is moved up to the next layer.")]
+    [SerializeField] private int _cratePlacementAttempts = 16;
 
     [Header("Gate Button Tutorial")]
     [Tooltip("The checkpoint gate button's Interactable. While the shipment-is-waiting-at-the-gate " +
@@ -145,6 +160,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Local state (server-only) ─────────────────────────────────────────────
 
     private readonly List<NetworkObject> _spawnedPackages = new();
+
+    /// <summary>Packages spawned pinned inside the delivery crate while the truck is still en route
+    /// (see <see cref="TryPrepareCrateDelivery"/>). Not part of the live task (HUD, save state,
+    /// threat level) until <see cref="TryReleaseCrateDelivery"/> moves them to <see cref="_spawnedPackages"/>.</summary>
+    private readonly List<NetworkObject> _pendingCratePackages = new();
 
     /// <summary>Packages correctly sorted (delivered to a mailbox cubby or confiscated into a
     /// Confiscate bin) that are left sitting there (locked, no longer despawned immediately —
@@ -234,6 +254,13 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     public int SortedCount => _sortedCount.Value;
     public int TotalCount  => _totalCount.Value;
+
+    /// <summary>
+    /// The crate transform packages are pinned to while riding the delivery truck. Resolvable on
+    /// every peer (scene references), used by <see cref="MailPackageItem"/> to rebuild its pin.
+    /// </summary>
+    public Transform DeliveryCrateTransform =>
+        _deliveryTruck != null && _deliveryTruck.DeliveryCrate != null ? _deliveryTruck.DeliveryCrate : _crateSpawnPoint;
 
     /// <summary>Captures every unresolved package with its authoritative labels and placement.</summary>
     public MailTaskSaveState CaptureSaveState()
@@ -528,6 +555,126 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// </summary>
     public bool TryTriggerTask()
     {
+        if (!TryRollDelivery(out List<SuspectRecord> addressees))
+            return false;
+
+        DespawnExistingPackages();
+
+        int failedSpawnCount = 0;
+        foreach (SuspectRecord resident in addressees)
+        {
+            NetworkObject netObj = SpawnSinglePackage(resident, GetRandomSpawnPosition(),
+                Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
+            if (netObj != null)
+                _spawnedPackages.Add(netObj);
+            else
+                failedSpawnCount++;
+        }
+
+        if (_spawnedPackages.Count == 0)
+        {
+            _taskActive = false;
+            _isActive.Value = false;
+            _totalCount.Value = 0;
+            UpdateThreatLevel();
+            Debug.LogWarning($"[SortMailTask] Mail delivery spawned no packages ({failedSpawnCount}/{addressees.Count} attempts failed); it can be retried.");
+            return false;
+        }
+
+        ActivateDelivery(failedSpawnCount);
+        return true;
+    }
+
+    /// <summary>
+    /// Server-only. Called by <see cref="DeliveryTruckController"/> as the truck activates: rolls
+    /// today's delivery and spawns every package pinned at a random spot inside the delivery
+    /// crate (locked, kinematic, no highlight) so they ride along with the truck instead of
+    /// popping into existence on arrival. The task itself does not go live (HUD, save state,
+    /// <see cref="OnMailDelivered"/>) until <see cref="TryReleaseCrateDelivery"/>. Returns
+    /// <see langword="false"/> if nothing could be spawned — the truck then falls back to
+    /// <see cref="TryTriggerTask"/> once the crate lands.
+    /// </summary>
+    public bool TryPrepareCrateDelivery()
+    {
+        Transform crate = DeliveryCrateTransform;
+        if (crate == null)
+        {
+            Debug.LogWarning("[SortMailTask] No delivery crate transform — packages will spawn on landing instead.");
+            return false;
+        }
+
+        if (!TryRollDelivery(out List<SuspectRecord> addressees))
+            return false;
+
+        DespawnExistingPackages();
+
+        List<Vector3> localPositions = BuildCratePackageLayout(addressees.Count);
+        Vector3 scale = crate.lossyScale;
+        Vector3 inverseScale = new Vector3(
+            Mathf.Approximately(scale.x, 0f) ? 1f : 1f / scale.x,
+            Mathf.Approximately(scale.y, 0f) ? 1f : 1f / scale.y,
+            Mathf.Approximately(scale.z, 0f) ? 1f : 1f / scale.z);
+
+        int failedSpawnCount = 0;
+        for (int i = 0; i < addressees.Count; i++)
+        {
+            // Layout is authored in metres; SocketFollow uses crate.TransformPoint, so undo scale.
+            Vector3    localPos = Vector3.Scale(localPositions[i], inverseScale);
+            Quaternion localRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+            NetworkObject netObj = SpawnSinglePackage(addressees[i],
+                crate.TransformPoint(localPos), crate.rotation * localRot,
+                pinToCrate: true, crateLocalPosition: localPos, crateLocalRotation: localRot);
+
+            if (netObj != null)
+                _pendingCratePackages.Add(netObj);
+            else
+                failedSpawnCount++;
+        }
+
+        if (_pendingCratePackages.Count == 0)
+        {
+            Debug.LogWarning($"[SortMailTask] Crate delivery spawned no packages ({failedSpawnCount}/{addressees.Count} attempts failed); will retry on landing.");
+            return false;
+        }
+
+        Debug.Log($"[SortMailTask] {_pendingCratePackages.Count} package(s) loaded into the delivery crate" +
+                  (failedSpawnCount > 0 ? $" ({failedSpawnCount} failed)." : "."));
+        return true;
+    }
+
+    /// <summary>
+    /// Server-only. Called once the delivery crate has landed: un-pins every package prepared by
+    /// <see cref="TryPrepareCrateDelivery"/> (physics, solid colliders, interaction and the
+    /// delivery highlight come on) and makes the task live. Returns <see langword="false"/> if
+    /// there were no pending crate packages.
+    /// </summary>
+    public bool TryReleaseCrateDelivery()
+    {
+        if (!IsServer) return false;
+
+        _pendingCratePackages.RemoveAll(netObj => netObj == null || !netObj.IsSpawned);
+        if (_pendingCratePackages.Count == 0) return false;
+
+        foreach (NetworkObject netObj in _pendingCratePackages)
+        {
+            if (netObj.TryGetComponent(out MailPackageItem package))
+                package.ReleaseFromCrate();
+            _spawnedPackages.Add(netObj);
+        }
+        _pendingCratePackages.Clear();
+
+        ActivateDelivery(0);
+        return true;
+    }
+
+    /// <summary>
+    /// Server-only. Validates prerequisites and draws today's addressees. Does not spawn anything.
+    /// </summary>
+    private bool TryRollDelivery(out List<SuspectRecord> addressees)
+    {
+        addressees = null;
+
         if (!IsServer)
         {
             Debug.LogWarning("[SortMailTask] Tried to trigger mail delivery outside the server.");
@@ -561,55 +708,31 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             return false;
         }
 
-        DespawnExistingPackages();
-        _taskActive = true;
-        _sortedCount.Value = 0;
-
         int packageCount = Random.Range(_minPackageCount, _maxPackageCount + 1);
 
         // Cap at the number of eligible residents: each resident has exactly one physical
         // MailCubbySlot (see MailCubbyManager), so once a package has been correctly delivered
         // there, that cubby is occupied and cannot accept a second package for the same resident.
-        // Without this cap, whenever packageCount exceeds addressPool.Count (guaranteed once
-        // _maxPackageCount > the live resident count, which only gets more likely as residents
-        // are killed off over the campaign) the draw below reshuffles into a second pass and can
-        // hand the same resident two packages in one delivery — the second one is then physically
-        // impossible to deliver correctly no matter where the player puts it. This was the
+        // Without this cap the draw could hand the same resident two packages in one delivery —
+        // the second one is then physically impossible to deliver correctly. This was the
         // "exactly one package never registers, even sorted correctly" bug.
         packageCount = Mathf.Min(packageCount, addressPool.Count);
 
-        // Draw addressees from a single shuffled pass over every eligible resident so each one
-        // gets at most one package — packageCount is capped above at addressPool.Count so this
-        // pass never needs to wrap around and reshuffle (which would risk handing the same
-        // resident two packages — see the cap above).
-        List<SuspectRecord> residentDrawOrder = new List<SuspectRecord>(addressPool);
-        Shuffle(residentDrawOrder);
-        int residentCursor = 0;
-        int failedSpawnCount = 0;
+        // Draw addressees from a single shuffled pass so each resident gets at most one package.
+        Shuffle(addressPool);
+        addressees = addressPool.GetRange(0, packageCount);
+        return true;
+    }
 
-        for (int i = 0; i < packageCount; i++)
-        {
-            if (residentCursor >= residentDrawOrder.Count)
-            {
-                Shuffle(residentDrawOrder);
-                residentCursor = 0;
-            }
-
-            if (!SpawnSinglePackage(residentDrawOrder[residentCursor]))
-                failedSpawnCount++;
-            residentCursor++;
-        }
-
+    /// <summary>
+    /// Server-only. Makes the delivery live once its packages are in <see cref="_spawnedPackages"/>:
+    /// resets progress, registers the HUD/pending task and fires <see cref="OnMailDelivered"/>.
+    /// </summary>
+    private void ActivateDelivery(int failedSpawnCount)
+    {
+        _taskActive = true;
+        _sortedCount.Value = 0;
         _totalCount.Value = _spawnedPackages.Count;
-        if (_spawnedPackages.Count == 0)
-        {
-            _taskActive = false;
-            _isActive.Value = false;
-            UpdateThreatLevel();
-            Debug.LogWarning($"[SortMailTask] Mail delivery spawned no packages ({failedSpawnCount}/{packageCount} attempts failed); it can be retried.");
-            return false;
-        }
-
         UpdateThreatLevel();
 
         _isActive.Value = true;
@@ -621,11 +744,60 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         OnMailDelivered?.Invoke();
 
         string spawnResult = failedSpawnCount > 0
-            ? $"spawned {_spawnedPackages.Count} package(s); {failedSpawnCount} attempt(s) failed"
-            : $"spawned {_spawnedPackages.Count} package(s)";
+            ? $"{_spawnedPackages.Count} package(s) live; {failedSpawnCount} attempt(s) failed"
+            : $"{_spawnedPackages.Count} package(s) live";
         Debug.Log($"[SortMailTask] Delivery triggered — {spawnResult}. " +
                   $"Prohibited today: {string.Join(", ", _todaysProhibitedGoods)}");
-        return true;
+    }
+
+    /// <summary>
+    /// Random, non-overlapping package positions inside the crate, in metres in crate space.
+    /// Fills the bottom layer first; once a package can't find a free spot after
+    /// <see cref="_cratePlacementAttempts"/> tries, a new layer is started on top.
+    /// </summary>
+    private List<Vector3> BuildCratePackageLayout(int count)
+    {
+        var positions = new List<Vector3>(count);
+        var currentLayer = new List<Vector2>();
+        Vector2 half = _cratePackageAreaSize * 0.5f;
+        float spacingSqr = _cratePackageSpacing * _cratePackageSpacing;
+        float layerY = _cratePackageAreaCenter.y;
+        int attempts = Mathf.Max(1, _cratePlacementAttempts);
+
+        for (int i = 0; i < count; i++)
+        {
+            Vector2 candidate = default;
+            bool placed = false;
+
+            for (int attempt = 0; attempt < attempts && !placed; attempt++)
+            {
+                candidate = new Vector2(Random.Range(-half.x, half.x), Random.Range(-half.y, half.y));
+                placed = true;
+                foreach (Vector2 other in currentLayer)
+                {
+                    if ((other - candidate).sqrMagnitude < spacingSqr)
+                    {
+                        placed = false;
+                        break;
+                    }
+                }
+            }
+
+            if (!placed)
+            {
+                currentLayer.Clear();
+                layerY += _cratePackageLayerHeight;
+                candidate = new Vector2(Random.Range(-half.x, half.x), Random.Range(-half.y, half.y));
+            }
+
+            currentLayer.Add(candidate);
+            positions.Add(new Vector3(
+                _cratePackageAreaCenter.x + candidate.x,
+                layerY,
+                _cratePackageAreaCenter.z + candidate.y));
+        }
+
+        return positions;
     }
 
     /// <summary>
@@ -739,12 +911,19 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         return pool;
     }
 
-    private bool SpawnSinglePackage(SuspectRecord resident)
+    /// <summary>
+    /// Server-only. Spawns one labelled package at the given pose. When <paramref name="pinToCrate"/>
+    /// is set, the package is pinned to the delivery crate at the crate-local pose before spawn
+    /// (replicated in the spawn payload), locked, and left un-highlighted until released.
+    /// Returns the spawned NetworkObject, or null on failure. Does not add it to any list.
+    /// </summary>
+    private NetworkObject SpawnSinglePackage(SuspectRecord resident, Vector3 spawnPos, Quaternion spawnRot,
+        bool pinToCrate = false, Vector3 crateLocalPosition = default, Quaternion crateLocalRotation = default)
     {
         if (resident == null || resident.SuspectData == null)
         {
             Debug.LogWarning("[SortMailTask] Skipped package spawn for an invalid resident record.");
-            return false;
+            return null;
         }
 
         GameObject itemGo = null;
@@ -765,9 +944,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 ? MailSortBinType.Confiscate
                 : MailSortBinType.Delivery;
 
-            Vector3    spawnPos = GetRandomSpawnPosition();
-            Quaternion spawnRot = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-
             itemGo = Instantiate(_packagePrefab, spawnPos, spawnRot);
             netObj = itemGo.GetComponent<NetworkObject>();
             MailPackageItem package = itemGo.GetComponent<MailPackageItem>();
@@ -776,13 +952,22 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             {
                 Debug.LogError("[SortMailTask] Package prefab is missing a NetworkObject or MailPackageItem component.");
                 Destroy(itemGo);
-                return false;
+                return null;
             }
 
+            if (pinToCrate)
+                package.SetCratePinBeforeSpawn(crateLocalPosition, crateLocalRotation);
+
             netObj.Spawn(destroyWithScene: true);
-            package.ServerInitialize(resident.SuspectData, residentName, goodsLabel, correctBin);
-            _spawnedPackages.Add(netObj);
-            return true;
+            package.ServerInitialize(resident.SuspectData, residentName, goodsLabel, correctBin, highlight: !pinToCrate);
+
+            if (pinToCrate)
+            {
+                package.LockInteractableNetworked();
+                package.EnsureCratePinAppliedOnServer();
+            }
+
+            return netObj;
         }
         catch (Exception exception)
         {
@@ -791,7 +976,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 netObj.Despawn(destroy: true);
             else if (itemGo != null)
                 Destroy(itemGo);
-            return false;
+            return null;
         }
     }
 
@@ -882,6 +1067,14 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
                 netObj.Despawn(destroy: true);
         }
         _spawnedPackages.Clear();
+
+        foreach (NetworkObject netObj in _pendingCratePackages)
+        {
+            if (netObj != null && netObj.IsSpawned)
+                netObj.Despawn(destroy: true);
+        }
+        _pendingCratePackages.Clear();
+
         _networkThreatLevel.Value = 0f;
     }
 
@@ -964,6 +1157,19 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [ClientRpc]
     private void NotifyDeliveryAlertClientRpc()
     {
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Transform crate = DeliveryCrateTransform;
+        if (crate == null) return;
+
+        // Package area inside the crate (metres, crate pivot/rotation, scale ignored).
+        Gizmos.matrix = Matrix4x4.TRS(crate.position, crate.rotation, Vector3.one);
+        Gizmos.color = new Color(1f, 0.8f, 0.2f, 0.9f);
+        Vector3 size = new Vector3(_cratePackageAreaSize.x, _cratePackageLayerHeight, _cratePackageAreaSize.y);
+        Gizmos.DrawWireCube(_cratePackageAreaCenter, size);
+        Gizmos.matrix = Matrix4x4.identity;
     }
 
     /// <summary>

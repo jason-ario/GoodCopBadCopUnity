@@ -207,6 +207,12 @@ public class SoldierMutantResponder : NetworkBehaviour
         _suspect.KillAsGuard();
         _suspect.EnableJunkPickup();
 
+        // Persist the now-empty slot immediately so a reload can't resurrect this guard,
+        // even if the corpse is never bagged before the next day-start checkpoint.
+        GuardPurchasePoint parentPoint = GetComponentInParent<GuardPurchasePoint>();
+        if (parentPoint != null)
+            parentPoint.NotifyGuardDied();
+
         JunkItem junkItem = _suspect.JunkItem;
         if (junkItem != null)
             junkItem.OnCollected = HandleCorpseCollected;
@@ -239,6 +245,52 @@ public class SoldierMutantResponder : NetworkBehaviour
 
         if (_associatedPurchasePoint != null)
             _associatedPurchasePoint.SetUnlocked(true);
+    }
+
+    /// <summary>
+    /// Brings this soldier back as a fresh, living guard when its <see cref="GuardPurchasePoint"/>
+    /// slot receives a newly purchased guard. The slot reuses this same GameObject, so the previous
+    /// guard's death (dead flag, death animation, junk pickup, lost health, disabled agent, corpse
+    /// position) must be undone. Call on every peer while the GameObject is active; visual state is
+    /// reset locally everywhere, gameplay state only on the server.
+    /// </summary>
+    public void ResetForNewArrival()
+    {
+        SuspectCharacter suspect = _suspect != null ? _suspect : GetComponent<SuspectCharacter>();
+        if (suspect != null)
+            suspect.ResetDeathStateForReuse();
+
+        if (!IsServer || _agent == null)
+            return;
+
+        StopCombatRoutine();
+        _currentTarget = null;
+        _state = State.Idle;
+        _scanTimer = 0f;
+        _health = _maxHealth;
+
+        if (suspect != null && suspect.JunkItem != null)
+        {
+            suspect.JunkItem.OnCollected = null;
+            suspect.JunkItem.SetCollectible(false);
+        }
+
+        _agent.enabled = true;
+        if (_agent.isOnNavMesh)
+        {
+            _agent.Warp(_postPosition);
+            _agent.ResetPath();
+            _agent.isStopped = true;
+        }
+        else
+        {
+            transform.position = _postPosition;
+        }
+        transform.rotation = _postRotation;
+
+        _isWalkingAnim = false;
+        if (suspect != null && suspect.animator != null)
+            suspect.animator.SetBool("Walking", false);
     }
 
     private void Update()

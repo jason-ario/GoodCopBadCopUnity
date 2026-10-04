@@ -22,7 +22,9 @@ namespace GoodCopBadCop.Input
         ZoomHeldItem,
         Reload,
         // Not exposed in Settings -> Controls; registered so helper icons can show the Tab / View prompt.
-        OpenGuidebook
+        OpenGuidebook,
+        // Held to transmit when Voice Input is set to Push To Talk (read by DissonanceVoiceChatAdapter).
+        PushToTalk
     }
 
     /// <summary>
@@ -46,6 +48,7 @@ namespace GoodCopBadCop.Input
             { GameAction.ZoomHeldItem, KeyCode.F },
             { GameAction.Reload, KeyCode.R },
             { GameAction.OpenGuidebook, KeyCode.Tab },
+            { GameAction.PushToTalk, KeyCode.B },
         };
 
         private static readonly Dictionary<GameAction, int> DefaultMouseButtons = new()
@@ -66,6 +69,7 @@ namespace GoodCopBadCop.Input
             { GameAction.ZoomHeldItem, "rightStickPress" },
             { GameAction.Reload, "buttonNorth" },
             { GameAction.OpenGuidebook, "select" },
+            { GameAction.PushToTalk, "" },
         };
 
         private static readonly Dictionary<GameAction, KeyCode> Keys = new();
@@ -170,6 +174,11 @@ namespace GoodCopBadCop.Input
                 case KeyCode.Alpha4: case KeyCode.Alpha5: case KeyCode.Alpha6: case KeyCode.Alpha7:
                 case KeyCode.Alpha8: case KeyCode.Alpha9:
                     return key.ToString().Replace("Alpha", string.Empty);
+                // Extra mouse buttons can be bound to keyboard actions (e.g. side buttons for push-to-talk).
+                case KeyCode.Mouse3: return "Mouse 4";
+                case KeyCode.Mouse4: return "Mouse 5";
+                case KeyCode.Mouse5: return "Mouse 6";
+                case KeyCode.Mouse6: return "Mouse 7";
                 default:
                     return key.ToString();
             }

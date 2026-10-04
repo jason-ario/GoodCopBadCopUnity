@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Dissonance;
+using GoodCopBadCop.Input;
 using R3;
 using Unity.Netcode;
 using UnityEngine;
@@ -22,6 +23,7 @@ namespace GoodCopBadCop.VoiceChat
         private DisposableBag disposables;
         private bool appliedLocalSpeaking;
         private bool voiceActivatedForSession;
+        private bool lobbyTriggerUserMuted;
 
         public DissonanceVoiceChatAdapter(
             IVoiceChatModel model,
@@ -61,6 +63,7 @@ namespace GoodCopBadCop.VoiceChat
 
             bool hasRemotePeer = HasRemoteNetworkPeer();
             UpdateSessionActivation(hasRemotePeer);
+            UpdatePushToTalkGate();
 
             // TODO: If all players leave the lobby, the microphone indicator can remain visible;
             // handle lobby/network disconnect events and force local speaking off.
@@ -189,7 +192,8 @@ namespace GoodCopBadCop.VoiceChat
             lobbyBroadcastTrigger.BroadcastPosition = false;
             lobbyBroadcastTrigger.UseColliderTrigger = false;
             lobbyBroadcastTrigger.Mode = ToDissonanceMode(model.InputMode.CurrentValue);
-            lobbyBroadcastTrigger.IsMuted = muted;
+            lobbyTriggerUserMuted = muted;
+            lobbyBroadcastTrigger.IsMuted = muted || IsPushToTalkGateClosed();
             lobbyBroadcastTrigger.enabled = enabled;
 
             lobbyReceiptTrigger.RoomName = LobbyRoomName;
@@ -197,12 +201,39 @@ namespace GoodCopBadCop.VoiceChat
             lobbyReceiptTrigger.enabled = enabled;
         }
 
+        /// <summary>
+        /// Push-to-talk is gated here rather than by Dissonance's own PushToTalk mode. That mode polls
+        /// legacy <c>Input.GetAxis(InputName)</c>, which can't follow the rebindable
+        /// <see cref="GameAction.PushToTalk"/> key. Instead the trigger runs in Open mode and stays
+        /// muted unless the bound key is held.
+        /// </summary>
+        private void UpdatePushToTalkGate()
+        {
+            if (lobbyBroadcastTrigger == null)
+            {
+                return;
+            }
+
+            bool targetMuted = lobbyTriggerUserMuted || IsPushToTalkGateClosed();
+            if (lobbyBroadcastTrigger.IsMuted != targetMuted)
+            {
+                lobbyBroadcastTrigger.IsMuted = targetMuted;
+            }
+        }
+
+        private bool IsPushToTalkGateClosed()
+        {
+            return model.InputMode.CurrentValue == EVoiceChatInputMode.PushToTalk
+                && !RebindableInput.GetKeyHeld(GameAction.PushToTalk);
+        }
+
         private static CommActivationMode ToDissonanceMode(EVoiceChatInputMode mode)
         {
             switch (mode)
             {
                 case EVoiceChatInputMode.PushToTalk:
-                    return CommActivationMode.PushToTalk;
+                    // Open + UpdatePushToTalkGate muting = rebindable push-to-talk.
+                    return CommActivationMode.Open;
                 case EVoiceChatInputMode.OpenMic:
                     return CommActivationMode.Open;
                 default:
@@ -217,6 +248,9 @@ namespace GoodCopBadCop.VoiceChat
         /// on and then stays on for the rest of that session, even if the other players leave.
         /// When the session ends (lobby left / NetworkManager shut down) it switches off again so the
         /// next solo session starts with the mic closed.
+        /// Turning voice chat off in settings also switches DissonanceComms off (OnDisable stops the
+        /// capture pipeline and calls Microphone.End). Muting alone doesn't close the mic, so without
+        /// this the headset stayed in hands-free mode after voice chat was disabled mid-game.
         /// The GameObject stays active so NfgoPlayer can still find the component on spawn.
         /// </summary>
         private void UpdateSessionActivation(bool hasRemotePeer)
@@ -238,7 +272,7 @@ namespace GoodCopBadCop.VoiceChat
                 Debug.Log("[VoiceChat] Another player joined - voice chat switched on for this session.");
             }
 
-            SetCommsActive(voiceActivatedForSession);
+            SetCommsActive(voiceActivatedForSession && model.IsEnabled.CurrentValue);
         }
 
         private void SetCommsActive(bool active)

@@ -5,9 +5,11 @@ using UnityEngine;
 using Random = UnityEngine.Random;
 
 /// <summary>
-/// Daily graffiti-cleaning task. Graffiti is spawned at day start via
-/// <see cref="TriggerDailyTask"/> (called by <see cref="DailyTaskScheduler"/> or day scripts),
-/// then persists through the shift so players can scrub it during the night phase.
+/// Daily graffiti-cleaning task. Day 2+ adds a fresh batch on every <see cref="ShiftManager.OnDayStart"/>
+/// on top of any unscrubbed leftovers — graffiti piles up across days (see <see cref="OnDayStart"/>);
+/// Day 1 pre-spawns via <see cref="SpawnGraffitiEarly"/>. A later
+/// <see cref="TriggerDailyTask"/> (from <see cref="DailyTaskScheduler"/> or day scripts) reuses any
+/// pieces still on the walls. Placements + scrub progress are saved in the day-start checkpoint.
 ///
 /// Implements both <see cref="ISystemicThreat"/> (HUD / performance scoring) and
 /// <see cref="IDailyTask"/> (compatible with <see cref="DailyTaskScheduler"/>).
@@ -49,6 +51,14 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Transforms on the checkpoint walls where graffiti can appear. A point is picked at random for each piece.")]
     [SerializeField] private Transform[]  _spawnPoints;
 
+    [Header("Day Start (Day 2+)")]
+    [Tooltip("Every day after Day 1, add a fresh batch of graffiti on free spawn points the moment the " +
+             "day starts (unscrubbed pieces from earlier days stay — graffiti piles up) and activate " +
+             "the task (compass pips + Checkpoint Integrity), without blocking clock-out. " +
+             "The pieces are captured by the day-start checkpoint save, so unscrubbed graffiti is " +
+             "rebuilt on load. Day 1 is excluded — Day_01 pre-spawns its own via SpawnGraffitiEarly.")]
+    [SerializeField] private bool _spawnOnDayStart = true;
+
     // ── Networked state ──────────────────────────────────────────────────────
 
     private readonly NetworkVariable<int> _scrubbed = new(
@@ -78,6 +88,14 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private readonly List<NetworkObject> _spawnedGraffiti = new();
     private readonly Dictionary<NetworkObject, GraffitiPlacementSaveData> _graffitiPlacements = new();
     private bool _isComplete;
+
+    /// <summary>
+    /// Server-only. Campaign day whose day-start handling (carry-over + fresh batch) has already
+    /// run, or whose graffiti was rebuilt from a save. <see cref="ShiftManager.OnDayStart"/> can fire
+    /// more than once per day across transition paths; without this a second firing would wipe and
+    /// re-roll graffiti the player has already seen (or that a save load just restored).
+    /// </summary>
+    private int _dayStartHandledForDay = -1;
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────
 
@@ -141,17 +159,23 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer) return;
 
         _isComplete = false;
-        _scrubbed.Value = 0;
+
+        // Drop pieces already scrubbed (and despawned) so only graffiti still on the walls counts
+        // as "already spawned this cycle".
+        PruneDespawnedGraffiti();
 
         if (_spawnedGraffiti.Count > 0)
         {
-            // SpawnGraffitiEarly already placed graffiti for this cycle (e.g. Day 1's
-            // pre-spawn at game start) — reuse it instead of despawning and re-rolling.
+            // Graffiti was already placed this cycle (Day 1's SpawnGraffitiEarly, or the Day 2+
+            // day-start spawn) — reuse it instead of despawning and re-rolling. Keep the existing
+            // scrubbed count: zeroing it while scrubbed pieces are already gone would leave the
+            // task permanently short (e.g. 2/3 with nothing left to scrub).
             Debug.Log($"[CleanGraffitiTask] TriggerDailyTask — reusing {_spawnedGraffiti.Count} " +
-                      "already-spawned graffiti piece(s) from SpawnGraffitiEarly.");
+                      "already-spawned graffiti piece(s).");
         }
         else
         {
+            _scrubbed.Value = 0;
             DespawnExistingGraffiti();
 
             int count = RollGraffitiCount();
@@ -185,6 +209,8 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public void SpawnGraffitiEarly()
     {
         if (!IsServer) return;
+
+        PruneDespawnedGraffiti();
 
         if (_spawnedGraffiti.Count > 0)
         {
@@ -263,6 +289,10 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         foreach (GraffitiPlacementSaveData placement in state.Placements ?? Array.Empty<GraffitiPlacementSaveData>())
             SpawnSavedGraffiti(placement);
+
+        // The saved set IS this day's graffiti — a later OnDayStart firing for the same day must
+        // not wipe it and roll a new one.
+        _dayStartHandledForDay = CurrentCampaignDay;
 
         _isActive.Value = state.IsActive && !_isComplete;
         if (_isActive.Value && CleanupTaskGating.IsMandatoryDay)
@@ -382,8 +412,16 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     // ── Day start ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Cleans up any remaining graffiti from the previous day.
-    /// Called before <see cref="TriggerDailyTask"/> so the spawn list is always fresh.
+    /// Day 2+: graffiti PILES UP. Unscrubbed pieces from previous days stay on the walls and a fresh
+    /// batch is added on free spawn points, so ignoring graffiti keeps costing Checkpoint Integrity.
+    /// The day's progress counter restarts at 0 / (carried-over + new). The number of spawn points
+    /// is the natural cap — once every point is tagged, nothing new appears until some are scrubbed.
+    /// Runs once per campaign day (see <see cref="_dayStartHandledForDay"/>).
+    ///
+    /// Persistence: the day-start checkpoint is committed one frame after
+    /// <see cref="ShiftManager.OnDayStart"/>, so the whole accumulated set is captured by
+    /// <see cref="CaptureSaveState"/> and rebuilt by <see cref="RestoreSaveState"/> on load. When a
+    /// load is pending, nothing is changed here — the saved set replaces it one frame later.
     /// </summary>
     private void OnDayStart()
     {
@@ -391,16 +429,51 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         if (!IsServer) return;
 
-        if (_spawnedGraffiti.Count > 0)
-        {
-            // Deactivate first so OnIsActiveChanged removes the stale HUD threat entry
-            // (e.g. graffiti left unscrubbed from the previous day) before the counts
-            // below are reset.
-            _isActive.Value = false;
+        int day = CurrentCampaignDay;
+        if (day == _dayStartHandledForDay) return;
 
-            _scrubbed.Value   = 0;
-            _totalCount.Value = 0;
-            DespawnExistingGraffiti();
+        // A save load will rebuild the authoritative set one frame from now — leave everything as-is
+        // (and leave the day unhandled; RestoreSaveState marks it).
+        if (CampaignManager.Instance != null && CampaignManager.Instance.HasPendingWorkdayRestore) return;
+        if (ShiftManager.Instance != null && ShiftManager.Instance.IsRestoringWorkdayState) return;
+
+        _dayStartHandledForDay = day;
+
+        // Keep only pieces still on the walls; they carry over into today's count.
+        PruneDespawnedGraffiti();
+        int carriedOver = _spawnedGraffiti.Count;
+
+        int spawned = 0;
+        // Day 1 owns its graffiti via Day_01 → SpawnGraffitiEarly (subscribed after this handler).
+        if (_spawnOnDayStart && !CleanupTaskGating.IsMandatoryDay)
+            spawned = SpawnGraffiti(RollGraffitiCount());
+
+        _scrubbed.Value   = 0;
+        _totalCount.Value = carriedOver + spawned;
+
+        // Optional on Day 2+ (see CleanupTaskGating): activating only drives compass pips and the
+        // TaskRegistry entry — HUDTaskList skips this task and it never blocks clock-out.
+        _isActive.Value = _totalCount.Value > 0 && !CleanupTaskGating.IsMandatoryDay;
+
+        if (_totalCount.Value > 0)
+            Debug.Log($"[CleanGraffitiTask] Day {day} start — {carriedOver} carried over + {spawned} new " +
+                      $"= {_totalCount.Value} graffiti piece(s).");
+    }
+
+    /// <summary>Current campaign day, or 1 before <see cref="CampaignManager"/> reports one.</summary>
+    private static int CurrentCampaignDay =>
+        CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+
+    /// <summary>Removes scrubbed/destroyed pieces from server tracking.</summary>
+    private void PruneDespawnedGraffiti()
+    {
+        for (int i = _spawnedGraffiti.Count - 1; i >= 0; i--)
+        {
+            NetworkObject netObj = _spawnedGraffiti[i];
+            if (netObj != null && netObj.IsSpawned) continue;
+
+            if (netObj != null) _graffitiPlacements.Remove(netObj);
+            _spawnedGraffiti.RemoveAt(i);
         }
     }
 
@@ -420,19 +493,25 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             return 0;
         }
 
-        // Pick spawn points without replacement so no two pieces land on the same spot
-        // in a single spawn cycle. Clamp to the number of available points since we
-        // can't place more unique pieces than there are spots.
-        int usableCount = Mathf.Min(count, _spawnPoints.Length);
-        if (usableCount < count)
-        {
-            Debug.LogWarning($"[CleanGraffitiTask] Requested {count} graffiti pieces but only " +
-                              $"{_spawnPoints.Length} spawn point(s) are assigned — spawning {usableCount}.");
-        }
+        // Pick spawn points without replacement so no two pieces land on the same spot, and skip
+        // points still occupied by carried-over graffiti (pieces pile up across days). Clamp to the
+        // number of free points since we can't place more unique pieces than there are spots.
+        PruneDespawnedGraffiti();
+        HashSet<int> occupied = new();
+        foreach (GraffitiPlacementSaveData placement in _graffitiPlacements.Values)
+            occupied.Add(placement.SpawnPointIndex);
 
         List<int> availableIndices = new(_spawnPoints.Length);
         for (int i = 0; i < _spawnPoints.Length; i++)
-            availableIndices.Add(i);
+            if (_spawnPoints[i] != null && !occupied.Contains(i))
+                availableIndices.Add(i);
+
+        int usableCount = Mathf.Min(count, availableIndices.Count);
+        if (usableCount < count)
+        {
+            Debug.Log($"[CleanGraffitiTask] Requested {count} graffiti pieces but only " +
+                      $"{availableIndices.Count} free spawn point(s) — spawning {usableCount}.");
+        }
 
         int spawnedCount = 0;
 

@@ -831,7 +831,9 @@ public class FolderController : PickableObject
 
     IEnumerator UseStampSequence(StampContainer.StampType stampType)
     {
-        GetComponent<HighlightPlus.HighlightEffect>().highlighted = false;
+        // Clear the hover outline through the Interactable API (respects any HighlightHold claims)
+        // rather than writing HighlightEffect.highlighted directly.
+        Highlight(false);
 
         // Force the Rigidbody kinematic before the stamp animation begins. If the folder was
         // thrown and came to rest on top of something (desk, another object) without ever being
@@ -993,7 +995,10 @@ public class FolderController : PickableObject
             PlayerInstance.Instance.CanControl = true;
         }
 
-        GetComponent<HighlightPlus.HighlightEffect>().highlighted = true;
+        // Do NOT force the outline back on here. This sequence runs on every client (ClientRpc),
+        // and on observers nothing is hovering the folder, so a forced `highlighted = true` stuck
+        // on until they happened to aim at it and away. Hover re-highlights the folder on the next
+        // frame for whoever is actually looking at it; persistent holds are owned by their callers.
 
         // Restore interactability now that the sequence is done.
         // Skip if the folder was picked up mid-sequence — _holdingClientId already
@@ -1131,6 +1136,35 @@ public class FolderController : PickableObject
         page.NetworkObject.AutoObjectParentSync = false;
 
         RegisterDocumentServerRpc(new NetworkObjectReference(page.NetworkObject));
+    }
+
+    /// <summary>
+    /// True when nothing is filed in any of this folder's slots (ID card, Application, exam
+    /// pages, evidence). Safe on any client: filed documents track their slot via an enabled
+    /// <see cref="SocketFollow"/> on every peer, unlike the server-only queue/despawn lists.
+    /// </summary>
+    public bool IsEmpty()
+    {
+        var slots = new HashSet<Transform>();
+        if (idCardSlot != null) slots.Add(idCardSlot);
+        if (applicationSlot != null) slots.Add(applicationSlot);
+        foreach (Transform slot in examPageSlots)
+            if (slot != null) slots.Add(slot);
+        foreach (Transform slot in _evidenceSlots)
+        {
+            if (slot == null) continue;
+            if (slot.childCount > 0) return false;
+            slots.Add(slot);
+        }
+
+        // Include inactive: a stowed folder deactivates its filed documents (SetDocumentsActive).
+        foreach (SocketFollow follow in FindObjectsByType<SocketFollow>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (follow.enabled && follow.Target != null && slots.Contains(follow.Target))
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>

@@ -97,7 +97,11 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
     private bool LmbHeld => Input.GetMouseButton(0)     || (Gamepad.current?.rightTrigger.isPressed             ?? false);
-    private bool LmbUp   => Input.GetMouseButtonUp(0)   || (Gamepad.current?.rightTrigger.wasReleasedThisFrame  ?? false);
+
+    // Cursor-driven diegetic view: the Interact key opens the view (BunkerDoorInteractable), and
+    // clicking/dragging inside it stays on LMB / RT, like every other cursor view.
+    private bool GrabDown => LmbDown;
+    private bool GrabHeld => LmbHeld;
 
     // ─── MonoBehaviour ────────────────────────────────────────────────────────
 
@@ -156,7 +160,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
         // view itself stays open until the wheel is fully spun or the exit key is pressed.
         if (!_isDragging)
         {
-            if (LmbDown && IsPointerOverWheel(cam))
+            if (GrabDown && IsPointerOverWheel(cam))
             {
                 SetDragging(true);
                 _lastMouseAngle = GetMouseAngleAroundWheel(cam);
@@ -169,14 +173,10 @@ public class DoorWheelDiegeticController : DiegeticViewController
         }
 
         // Dragging and released: stop spinning, but do NOT close the view.
-        if (!LmbHeld && !LmbUp)
-        {
-            // In case the button was released before the first OnUpdate (edge case).
-            SetDragging(false);
-            return;
-        }
-
-        if (LmbUp)
+        // Test the combined held state (not the per-button release events) so letting go of
+        // one input while the other is still held keeps the drag alive, and a release that
+        // was missed (focus/pause) still ends the drag.
+        if (!GrabHeld)
         {
             SetDragging(false);
             return;

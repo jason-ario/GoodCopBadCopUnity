@@ -46,6 +46,14 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 {
     public static CleanBloodTask Instance { get; private set; }
 
+    /// <summary>
+    /// Blood cleanup is retired as a player objective (too hard to read for players). While false,
+    /// every splatter is routed to <see cref="RegisterTransientBloodSplatter"/> — mop-able and
+    /// swept on day start, but never counted, never activating this task, never blocking
+    /// clock-out, and never feeding Checkpoint Integrity. Only graffiti counts there now.
+    /// </summary>
+    public static readonly bool BloodCleanupEnabled = false;
+
     [Header("Task Properties")]
     [SerializeField] private string _taskName = "Clean Blood";
     [Tooltip("Number of coupons the ATM dispenses when all blood has been scrubbed.")]
@@ -214,6 +222,10 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public void RestoreSaveState(BloodTaskSaveState state)
     {
         if (!IsServer || state == null) return;
+
+        // Blood cleanup is retired — ignore progress from older saves so it can't revive the task.
+        if (!BloodCleanupEnabled) return;
+
         _taskActive = state.IsActive;
         _isComplete = state.IsComplete;
         _hasRegisteredThisRun = state.TotalCount > 0;
@@ -351,6 +363,16 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer || netObj == null) return;
 
+        // RETIRED: blood is no longer a cleanup objective. It never counts toward this task, the
+        // graffiti row of Checkpoint Integrity, or clock-out — every splatter is purely cosmetic
+        // (still mop-able, swept on the next day start). The counted/bonus path below is kept
+        // dormant for reference only; re-enable by setting BloodCleanupEnabled = true.
+        if (!BloodCleanupEnabled)
+        {
+            RegisterTransientBloodSplatter(netObj);
+            return;
+        }
+
         GraffitiInteractable interactable = netObj.GetComponent<GraffitiInteractable>();
         if (interactable == null) return;
 
@@ -399,6 +421,7 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer || netObj == null) return;
 
+        _transientSplatters.Remove(netObj);
         bool wasBonus = _bonusSplatters.Remove(netObj);
         if (!_spawnedSplatters.Remove(netObj))
         {

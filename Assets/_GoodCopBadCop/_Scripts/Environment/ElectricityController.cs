@@ -7,6 +7,8 @@ public class ElectricityController : NetworkBehaviour
     [SerializeField] private ElectricObject[] electricObjects;
     [SerializeField] private AudioClip powerOffSound;
     [SerializeField] private AudioClip powerOnSound;
+    [Tooltip("Played instead of powerOnSound when power is restored at the power station (fuse-box outage). Falls back to powerOnSound if empty.")]
+    [SerializeField] private AudioClip fuseBoxPowerOnSound;
     [SerializeField] private AudioSource sfxSource;
     [SerializeField] private Vector2 powerOutageRandomTime = new Vector2(60, 120);
 
@@ -185,7 +187,7 @@ public class ElectricityController : NetworkBehaviour
         bool wasFuseOutage = _requiresFuseBoxRestore.Value;
         _requiresFuseBoxRestore.Value = false;
         _isPowerOn.Value = true;
-        PowerOnClientRpc();
+        PowerOnClientRpc(wasFuseOutage);
 
         if (wasFuseOutage)
             OnFuseOutageResolved?.Invoke();
@@ -208,7 +210,7 @@ public class ElectricityController : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void PowerOnClientRpc()
+    private void PowerOnClientRpc(bool wasFuseOutage)
     {
         // Cancel any pending power-off coroutine so its delayed OnElectricityTurnOff
         // does not fire after the power has already been restored.
@@ -225,7 +227,8 @@ public class ElectricityController : NetworkBehaviour
             electricObject.OnElectricityTurnOn?.Invoke();
         }
 
-        sfxSource.PlayOneShot(powerOnSound);
+        AudioClip onClip = wasFuseOutage && fuseBoxPowerOnSound != null ? fuseBoxPowerOnSound : powerOnSound;
+        if (onClip != null) sfxSource.PlayOneShot(onClip);
 
         // Fire "power restored" here unconditionally, rather than relying solely on
         // OnPowerStateChanged below (driven by the _isPowerOn NetworkVariable's OnValueChanged).

@@ -52,28 +52,39 @@ public class DeathScreenUI : MonoBehaviour
         if (backToMenuButton != null)
             backToMenuButton.SetActive(true);
 
-        if (spectateButton != null)
-            spectateButton.SetActive(HasTeammate());
+        RefreshSpectateButton();
+    }
+
+    private void RefreshSpectateButton()
+    {
+        if (spectateButton == null) return;
+
+        bool canSpectate = HasAliveTeammate();
+        if (spectateButton.activeSelf != canSpectate)
+            spectateButton.SetActive(canSpectate);
     }
 
     /// <summary>
-    /// Returns true when there is at least one other connected player (teammate)
-    /// in the party besides the local player.
+    /// Returns true when at least one teammate (not the local player) is spawned and alive,
+    /// i.e. there is someone to spectate. Uses the same validity rules as SpectateManager.
     /// </summary>
-    private bool HasTeammate()
+    private bool HasAliveTeammate()
     {
-        if (NetworkManager.Singleton == null) return false;
+        return SpectateManager.Instance != null && SpectateManager.Instance.SpectatableCount > 0;
+    }
 
-        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
-        {
-            if (client.PlayerObject == null) continue;
+    // Poll so the Spectate button also tracks teammates that spawn, revive or die after the
+    // death screen opened (OnDeath subscriptions only cover players present at OnEnable).
+    private const float SpectateRefreshInterval = 0.5f;
+    private float _spectateRefreshTimer;
 
-            var player = client.PlayerObject.GetComponent<PlayerInstance>();
-            if (player != null && player != PlayerInstance.Instance)
-                return true;
-        }
+    private void Update()
+    {
+        _spectateRefreshTimer -= Time.unscaledDeltaTime;
+        if (_spectateRefreshTimer > 0f) return;
 
-        return false;
+        _spectateRefreshTimer = SpectateRefreshInterval;
+        RefreshSpectateButton();
     }
 
     /// <summary>
@@ -159,6 +170,12 @@ public class DeathScreenUI : MonoBehaviour
     /// <summary>Called by the Spectate button's OnClick event in the Inspector.</summary>
     public void OnSpectateClicked()
     {
+        if (!HasAliveTeammate())
+        {
+            RefreshSpectateButton();
+            return;
+        }
+
         gameObject.SetActive(false);
         PlayerInstance.Instance?.StartSpectating();
     }

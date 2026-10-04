@@ -441,6 +441,12 @@ public class CampaignManager : NetworkBehaviour
         if (IsServer && day != 1)
             DespawnDay1Soldier();
 
+        // Vlad and the Soldier are Day 1-only scripted spawns, never lineup suspects. Drop any
+        // still-pending Day 1 intercept (static — survives day changes and scene reloads) so it
+        // can't consume a slot on this day.
+        if (day != 1)
+            SuspectController.ClearDay1OnlyIntercept();
+
         // Vlad's persistent scene character is only needed for Day 1 (tutorial arrival, spawned
         // separately via prefab) and Day 2 (tool locker / out-back sequences, using this scene
         // instance). From Day 3 onward he must never appear again.

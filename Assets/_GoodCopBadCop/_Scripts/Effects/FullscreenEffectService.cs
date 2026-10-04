@@ -11,6 +11,7 @@ namespace GoodCopBadCop.Effects
     {
         private FullscreenEffectView view;
         private DamageVignetteView vignetteView;
+        private GlitchEffectView glitchView;
 
         public void Play(FullscreenEffectSettings settings, EffectContext context)
         {
@@ -37,6 +38,15 @@ namespace GoodCopBadCop.Effects
                     }
 
                     damageVignetteView.Play(settings);
+                    break;
+
+                case EFullscreenEffectMode.Glitch:
+                    if (glitchView == null)
+                        glitchView = Object.FindFirstObjectByType<GlitchEffectView>();
+                    if (glitchView == null)
+                        glitchView = GlitchEffectView.CreateDefaultView();
+
+                    glitchView.Play(settings);
                     break;
             }
         }

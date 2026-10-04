@@ -25,7 +25,7 @@ using UnityEngine;
 /// </list>
 /// </summary>
 [RequireComponent(typeof(BoxCollider))]
-public class BunkBedInteractable : Interactable, IHeldItemPassthrough
+public class BunkBedInteractable : Interactable
 {
     [Header("Bed Camera")]
     [Tooltip("CinemachineCamera that becomes active while the End Day popup is shown.")]

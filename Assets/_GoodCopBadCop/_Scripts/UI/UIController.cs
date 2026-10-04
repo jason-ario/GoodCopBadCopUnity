@@ -307,6 +307,17 @@ public class UIController : MonoBehaviour
         PlayerInstance.Instance.ClosedUIPanel();
     }
 
+    /// <summary>
+    /// Hides the HQ Order Screen without touching player control, HUD or cursor. Used when the
+    /// handset is force-released from a holder who died/was replaced — the death flow owns
+    /// player state then, and <see cref="CloseHQOrderScreen"/> would re-enable a dead player.
+    /// </summary>
+    public void HideHQOrderScreenOnly()
+    {
+        if (hqOrderScreenUI != null)
+            hqOrderScreenUI.SetActive(false);
+    }
+
     /// <summary>True while the player HUD is shown.</summary>
     public bool IsPlayerUIVisible => playerUI != null && playerUI.activeSelf;
 
@@ -339,7 +350,42 @@ public class UIController : MonoBehaviour
         if (DiegeticViewController.IsAnyViewActive)
             return;
 
+        // Guard: a scripted phone call (e.g. Day 3's HQ power-outage call) keeps the HUD hidden
+        // until the handset is put down. The scripted dialogue's own exit path calls
+        // ShowPlayerUI() a frame before the auto hang-up, which would otherwise flash the HUD.
+        if (IsPhoneCallBackdropVisible)
+            return;
+
         playerUI.SetActive(true);
+    }
+
+    // ── Scripted phone call backdrop ─────────────────────────────────────────
+
+    [Header("Scripted Phone Call")]
+    [Tooltip("Full-screen dim backdrop (same look as the HQ Order Screen BG) shown while the local " +
+             "player holds the phone during a scripted call. Has no buttons or dial tone.")]
+    [SerializeField] private GameObject phoneCallBackdropUI;
+
+    /// <summary>True while the scripted phone call backdrop is shown.</summary>
+    public bool IsPhoneCallBackdropVisible => phoneCallBackdropUI != null && phoneCallBackdropUI.activeSelf;
+
+    /// <summary>
+    /// Hides the HUD and shows the dim phone backdrop for a scripted call (HQ dialogue plays
+    /// over it). Does not touch movement, cursor, or interaction — the telephone and the
+    /// scripted dialogue own those.
+    /// </summary>
+    public void ShowPhoneCallBackdrop()
+    {
+        playerUI.SetActive(false);
+        if (phoneCallBackdropUI != null)
+            phoneCallBackdropUI.SetActive(true);
+    }
+
+    /// <summary>Hides the scripted call backdrop. The HUD is restored by the put-down flow.</summary>
+    public void HidePhoneCallBackdrop()
+    {
+        if (phoneCallBackdropUI != null)
+            phoneCallBackdropUI.SetActive(false);
     }
     
     public void FadeIn(Action onComplete = null)
@@ -836,24 +882,32 @@ public class UIController : MonoBehaviour
             lowHealthAlertNotification.Hide();
     }
 
+    private Coroutine _showDeathScreenRoutine;
+
     /// <summary>Shows the death screen after the given delay in seconds.</summary>
     public void ShowDeathScreen(float delay)
     {
         if (deathScreenUI == null) return;
-        StartCoroutine(ShowDeathScreenDelayed(delay));
+        if (_showDeathScreenRoutine != null) StopCoroutine(_showDeathScreenRoutine);
+        _showDeathScreenRoutine = StartCoroutine(ShowDeathScreenDelayed(delay));
     }
 
     private IEnumerator ShowDeathScreenDelayed(float delay)
     {
         yield return new WaitForSeconds(delay);
+        _showDeathScreenRoutine = null;
         deathScreenUI.gameObject.SetActive(true);
     }
 
-    /// <summary>Hides the death screen immediately.</summary>
+    /// <summary>Hides the death screen immediately and cancels any pending delayed show.</summary>
     public void HideDeathScreen()
     {
         if (deathScreenUI == null) return;
-        StopCoroutine(nameof(ShowDeathScreenDelayed));
+        if (_showDeathScreenRoutine != null)
+        {
+            StopCoroutine(_showDeathScreenRoutine);
+            _showDeathScreenRoutine = null;
+        }
         deathScreenUI.gameObject.SetActive(false);
     }
 

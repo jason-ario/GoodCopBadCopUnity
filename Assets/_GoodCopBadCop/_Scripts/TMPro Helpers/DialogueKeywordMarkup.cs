@@ -109,7 +109,7 @@ public static class DialogueKeywordMarkup
 
     private static string Wrap(DialogueEmphasisProfile profile, string phrase)
     {
-        string hex = ColorUtility.ToHtmlStringRGBA(profile.color);
+        string hex = ColorUtility.ToHtmlStringRGB(profile.color);
         string open = (profile.bold ? "<b>" : "") + (profile.italic ? "<i>" : "") +
                       $"<color=#{hex}>{LinkPrefix}{profile.id}\">";
         string close = CloseLinkTag + "</color>" + (profile.italic ? "</i>" : "") + (profile.bold ? "</b>" : "");

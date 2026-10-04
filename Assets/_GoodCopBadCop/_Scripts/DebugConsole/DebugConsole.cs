@@ -230,11 +230,8 @@ public class DebugConsole : MonoBehaviour
             SpawnDebugAggroedMutant();
         }
 
-        // F11 — force the Alexei scripted event on the next suspect arrival.
-        if (Input.GetKeyDown(KeyCode.F11))
-        {
-            ForceAlexeiSequenceOnNextSuspect();
-        }
+        // F11 is owned by VFXDebugConsoleUI. The soldier mocking debug event used to share it,
+        // which silently queued the Soldier into the lineup whenever the VFX overlay was opened.
 
         // M — make the next eligible civilian suspect use the full-mutant booth flow.
         if (Input.GetKeyDown(KeyCode.M))
@@ -1123,8 +1120,8 @@ public class DebugConsole : MonoBehaviour
             return;
         }
 
-        SuspectController.InterceptNextSuspectSpawn = () => SoldierMockingController.Instance.BeginSequence();
-        Debug.Log("[DebugConsole] Soldier mocking event will intercept the next suspect spawn slot (F11).");
+        SuspectController.ArmDay1OnlyIntercept(() => SoldierMockingController.Instance.BeginSequence());
+        Debug.Log("[DebugConsole] Soldier mocking event will intercept the next Day 1 suspect spawn slot.");
     }
 
     /// <summary>

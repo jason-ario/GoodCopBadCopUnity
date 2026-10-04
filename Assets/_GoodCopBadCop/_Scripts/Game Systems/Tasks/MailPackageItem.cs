@@ -102,6 +102,31 @@ public class MailPackageItem : PickableObject
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// True while this package rides inside the delivery truck's crate (see
+    /// <see cref="SortMailTask.TryPrepareCrateDelivery"/>). Pinned packages follow the crate via
+    /// <see cref="SocketFollow"/> on every peer with NetworkTransform disabled, kinematic, colliders
+    /// off, locked and un-highlighted — mirroring supply-box containment. Replicated (with the
+    /// crate-local pose below) so late joiners rebuild the pin on spawn.
+    /// </summary>
+    private readonly NetworkVariable<bool> _pinnedToCrate = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Pinned pose in the crate transform's local space (already scale-compensated).</summary>
+    private readonly NetworkVariable<Vector3> _crateLocalPosition = new(
+        Vector3.zero,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<Quaternion> _crateLocalRotation = new(
+        Quaternion.identity,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public bool IsPinnedToCrate => _pinnedToCrate.Value;
+
     /// <summary>True once this package has been correctly sorted and is pending despawn. Server-only guard against double-counting.</summary>
     public bool IsResolved { get; private set; }
 
@@ -116,13 +141,18 @@ public class MailPackageItem : PickableObject
         _residentName.OnValueChanged += (_, _) => RefreshLabel();
         _goodsLabel.OnValueChanged   += (_, _) => RefreshLabel();
         _deliveryHighlightActive.OnValueChanged += OnDeliveryHighlightChanged;
+        _pinnedToCrate.OnValueChanged += OnPinnedToCrateChanged;
         RefreshLabel();
         ApplyDeliveryHighlight(_deliveryHighlightActive.Value);
+
+        if (_pinnedToCrate.Value)
+            ApplyCratePinLocal();
     }
 
     public override void OnNetworkDespawn()
     {
         _deliveryHighlightActive.OnValueChanged -= OnDeliveryHighlightChanged;
+        _pinnedToCrate.OnValueChanged -= OnPinnedToCrateChanged;
         ApplyDeliveryHighlight(false);
         base.OnNetworkDespawn();
     }
@@ -143,7 +173,7 @@ public class MailPackageItem : PickableObject
     /// <see cref="AssignedResident"/> on every client — see that property's doc comment for why
     /// this must go through a networked value rather than a plain field.
     /// </param>
-    public void ServerInitialize(SuspectData resident, string residentName, string goodsLabel, MailSortBinType correctBin)
+    public void ServerInitialize(SuspectData resident, string residentName, string goodsLabel, MailSortBinType correctBin, bool highlight = true)
     {
         if (!IsServer) return;
 
@@ -152,11 +182,146 @@ public class MailPackageItem : PickableObject
         _residentName.Value        = residentName;
         _goodsLabel.Value          = goodsLabel;
         _correctBin.Value          = (int)correctBin;
-        _deliveryHighlightActive.Value = true;
-        ApplyDeliveryHighlight(true);
+        _deliveryHighlightActive.Value = highlight;
+        ApplyDeliveryHighlight(highlight);
         IsResolved                 = false;
 
         RefreshLabel();
+    }
+
+    // ── Crate pinning (delivery truck ride-along) ─────────────────────────────
+
+    /// <summary>
+    /// Server-only, call BEFORE Spawn. Pins this package inside the delivery crate at the given
+    /// crate-local pose. The values ship with the spawn payload, so every peer (including late
+    /// joiners) applies the pin in <see cref="OnNetworkSpawn"/> — same pattern as
+    /// <see cref="PickableObject.SetSupplyBoxContainedNetworked(NetworkObjectReference, string)"/>.
+    /// </summary>
+    public void SetCratePinBeforeSpawn(Vector3 crateLocalPosition, Quaternion crateLocalRotation)
+    {
+        if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
+        {
+            Debug.LogWarning($"[MailPackageItem] Only the server can pin {name} to the delivery crate.", this);
+            return;
+        }
+
+        _crateLocalPosition.Value = crateLocalPosition;
+        _crateLocalRotation.Value = crateLocalRotation;
+        _pinnedToCrate.Value      = true;
+    }
+
+    /// <summary>
+    /// Server-only, call right after Spawn. NetworkRigidbody can restore the prefab's
+    /// non-kinematic state during spawn (after our OnNetworkSpawn), so re-assert the pin.
+    /// </summary>
+    public void EnsureCratePinAppliedOnServer()
+    {
+        if (!IsServer || !_pinnedToCrate.Value) return;
+        ApplyCratePinLocal();
+    }
+
+    /// <summary>
+    /// Server-only. Un-pins this package from the crate where it currently sits, enables
+    /// server-authoritative physics (it settles onto the crate floor), restores solid colliders,
+    /// unlocks interaction and turns on the delivery highlight. Clients snap to the server pose
+    /// and hand position over to NetworkTransform.
+    /// </summary>
+    public void ReleaseFromCrate()
+    {
+        if (!IsServer || !_pinnedToCrate.Value) return;
+
+        Vector3    position = transform.position;
+        Quaternion rotation = transform.rotation;
+
+        // Use the crate's current (landed) pose directly rather than the last SocketFollow frame.
+        Transform crate = SortMailTask.Instance != null ? SortMailTask.Instance.DeliveryCrateTransform : null;
+        if (crate != null)
+        {
+            position = crate.TransformPoint(_crateLocalPosition.Value);
+            rotation = crate.rotation * _crateLocalRotation.Value;
+        }
+
+        _pinnedToCrate.Value = false;
+        ReleaseCratePinLocal(position, rotation);
+        ReleaseFromCrateClientRpc(position, rotation);
+
+        UnlockInteractableNetworked();
+        _deliveryHighlightActive.Value = true;
+        ApplyDeliveryHighlight(true);
+    }
+
+    [ClientRpc]
+    private void ReleaseFromCrateClientRpc(Vector3 position, Quaternion rotation)
+    {
+        if (IsServer) return;
+        ReleaseCratePinLocal(position, rotation);
+    }
+
+    private void OnPinnedToCrateChanged(bool previous, bool current)
+    {
+        // Pin is applied from the spawn payload; release normally arrives via the ClientRpc with
+        // the authoritative pose. This is just a safety net if the NV delta lands first.
+        if (current)
+            ApplyCratePinLocal();
+        else if (!IsServer)
+            ReleaseCratePinLocal(transform.position, transform.rotation);
+    }
+
+    /// <summary>Per-peer: follow the delivery crate at the replicated crate-local pose.</summary>
+    private void ApplyCratePinLocal()
+    {
+        Transform crate = SortMailTask.Instance != null ? SortMailTask.Instance.DeliveryCrateTransform : null;
+        if (crate == null)
+        {
+            Debug.LogWarning($"[MailPackageItem] {name} is pinned to the delivery crate, but no crate transform could be resolved.", this);
+            return;
+        }
+
+        // NetworkTransform would fight the per-peer SocketFollow — every peer drives the pose locally.
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = false;
+
+        if (_rb != null)
+        {
+            if (!_rb.isKinematic)
+            {
+                _rb.linearVelocity  = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+            }
+            _rb.isKinematic = true;
+        }
+
+        // Also forces kinematic and disables physics colliders (PickableColliderController.SetHeld).
+        SetSocketFollowWithLocalOffset(crate, _crateLocalPosition.Value, _crateLocalRotation.Value);
+        transform.SetPositionAndRotation(
+            crate.TransformPoint(_crateLocalPosition.Value),
+            crate.rotation * _crateLocalRotation.Value);
+    }
+
+    /// <summary>Per-peer: stop following the crate and hand the package back to physics / NetworkTransform.</summary>
+    private void ReleaseCratePinLocal(Vector3 position, Quaternion rotation)
+    {
+        ClearSocketFollow();
+        transform.SetPositionAndRotation(position, rotation);
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
+
+        if (_rb != null)
+        {
+            // Server simulates; clients stay kinematic and follow NetworkTransform.
+            _rb.isKinematic = !IsServer;
+            if (IsServer)
+            {
+                _rb.linearVelocity  = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+            }
+        }
+
+        PickableColliderController colliderController = GetComponent<PickableColliderController>();
+        if (colliderController != null) colliderController.SetReleased();
+
+        Physics.SyncTransforms();
     }
 
     /// <summary>

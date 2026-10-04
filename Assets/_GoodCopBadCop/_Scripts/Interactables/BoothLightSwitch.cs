@@ -14,7 +14,7 @@ using UnityEngine;
 ///     OnElectricityTurnOn  → BoothLightSwitch.OnElectricityOn
 ///     OnElectricityTurnOff → BoothLightSwitch.OnElectricityOff
 /// </summary>
-public class BoothLightSwitch : Interactable, IHeldItemPassthrough
+public class BoothLightSwitch : Interactable
 {
     [Header("Switch Visual")]
     [Tooltip("The child Transform that physically rotates (the 'switch' child).")]

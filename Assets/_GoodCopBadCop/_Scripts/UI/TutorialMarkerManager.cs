@@ -50,7 +50,8 @@ public class TutorialMarkerManager : MonoBehaviour
     /// Calling this again on the same target is a no-op (safe to call repeatedly).
     /// </summary>
     /// <param name="target">The Transform to point at.</param>
-    public void Mark(Transform target)
+    /// <param name="hoverHeight">Optional world-space height above the target's pivot; defaults to the prefab's authored value.</param>
+    public void Mark(Transform target, float? hoverHeight = null)
     {
         if (target == null)
         {
@@ -62,7 +63,7 @@ public class TutorialMarkerManager : MonoBehaviour
 
         TutorialMarker marker = GetFromPool();
         _active[target] = marker;
-        marker.Show(target);
+        marker.Show(target, hoverHeight);
     }
 
     /// <summary>Hides the marker on <paramref name="target"/> and returns it to the pool.</summary>

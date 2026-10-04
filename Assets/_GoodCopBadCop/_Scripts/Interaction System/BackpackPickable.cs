@@ -5,15 +5,15 @@ using UnityEngine;
 /// <summary>
 /// A <see cref="PickableObject"/> that stores any item in a FIFO queue.
 ///
-/// Interaction summary:
-/// - LMB empty-handed             → pick up the backpack (standard).
-/// - LMB while holding an item    → store that item in the backpack (IHeldItemPassthrough).
-/// - E  empty-handed in world     → extract the oldest stored item into your hands.
-/// - LMB while holding backpack   → equip to player's back (OnStartUse).
-/// - Unequip key (G) while worn   → unequip and hold in hands (both hands must be free).
+/// Interaction summary (see the input convention in IInteractable.cs):
+/// - Tap Interact empty-handed       → pick up the backpack (standard).
+/// - Tap Interact holding an item    → store that item in the backpack.
+/// - Hold Interact empty-handed      → take out the oldest stored item (when any are stored).
+/// - LMB while holding backpack      → equip to player's back (OnStartUse).
+/// - Unequip key (G) while worn      → unequip and hold in hands (both hands must be free).
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class BackpackPickable : PickableObject, IHeldItemPassthrough
+public class BackpackPickable : PickableObject
 {
     private const KeyCode UnequipKey = KeyCode.G;
     private const string InteractTextEmpty  = "Backpack";
@@ -159,8 +159,8 @@ public class BackpackPickable : PickableObject, IHeldItemPassthrough
     // ── Interaction ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// LMB empty-handed → standard pickup via base class.
-    /// LMB while holding an item (IHeldItemPassthrough path) → store held item.
+    /// Tap Interact empty-handed → standard pickup via base class.
+    /// Tap Interact while holding an item → store held item.
     /// </summary>
     public override void Interact(PlayerInteractionController player)
     {
@@ -176,19 +176,21 @@ public class BackpackPickable : PickableObject, IHeldItemPassthrough
         }
     }
 
-    /// <summary>
-    /// E or LMB (empty-handed) → extract the oldest stored item into the player's hands,
-    /// or pick up the backpack itself when it is empty.
-    /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player)
+    /// <summary>Tap does something both empty-handed (pick up) and while holding an item (store it).</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) => true;
+
+    /// <summary>Hold Interact takes out the oldest stored item — empty-handed, and only when something is stored.</summary>
+    public override string GetHoldInteractVerb(PlayerInteractionController player)
+    {
+        if (player.pickupController.HeldObject != null) return null;
+        return _storedItems.Count > 0 ? "take out" : null;
+    }
+
+    /// <summary>Hold Interact (empty-handed) → extract the oldest stored item into the player's hands.</summary>
+    public override void InteractHold(PlayerInteractionController player)
     {
         if (player.pickupController.HeldObject != null) return;
-        if (_storedItems.Count == 0)
-        {
-            // Nothing to extract — fall back to a standard pickup.
-            base.InteractAlternate(player);
-            return;
-        }
+        if (_storedItems.Count == 0) return;
         ExtractItemServerRpc();
     }
 

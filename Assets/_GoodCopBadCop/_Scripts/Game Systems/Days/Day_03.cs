@@ -66,48 +66,6 @@ public class Day_03 : DayBase, IDailyTask
     {
         CutPowerServer();
         StartCoroutine(RingPowerOutageCallAfterDelay());
-        StartFuseTutorialProximityWatch();
-    }
-
-    /// <summary>
-    /// Local, every client. Starts polling the local player's distance to the power station's
-    /// fuse box; the first time they come within <see cref="_fuseTutorialTriggerRadius"/> while
-    /// the outage is still active, shows the "Fix Fuse" tutorial overlay once. Stopped by
-    /// <see cref="StopFuseTutorialProximityWatch"/> when power is restored.
-    /// </summary>
-    private void StartFuseTutorialProximityWatch()
-    {
-        if (_fuseTutorialShown || _fuseBoxController == null) return;
-        StopFuseTutorialProximityWatch();
-        _fuseTutorialWatchCoroutine = StartCoroutine(WatchForPowerStationArrival());
-    }
-
-    private void StopFuseTutorialProximityWatch()
-    {
-        if (_fuseTutorialWatchCoroutine == null) return;
-        StopCoroutine(_fuseTutorialWatchCoroutine);
-        _fuseTutorialWatchCoroutine = null;
-    }
-
-    private System.Collections.IEnumerator WatchForPowerStationArrival()
-    {
-        var wait = new WaitForSeconds(0.25f);
-        float sqrRadius = _fuseTutorialTriggerRadius * _fuseTutorialTriggerRadius;
-
-        while (!_fuseTutorialShown && _fuseBoxController != null)
-        {
-            var player = PlayerInstance.Instance;
-            if (player != null &&
-                (player.transform.position - _fuseBoxController.transform.position).sqrMagnitude <= sqrRadius)
-            {
-                _fuseTutorialShown = true;
-                TutorialOverlay.Instance?.ShowFixFuseTutorial();
-                break;
-            }
-            yield return wait;
-        }
-
-        _fuseTutorialWatchCoroutine = null;
     }
 
     /// <summary>
@@ -131,7 +89,7 @@ public class Day_03 : DayBase, IDailyTask
             Debug.LogWarning("[Day_03] No Telephone.Instance found -- skipping the HQ call and delivering the Restore Power task directly.");
             Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
             OnPowerOutageCallAnsweredAllClients();
-            OnPowerOutageDialogueComplete();
+            GrantRestorePowerTaskLocal();
             yield break;
         }
 
@@ -201,23 +159,55 @@ public class Day_03 : DayBase, IDailyTask
     /// <summary>
     /// Server-only (fires from the same server-only chain as <see cref="PlayPowerOutageDialogueAfterGrab"/>).
     /// Called once the HQ power-outage dialogue finishes (or immediately as a fallback if the
-    /// dialogue couldn't be played). Grants the "Restore Power" guidebook task and starts
-    /// listening for the fuse box to be fixed, then auto-hangs-up the phone so the player isn't
-    /// stuck holding the handset.
+    /// dialogue couldn't be played). Broadcasts the call completion so every client grants the
+    /// "Restore Power" task (see <see cref="OnPowerOutageCallCompletedAllClients"/>), then
+    /// auto-hangs-up the phone so the player isn't stuck holding the handset.
     /// </summary>
     private void OnPowerOutageDialogueComplete()
     {
+        if (Telephone.Instance != null)
+        {
+            Telephone.Instance.NotifyScriptedCallCompleted();
+            Telephone.Instance.HangUpCurrentCaller();
+        }
+        else
+        {
+            GrantRestorePowerTaskLocal();
+        }
+
+        Debug.Log("[Day_03] HQ power-outage dialogue complete -- Restore Power task broadcast, hanging up.");
+    }
+
+    /// <summary>
+    /// Fired on every client via <see cref="Telephone.OnScriptedCallCompletedAllClients"/>.
+    /// Subscribed for the whole day (not just while ringing) so clients that never saw the ring
+    /// locally (e.g. the host-only debug trigger) still receive the task.
+    /// </summary>
+    private void OnPowerOutageCallCompletedAllClients()
+    {
+        // Clear any leftover "Answer the Phone" row (e.g. if this client missed the answer event).
+        OnPowerOutageCallAnsweredAllClients();
+        GrantRestorePowerTaskLocal();
+    }
+
+    /// <summary>
+    /// Local, every client. Grants the "Restore Power" guidebook task, starts listening for the
+    /// fuse box to be fixed, and points the local player at the fuse box. Idempotent.
+    /// </summary>
+    private void GrantRestorePowerTaskLocal()
+    {
+        if (_powerOutageThreat != null) return;
+
         _powerOutageThreat = new RepairPowerThreat();
         TaskRegistry.Instance?.AddThreat(_powerOutageThreat);
 
         if (ElectricityController.Instance != null)
+        {
+            ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerOutageResolved;
             ElectricityController.Instance.OnPowerRestoredAllClients += OnPowerOutageResolved;
+        }
 
         BeginInvestigateFuseBoxStep();
-
-        Telephone.Instance?.HangUpCurrentCaller();
-
-        Debug.Log("[Day_03] HQ power-outage dialogue complete -- Restore Power task granted, hanging up.");
     }
 
     /// <summary>
@@ -269,17 +259,17 @@ public class Day_03 : DayBase, IDailyTask
              "TutorialMarker arrow (see TutorialMarkerManager) the instant the 'Restore Power' " +
              "task is granted, directing the player to investigate it. Both are cleared the " +
              "first time the box is opened (see FuseBoxPuzzleController.OnBoxInteracted), which " +
-             "also advances the task text to 'insert the missing fuses'. The power switch lever " +
+             "also shows the 'Fix Fuse' tutorial overlay, highlights the spawned fuses, and advances " +
+             "the task text to 'find and add the fuses'. The power switch lever " +
              "highlights itself automatically once every fuse slot is filled — see " +
              "PowerSwitch.OnFuseCountChanged — so no separate wiring is needed for that step.")]
     [SerializeField] private FuseBoxPuzzleController _fuseBoxController;
 
-    [Tooltip("Distance (m) from the fuse box at which the local player counts as having arrived " +
-             "at the power station, showing the one-shot 'Fix Fuse' tutorial overlay.")]
-    [SerializeField] private float _fuseTutorialTriggerRadius = 12f;
+    [Tooltip("Gap (m) between the top of the fuse box's rendered bounds and the tutorial arrow's " +
+             "pivot. The arrow height is computed from the box's renderer bounds at runtime.")]
+    [SerializeField] private float _fuseBoxMarkerClearance = 0.25f;
 
     private bool _fuseTutorialShown;
-    private Coroutine _fuseTutorialWatchCoroutine;
 
     /// <summary>Runtime "Restore Power" guidebook task, created only while the outage is active.</summary>
     private RepairPowerThreat _powerOutageThreat;
@@ -304,6 +294,11 @@ public class Day_03 : DayBase, IDailyTask
              "1 = the task's full default roll. Fences already broken by an earlier breach still count.")]
     [Range(0.05f, 1f)]
     [SerializeField] private float _cleanupAmountScale = 0.33f;
+
+    [Tooltip("Extra multiplier applied on top of the cleanup scale for fences only " +
+             "(gore is unaffected). 0.5 = half as many fence segments broken.")]
+    [Range(0.05f, 1f)]
+    [SerializeField] private float _fenceBreakScale = 0.5f;
 
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
@@ -330,7 +325,7 @@ public class Day_03 : DayBase, IDailyTask
             // Randomly breaks a batch of perimeter fence segments so the yard has repair work
             // waiting alongside the gore, mirroring the post-breach fence damage from Day 1
             // (see FenceRepairTask.TriggerTask doc comment). Self-guards to server-only.
-            FenceRepairTask.Instance?.TriggerTask(_cleanupAmountScale);
+            FenceRepairTask.Instance?.TriggerTask(_cleanupAmountScale * _fenceBreakScale);
         }
 
         // Arms the Mutant Ocho / Vlad-corpse roof cutscene right as the player exits the
@@ -355,6 +350,9 @@ public class Day_03 : DayBase, IDailyTask
         // debug skip) always starts with a clean subscription, matching the pattern above.
         ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
         ShiftManager.OnLastSuspectProcessed += OnAllSuspectsProcessed_Day3;
+
+        // Every client grants "Restore Power" when the server broadcasts the HQ call's end.
+        Telephone.OnScriptedCallCompletedAllClients += OnPowerOutageCallCompletedAllClients;
     }
 
     public override void DayDeactivated()
@@ -398,6 +396,7 @@ public class Day_03 : DayBase, IDailyTask
     {
         ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
         Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
+        Telephone.OnScriptedCallCompletedAllClients -= OnPowerOutageCallCompletedAllClients;
 
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerOutageResolved;
@@ -424,24 +423,50 @@ public class Day_03 : DayBase, IDailyTask
         }
 
         _fuseBoxController.SetForceHighlight(true);
-        TutorialMarkerManager.Instance?.Mark(_fuseBoxController.transform);
+        TutorialMarkerManager.Instance?.Mark(_fuseBoxController.transform, GetFuseBoxMarkerHoverHeight());
 
+        _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
         _fuseBoxController.OnBoxInteracted += OnFuseBoxFirstOpened;
     }
 
     /// <summary>
-    /// Step 2: fired the first time the fuse box door is toggled. Clears the fuse-box highlight
-    /// and arrow, advances the guidebook task to "insert the missing fuses", then starts
-    /// listening for every slot to be filled. The fuses themselves already self-highlight the
-    /// instant they spawn (see <see cref="FusePickup.OnNetworkSpawn"/>) and clear on pickup, so
-    /// no extra highlight wiring is needed for them here.
+    /// Hover height (above the fuse box pivot) that places the arrow clearly above the top of the
+    /// box's rendered bounds. The box mesh is large and flipped, so its pivot is not near its top.
+    /// </summary>
+    private float GetFuseBoxMarkerHoverHeight()
+    {
+        Transform box = _fuseBoxController.transform;
+        bool found = false;
+        float top = box.position.y;
+
+        foreach (Renderer r in _fuseBoxController.GetComponentsInChildren<Renderer>())
+        {
+            if (!r.enabled || r is ParticleSystemRenderer) continue;
+            top = found ? Mathf.Max(top, r.bounds.max.y) : r.bounds.max.y;
+            found = true;
+        }
+
+        return Mathf.Max(top - box.position.y, 0f) + _fuseBoxMarkerClearance;
+    }
+
+    /// <summary>
+    /// Step 2: fired the first time the fuse box door is toggled. Shows the one-shot "Fix Fuse"
+    /// tutorial overlay, highlights the spawned fuses (see <see cref="FusePickup.SetFindHighlightActive"/>),
+    /// advances the guidebook task to "find and add the fuses", then starts listening for every
+    /// slot to be filled. The fuse-box highlight and arrow intentionally stay on during this step
+    /// so the player knows where the fuses go; they're cleared once every slot is filled.
     /// </summary>
     private void OnFuseBoxFirstOpened()
     {
         _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
 
-        _fuseBoxController.SetForceHighlight(false);
-        TutorialMarkerManager.Instance?.Unmark(_fuseBoxController.transform);
+        if (!_fuseTutorialShown)
+        {
+            _fuseTutorialShown = true;
+            TutorialOverlay.Instance?.ShowFixFuseTutorial();
+        }
+
+        FusePickup.SetFindHighlightActive(true);
 
         _powerOutageThreat?.SetStep(RepairPowerThreat.Step.InsertFuses);
 
@@ -454,8 +479,8 @@ public class Day_03 : DayBase, IDailyTask
 
     /// <summary>
     /// Step 3: fired whenever a fuse is inserted/extracted while the "insert fuses" step is
-    /// active. Once every slot is filled, advances the guidebook task to "pull the lever".
-    /// The power switch highlights itself automatically once
+    /// active. Once every slot is filled, clears the fuse highlights plus the fuse-box highlight
+    /// and arrow, and advances the guidebook task to "pull the lever". The power switch highlights itself automatically once
     /// <see cref="FuseBoxPuzzleController.IsReady"/> — see <see cref="PowerSwitch.OnFuseCountChanged"/>
     /// — so no separate lever highlight call is needed here.
     /// </summary>
@@ -464,6 +489,9 @@ public class Day_03 : DayBase, IDailyTask
         if (_fuseBoxController == null || !_fuseBoxController.IsReady) return;
 
         _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedDuringOutage;
+        FusePickup.SetFindHighlightActive(false);
+        _fuseBoxController.SetForceHighlight(false);
+        TutorialMarkerManager.Instance?.Unmark(_fuseBoxController.transform);
         _powerOutageThreat?.SetStep(RepairPowerThreat.Step.PullLever);
     }
 
@@ -474,6 +502,8 @@ public class Day_03 : DayBase, IDailyTask
     /// </summary>
     private void ClearFuseBoxTutorialState()
     {
+        FusePickup.SetFindHighlightActive(false);
+
         if (_fuseBoxController == null) return;
 
         _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
@@ -520,7 +550,6 @@ public class Day_03 : DayBase, IDailyTask
         // restored via some other path (e.g. a debug cheat) without ever progressing through
         // the normal open-box / insert-fuses steps above.
         ClearFuseBoxTutorialState();
-        StopFuseTutorialProximityWatch();
 
         if (_powerOutageThreat != null)
         {

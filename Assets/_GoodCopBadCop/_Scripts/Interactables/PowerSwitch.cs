@@ -1,5 +1,6 @@
 using DG.Tweening;
 using System.Collections;
+using GoodCopBadCop.Input;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -8,11 +9,11 @@ using UnityEngine.InputSystem;
 /// A lever-style power switch located at the power station.
 ///
 /// Interaction rules:
-///   – The player grabs the handle and drags Mouse Y to pull it down.
+///   – The player holds Interact (E / gamepad West) to grab the handle and drags Mouse Y to pull it down.
 ///   – On release the handle snaps to the nearest end (up or down).
-///   – When committed to the DOWN position, a loud completion sound plays on all
-///     clients. If <see cref="FuseBoxPuzzleController.IsReady"/>, the server also
-///     calls <see cref="ElectricityController.PowerOn"/> to restore electricity.
+///   – When committed to the DOWN position with <see cref="FuseBoxPuzzleController.IsReady"/>
+///     and power off, the server plays a loud activation sound on all clients (once)
+///     and calls <see cref="ElectricityController.PowerOn"/> to restore electricity.
 ///   – A <see cref="Reset"/> method (server-only) snaps the switch back to the UP
 ///     position — call this when a new power outage begins.
 ///
@@ -22,7 +23,7 @@ using UnityEngine.InputSystem;
 ///   - Assign the handle child to <see cref="_handle"/> (rotates on drag).
 ///   - Optionally add child Transforms for camera, IK targets, and look target.
 /// </summary>
-public class PowerSwitch : Interactable, IHeldItemPassthrough
+public class PowerSwitch : Interactable
 {
     // ── Inspector ─────────────────────────────────────────────────────────────
 
@@ -32,11 +33,17 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
 
     [Header("Audio")]
     [SerializeField] private AudioSource _audioSource;
-    [Tooltip("Plays on all clients when the switch is committed to the DOWN position.")]
+    [Tooltip("Plays once on all clients when the switch actually restores power (fuses in, power off).")]
     [SerializeField] private AudioClip _activateSound;
     [SerializeField] private AudioClip _switchOnSound;
     [SerializeField] private AudioClip _switchOffSound;
-
+    [Tooltip("Disembodied creepy laugh played on all clients shortly after the switch restores power " +
+             "(same clip as Ocho's booth-outage laugh). Leave empty to skip.")]
+    [SerializeField] private AudioClip _creepyLaughClip;
+    [Tooltip("Seconds after power is restored before the creepy laugh plays.")]
+    [SerializeField] private float _creepyLaughDelay = 1.5f;
+    [SerializeField] private float _creepyLaughVolume = 1f;
+    [SerializeField] private float _creepyLaughMaxDistance = 30f;
     [Header("Camera & IK")]
     [Tooltip("Child Transform the camera DOTweens to during the interaction. Optional.")]
     [SerializeField] private Transform _camPos;
@@ -118,7 +125,9 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         SetForceHighlight(_fuseBoxController != null && _fuseBoxController.IsReady);
     }
 
-    private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed            ?? false);
+    // Interact key (E / ButtonWest) starts the grab (see Interact) and must stay held to keep it.
+    // LMB / RT is reserved for held-item use, so it plays no part here.
+    private bool GrabHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || (Gamepad.current?.buttonWest.isPressed ?? false);
 
     // ── Update ────────────────────────────────────────────────────────────────
 
@@ -133,7 +142,7 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
 
         // Use current button state so a release consumed by pause/focus changes is recovered
         // on the first gameplay frame instead of leaving this interaction latched forever.
-        if (!LmbHeld)
+        if (!GrabHeld)
         {
             CommitSwitch();
             _exitCoroutine = StartCoroutine(ExitSwitchView());
@@ -356,13 +365,12 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
         // Only the DOWN commit triggers the power-restore attempt.
         if (!isDown) return;
 
-        // Play the big activation sound on all clients regardless of fuse state,
-        // then conditionally restore power.
-        PlayActivateSoundClientRpc();
-
+        // The big activation sound plays on all clients only when this pull actually
+        // restores power (fuses in, power currently off) — once per activation.
         if (_fuseBoxController != null && _fuseBoxController.IsReady
             && _electricityController != null && !_electricityController.IsPowerOn)
         {
+            PlayActivateSoundClientRpc();
             _electricityController.PowerOn();
             Debug.Log("[PowerSwitch] Fuse box ready — power restored.");
         }
@@ -391,6 +399,21 @@ public class PowerSwitch : Interactable, IHeldItemPassthrough
     {
         if (_audioSource != null && _activateSound != null)
             _audioSource.PlayOneShot(_activateSound);
+
+        if (_creepyLaughClip != null)
+            StartCoroutine(PlayCreepyLaughAfterDelay());
+    }
+
+    private IEnumerator PlayCreepyLaughAfterDelay()
+    {
+        yield return new WaitForSeconds(_creepyLaughDelay);
+
+        // Standalone spatial emitter, matching how OchoBoothEncounter plays its laugh.
+        if (SFXController.Instance != null)
+            SFXController.Instance.PlayAtPosition(_creepyLaughClip, transform.position,
+                _creepyLaughVolume, 1f, _creepyLaughMaxDistance);
+        else if (_audioSource != null)
+            _audioSource.PlayOneShot(_creepyLaughClip, _creepyLaughVolume);
     }
 
     private void OnSwitchStateChanged(bool oldValue, bool newValue)

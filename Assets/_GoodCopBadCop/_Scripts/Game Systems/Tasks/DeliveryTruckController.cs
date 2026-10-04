@@ -14,7 +14,9 @@ using UnityEngine.Serialization;
 ///
 /// Sequence, once <see cref="BeginDeliverySequence"/> is called on the server:
 ///   1. Truck activates at _pointA (engine idle audio, visual shown) and the delivery crate
-///      appears mounted on its roof via a <see cref="ParentConstraint"/>.
+///      appears mounted on its roof via a <see cref="ParentConstraint"/>. The day's packages are
+///      spawned right away, pinned at random spots inside the crate (see
+///      <see cref="SortMailTask.TryPrepareCrateDelivery"/>) — locked, kinematic, un-highlighted.
 ///   2. Drives from _pointA to _pointB (drive audio, with a rev delay before it starts moving) —
 ///      the crate rides along on the roof for the whole trip. _pointB sits in front of the
 ///      checkpoint gate.
@@ -27,8 +29,9 @@ using UnityEngine.Serialization;
 ///      continuing.
 ///   4. Drives from _pointB through the (now open) gate to _pointC — the crate still rides along.
 ///   5. On arrival at _pointC, the roof constraint is released and the crate tumbles down to its
-///      resting spot on the ground. Once it settles, the server spawns the mail delivery via
-///      <see cref="SortMailTask.TriggerTask"/>.
+///      resting spot on the ground. Once it settles, the pinned packages are released
+///      (<see cref="SortMailTask.TryReleaseCrateDelivery"/>: physics + highlights on, task goes
+///      live). If no packages were pre-spawned, falls back to <see cref="SortMailTask.TryTriggerTask"/>.
 ///   6. Idles at _pointC for the remainder of _idleDurationAtDestination.
 ///   7. Drives backwards from _pointC all the way to _pointA (drive audio again, same facing
 ///      direction — a reverse, not a turn-around) — the crate stays behind. Shortly after the
@@ -162,6 +165,9 @@ public class DeliveryTruckController : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>The delivery crate transform packages are pinned to while riding along (see <see cref="SortMailTask.TryPrepareCrateDelivery"/>).</summary>
+    public Transform DeliveryCrate => deliveryCrate;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -271,6 +277,15 @@ public class DeliveryTruckController : NetworkBehaviour
         _sequenceRunning = true;
 
         ActivateClientRpc();
+
+        // Mount the crate on the server's own instance right away (the ClientRpc above may be
+        // deferred on the host) so the packages spawn already inside it, then spawn this
+        // delivery's packages pinned at random spots in the crate. They ride along and are only
+        // released (physics + highlights) once the crate lands at pointC. If the task isn't ready
+        // yet (e.g. startup/restore race), the landing step falls back to spawning them there.
+        MountCrateOnRoof();
+        SortMailTask.Instance?.TryPrepareCrateDelivery();
+
         BeginDriveClientRpc(DriveLeg.ToPointB);
         yield return new WaitForSeconds(driveRevDelay + driveToPointBDuration);
 
@@ -303,10 +318,18 @@ public class DeliveryTruckController : NetworkBehaviour
         // connect later still see it (see _crateDropped).
         _crateDropped.Value = true;
 
-        // Crate has settled — this is the moment the mail delivery spawns. The task's dynamic
-        // resident pool can still be initializing during startup/restore, so retry briefly
-        // instead of silently leaving a dropped crate with no packages.
-        yield return StartCoroutine(TriggerMailTaskAfterCrateLanding());
+        // Make sure the server's crate is exactly at rest before packages are released from it
+        // (the tumble coroutine and this wait can end a frame apart).
+        PlaceCrateAtRest();
+
+        // Crate has settled — this is the moment the mail delivery goes live. Normally the
+        // packages have been riding inside the crate since the truck activated, so just un-pin
+        // them. Otherwise spawn them now; the task's dynamic resident pool can still be
+        // initializing during startup/restore, so retry briefly instead of silently leaving a
+        // dropped crate with no packages.
+        SortMailTask mailTask = SortMailTask.Instance;
+        if (mailTask == null || !mailTask.TryReleaseCrateDelivery())
+            yield return StartCoroutine(TriggerMailTaskAfterCrateLanding());
 
         // Destination highlights are activated by SortMailTask only after at least one package
         // successfully spawns, covering truck, deferred, immediate, and restored deliveries.

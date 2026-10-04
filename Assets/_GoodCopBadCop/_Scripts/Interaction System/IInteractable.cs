@@ -11,17 +11,20 @@ public interface IInteractable
 
 /// <summary>
 /// Marker interface for interactables that act as pickup slots (e.g. InkStamp).
-/// Left-clicking one with empty hands should call Interact(), just like a PickableObject.
+/// Pressing Interact on one with empty hands calls Interact(), just like a PickableObject.
 /// </summary>
 public interface IPickupSlot { }
 
-/// <summary>
-/// Marker interface for interactables that handle LMB interaction regardless of
-/// what the player is holding. When implemented, <see cref="PlayerInteractionController"/>
-/// will call <see cref="IInteractable.Interact"/> via <c>TryItemUse</c> instead of
-/// routing to <c>TryUseObject</c> when the held item is not compatible.
-/// </summary>
-public interface IHeldItemPassthrough { }
+// ── Input convention ────────────────────────────────────────────────────────────────────────
+// Every world-object interaction (pick up, open, pull, sit, extract…) goes through the Interact
+// key (E / gamepad West), whether or not the player is holding an item:
+//   • Tap   → Interact()
+//   • Hold  → InteractHold(), only when GetHoldInteractVerb() returns a verb. The reticle fills a
+//             ring over PlayerInteractionController.holdInteractDuration and shows "Hold E to <verb>".
+//             For these objects, Interact() fires on release (a tap) instead of on press.
+// LMB / RT is reserved for using the held item — including using it ON a target via
+// InteractWithItem() (stamp on paper, key in lock, bag on junk…). It never triggers Interact().
+// Inside cursor-driven diegetic views (PC, panels, lockers…) LMB still clicks UI as before.
 
 /// <summary>
 /// Independent reasons an <see cref="Interactable"/>'s highlight can be held on regardless of
@@ -67,11 +70,18 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public string interactText;
 
     /// <summary>
-    /// When true, the reticle will display an extract hint (key icon + action text)
-    /// next to the reticle while this object is targeted.
-    /// Override to true in subclasses that have a meaningful E-key action (e.g. <see cref="ContainerPickableObject"/>).
+    /// When true, the reticle shows <see cref="interactText"/> next to the Interact key icon while
+    /// this object is targeted (e.g. <see cref="Chair"/>: "[E] Sit"). When false only the key icon shows.
+    /// Ignored while a hold action is available — the "Hold E to …" prompt replaces it.
     /// </summary>
     public virtual bool ShowInteractHint => false;
+
+    /// <summary>
+    /// Whether pressing Interact on this object does anything for <paramref name="player"/> right now.
+    /// Only drives the reticle's key icon (so it isn't offered when it would do nothing, e.g. a pickup
+    /// while the player's hands are full); the press itself is still forwarded to <see cref="Interact"/>.
+    /// </summary>
+    public virtual bool ShowsInteractPrompt(PlayerInteractionController player) => true;
 
     /// <summary>
     /// Only highlight children whose names contain this string.
@@ -88,15 +98,12 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     [SerializeField, Min(0f)] private float holdHighlightFadeDuration = 0.5f;
 
     [Header("Persistent Highlight Pulse")]
-    [Tooltip("Full pulse cycles per second for persistent (objective) highlights. 0 = no pulse (fixed). Hover never pulses.")]
+    [Tooltip("Full pulse cycles per second for persistent (objective) highlights. 0 = no pulse (steady). Hover never pulses.")]
     [SerializeField, Min(0f)] private float holdHighlightPulseSpeed = 0.6f;
-    [Tooltip("Lowest outline/glow intensity in the pulse, as a fraction of the authored intensity (1 = no visible pulse).")]
-    [SerializeField, Range(0.05f, 1f)] private float holdHighlightPulseMinIntensity = 0.35f;
+    [Tooltip("Outline opacity at the faintest point of the pulse (1 = no visible pulse). Thickness and color never change.")]
+    [SerializeField, Range(0.05f, 1f)] private float holdHighlightPulseMinOpacity = 0.4f;
 
-    // Authored effect intensities, scaled by the pulse and restored when the hold ends.
-    private bool _authoredIntensityCached;
-    private float _authoredOutline;
-    private float _authoredGlow;
+    /// <summary>True while the pulse has moved HighlightEffect.outlineOpacity off 1.</summary>
     private bool _pulseApplied;
 
     /// <summary>Extra distance past the range before an in-range glow fades out, so it doesn't flicker at the boundary.</summary>
@@ -169,16 +176,18 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     }
 
     /// <summary>
-    /// Called when the player presses E while this interactable is targeted.
-    /// Distinct from <see cref="Interact"/> which is triggered by LMB (when empty-handed).
-    /// Defaults to calling <see cref="Interact"/> so existing subclasses require no changes.
-    /// Override in subclasses that need separate E vs LMB behaviour
-    /// (e.g. <see cref="ContainerPickableObject"/> picks up on LMB and extracts on E).
+    /// Verb for this object's secondary "hold Interact" action (e.g. "open", "arm", "take out"),
+    /// or null when it has none for <paramref name="player"/> right now. Shown as "Hold E to {verb}".
+    /// Returning non-null makes a quick tap call <see cref="Interact"/> on release, and holding for
+    /// <see cref="PlayerInteractionController.holdInteractDuration"/> call <see cref="InteractHold"/>.
     /// </summary>
-    public virtual void InteractAlternate(PlayerInteractionController player)
-    {
-        Interact(player);
-    }
+    public virtual string GetHoldInteractVerb(PlayerInteractionController player) => null;
+
+    /// <summary>
+    /// Secondary action, fired when the player holds Interact for the full hold duration while
+    /// <see cref="GetHoldInteractVerb"/> returns a verb. See the input convention at the top of this file.
+    /// </summary>
+    public virtual void InteractHold(PlayerInteractionController player) { }
 
     protected virtual void Awake()
     {
@@ -194,7 +203,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         highlightEffect.enabled = true;
         highlightEffect.highlighted = false;
         CacheAuthoredFade();
-        CacheAuthoredIntensity();
+
 
         if (!string.IsNullOrEmpty(highlightNameFilter))
             highlightEffect.effectNameFilter = highlightNameFilter;
@@ -272,7 +281,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         else if (!hasHold && hadHold)
         {
             HoldHighlightRangeDriver.Untrack(this);
-            RestoreAuthoredIntensity();
+            RestorePulseOpacity();
         }
 
         if (IsHoldHighlightVisible == wasVisible) return;
@@ -297,11 +306,12 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     }
 
     /// <summary>
-    /// Called each frame by <see cref="HoldHighlightRangeDriver"/> while a hold is claimed. Gently pulses
-    /// the outline (and glow, if authored) between <see cref="holdHighlightPulseMinIntensity"/> and the
-    /// authored intensity so objective call-outs read differently from the steady hover highlight.
-    /// All objects share one phase (driven by <paramref name="time"/>) so multiple objectives breathe together.
-    /// Intensities stay above zero, so HighlightPlus never rebuilds its materials mid-pulse.
+    /// Called each frame by <see cref="HoldHighlightRangeDriver"/> while a hold is claimed. Gently fades the
+    /// outline's opacity between fully opaque and <see cref="holdHighlightPulseMinOpacity"/> so objective
+    /// call-outs read differently from the steady hover highlight. Drives
+    /// <c>HighlightEffect.outlineOpacity</c> (a project addition to HighlightPlus), which is applied after
+    /// the outline is composed — width and color stay exactly as authored. All objects share one phase
+    /// (<paramref name="time"/>) so multiple objectives pulse together.
     /// </summary>
     public void UpdateHoldHighlightPulse(float time)
     {
@@ -309,36 +319,21 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
         if (!IsHoldHighlightActive || holdHighlightPulseSpeed <= 0f)
         {
-            RestoreAuthoredIntensity();
+            RestorePulseOpacity();
             return;
         }
 
-        CacheAuthoredIntensity();
-
         float wave = 0.5f + 0.5f * Mathf.Sin(time * holdHighlightPulseSpeed * Mathf.PI * 2f);
-        float intensity = Mathf.Lerp(holdHighlightPulseMinIntensity, 1f, wave);
-
-        if (_authoredOutline > 0f) highlightEffect.outline = _authoredOutline * intensity;
-        if (_authoredGlow > 0f) highlightEffect.glow = _authoredGlow * intensity;
+        highlightEffect.outlineOpacity = Mathf.Lerp(holdHighlightPulseMinOpacity, 1f, wave);
         _pulseApplied = true;
     }
 
-    private void CacheAuthoredIntensity()
-    {
-        if (_authoredIntensityCached || highlightEffect == null) return;
-
-        _authoredOutline = highlightEffect.outline;
-        _authoredGlow = highlightEffect.glow;
-        _authoredIntensityCached = true;
-    }
-
-    /// <summary>Puts the authored outline/glow back so hover renders at its normal, steady intensity.</summary>
-    private void RestoreAuthoredIntensity()
+    /// <summary>Returns the outline to full opacity so hover renders steady.</summary>
+    private void RestorePulseOpacity()
     {
         if (!_pulseApplied || highlightEffect == null) return;
 
-        highlightEffect.outline = _authoredOutline;
-        highlightEffect.glow = _authoredGlow;
+        highlightEffect.outlineOpacity = 1f;
         _pulseApplied = false;
     }
 
@@ -427,6 +422,18 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
     protected virtual void OnStopHighlight()
     {
+    }
+
+    /// <summary>
+    /// Whether a held item may be used on this interactable (routes LMB to
+    /// <see cref="InteractWithItem"/> and shows the button tooltip). Defaults to the
+    /// <see cref="itemsThatCanInteractWith"/> list; override to accept items by type/state.
+    /// </summary>
+    public virtual bool CanInteractWithItem(PickableObject item)
+    {
+        return item != null
+            && itemsThatCanInteractWith != null
+            && Array.IndexOf(itemsThatCanInteractWith, item.ItemData) >= 0;
     }
 
     public virtual void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)

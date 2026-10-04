@@ -64,6 +64,7 @@ public class TutorialMarker : MonoBehaviour
     private float _alpha;            // current fade value, 0 = hidden, 1 = fully visible
     private float _bobOffset;   // per-instance phase offset to desync multiple markers
     private Vector3 _baseLocalScale; // authored scale at referenceDistance, before distance scaling
+    private float _defaultHoverHeight; // authored hoverHeight, restored on every pooled Show()
 
     private static readonly HashSet<TutorialMarker> _activeInstances = new();
 
@@ -106,6 +107,7 @@ public class TutorialMarker : MonoBehaviour
         for (int i = 0; i < _renderers.Length; i++)
             _baseColors[i] = _renderers[i].color;
         _baseLocalScale = transform.localScale;
+        _defaultHoverHeight = hoverHeight;
     }
 
     private void OnEnable()
@@ -171,9 +173,14 @@ public class TutorialMarker : MonoBehaviour
     /// <summary>Overrides the world-space hover height above the target's pivot.</summary>
     public void SetHoverHeight(float height) => hoverHeight = height;
 
-    /// <summary>Attaches the marker to <paramref name="target"/> and fades it in.</summary>
-    public void Show(Transform target)
+    /// <summary>
+    /// Attaches the marker to <paramref name="target"/> and fades it in. Pass
+    /// <paramref name="hoverHeightOverride"/> for tall targets whose pivot is far below their top;
+    /// otherwise the authored hover height is used (pooled markers never keep a previous override).
+    /// </summary>
+    public void Show(Transform target, float? hoverHeightOverride = null)
     {
+        hoverHeight = hoverHeightOverride ?? _defaultHoverHeight;
         _target = target;
         _bobOffset = Random.Range(0f, 1f);
         gameObject.SetActive(true);

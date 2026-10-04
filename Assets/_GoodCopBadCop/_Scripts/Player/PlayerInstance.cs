@@ -24,6 +24,8 @@ public class PlayerInstance : NetworkBehaviour
     [SerializeField] private Unity.Cinemachine.CinemachineCamera deathCamera;
     [SerializeField] private Unity.Cinemachine.CinemachineCamera spectateCamera;
     [SerializeField] private float deathUIDelay = 2f;
+    [Tooltip("Delay before the death screen re-opens after the last spectated teammate dies.")]
+    [SerializeField] private float returnToDeathScreenDelay = 1f;
     [SerializeField] private AudioClip _deathStinger;
 
     private readonly NetworkVariable<bool> _isOutside = new NetworkVariable<bool>(
@@ -621,9 +623,34 @@ public class PlayerInstance : NetworkBehaviour
         var damageVignette = FindFirstObjectByType<GoodCopBadCop.Effects.DamageVignetteView>();
         if (damageVignette != null)
             damageVignette.Hide();
+        var glitchEffect = FindFirstObjectByType<GoodCopBadCop.Effects.GlitchEffectView>();
+        if (glitchEffect != null)
+            glitchEffect.Hide();
 
         SpectateManager.Instance?.StartSpectating();
         Debug.Log("[PlayerInstance] Started spectating.");
+    }
+
+    /// <summary>
+    /// Reverses <see cref="StartSpectating"/> for a still-dead local player: stops spectating,
+    /// puts the death camera back on this player's body, and re-opens the death screen.
+    /// Called by SpectateManager when the last living teammate dies or leaves.
+    /// </summary>
+    public void ReturnToDeathScreen()
+    {
+        if (!IsLocalPlayer) return;
+
+        SpectateManager.Instance?.StopSpectating();
+
+        if (deathCamera != null)
+        {
+            deathCamera.gameObject.SetActive(true);
+            deathCamera.Priority = 100;
+        }
+
+        UIController.Instance?.ScreenDamage?.Hide();
+        UIController.Instance?.ShowDeathScreen(returnToDeathScreenDelay);
+        Debug.Log("[PlayerInstance] Returned to death screen from spectating.");
     }
 
     /// <summary>

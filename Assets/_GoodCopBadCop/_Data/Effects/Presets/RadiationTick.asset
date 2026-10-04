@@ -17,11 +17,11 @@ MonoBehaviour:
   minInterval: 1
   fullscreen:
     enabled: 1
-    mode: 1
+    mode: 2
     overlaySprite: {fileID: 0}
-    tint: {r: 1, g: 0.85, b: 0.1, a: 1}
-    opacity: 0.85
-    duration: 1
+    tint: {r: 1, g: 0.86, b: 0.15, a: 1}
+    opacity: 1
+    duration: 1.6
     opacityCurve:
       serializedVersion: 2
       m_Curve:
@@ -35,7 +35,16 @@ MonoBehaviour:
         inWeight: 0
         outWeight: 0
       - serializedVersion: 3
-        time: 0.5
+        time: 0.15
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.7
         value: 1
         inSlope: 0
         outSlope: 0
@@ -55,13 +64,17 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    vignetteIntensity: 0.45
+    vignetteIntensity: 0
     vignetteSmoothness: 0.75
-    chromaticAberration: 0.1
+    chromaticAberration: 0
     saturation: 0
     lensDistortion: 0
     screenTint: {r: 1, g: 1, b: 1, a: 1}
     screenTintAmount: 0
+    glitchEdgeWidth: 0.45
+    glitchWarpStrength: 0.6
+    glitchTearStrength: 0.55
+    glitchGlowStrength: 0.55
   camera:
     enabled: 0
     localSway:

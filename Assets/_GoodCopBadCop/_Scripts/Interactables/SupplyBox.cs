@@ -13,9 +13,6 @@ public class SupplyBox : PickableObject
     [SerializeField] private AudioClip _closeClip;
     bool isOpen = false;
 
-    /// <summary>Shows the E-key reticle hint only while the box can be opened.</summary>
-    public override bool ShowInteractHint => !isOpen;
-
     private static readonly int BoxOpenHash = Animator.StringToHash("BoxOpen");
 
     /// <summary>
@@ -107,10 +104,8 @@ public class SupplyBox : PickableObject
 
     private void UpdateInteractText()
     {
-        if (!isOpen)
-            interactText = "to open";
-        else
-            interactText = canPickUp ? "Close Box [E] | Pick Up [LMB]" : "Close Box [E]";
+        // Prompts are input-agnostic now: the reticle shows the key icon / "Hold E to open|close".
+        interactText = "Supply Box";
     }
 
     // ── Item Registration ─────────────────────────────────────────────────────
@@ -211,8 +206,7 @@ public class SupplyBox : PickableObject
     // ── Interaction ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// LMB / Right Trigger — pick up the box. Routed here by
-    /// <see cref="PlayerInteractionController"/> regardless of input device.
+    /// Tap Interact — pick up the box (once it's allowed to be carried).
     /// </summary>
     public override void Interact(PlayerInteractionController player)
     {
@@ -220,11 +214,16 @@ public class SupplyBox : PickableObject
             base.Interact(player);
     }
 
-    /// <summary>
-    /// E key / ButtonWest (Xbox X) — toggle open / closed. Routed here by
-    /// <see cref="PlayerInteractionController"/> regardless of input device.
-    /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player)
+    /// <summary>Only offer the tap prompt when a tap would actually pick the box up.</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
+        canPickUp && base.ShowsInteractPrompt(player);
+
+    /// <summary>Hold Interact — open / close. Always available, held item or not.</summary>
+    public override string GetHoldInteractVerb(PlayerInteractionController player) =>
+        isOpen ? "close" : "open";
+
+    /// <summary>Hold Interact — toggle open / closed.</summary>
+    public override void InteractHold(PlayerInteractionController player)
     {
         if (!isOpen)
             OpenBoxNetworked();

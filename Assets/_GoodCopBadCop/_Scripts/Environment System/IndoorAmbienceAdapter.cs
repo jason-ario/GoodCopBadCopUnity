@@ -22,6 +22,9 @@ namespace GoodCopBadCop.EnvironmentSystem
         [Tooltip("Trigger colliders covering the interior. The camera counts as indoors while inside any of them.")]
         [SerializeField] private Collider[] interiorZones = Array.Empty<Collider>();
 
+        [Tooltip("Also treat every enabled BunkerFogZone (bunker, power plant, ...) as an interior zone.")]
+        [SerializeField] private bool includeFogZones = true;
+
         [Tooltip("The camera to track. Falls back to Camera.main if not assigned.")]
         [SerializeField] private Camera targetCamera;
 
@@ -49,6 +52,9 @@ namespace GoodCopBadCop.EnvironmentSystem
 
         private float[] _baseVolumes;
         private float[] _lastWritten;
+
+        /// <summary>Eased 0..1 blend of the local camera being indoors (0 = outdoors, 1 = fully inside).</summary>
+        public float IndoorBlend => Mathf.SmoothStep(0f, 1f, _blend);
 
         private void Awake()
         {
@@ -94,15 +100,30 @@ namespace GoodCopBadCop.EnvironmentSystem
         {
             for (int i = 0; i < interiorZones.Length; i++)
             {
-                Collider zone = interiorZones[i];
-                if (zone == null || !zone.enabled || !zone.gameObject.activeInHierarchy)
-                    continue;
-
-                // ClosestPoint returns the point itself when it's inside the collider (handles rotated boxes).
-                if ((zone.ClosestPoint(point) - point).sqrMagnitude < 0.0001f)
+                if (IsInsideZone(interiorZones[i], point))
                     return true;
             }
+
+            if (includeFogZones)
+            {
+                var fogZones = BunkerFogZone.Active;
+                for (int i = 0; i < fogZones.Count; i++)
+                {
+                    if (fogZones[i] != null && fogZones[i].isActiveAndEnabled && fogZones[i].Contains(point))
+                        return true;
+                }
+            }
+
             return false;
+        }
+
+        private static bool IsInsideZone(Collider zone, Vector3 point)
+        {
+            if (zone == null || !zone.enabled || !zone.gameObject.activeInHierarchy)
+                return false;
+
+            // ClosestPoint returns the point itself when it's inside the collider (handles rotated boxes).
+            return (zone.ClosestPoint(point) - point).sqrMagnitude < 0.0001f;
         }
 
         private void ApplyOutdoorGain(float gain)

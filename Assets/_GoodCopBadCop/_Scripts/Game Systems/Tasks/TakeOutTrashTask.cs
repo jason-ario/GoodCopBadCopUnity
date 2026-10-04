@@ -1186,9 +1186,8 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// oriented so its forward axis faces down into the ground surface described by
     /// <paramref name="groundNormal"/>. No-op when no decal prefabs are assigned. Server-only.
     ///
-    /// Registers the spawned decal with <see cref="CleanBloodTask"/>, which counts in-bounds
-    /// splatters (required on Day 1, and shown under graffiti in Checkpoint Integrity) and treats
-    /// out-of-bounds ones as bonus-only.
+    /// Hands the spawned decal to <see cref="CleanBloodTask"/>, which treats it as cosmetic
+    /// (mop-able, never counted toward any task or Checkpoint Integrity).
     /// </summary>
     private void SpawnBloodDecal(Vector3 position, Vector3 groundNormal)
     {
@@ -1222,8 +1221,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             LocalScale = decalGo.transform.localScale
         };
 
-        // CleanBloodTask decides by position whether this splatter is required (in-bounds) or
-        // bonus-only, and claims its scrub callback either way.
+        // CleanBloodTask claims the scrub callback (blood is cosmetic and never counted).
         CleanBloodTask.Instance?.RegisterBloodSplatter(netObj);
 
         SpawnBloodParticleClientRpc(position, rotation);

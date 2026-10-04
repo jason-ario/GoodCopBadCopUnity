@@ -15,7 +15,8 @@ using UnityEngine.AI;
 /// (and, when <see cref="requiresZoneActivation"/> is set, by zone entry) and otherwise runs
 /// continuously regardless of shift/day-night state, until <see cref="MaxAmbientSpawnsPerDay"/> ambient
 /// spawns have occurred that day across ALL spawners combined (a shared, map-wide budget) — then
-/// every spawner pauses until the campaign day changes.
+/// every spawner pauses until the campaign day changes. Spawners with <see cref="exemptFromDailyCap"/>
+/// set (e.g. the power plant, needed for the Day 3 power outage) ignore that budget and don't consume it.
 ///
 /// Ambient mutants spawned this way (including legacy-mutant reintroductions) never start
 /// aggroed — they always spawn with no aggro target, ignoring <see cref="MutantEnemyData.aggroChance"/>
@@ -81,6 +82,11 @@ public class MutantSpawner : NetworkBehaviour
              "ambient spawning stops until the next day. Scripted packs (SpawnPackAt) and the debug " +
              "aggro cheat are not counted. 0 = unlimited.")]
     [SerializeField, Min(0)] private int maxSpawnsPerDay = 5;
+
+    [Tooltip("When enabled, this spawner ignores the shared map-wide daily cap (MaxAmbientSpawnsPerDay) " +
+             "and its spawns do not consume that budget. Use for scripted/location spawners that must " +
+             "always populate their area, e.g. the power plant during the Day 3 power outage.")]
+    [SerializeField] private bool exemptFromDailyCap = false;
 
     [Header("Activation")]
     [Tooltip("The first campaign day on which this spawner becomes active.")]
@@ -292,6 +298,9 @@ public class MutantSpawner : NetworkBehaviour
     /// </summary>
     private bool HasDailySpawnBudget()
     {
+        if (exemptFromDailyCap)
+            return true;
+
         RefreshDailySpawnBudget(CurrentCampaignDay);
         return s_spawnsToday < MaxAmbientSpawnsPerDay;
     }
@@ -346,7 +355,7 @@ public class MutantSpawner : NetworkBehaviour
 
             PruneDeadEnemies();
 
-            if (_activeEnemies.Count < effectiveCap && SpawnSingleEnemy())
+            if (_activeEnemies.Count < effectiveCap && SpawnSingleEnemy() && !exemptFromDailyCap)
                 s_spawnsToday++;
 
             if (i < count - 1)

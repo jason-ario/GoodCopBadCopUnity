@@ -107,18 +107,27 @@ public abstract class ContainerPickableObject : PickableObject, IAmmoProvider
     /// </summary>
     protected abstract string BuildInteractText(int itemsRemaining);
 
-    /// <summary>Shows the E-key extract hint only while the container still has an item to give.</summary>
-    public override bool ShowInteractHint => !IsEmpty;
-
     // ── Interaction ───────────────────────────────────────────────────────────
 
+    /// <summary>Verb for the hold prompt ("Hold E to {verb}"). Override for a more specific label.</summary>
+    protected virtual string ExtractVerb => "take one out";
+
     /// <summary>
-    /// Called when the player presses E while targeting this container (empty-handed).
-    /// Spawns one contained item on the server and routes it directly to the requesting
-    /// player's hands via a targeted ClientRpc.
-    /// LMB pickup is inherited unchanged from <see cref="PickableObject.Interact"/>.
+    /// Hold Interact extracts one item while the container still has one and the player's hand is free.
+    /// Tap Interact picks the container up (inherited <see cref="PickableObject.Interact"/>).
     /// </summary>
-    public override void InteractAlternate(PlayerInteractionController player)
+    public override string GetHoldInteractVerb(PlayerInteractionController player)
+    {
+        if (IsEmpty) return null;
+        if (player.pickupController != null && player.pickupController.HeldObject != null) return null;
+        return ExtractVerb;
+    }
+
+    /// <summary>
+    /// Hold Interact (empty-handed): spawns one contained item on the server and routes it
+    /// directly to the requesting player's hands via a targeted ClientRpc.
+    /// </summary>
+    public override void InteractHold(PlayerInteractionController player)
     {
         if (player.pickupController.HeldObject != null) return;
         if (_itemsRemaining.Value <= 0) return;

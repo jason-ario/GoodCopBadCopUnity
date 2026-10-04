@@ -283,17 +283,17 @@ public class JunkItem : Interactable
     // ── Interaction ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Triggered by the E key. If the player is holding a non-full TrashBag, collects
-    /// this item. Does nothing when empty-handed; shows a "Trash is full" toast when the bag is full.
+    /// Interact key does nothing on junk: collecting is item-on-target use, so it happens through
+    /// LMB / RT with a trash bag in hand (<see cref="InteractWithItem"/>).
     /// </summary>
-    public override void Interact(PlayerInteractionController player)
-    {
-        TryCollectInto(player.pickupController.HeldObject as TrashBag);
-    }
+    public override void Interact(PlayerInteractionController player) { }
+
+    /// <summary>No Interact-key prompt — junk is collected with LMB / RT (see <see cref="Interact"/>).</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) => false;
 
     /// <summary>
-    /// Triggered by left-click while holding a compatible item (TrashBag). Collects this
-    /// junk item into the bag.
+    /// LMB / RT while holding a compatible item (TrashBag) — collects this junk item into the bag.
+    /// Shows a "Trash is full" toast when the bag is full.
     /// </summary>
     public override void InteractWithItem(PlayerInteractionController player, PickableObject heldItem)
     {

@@ -58,6 +58,14 @@ public class SoldierMockingController : NetworkBehaviour
     public void BeginSequence()
     {
         if (!IsServer) return;
+
+        // The Soldier is never a lineup suspect — he only exists for his Day 1 cutscene.
+        if (CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay != 1)
+        {
+            Debug.LogWarning($"[SoldierMockingController] BeginSequence ignored on Day {CampaignManager.Instance.CurrentDay} — the Soldier only appears on Day 1.");
+            return;
+        }
+
         StartCoroutine(SoldierMockingSequence());
     }
 

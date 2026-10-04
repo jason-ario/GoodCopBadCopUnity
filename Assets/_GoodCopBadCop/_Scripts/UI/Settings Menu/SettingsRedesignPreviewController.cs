@@ -20,7 +20,6 @@ namespace GoodCopBadCop.UI.SettingsMenu
     public sealed class SettingsRedesignPreviewController : MonoBehaviour, ISettingsMenuView
     {
         private const string PreferencePrefix = "settings_preview.";
-        private const int RowPoolSize = 8;
         private const float FirstRowY = 355f;
         private const float RowSpacing = 67f;
         private static readonly Vector2 RowPosition = new Vector2(-371.25f, FirstRowY);
@@ -141,10 +140,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("SFX Volume", "sfx_volume", 80f),
             new Setting("Voice Volume", "voice_volume", 80f),
             new Setting("Voice Chat", "voice_chat_enabled", "Off", "On"),
-            new Setting("Voice Input", "voice_input", "Voice Activation", "Push To Talk"),
+            new Setting("Voice Input", "voice_input", "Voice Activation", "Push To Talk", "Open Mic"),
             new Setting("Microphone Muted", "microphone_muted", "Off", "On"),
             new Setting("Voice Deafened", "voice_deafened", "Off", "On"),
-            new Setting("Voice Proximity Range", "voice_proximity_range", 10f),
+            // Voice is lobby-wide, so there is no proximity range row.
             new Setting("Microphone", "microphone", "Default")
         };
 
@@ -161,8 +160,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("Toggle Mask", "toggle_mask", GameAction.ToggleMask),
             new Setting("Open Emotes", "open_emotes", GameAction.OpenEmotes),
             new Setting("Zoom Item", "zoom_item", GameAction.ZoomHeldItem),
-            new Setting("Reload", "reload_key", GameAction.Reload)
+            new Setting("Reload", "reload_key", GameAction.Reload),
+            new Setting("Push To Talk", "push_to_talk", GameAction.PushToTalk)
         };
+
+        private static Setting MicrophoneSetting => Array.Find(Audio, s => s.Key == "microphone");
+
+        // One pooled row per setting in the longest tab; rows past the pool size would never be shown.
+        private static int RowPoolSize =>
+            Mathf.Max(Mathf.Max(Gameplay.Length, Graphics.Length), Mathf.Max(Audio.Length, Controls.Length));
 
         private readonly List<Row> rows = new List<Row>();
         private readonly List<Button> tabButtons = new List<Button>();
@@ -275,6 +281,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             if (isInitialized)
             {
+                // Pick up microphones plugged in/removed since the menu was last opened.
+                PopulateMicrophoneOptions();
                 tabSelected.OnNext(ToSettingsMenuTab(activeTab));
             }
         }
@@ -327,7 +335,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             foreach (KeyCode keyCode in Enum.GetValues(typeof(KeyCode)))
             {
                 if (keyCode == KeyCode.Escape) continue;
-                if ((int)keyCode >= (int)KeyCode.Mouse0 && (int)keyCode <= (int)KeyCode.Mouse6) continue;
+                // LMB/RMB/MMB go through CompleteMouseRebind above; Mouse3+ (side buttons) bind as keys.
+                if ((int)keyCode >= (int)KeyCode.Mouse0 && (int)keyCode <= (int)KeyCode.Mouse2) continue;
                 if (UnityEngine.Input.GetKeyDown(keyCode))
                 {
                     CompleteKeyRebind(setting, keyCode);
@@ -390,11 +399,25 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static void PopulateMicrophoneOptions()
         {
+            Setting microphone = MicrophoneSetting;
+            if (microphone == null)
+            {
+                return;
+            }
+
+            string selected = microphone.Index > 0 && microphone.Index < microphone.Options.Length
+                ? microphone.Options[microphone.Index]
+                : null;
+
             string[] devices = Microphone.devices;
             string[] options = new string[devices.Length + 1];
             options[0] = "Default";
             Array.Copy(devices, 0, options, 1, devices.Length);
-            Audio[9].SetOptions(options);
+            microphone.SetOptions(options);
+
+            // Keep the current selection if the device is still present (the list may have reordered).
+            int selectedIndex = selected != null ? Array.IndexOf(options, selected) : -1;
+            microphone.Index = selectedIndex >= 0 ? selectedIndex : 0;
         }
 
         private void CacheHierarchy()
@@ -609,21 +632,27 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetQualityPresetValue(int value) { Graphics[4].Index = value; RefreshActiveSetting("quality"); }
         public void SetBrightnessValue(float value) { Graphics[5].Value = value; RefreshActiveSetting("brightness"); }
         public void SetFilmGrainEnabledValue(bool value) { Graphics[6].Index = value ? 1 : 0; RefreshActiveSetting("film_grain"); }
-        public void SetVoiceChatProximityRangeValue(int value) { Audio[8].Value = value; RefreshActiveSetting("voice_proximity_range"); }
+        public void SetVoiceChatProximityRangeValue(int value) { }
 
         public void SetVoiceChatMicrophoneNameValue(string value)
         {
+            Setting microphone = MicrophoneSetting;
+            if (microphone == null)
+            {
+                return;
+            }
+
             int index = 0;
             if (!string.IsNullOrEmpty(value))
             {
-                int foundIndex = Array.IndexOf(Audio[9].Options, value);
+                int foundIndex = Array.IndexOf(microphone.Options, value);
                 if (foundIndex >= 0)
                 {
                     index = foundIndex;
                 }
             }
 
-            Audio[9].Index = index;
+            microphone.Index = index;
             RefreshActiveSetting("microphone");
         }
 

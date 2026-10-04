@@ -38,6 +38,7 @@ namespace HighlightPlus {
         public static int OutlineStencilComp = Shader.PropertyToID("_OutlineStencilComp");
         public static int OutlineEdgeThreshold = Shader.PropertyToID("_EdgeThreshold");
         public static int OutlineSharpness = Shader.PropertyToID("_OutlineSharpness");
+        public static int OutlineOpacity = Shader.PropertyToID("_HPOutlineOpacity"); // GoodCopBadCop
 
         // glow uniforms
         public static int GlowZTest = Shader.PropertyToID("_GlowZTest");

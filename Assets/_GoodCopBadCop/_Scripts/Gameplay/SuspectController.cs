@@ -102,6 +102,45 @@ public class SuspectController : NetworkBehaviour
     public static System.Action InterceptNextSuspectSpawn;
 
     /// <summary>
+    /// The intercept most recently armed through <see cref="ArmDay1OnlyIntercept"/> (Vlad, the
+    /// Soldier). Tracked so a Day 1-only scripted character can never leak into a later day's
+    /// lineup — the static <see cref="InterceptNextSuspectSpawn"/> otherwise survives day changes
+    /// and scene reloads.
+    /// </summary>
+    private static System.Action _day1OnlyIntercept;
+
+    /// <summary>
+    /// Arms <see cref="InterceptNextSuspectSpawn"/> with a Day 1-only scripted spawn (Vlad, the
+    /// Soldier). It is discarded automatically if it is still pending once any other day is active
+    /// (see <see cref="ClearDay1OnlyIntercept"/> and the guard in WaitAndSpawnNextSuspect).
+    /// </summary>
+    public static void ArmDay1OnlyIntercept(System.Action intercept)
+    {
+        InterceptNextSuspectSpawn = intercept;
+        _day1OnlyIntercept = intercept;
+    }
+
+    /// <summary>
+    /// Clears a still-pending Day 1-only intercept without touching intercepts armed by other
+    /// systems (e.g. Day 2's Ocho booth encounter, which may legitimately carry over a day).
+    /// </summary>
+    public static void ClearDay1OnlyIntercept()
+    {
+        if (_day1OnlyIntercept != null && InterceptNextSuspectSpawn == _day1OnlyIntercept)
+        {
+            InterceptNextSuspectSpawn = null;
+            Debug.Log("[SuspectController] Cleared a pending Day 1-only scripted intercept (Vlad/Soldier) — not valid outside Day 1.");
+        }
+        _day1OnlyIntercept = null;
+    }
+
+    private static bool IsDay1Active()
+    {
+        int day = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+        return day == 1;
+    }
+
+    /// <summary>
     /// When true, the next suspect's entry line and bark schedule are suppressed — useful for
     /// scripted arrivals where a <see cref="ScriptedDialogueRunner"/> takes over dialogue.
     /// Consumed and reset to false inside <see cref="SayEntryDialogue"/>.
@@ -282,6 +321,11 @@ public class SuspectController : NetworkBehaviour
                 Debug.LogWarning("[SuspectController] ForceNextSuspectMutant: no mutant available in pool — falling back to normal suspect.");
             }
         }
+
+        // Day 1-only scripted characters (Vlad, the Soldier) must never take a slot on any other day.
+        // Drop the stale intercept and fall through to the normal lineup spawn for this slot.
+        if (InterceptNextSuspectSpawn != null && InterceptNextSuspectSpawn == _day1OnlyIntercept && !IsDay1Active())
+            ClearDay1OnlyIntercept();
 
         // Check for a scripted event intercept (e.g. Alexei on Day 1).
         // Consumed before the mutant/regular spawn so no character spawns for this slot.

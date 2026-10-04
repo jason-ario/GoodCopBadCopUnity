@@ -385,6 +385,15 @@ namespace HighlightPlus {
         [Range(0, 1)]
         [Tooltip("Intensity of the outline. A value of 0 disables the outline completely.")]
         public float outline = 1f;
+
+        /// <summary>
+        /// GoodCopBadCop: runtime-only multiplier on the outline's final opacity (0-1). Unlike
+        /// <see cref="outline"/>, it never changes the outline's apparent thickness or color — for the
+        /// Highest-quality smooth outline it is applied after saturation/sharpness in the compose shader.
+        /// Driven by Interactable's objective-highlight pulse. Not serialized and not part of profiles.
+        /// </summary>
+        [System.NonSerialized] public float outlineOpacity = 1f;
+
         [ColorUsage(true, true)] public Color outlineColor = Color.black;
         public ColorStyle outlineColorStyle = ColorStyle.SingleColor;
         [GradientUsage(hdr: true, ColorSpace.Linear)] public Gradient outlineGradient;
@@ -1773,12 +1782,12 @@ namespace HighlightPlus {
                         if (usesOutlineNonHQ) {
                             Color outlineColor = this.outlineColor;
                             if (outlineColorStyle == ColorStyle.Gradient) {
-                                outlineColor.a *= outline * fade;
+                                outlineColor.a *= outline * fade * Mathf.Clamp01(outlineOpacity); // GoodCopBadCop: opacity
                                 Bounds bounds = outlineGradientInLocalSpace ? mesh.bounds : rms[k].renderer.bounds;
                                 cbHighlight.SetGlobalVector(ShaderParams.OutlineVertexData, new Vector4(bounds.min.y, bounds.size.y + 0.0001f, 0, 0));
                             }
                             else {
-                                outlineColor.a *= outline * fade;
+                                outlineColor.a *= outline * fade * Mathf.Clamp01(outlineOpacity); // GoodCopBadCop: opacity
                                 cbHighlight.SetGlobalVector(ShaderParams.OutlineVertexData, new Vector4(-1e6f, 1f, 0, 0));
                             }
                             cbHighlight.SetGlobalColor(ShaderParams.OutlineColor, outlineColor);
@@ -2090,6 +2099,7 @@ namespace HighlightPlus {
                     if (useSmoothOutline) {
                         float intensity = outline * fade;
                         fxMatComposeOutline.color = new Color(outlineColor.r, outlineColor.g, outlineColor.b, outlineColor.a * intensity * 10f);
+                        fxMatComposeOutline.SetFloat(ShaderParams.OutlineOpacity, Mathf.Clamp01(outlineOpacity)); // GoodCopBadCop
                         SmoothOutline(smoothRTWidth / outlineDownsampling, smoothRTHeight / outlineDownsampling);
                     }
 
