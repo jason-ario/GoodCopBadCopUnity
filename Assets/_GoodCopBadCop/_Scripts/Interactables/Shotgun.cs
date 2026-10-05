@@ -151,10 +151,15 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 out NetworkObjectReference[] mutantRefs, out int[] mutantPellets,
                 out NetworkObjectReference[] playerRefs, out int[] playerPellets,
                 out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
-                out bool hitGlass);
+                out bool hitGlass, out Vector3[] propPoints);
+
+            // Cosmetic prop reactions (wobble / shatter) play instantly for the shooter; the server
+            // relays them to everyone else.
+            foreach (Vector3 point in propPoints)
+                HittableProp.TryHitAt(point, cam.transform.forward);
 
             FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, playerRefs, playerPellets,
-                suspectRefs, suspectPoints, hitGlass);
+                suspectRefs, suspectPoints, hitGlass, propPoints);
         }
     }
 
@@ -168,11 +173,12 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         out NetworkObjectReference[] mutantRefs, out int[] mutantPellets,
         out NetworkObjectReference[] playerRefs, out int[] playerPellets,
         out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
-        out bool hitGlass)
+        out bool hitGlass, out Vector3[] propPoints)
     {
         Dictionary<NetworkObject, int> mutantHits = new();
         Dictionary<NetworkObject, int> playerHits = new();
         Dictionary<NetworkObject, Vector3> suspectHits = new();
+        Dictionary<HittableProp, Vector3> propHits = new();
         hitGlass = false;
 
         ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
@@ -251,13 +257,21 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 if (glassHit != null && !glassHit.IsSmashed)
                     hitGlass = true;
 
-                // Solid geometry (or handled glass) — this blocks the pellet either way.
+                // Cosmetic props (signs, bottles…) — one reaction per prop per blast.
+                HittableProp prop = hit.collider.GetComponentInParent<HittableProp>();
+                if (prop != null && !propHits.ContainsKey(prop))
+                    propHits[prop] = hit.point;
+
+                // Solid geometry (or handled glass/prop) — this blocks the pellet either way.
                 break;
             }
         }
 
         ToArrays(mutantHits, out mutantRefs, out mutantPellets);
         ToArrays(playerHits, out playerRefs, out playerPellets);
+
+        propPoints = new Vector3[propHits.Count];
+        propHits.Values.CopyTo(propPoints, 0);
 
         suspectRefs   = new NetworkObjectReference[suspectHits.Count];
         suspectPoints = new Vector3[suspectHits.Count];
@@ -326,7 +340,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         NetworkObjectReference[] mutantRefs, int[] mutantPellets,
         NetworkObjectReference[] playerRefs, int[] playerPellets,
         NetworkObjectReference[] suspectRefs, Vector3[] suspectPoints,
-        bool hitGlass, ServerRpcParams rpcParams = default)
+        bool hitGlass, Vector3[] propPoints, ServerRpcParams rpcParams = default)
     {
         ulong shooterClientId = rpcParams.Receive.SenderClientId;
 
@@ -406,6 +420,32 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                     ShotgunUpdateGlassClientRpc(newHits);
             }
         }
+
+        if (propPoints != null && propPoints.Length > 0)
+        {
+            // Cosmetic only — replay on every client except the shooter (who already played it).
+            // Clamp to the pellet count so a bad report can't spam reactions.
+            if (propPoints.Length > _pelletCount)
+                System.Array.Resize(ref propPoints, _pelletCount);
+
+            List<ulong> propTargets = new List<ulong>();
+            foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
+                if (id != shooterClientId) propTargets.Add(id);
+
+            if (propTargets.Count > 0)
+                ShotgunPropHitClientRpc(propPoints, rayDirection, new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams { TargetClientIds = propTargets }
+                });
+        }
+    }
+
+    /// <summary>Replays cosmetic <see cref="HittableProp"/> reactions on non-shooting clients.</summary>
+    [ClientRpc]
+    private void ShotgunPropHitClientRpc(Vector3[] hitPoints, Vector3 direction, ClientRpcParams clientRpcParams = default)
+    {
+        foreach (Vector3 point in hitPoints)
+            HittableProp.TryHitAt(point, direction);
     }
 
     /// <summary>

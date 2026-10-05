@@ -213,6 +213,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
                 return;
 
+            // While paused, gameplay writes go into the pause snapshot so ClosePauseMenu
+            // restores the up-to-date value rather than the stale pre-pause one.
+            if (UIController.Instance != null && UIController.Instance.TryCaptureControlWhilePaused(this, value))
+                return;
+
             canControl = value;
 
             if (canControl)
@@ -768,6 +773,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         // (dumpster deposit, coin-slot insertion, etc.) call SetCanLook(true) after yielding;
         // if a cutscene started during that yield, look must stay disabled.
         if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
+            return;
+        if (UIController.Instance != null && UIController.Instance.TryCaptureLookWhilePaused(this, value))
             return;
         CanLook = value;
     }

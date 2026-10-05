@@ -94,17 +94,16 @@ public class HittableProp : MonoBehaviour
 
     // Public API
 
-    /// <summary>Plays the hit sound and kicks the wobble spring.</summary>
-    public void Hit(Vector3 hitPoint, Vector3 direction)
+    /// <summary>
+    /// Plays the hit sound and kicks the wobble spring. Subclasses (e.g. <see cref="ShatterableProp"/>)
+    /// override this to swap the wobble for a different reaction while reusing the weapon hit pipeline.
+    /// </summary>
+    public virtual void Hit(Vector3 hitPoint, Vector3 direction)
     {
         if (Time.time - _lastHitTime < _minHitInterval) return;
         _lastHitTime = Time.time;
 
-        if (_hitSound != null && SFXController.Instance != null)
-        {
-            float pitch = Random.Range(_pitchRange.x, _pitchRange.y);
-            SFXController.Instance.PlayAtPosition(_hitSound, hitPoint, _volume, pitch, _soundMaxDistance);
-        }
+        PlayHitSound(hitPoint);
 
         Vector3 dir = Vector3.ProjectOnPlane(direction, Vector3.up);
         if (dir.sqrMagnitude < 0.0001f) dir = Random.insideUnitCircle.normalized;
@@ -123,6 +122,15 @@ public class HittableProp : MonoBehaviour
         _velocity.z += tiltAxis.z * _tiltImpulse;
 
         enabled = true;
+    }
+
+    /// <summary>Plays the configured hit sound at <paramref name="point"/> with a randomised pitch.</summary>
+    protected void PlayHitSound(Vector3 point)
+    {
+        if (_hitSound == null || SFXController.Instance == null) return;
+
+        float pitch = Random.Range(_pitchRange.x, _pitchRange.y);
+        SFXController.Instance.PlayAtPosition(_hitSound, point, _volume, pitch, _soundMaxDistance);
     }
 
     /// <summary>

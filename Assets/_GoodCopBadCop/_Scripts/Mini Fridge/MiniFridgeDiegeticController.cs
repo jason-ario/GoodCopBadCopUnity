@@ -20,10 +20,12 @@ public class MiniFridgeDiegeticController : DiegeticViewController
 
     private MiniFridge _fridge;
     private PickableObject _lastHovered;
+    private readonly RaycastHit[] _hitBuffer = new RaycastHit[32];
 
     // ─── Constants ────────────────────────────────────────────────────────────
 
     private const string HoldingObjectMessage = "Put down what you're holding first!";
+    private const float MaxRayDistance = 100f;
 
     // ─── Public API ──────────────────────────────────────────────────────────
 
@@ -73,9 +75,7 @@ public class MiniFridgeDiegeticController : DiegeticViewController
         if (cam == null) return;
 
         Ray ray = cam.ScreenPointToRay(Input.mousePosition);
-        bool didHit = Physics.Raycast(ray, out RaycastHit hit, 100f, ~0, QueryTriggerInteraction.Collide);
-
-        PickableObject hovered = didHit ? hit.collider.GetComponentInParent<PickableObject>() : null;
+        PickableObject hovered = FindHoveredItem(ray);
 
         if (hovered != _lastHovered)
         {
@@ -95,6 +95,50 @@ public class MiniFridgeDiegeticController : DiegeticViewController
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the nearest free <see cref="PickableObject"/> under the cursor ray.
+    /// The view camera is fixed in front of the fridge, so things can stand between it and
+    /// the items: the local player's own capsule (only the "Art" mesh is hidden), other
+    /// players, the door's trigger collider, or trigger volumes. A single nearest-hit raycast
+    /// was swallowed by those, so no item could be hovered or picked up. This scans every hit
+    /// and skips triggers, player colliders and the fridge's own parts. Any other solid
+    /// geometry still blocks the ray.
+    /// </summary>
+    private PickableObject FindHoveredItem(Ray ray)
+    {
+        int count = Physics.RaycastNonAlloc(ray, _hitBuffer, MaxRayDistance, ~0, QueryTriggerInteraction.Collide);
+        if (count == 0) return null;
+
+        System.Array.Sort(_hitBuffer, 0, count, HitDistanceComparer.Instance);
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = _hitBuffer[i].collider;
+            if (col == null) continue;
+
+            PickableObject item = col.GetComponentInParent<PickableObject>();
+            if (item != null)
+            {
+                if (item.IsHeld) continue;
+                return item;
+            }
+
+            if (col.isTrigger) continue;
+            if (col.GetComponentInParent<PlayerInstance>() != null) continue;
+            if (col.transform.IsChildOf(transform)) continue;
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private sealed class HitDistanceComparer : System.Collections.Generic.IComparer<RaycastHit>
+    {
+        public static readonly HitDistanceComparer Instance = new HitDistanceComparer();
+        public int Compare(RaycastHit a, RaycastHit b) => a.distance.CompareTo(b.distance);
+    }
 
     private void ClearHover()
     {

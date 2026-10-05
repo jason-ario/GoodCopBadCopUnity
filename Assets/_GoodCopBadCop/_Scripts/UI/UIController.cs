@@ -85,6 +85,10 @@ public class UIController : MonoBehaviour
     bool showedReticleBeforePause = false;
     bool playerUIWasActiveBeforePaused = false;
 
+    // True while OpenPauseMenu/ClosePauseMenu themselves are writing control/look, so those
+    // writes go to the live player instead of being captured into the pause snapshot.
+    private bool _applyingPauseState;
+
     private void Awake()
     {
         Instance = this;
@@ -323,6 +327,11 @@ public class UIController : MonoBehaviour
 
     public void ClosePlayerUI()
     {
+        // While paused, the HUD is already hidden by the pause menu; record the request so
+        // ClosePauseMenu doesn't bring back a HUD that gameplay hid in the meantime.
+        if (pauseMenuOpened)
+            playerUIWasActiveBeforePaused = false;
+
         playerUI.SetActive(false);
     }
     
@@ -355,6 +364,14 @@ public class UIController : MonoBehaviour
         // ShowPlayerUI() a frame before the auto hang-up, which would otherwise flash the HUD.
         if (IsPhoneCallBackdropVisible)
             return;
+
+        // While paused, defer the reveal to ClosePauseMenu (e.g. the intro cutscene ending
+        // while the settings menu is open) instead of popping the HUD over the pause menu.
+        if (pauseMenuOpened)
+        {
+            playerUIWasActiveBeforePaused = true;
+            return;
+        }
 
         playerUI.SetActive(true);
     }
@@ -745,9 +762,17 @@ public class UIController : MonoBehaviour
         playerUI.SetActive(false);
         
         ShowCursor();
-        
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(false);
-        PlayerInstance.Instance.CanControl = false;
+
+        _applyingPauseState = true;
+        try
+        {
+            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(false);
+            PlayerInstance.Instance.CanControl = false;
+        }
+        finally
+        {
+            _applyingPauseState = false;
+        }
         pauseMenu.SetActive(true);
     }
     
@@ -755,31 +780,88 @@ public class UIController : MonoBehaviour
     {
         bool dialogueModeActive = DialogueChoiceSystem.IsInDialogueMode;
 
-        if (dialogueModeActive)
+        _applyingPauseState = true;
+        try
         {
-            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(false);
-            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
-            ShowCursor();
-            PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(false);
-        }
-        else
-        {
-            // Restore CanLook first so the CanControl setter can properly re-enable the reticle.
-            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(couldLookBeforePaused);
-            PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(couldControlBeforePaused);
-
-            if (showedCursorBeforePaused == false)
+            if (dialogueModeActive)
             {
-                HideCursor();
+                PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(false);
+                PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(false);
+                ShowCursor();
+                PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(false);
             }
+            else
+            {
+                // Restore CanLook first so the CanControl setter can properly re-enable the reticle.
+                PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanLook(couldLookBeforePaused);
+                PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(couldControlBeforePaused);
 
-            PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(showedReticleBeforePause);
+                if (showedCursorBeforePaused == false)
+                {
+                    HideCursor();
+                }
+
+                PlayerInstance.Instance.PlayerInteractionController.SetReticleActive(showedReticleBeforePause);
+            }
+        }
+        finally
+        {
+            _applyingPauseState = false;
         }
 
         playerUI.SetActive(playerUIWasActiveBeforePaused);
 
         pauseMenuOpened = false;
         pauseMenu.SetActive(false);
+    }
+
+    /// <summary>
+    /// Called from <see cref="PlayerMovementController.CanControl"/>'s setter. While the pause menu
+    /// is open, a control change from gameplay (e.g. <c>ShiftManager.EnablePlayerControl</c> when
+    /// the intro cutscene ends with Settings open) is written into the pause snapshot instead of
+    /// the live player. Otherwise <see cref="ClosePauseMenu"/> would restore the stale pre-pause
+    /// value and leave the player locked. Mirrors the setter's cursor/reticle side effects.
+    /// Returns true when the write was captured, in which case the caller must not apply it.
+    /// </summary>
+    internal bool TryCaptureControlWhilePaused(PlayerMovementController mover, bool value)
+    {
+        if (!ShouldCaptureWhilePaused(mover))
+            return false;
+
+        couldControlBeforePaused = value;
+        if (!value)
+        {
+            showedCursorBeforePaused = true;
+            showedReticleBeforePause = false;
+        }
+        else if (couldLookBeforePaused)
+        {
+            showedCursorBeforePaused = false;
+            showedReticleBeforePause = true;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Look counterpart of <see cref="TryCaptureControlWhilePaused"/>, called from
+    /// <see cref="PlayerMovementController.SetCanLook"/>. Returns true when the write was captured.
+    /// </summary>
+    internal bool TryCaptureLookWhilePaused(PlayerMovementController mover, bool value)
+    {
+        if (!ShouldCaptureWhilePaused(mover))
+            return false;
+
+        couldLookBeforePaused = value;
+        return true;
+    }
+
+    private bool ShouldCaptureWhilePaused(PlayerMovementController mover)
+    {
+        return pauseMenuOpened
+               && !_applyingPauseState
+               && mover != null
+               && PlayerInstance.Instance != null
+               && mover.gameObject == PlayerInstance.Instance.gameObject;
     }
 
     public void ShowCashPopUpNotification(int amount, string message)

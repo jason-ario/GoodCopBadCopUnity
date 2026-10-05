@@ -95,13 +95,11 @@ public class ApplicationLetter : FolderItem
         syncedVisible.Value = state.ApplicationVisible;
 
         ApplySyncedState();
-        ApplyFonts(suspectData);
     }
 
     public void ApplyPreviewState(SuspectPaperworkState state, SuspectData suspectData)
     {
         ApplyState(state);
-        ApplyFonts(suspectData);
     }
 
     /// <summary>
@@ -156,19 +154,6 @@ public class ApplicationLetter : FolderItem
 
         if (reasonForEntryText != null)
             reasonForEntryText.gameObject.SetActive(!showDrawing);
-    }
-
-    private void ApplyFonts(SuspectData suspectData)
-    {
-        if (suspectData == null || suspectData.handwritingFont == null)
-            return;
-
-        nameText.font = suspectData.handwritingFont;
-        reasonForEntryText.font = suspectData.handwritingFont;
-        birthDateText.font = suspectData.handwritingFont;
-        sexText.font = suspectData.handwritingFont;
-        if (expirationDateText != null)
-            expirationDateText.font = suspectData.handwritingFont;
     }
 
     private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => nameText.text = current.ToString();

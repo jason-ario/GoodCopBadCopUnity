@@ -1,4 +1,5 @@
 using System.Collections;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -6,6 +7,9 @@ using UnityEngine.Rendering.Universal;
 /// <summary>
 /// Disables the post-processing vignette and the Breakable Glass object while the main menu
 /// is active, then explicitly re-enables both when the game starts.
+///
+/// If the <see cref="MainMenuSplashScreen"/> is playing, the vignette stays on during the logos
+/// and fades out alongside the main menu UI fade-in instead of switching off at load.
 /// </summary>
 public class MainMenuSceneSetup : MonoBehaviour
 {
@@ -16,10 +20,25 @@ public class MainMenuSceneSetup : MonoBehaviour
     [SerializeField] private GameObject breakableGlass;
 
     private Vignette _vignette;
+    private float _vignetteIntensity;
+    private Tween _vignetteFade;
+    private bool _waitingForSplash;
 
     private void Start()
     {
-        DisableVignette();
+        CacheVignette();
+
+        if (MainMenuSplashScreen.WillPlayThisLoad)
+        {
+            // Keep the vignette on under the splash logos; fade it with the menu fade-in.
+            _waitingForSplash = true;
+            MainMenuSplashScreen.MenuFadeInStarted += OnSplashMenuFadeInStarted;
+        }
+        else
+        {
+            DisableVignette();
+        }
+
         DisableBreakableGlass();
 
         if (GameManager.Instance != null)
@@ -34,6 +53,11 @@ public class MainMenuSceneSetup : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_waitingForSplash)
+            MainMenuSplashScreen.MenuFadeInStarted -= OnSplashMenuFadeInStarted;
+
+        _vignetteFade?.Kill();
+
         if (GameManager.Instance != null)
         {
             GameManager.Instance.OnGameStart -= OnGameStart;
@@ -44,7 +68,7 @@ public class MainMenuSceneSetup : MonoBehaviour
     // Main Menu State
     // ---------------------------------------------------------------------------
 
-    private void DisableVignette()
+    private void CacheVignette()
     {
         if (postProcessingVolume == null)
         {
@@ -61,7 +85,40 @@ public class MainMenuSceneSetup : MonoBehaviour
             return;
         }
 
+        _vignetteIntensity = _vignette.intensity.value;
+    }
+
+    private void DisableVignette()
+    {
+        if (_vignette == null)
+            return;
+
         _vignette.active = false;
+    }
+
+    private void OnSplashMenuFadeInStarted(float duration)
+    {
+        _waitingForSplash = false;
+        MainMenuSplashScreen.MenuFadeInStarted -= OnSplashMenuFadeInStarted;
+
+        if (_vignette == null)
+            return;
+
+        _vignetteFade?.Kill();
+        _vignetteFade = DOTween.To(
+                () => _vignette.intensity.value,
+                v => _vignette.intensity.value = v,
+                0f,
+                duration)
+            .SetEase(Ease.InOutSine)
+            .SetUpdate(true)
+            .SetLink(gameObject)
+            .OnComplete(() =>
+            {
+                DisableVignette();
+                // Restore the authored intensity so re-enabling at game start looks correct.
+                _vignette.intensity.value = _vignetteIntensity;
+            });
     }
 
     private void DisableBreakableGlass()
@@ -98,6 +155,14 @@ public class MainMenuSceneSetup : MonoBehaviour
         if (_vignette == null)
             return;
 
+        if (_waitingForSplash)
+        {
+            _waitingForSplash = false;
+            MainMenuSplashScreen.MenuFadeInStarted -= OnSplashMenuFadeInStarted;
+        }
+
+        _vignetteFade?.Kill();
+        _vignette.intensity.value = _vignetteIntensity;
         _vignette.active = true;
     }
 

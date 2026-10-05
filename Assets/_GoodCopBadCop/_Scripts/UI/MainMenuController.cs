@@ -54,6 +54,10 @@ public class MainMenuController : MonoBehaviour
     [Header("Quit")]
     [SerializeField] private ConfirmationDialogController quitConfirmationDialog;
 
+    [Header("Splash Screen")]
+    [Tooltip("Studio logo splash played before the main menu on the first load of the session. Optional.")]
+    [SerializeField] private MainMenuSplashScreen splashScreen;
+
     [Header("Debug")]
     [SerializeField] private bool _debugSkipToGame;
     [SerializeField] private int _debugSlotIndex = 0;
@@ -110,19 +114,60 @@ public class MainMenuController : MonoBehaviour
 #if UNITY_EDITOR
         if (_debugSkipToGame)
         {
+            if (splashScreen != null)
+                splashScreen.HideImmediately();
+
             DebugSkipToGame();
             return;
         }
 #endif
 
-        SwitchToScreen(homeScreen);
-        playableDirector.gameObject.SetActive(true);
-        RefreshContinueButton();
+        // Music and the menu cutscene (cameras) start immediately, so the splash fades from black
+        // straight into the live menu scene and the logos play over it.
         PlayMainMenuMusic();
+        playableDirector.gameObject.SetActive(true);
+
+        if (splashScreen != null)
+        {
+            // Hold the menu UI hidden and non-interactable during the splash. The splash fades
+            // the menu UI (canvasGroup) in once the logos finish.
+            HideAllMenus();
+            SetMenuInteractable(false);
+
+            bool playing = splashScreen.TryPlay(
+                menuGroup: canvasGroup,
+                onLogosFinished: ShowMainMenu,
+                onComplete: () => SetMenuInteractable(true));
+
+            if (playing)
+                return;
+
+            SetMenuInteractable(true);
+        }
+
+        ShowMainMenu();
+    }
+
+    /// <summary>Shows the home screen. Music and the menu cutscene are started separately in
+    /// <see cref="Start"/> so they run underneath the splash screen.</summary>
+    private void ShowMainMenu()
+    {
+        SwitchToScreen(homeScreen);
+        RefreshContinueButton();
+    }
+
+    private void SetMenuInteractable(bool interactable)
+    {
+        if (canvasGroup == null)
+            return;
+
+        canvasGroup.interactable = interactable;
+        canvasGroup.blocksRaycasts = interactable;
     }
 
     private void Update()
     {
+        if (MainMenuSplashScreen.IsPlaying) return;
         if (!(Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)) return;
 
         // Quit confirmation dialog open — B = cancel
