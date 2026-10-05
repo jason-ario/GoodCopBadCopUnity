@@ -124,6 +124,19 @@ public class Drawer : Interactable
         Animator animator = GetComponent<Animator>();
         if (animator != null)
             animator.enabled = false;
+
+        // Drawer audio plays on every client (it's driven by the synced mesh motion), so the
+        // sources must be fully 3D — a 2D source (spatialBlend 0) ignores distance and was
+        // audible map-wide when a teammate used a drawer. Enforced here so prefab/scene
+        // overrides can't regress it.
+        ForceSpatial(audioSource);
+        ForceSpatial(_movementAudioSource);
+    }
+
+    private static void ForceSpatial(AudioSource source)
+    {
+        if (source == null) return;
+        source.spatialBlend = 1f;
     }
 
     public override void OnNetworkSpawn()

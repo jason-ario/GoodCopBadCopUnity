@@ -13,10 +13,16 @@ MonoBehaviour:
   m_Name: Keyword
   m_EditorClassIdentifier: Assembly-CSharp::DialogueEmphasisProfile
   id: keyword
-  usage: 'Gameplay info the player must remember (rules, tools, permits, thresholds). Static bold yellow, no motion. Shortcut: [[phrase]].'
+  usage: 'Gameplay info the player must remember (rules, tools, permits, thresholds). Bold yellow with a gentle travelling wave. Shortcut: [[phrase]].'
   color: {r: 1, g: 0.824, b: 0.247, a: 1}
   bold: 1
   italic: 0
-  jitter: 0
-  jitterAxes: {x: 1, y: 1}
+  motion: 1
+  amplitude: 0.06
+  axes: {x: 0.15, y: 1}
+  speed: 0.8
+  charPhase: 0.55
+  rotation: 4
+  scalePulse: 0.06
+  shear: 0
   stepRate: 0

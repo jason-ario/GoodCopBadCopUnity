@@ -558,7 +558,13 @@ public class UIController : MonoBehaviour
     /// </summary>
     public void ReleaseExclusiveBackButton(UnityAction onClickCallback)
     {
-        if (!_backButtonCallbacks.Remove(onClickCallback)) return;
+        if (!_backButtonCallbacks.Remove(onClickCallback))
+        {
+            // Another exclusive owner took over on top of this one: drop this callback from the
+            // set-aside list so it isn't restored (stale) when that owner releases.
+            _suspendedBackButtonCallbacks.Remove(onClickCallback);
+            return;
+        }
         backButton.onClick.RemoveListener(onClickCallback);
 
         foreach (UnityAction callback in _suspendedBackButtonCallbacks)

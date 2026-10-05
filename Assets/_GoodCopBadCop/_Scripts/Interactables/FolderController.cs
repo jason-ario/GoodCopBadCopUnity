@@ -949,7 +949,8 @@ public class FolderController : PickableObject
             ppc.PlayerAnimationController.CamRightArmIKTarget?.DOMove(stampDownTarget.position, .25f);
         }
 
-        SFXController.Instance.Play(stampSound);
+        // Runs on every client (ClientRpc) — must be positional, not the 2D SFX source.
+        SFXController.Instance.PlayAtPosition(stampSound, transform.position, maxDistance: 10f);
 
         // Only the stamping player sends the ServerRpc — avoids duplicate calls from every client.
         if (isStampingLocalPlayer)

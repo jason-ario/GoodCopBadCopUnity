@@ -115,7 +115,19 @@ public class GuidebookController : MonoBehaviour
 
         if (_playerInstance != null)
             _playerInstance.OnCutsceneStateChanged -= OnCutsceneStateChanged;
+
+        // Never leave the shared Back button owned by a controller that can no longer close it.
+        if (IsOpen) CloseGuidebook();
     }
+
+    /// <summary>
+    /// True only for the controller on the current local player object. <see cref="PlayerInstance.Instance"/>
+    /// is the static local player, so checking its IsLocalPlayer alone also passed for remote players'
+    /// copies and for the corpse left behind after a respawn — Tab then opened every copy, each taking
+    /// the Back button, and only this player's copy was closed when a cutscene/dialogue started.
+    /// </summary>
+    private bool IsLocalPlayersController =>
+        _playerInstance != null && _playerInstance == PlayerInstance.Instance && _playerInstance.IsLocalPlayer;
 
     /// <summary>
     /// Puts the book away the moment a cutscene or dialogue starts. Both entry paths
@@ -132,7 +144,12 @@ public class GuidebookController : MonoBehaviour
 
     private void Update()
     {
-        if (PlayerInstance.Instance == null || !PlayerInstance.Instance.IsLocalPlayer) return;
+        if (!IsLocalPlayersController)
+        {
+            // e.g. the player object was replaced on respawn while the book was open.
+            if (IsOpen) CloseGuidebook();
+            return;
+        }
 
         // Put the book away automatically when a cutscene or dialogue ends.
         bool inScene = IsInCutsceneOrDialogue();
@@ -165,7 +182,7 @@ public class GuidebookController : MonoBehaviour
     /// </summary>
     public void OpenGuidebook()
     {
-        if (IsOpen) return;
+        if (IsOpen || !IsLocalPlayersController) return;
         IsOpen = true;
         Local = this;
 

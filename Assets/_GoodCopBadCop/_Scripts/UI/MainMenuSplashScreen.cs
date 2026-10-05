@@ -85,6 +85,7 @@ public class MainMenuSplashScreen : MonoBehaviour
     private const float MaxFadeStep = 1f / 30f;
 
     private static bool _hasPlayedThisSession;
+    private static MainMenuSplashScreen _instance;
 
     private CanvasGroup _menuGroup;
     private Action _onLogosFinished;
@@ -103,10 +104,28 @@ public class MainMenuSplashScreen : MonoBehaviour
         IsPlaying = false;
         WillPlayThisLoad = false;
         MenuFadeInStarted = null;
+        _instance = null;
+    }
+
+    /// <summary>
+    /// Cancels the splash for this load (and the rest of the session) when the main menu is
+    /// bypassed, e.g. the debug "Game Start Point" window or cutscene mode. Safe to call from any
+    /// Awake: if the splash has already covered the screen it is hidden immediately; otherwise it
+    /// deactivates itself in its own Awake.
+    /// </summary>
+    public static void Suppress()
+    {
+        _hasPlayedThisSession = true;
+        WillPlayThisLoad = false;
+
+        if (_instance != null)
+            _instance.HideImmediately();
     }
 
     private void Awake()
     {
+        _instance = this;
+
         if (_hasPlayedThisSession)
         {
             WillPlayThisLoad = false;
@@ -148,6 +167,9 @@ public class MainMenuSplashScreen : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_instance == this)
+            _instance = null;
+
         if (IsPlaying)
         {
             IsPlaying = false;

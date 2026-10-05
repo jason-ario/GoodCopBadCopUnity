@@ -52,7 +52,10 @@ namespace Dissonance.Audio.Codecs.Opus
                 case AudioQuality.Medium:
                     return 17000;
                 case AudioQuality.High:
-                    return 24000;
+                    // GoodCopBadCop local change (stock: 24000). 24 kbps sounded compressed, and in-band
+                    // FEC spends part of the budget under packet loss. 48 kbps mono gives near-transparent
+                    // fullband speech (~6 KB/s per active talker). Re-apply if Dissonance is updated.
+                    return 48000;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(quality), quality, null);
             }

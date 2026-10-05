@@ -75,6 +75,10 @@ public class DebugConsole : MonoBehaviour
 
         if (hideMainMenu)
         {
+            // MainMenuController.Start won't run, so the splash would never be played or
+            // dismissed and its black backdrop would cover the screen. Cancel it outright.
+            MainMenuSplashScreen.Suppress();
+
             _mainMenuController.enabled = false;
             mainMenuScreen.SetActive(false);
         }

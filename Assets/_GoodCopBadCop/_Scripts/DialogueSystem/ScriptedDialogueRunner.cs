@@ -186,10 +186,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private string _lastAnimTrigger = string.Empty;
 
     // Tracks the most recently activated camera key on the server so late-joining clients
-    // can receive a camera catch-up RPC before LateJoinClientRpc fires.
+    // can catch up to it via LateJoinClientRpc.
     private string _currentCameraKey = string.Empty;
 
-    // NetworkObjectId of the current dialogue speaker — set on all clients by EnterScriptedModeClientRpc.
+    // NetworkObjectId of the current dialogue speaker — set on participants by
+    // EnterScriptedModeClientRpc and on late joiners by LateJoinClientRpc.
     // Used by SuspectController.ResolveCurrentDialogueSpeakerCam() to find the speaker's per-character cameras.
     // Reset to 0 when exiting scripted mode.
     private ulong _clientSpeakerNetId;
@@ -565,8 +566,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         foreach (var node in dialogue.nodes)
         {
-            // Track the active camera key server-side so late-joining clients can receive
-            // a camera catch-up RPC before LateJoinClientRpc fires.
+            // Track the active camera key server-side so late-joining clients can catch up
+            // to it via LateJoinClientRpc.
             _currentCameraKey = node.cameraTrigger ?? string.Empty;
 
             // Camera cut and text effect are set before the line starts so they're
@@ -844,11 +845,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
         };
 
-        // Send the current camera state first so the joiner's view snaps to the
-        // correct camera before dialogue mode activates (avoids a one-frame camera pop).
-        SetActiveOverrideCamClientRpc(_currentCameraKey, singleClientRpc);
-
-        LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, _allowParticipantExit, singleClientRpc);
+        // The current camera key rides along with the join so the client applies it only after
+        // caching the speaker ID — per-speaker keys (empty / SuspectCam / SuspectFaceCam) can't
+        // resolve without it, and the joiner never received the participant-targeted
+        // EnterScriptedModeClientRpc that normally sets it.
+        LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, _allowParticipantExit, _currentCameraKey ?? string.Empty, singleClientRpc);
 
         // A player who joins while a response choice is open must receive the current panel,
         // not wait until the next choice node to participate.
@@ -1034,10 +1035,19 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </summary>
     [ClientRpc]
     private void LateJoinClientRpc(ulong speakerNetId, bool isWaitingForInput, bool canLeave,
-        ClientRpcParams rpcParams = default)
+        string cameraKey, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = true;
         _clientIsWaitingForInput = isWaitingForInput;
+
+        // Late joiners never received the participant-targeted EnterScriptedModeClientRpc, so
+        // cache the speaker here. Without it SuspectController.ResolveCurrentDialogueSpeakerCam
+        // falls back to the booth's current suspect cam (e.g. joining Vlad's Day 2 tool locker
+        // talk inside the booth cut to the booth suspect instead of Vlad).
+        _clientSpeakerNetId = speakerNetId;
+
+        // Catch up to the camera the sequence is currently on, now that the speaker is known.
+        ApplyOverrideCam(cameraKey);
 
         // A proximity/late join is also a forced conversation — drop the phone first.
         Telephone.Instance?.ForceHangUpForDialogue();
@@ -1471,6 +1481,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </summary>
     [ClientRpc]
     private void SetActiveOverrideCamClientRpc(string key, ClientRpcParams rpcParams = default)
+    {
+        ApplyOverrideCam(key);
+    }
+
+    /// <summary>Local body of <see cref="SetActiveOverrideCamClientRpc"/> — also used by
+    /// <see cref="LateJoinClientRpc"/> after it caches the speaker ID.</summary>
+    private void ApplyOverrideCam(string key)
     {
         // Always deactivate the current override first.
         if (_activeOverrideCam != null)

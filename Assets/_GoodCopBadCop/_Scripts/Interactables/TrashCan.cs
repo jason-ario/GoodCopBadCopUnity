@@ -22,7 +22,8 @@ public class TrashCan : Interactable
 
     /// <summary>
     /// Folders are accepted by type (no inspector list entry needed); non-empty ones are
-    /// rejected with a notification in <see cref="InteractWithItem"/>, like supply boxes.
+    /// rejected with an error notification (negative sound, same as "Trash is full") in
+    /// <see cref="InteractWithItem"/>, like supply boxes.
     /// </summary>
     public override bool CanInteractWithItem(PickableObject item)
     {
@@ -47,7 +48,7 @@ public class TrashCan : Interactable
             if (supplyBox.GetItemsStillInBox(remaining) > 0)
             {
                 Debug.Log($"[TrashCan] Supply box not empty — still contains: {string.Join(", ", remaining)}", this);
-                UIController.Instance?.ShowShopNotification(SupplyBoxNotEmptyMessage);
+                UIController.Instance?.ShowErrorNotification(SupplyBoxNotEmptyMessage);
                 return;
             }
         }

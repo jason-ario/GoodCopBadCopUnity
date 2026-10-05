@@ -320,7 +320,7 @@ public class DoorController : Interactable, IMutantPassable
     private void PlayUnlockSoundClientRpc()
     {
         if (_unlockSound != null)
-            SFXController.Instance.Play(_unlockSound);
+            SFXController.Instance.PlayAtPosition(_unlockSound, transform.position, maxDistance: 15f);
     }
 
     // ── IMutantPassable ────────────────────────────────────────────────────────

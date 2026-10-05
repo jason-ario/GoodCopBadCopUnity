@@ -274,28 +274,119 @@ public class TMPWobbleText : MonoBehaviour
                 offset += new Vector3(x + noiseX, y + noiseY, 0f);
             }
 
-            if (style == null)
+            if (style == null || style.motion == DialogueEmphasisProfile.EmphasisMotion.Static)
             {
                 for (int v = 0; v < 4; v++)
                     vertices[vertexIndex + v] += offset;
                 continue;
             }
 
-            // Simple tremor: each glyph snaps to a small new offset on its own clock. No tilt,
-            // no twitch, no colour changes, so the phrase keeps one flat colour.
-            if (style.jitter > 0f && style.stepRate > 0f)
-            {
-                int step = Mathf.FloorToInt(now * style.stepRate + Hash01(charIndex, 0, 9));
-                float amp = style.jitter * fontSize * emphasisIntensity;
-                offset += new Vector3(HashSigned(charIndex, step, 1) * style.jitterAxes.x,
-                                      HashSigned(charIndex, step, 2) * style.jitterAxes.y, 0f) * amp;
-            }
+            // Per-glyph emphasis motion: offset + rotation + scale + lean around the glyph centre.
+            // Vertex colours are never touched, so the phrase keeps one flat colour.
+            EvaluateEmphasis(style, charIndex, now, fontSize * emphasisIntensity,
+                             out Vector2 emphOffset, out float rotDeg, out float scale, out float lean);
+            offset += (Vector3)emphOffset;
 
+            Vector3 center = (vertices[vertexIndex] + vertices[vertexIndex + 2]) * 0.5f;
+            Quaternion rot = Quaternion.Euler(0f, 0f, rotDeg);
             for (int v = 0; v < 4; v++)
-                vertices[vertexIndex + v] += offset;
+            {
+                Vector3 local = vertices[vertexIndex + v] - center;
+                local.x += lean * local.y;
+                local = rot * (local * scale);
+                vertices[vertexIndex + v] = center + local + offset;
+            }
         }
 
         tmp.UpdateVertexData(TMP_VertexDataUpdateFlags.Vertices);
         meshDirtyFromUs = true;
+    }
+
+    private const float Tau = Mathf.PI * 2f;
+
+    private static float Bump(float x, float width) => Mathf.Exp(-(x * x) / (width * width));
+
+    /// <summary>
+    /// Computes one glyph's emphasis pose. <paramref name="sizeScale"/> is font size times intensity,
+    /// so amplitudes stay proportional to the text. Rotation/scale/lean scale with intensity too.
+    /// </summary>
+    private void EvaluateEmphasis(DialogueEmphasisProfile s, int i, float now, float sizeScale,
+                                  out Vector2 offset, out float rotDeg, out float scale, out float lean)
+    {
+        float k = emphasisIntensity;
+        float amp = s.amplitude * sizeScale;
+        float t = now * s.speed;
+        float p = i * s.charPhase;
+
+        offset = Vector2.zero;
+        rotDeg = 0f;
+        scale = 1f;
+        lean = 0f;
+
+        switch (s.motion)
+        {
+            case DialogueEmphasisProfile.EmphasisMotion.Wave:
+            {
+                // Travelling ripple: glyph lifts, tilts along the slope, swells at the crest.
+                float u = Tau * t - p;
+                float w = Mathf.Sin(u);
+                float slope = Mathf.Cos(u);
+                offset = new Vector2(slope * amp * s.axes.x, w * amp * s.axes.y);
+                rotDeg = -slope * s.rotation * k;
+                scale = 1f + s.scalePulse * k * Mathf.Max(0f, w);
+                break;
+            }
+
+            case DialogueEmphasisProfile.EmphasisMotion.Drift:
+            {
+                // Airy float: smooth sway + organic noise, flame-like lean, unison breathing.
+                float u = Tau * t - p;
+                float sway = Mathf.Sin(u);
+                float nx = Mathf.PerlinNoise(i * 0.37f + 11.3f, t * 0.9f) * 2f - 1f;
+                float ny = Mathf.PerlinNoise(i * 0.37f + 47.1f, t * 0.9f) * 2f - 1f;
+                float rise = Mathf.Sin(Tau * t * 0.6f - p * 0.7f + 1.3f);
+
+                offset = new Vector2((0.65f * sway + 0.35f * nx) * amp * s.axes.x,
+                                     (0.55f * rise + 0.45f * ny) * amp * s.axes.y);
+                rotDeg = -(0.7f * sway + 0.3f * nx) * s.rotation * k;
+                lean = (0.75f * sway + 0.25f * nx) * s.shear * k;
+                scale = 1f + s.scalePulse * k * Mathf.Sin(Tau * t * 0.5f);
+                break;
+            }
+
+            case DialogueEmphasisProfile.EmphasisMotion.Shake:
+            {
+                // Lub-dub heartbeat drives a throb; tremble is constant but spikes on each beat.
+                float beatPhase = t - Mathf.Floor(t);
+                float beat = Mathf.Max(Bump(beatPhase, 0.07f), Bump(1f - beatPhase, 0.07f))
+                           + 0.6f * Bump(beatPhase - 0.22f, 0.07f);
+                float tremble = 0.4f + 1.2f * beat;
+
+                float rate = Mathf.Max(0.01f, s.stepRate);
+                int step = Mathf.FloorToInt(now * rate + Hash01(i, 0, 9));
+                offset = new Vector2(HashSigned(i, step, 1) * s.axes.x,
+                                     HashSigned(i, step, 2) * s.axes.y) * (amp * tremble);
+                rotDeg = HashSigned(i, step, 3) * s.rotation * k * (0.4f + 0.6f * beat);
+                scale = 1f + s.scalePulse * k * beat;
+                break;
+            }
+
+            case DialogueEmphasisProfile.EmphasisMotion.Squirm:
+            {
+                // Wriggle: out-of-sync sway, shear and twist per glyph, plus a lump crawling along.
+                float u = Tau * t - p;
+                float seed = Hash01(i, 0, 21) * Tau;
+                offset = new Vector2(Mathf.Sin(u * 1.7f + seed) * amp * s.axes.x,
+                                     Mathf.Sin(u) * amp * s.axes.y);
+                lean = Mathf.Sin(u * 1.3f + 0.5f) * s.shear * k;
+                rotDeg = Mathf.Sin(u * 0.8f + 2f + seed) * s.rotation * k;
+
+                float lump = Mathf.Max(0f, Mathf.Sin(Tau * t * 0.45f - i * 0.5f));
+                lump *= lump; lump *= lump; lump *= lump * lump; // ^16-ish: tight travelling bulge
+                scale = 1f + s.scalePulse * k * lump;
+                offset.y += lump * amp * 0.8f;
+                break;
+            }
+        }
     }
 }

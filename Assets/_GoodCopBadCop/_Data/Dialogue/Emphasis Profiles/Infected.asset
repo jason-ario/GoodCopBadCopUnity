@@ -13,10 +13,16 @@ MonoBehaviour:
   m_Name: Infected
   m_EditorClassIdentifier: Assembly-CSharp::DialogueEmphasisProfile
   id: infected
-  usage: Mutation and body wrongness. Bold bile-green with a faint sideways tremor. Use [[infected:phrase]].
+  usage: Mutation and body wrongness. Bold bile-green that wriggles and shears, with a lump crawling under the letters. Use [[infected:phrase]].
   color: {r: 0.561, g: 0.78, b: 0.251, a: 1}
   bold: 1
   italic: 0
-  jitter: 0.006
-  jitterAxes: {x: 1, y: 0.3}
-  stepRate: 8
+  motion: 4
+  amplitude: 0.04
+  axes: {x: 0.5, y: 1}
+  speed: 0.9
+  charPhase: 0.9
+  rotation: 3
+  scalePulse: 0.22
+  shear: 0.25
+  stepRate: 0
