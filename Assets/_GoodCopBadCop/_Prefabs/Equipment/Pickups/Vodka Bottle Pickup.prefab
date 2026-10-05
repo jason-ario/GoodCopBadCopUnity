@@ -136,15 +136,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 2.1187882
+      value: 24.85
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.551
+      value: 0.12352717
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -11.062841
+      value: -16.777
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
       propertyPath: m_LocalRotation.w
@@ -184,10 +184,85 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
       insertIndex: -1
       addedObject: {fileID: 207711168082443349}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6653938742227944973}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 899500326148443372}
   m_SourcePrefab: {fileID: 100100000, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
 --- !u!4 &124685704332218817 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
   m_PrefabInstance: {fileID: 445928388469192234}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &788455735204432763 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
+  m_PrefabInstance: {fileID: 445928388469192234}
+  m_PrefabAsset: {fileID: 0}
+--- !u!64 &6653938742227944973
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 788455735204432763}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 1
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 6121590469811200223, guid: 4182d3be7cf7d5442b7a55a2f4194253, type: 3}
+--- !u!114 &899500326148443372
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 788455735204432763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d223c326745449146a9e78d8a85f273c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShatterableProp
+  _visualRoot: {fileID: 0}
+  _hitSound: {fileID: 8300000, guid: c1f6bad2298b8de448db72e710c02881, type: 3}
+  _volume: 0.9
+  _pitchRange: {x: 0.9, y: 1.15}
+  _soundMaxDistance: 25
+  _spinImpulse: 220
+  _tiltImpulse: 110
+  _stiffness: 70
+  _damping: 5
+  _maxAngle: 35
+  _minHitInterval: 0.05
+  _disableOnShatter:
+  - {fileID: 0}
+  _shatterVFXPrefab: {fileID: 0}
+  _shatterVFXLifetime: 4
+  _respawnDelay: 0
+  _shardMaterial: {fileID: 2100000, guid: 709f1122504370346aff83d20f6069b8, type: 2}
+  _shardCount: 18
+  _shardSizeRange: {x: 0.06, y: 0.2}
+  _shardSpeed: 3.5
+  _shotDirectionBias: 0.8
+  _shardLifetime: 3
+  _dustMaterial: {fileID: 2100000, guid: 60bda0a48437770428f15c39f316bab9, type: 2}
+  _dustFlipbookTiles: {x: 1, y: 1}
+  _dustCount: 7
+  _dustColor: {r: 0.78, g: 0.74, b: 0.68, a: 0.55}
+  _dustSizeRange: {x: 0.35, y: 0.7}
+  _dustGrowth: 2.2
+  _dustSpeed: 1.2
+  _dustLifetimeRange: {x: 0.9, y: 1.6}
