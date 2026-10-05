@@ -197,6 +197,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // Cached per ShowChoicesClientRpc so local-player callbacks can read the text.
     private string[] _currentChoiceTexts;
 
+    // Client-side: the choice echo this client showed as a non-participant overhearing the
+    // conversation. Cleared when the sequence ends, since ExitScriptedModeClientRpc never reaches it.
+    private GameObject _overheardChoiceEcho;
+
     // Tracks the currently active override camera (client-side) so it can be deactivated
     // when the trigger changes or the sequence ends.
     private GameObject _activeOverrideCam;
@@ -1111,6 +1115,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         bool useAlternateVoice,
         bool useTelephoneAudioSource = false)
     {
+        // Megaphone lines and the awaiting-input signal are broadcast to every client, so every
+        // player must count toward the advance gate. Without this, _participants is empty (or
+        // stale from a previous sequence) for a standalone megaphone sequence, and the first
+        // advancer self-joins as the only participant — required == 1 — letting one player
+        // skip every line instantly with no countdown for the other.
+        _participants.Clear();
+        _leftParticipants.Clear();
+        _participants.UnionWith(DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton));
+
         // When unlocked, the player is already free (caller called ExitScriptedMode first).
         // Skipping EnterScriptedModeClientRpc keeps movement and the first-person camera active
         // so the player can reach whatever the instruction is asking them to do.
@@ -1139,6 +1152,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // The broadcast exit below ends any chained (deferExit) dialogue for everyone too.
         _megaphoneSequenceActive = false;
         _serverSequenceActive = false;
+        _participants.Clear();
+        _leftParticipants.Clear();
         ExitScriptedModeClientRpc();
         yield return null;
 
@@ -1257,6 +1272,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void SetActiveDialogueSpeakerClientRpc(ulong speakerNetId)
     {
         ActiveDialogueSpeakerNetId = speakerNetId;
+
+        // Sequence ended (or a new one started): drop an echo this client only overheard, but
+        // never a newer echo that has since replaced it (e.g. from world dialogue).
+        if (_overheardChoiceEcho != null && DialogueManager.Instance != null &&
+            DialogueManager.Instance.ActiveChoiceEcho == _overheardChoiceEcho)
+            DialogueManager.Instance.HideChoiceEcho();
+        _overheardChoiceEcho = null;
     }
 
     /// <summary>
@@ -1858,15 +1880,27 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
         DialogueChoiceSystem.Instance?.HideChoicePanel();
 
-        // Non-participants only see the spoken choice while within overhear range of the
-        // conversation (the active scripted speaker).
         Transform conversationSource = ResolveActiveDialogueSpeakerTransform();
-        if (!OverhearRange.CanLocalPlayerSee(conversationSource)) return;
+
+        // Only participants of THIS scripted dialogue get the echo unconditionally.
+        // OverhearRange.CanLocalPlayerSee is not used here because it treats a player in ANY
+        // conversation (e.g. booth dialogue mode) as a participant, and it treats an unresolved
+        // (null) source as audible. Either case leaked a lone choice echo to a far-away player.
+        bool isParticipant = IsScriptedModeActive;
+        if (!isParticipant)
+        {
+            // Non-participants: fail closed when the speaker can't be located, else pure range.
+            if (conversationSource == null || !OverhearRange.IsLocalPlayerWithin(conversationSource)) return;
+        }
 
         bool isLocalWinner = NetworkManager.Singleton != null &&
                              NetworkManager.Singleton.LocalClientId == winnerClientId;
         DialogueManager.Instance.ShowChoiceEcho(choiceText, playerName, Color.white, isLocalWinner,
-            overhearSource: conversationSource);
+            overhearSource: conversationSource, participantsAlwaysSee: isParticipant);
+
+        // Non-participants never receive ExitScriptedModeClientRpc (participant-targeted), so
+        // remember this echo and clear it when the sequence ends (SetActiveDialogueSpeakerClientRpc(0)).
+        _overheardChoiceEcho = isParticipant ? null : DialogueManager.Instance.ActiveChoiceEcho;
     }
 
     /// <summary>

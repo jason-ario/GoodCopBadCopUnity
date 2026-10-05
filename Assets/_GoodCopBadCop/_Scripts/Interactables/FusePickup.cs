@@ -30,8 +30,11 @@ public class FusePickup : PickableObject
     private static readonly HashSet<FusePickup> s_spawned = new();
     private static bool s_findHighlightActive;
 
-    /// <summary>True once this fuse has been picked up; it never re-highlights after that.</summary>
-    private bool _pickedUpOnce;
+    /// <summary>True while this fuse is seated in a <see cref="FuseSlot"/>; seated fuses never glow.</summary>
+    private bool _isSeated;
+
+    /// <summary>The "find the fuses" glow stays on while carried, until the fuse is seated.</summary>
+    protected override bool KeepHoldHighlightWhileHeld => true;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -42,7 +45,7 @@ public class FusePickup : PickableObject
 
     /// <summary>
     /// Local, every client. Toggles the "find the fuses" highlight on every spawned fuse that
-    /// hasn't been picked up yet. Fuses are NOT highlighted on spawn — <c>Day_03</c> enables this
+    /// isn't seated in a fuse slot (held fuses keep glowing). Fuses are NOT highlighted on spawn — <c>Day_03</c> enables this
     /// only once the fuse box has been investigated, and disables it once every slot is filled.
     /// Fuses spawned while active pick the state up automatically.
     /// </summary>
@@ -60,24 +63,27 @@ public class FusePickup : PickableObject
         base.OnNetworkSpawn();
 
         s_spawned.Add(this);
-        OnPickedUpNetworked += ClearHighlightOnPickedUp;
         ApplyFindHighlight();
     }
 
     public override void OnNetworkDespawn()
     {
-        OnPickedUpNetworked -= ClearHighlightOnPickedUp;
         s_spawned.Remove(this);
         base.OnNetworkDespawn();
     }
 
-    private void ApplyFindHighlight() =>
-        SetForceHighlight(s_findHighlightActive && !_pickedUpOnce && !IsHeld);
-
-    private void ClearHighlightOnPickedUp()
+    /// <summary>
+    /// Local, every client. Called by <see cref="FuseSlot"/> when this fuse is inserted into
+    /// (true) or extracted from (false) a slot. Seating clears the "find the fuses" glow;
+    /// extracting it while the highlight step is still active restores the glow.
+    /// </summary>
+    public void SetSeated(bool seated)
     {
-        _pickedUpOnce = true;
-        SetForceHighlight(false);
-        OnPickedUpNetworked -= ClearHighlightOnPickedUp;
+        if (_isSeated == seated) return;
+        _isSeated = seated;
+        ApplyFindHighlight();
     }
+
+    private void ApplyFindHighlight() =>
+        SetForceHighlight(s_findHighlightActive && !_isSeated);
 }

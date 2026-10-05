@@ -207,6 +207,17 @@ public class PickableObject : Interactable
     public bool IsHeldByOtherPlayer => _holdingClientId.Value != ulong.MaxValue &&
                                        _holdingClientId.Value != NetworkManager.Singleton.LocalClientId;
 
+    /// <summary>
+    /// When true, persistent highlight holds (tutorial/task call-outs) stay visible while this item
+    /// is carried instead of being hidden. Default false. E.g. <see cref="FusePickup"/> keeps its
+    /// "find the fuses" glow until it is seated in a fuse slot.
+    /// </summary>
+    protected virtual bool KeepHoldHighlightWhileHeld => false;
+
+    /// <summary>Hides the hold glow while carried, unless <see cref="KeepHoldHighlightWhileHeld"/> opts out.</summary>
+    private void ApplyHeldHighlightSuppression(bool held) =>
+        SetHoldHighlightSuppressed(held && !KeepHoldHighlightWhileHeld);
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -220,7 +231,7 @@ public class PickableObject : Interactable
         ApplySupplyBoxContainmentPhysics(_isContainedInSupplyBox.Value);
 
         // Late joiners must not see a held item glowing (task/tutorial holds are hidden while carried).
-        SetHoldHighlightSuppressed(IsHeld);
+        ApplyHeldHighlightSuppression(IsHeld);
 
         // Late-joining clients need to inherit the current stowed visibility too.
         gameObject.SetActive(!_isStowed.Value);
@@ -593,7 +604,7 @@ public class PickableObject : Interactable
         // Persistent highlight holds (mail delivery, tutorial, junk affordance, arrows) are hidden
         // on every machine while any player carries this item, and re-shown on release if any hold
         // is still claimed. Runs before the interactable-lock early-out so it is never skipped.
-        SetHoldHighlightSuppressed(current != ulong.MaxValue);
+        ApplyHeldHighlightSuppression(current != ulong.MaxValue);
 
         // Update trigger state on all clients, independent of the interactable lock — except
         // for a filed FolderItem (ID card, Application, exam page), whose root collider is
@@ -1356,7 +1367,7 @@ public class PickableObject : Interactable
 
         // Local prediction: hide the hold glow immediately for the picking-up player; the
         // _holdingClientId change then applies the same state authoritatively on every machine.
-        SetHoldHighlightSuppressed(true);
+        ApplyHeldHighlightSuppression(true);
 
         // Being picked up ends any active throw-impact window; colliders are disabled while
         // held anyway, but this also prevents a stale window from carrying into the next throw.
@@ -1378,7 +1389,7 @@ public class PickableObject : Interactable
 
         // Fall back to the authoritative held state (so a rejected/aborted pickup never stays
         // suppressed); the glow returns once the release replicates via OnHoldingClientChanged.
-        SetHoldHighlightSuppressed(IsHeld);
+        ApplyHeldHighlightSuppression(IsHeld);
 
         OnDroppedEvent?.Invoke();
 

@@ -33,6 +33,14 @@ public class MutantBreachData : ScriptableObject
              "cap is exceeded for them (no random picks are added).")]
     public GameObject[] uniqueMutantPrefabs;
 
+    [Header("Boss Health Bar")]
+    [Tooltip("When true, every mutant spawned from uniqueMutantPrefabs is flagged as a boss and its " +
+             "health is shown in a bar at the top of the screen on all clients (e.g. Day 4's Ocho).")]
+    public bool showUniqueMutantBossHealthBar = false;
+
+    [Tooltip("Name shown above the boss health bar. Falls back to the breachName if empty.")]
+    public string bossDisplayName = "";
+
     [Header("Timing")]
     [Tooltip("Seconds between the alarm/notification starting and the first mutant spawning. " +
              "Gives players a moment to ready themselves after the warning.")]

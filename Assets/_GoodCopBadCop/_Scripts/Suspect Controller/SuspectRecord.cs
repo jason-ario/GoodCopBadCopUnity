@@ -46,6 +46,21 @@ public class SuspectRecord
     public bool isLegacyMutant;
 
     /// <summary>
+    /// True once this suspect has turned into a full mutant at the booth and played their
+    /// full-mutant conversation. Any later booth appearance skips the conversation, paperwork
+    /// and entry bark entirely and goes straight to the window attack, like a regular mutant
+    /// intruder. Set via <see cref="SuspectRunRecords.MarkFullMutantEncounterPlayed"/>.
+    /// </summary>
+    public bool hasPlayedFullMutantEncounter;
+
+    /// <summary>
+    /// True when this suspect's full-mutant reveal has already happened. Also true for legacy
+    /// mutants, since that flag is only ever set after a full-mutant encounter (covers older saves
+    /// written before <see cref="hasPlayedFullMutantEncounter"/> existed).
+    /// </summary>
+    public bool HasCompletedFullMutantEncounter => hasPlayedFullMutantEncounter || isLegacyMutant;
+
+    /// <summary>
     /// True once this suspect has been passed through the gate into the city.
     /// This is persisted as historical state; population deaths are driven by
     /// <see cref="populationKillPending"/> so a passed mutant only gets one night.

@@ -159,6 +159,11 @@ public class UIController : MonoBehaviour
     {
         KeyBackButtonActivator.ClearEscapeBackButtonPressedThisFrame();
         UpdateBackButtonHudAvoidance();
+
+        // Some systems write Cursor directly (PC terminal, movement controller); re-assert it so
+        // the report's Continue button is always reachable for both players.
+        if (IsEndOfShiftReportOpen && (!Cursor.visible || Cursor.lockState == CursorLockMode.Locked))
+            ShowCursor();
     }
 
     // ── Back button / HUD avoidance ──────────────────────────────────────────
@@ -646,6 +651,7 @@ public class UIController : MonoBehaviour
 
     public void ShowEndShiftReport(ShiftReportData reportData)
     {
+        _endOfShiftReportOpen = true;
         if (PlayerInstance.Instance != null)
             PlayerInstance.Instance.CanControl = false;
         PlayerInstance.Instance?.PlayerInteractionController?.SetCanInteract(false, string.Empty);
@@ -658,6 +664,7 @@ public class UIController : MonoBehaviour
 
     public void HideEndOfShiftReport()
     {
+        _endOfShiftReportOpen = false;
         endOfShiftReportUI.gameObject.SetActive(false);
         PlayerInstance.Instance?.SetIsViewingShiftReport(false);
         HideCursor();
@@ -668,6 +675,19 @@ public class UIController : MonoBehaviour
     /// <summary>True while the end-of-shift report is on screen for the local player.</summary>
     public bool IsEndOfShiftReportVisible =>
         endOfShiftReportUI != null && endOfShiftReportUI.gameObject.activeInHierarchy;
+
+    private bool _endOfShiftReportOpen;
+
+    /// <summary>
+    /// True from <see cref="ShowEndShiftReport"/> until <see cref="HideEndOfShiftReport"/>, while the
+    /// report is actually on screen. While open the report owns the cursor and player control:
+    /// <see cref="HideCursor"/> is ignored, the cursor is re-asserted every LateUpdate, and
+    /// <see cref="PlayerMovementController.CanControl"/> refuses to re-enable. This matters for the
+    /// player who did NOT confirm the end of day — the report ClientRpc usually lands before the
+    /// replicated <c>_endDayConfirmed</c>, whose teardown (bed view close, diegetic views, etc.)
+    /// would otherwise hide/lock the cursor underneath the report.
+    /// </summary>
+    public bool IsEndOfShiftReportOpen => _endOfShiftReportOpen && IsEndOfShiftReportVisible;
 
     /// <summary>
     /// Last-resort teardown for the end-of-shift report, used when the normal transition failed to
@@ -800,6 +820,11 @@ public class UIController : MonoBehaviour
 
     public void HideCursor()
     {
+        // The end-of-shift report needs the cursor for Continue; late teardown from other UI
+        // (e.g. the other player's bed view closing when the day is confirmed) must not take it.
+        if (IsEndOfShiftReportOpen)
+            return;
+
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
@@ -980,10 +1005,10 @@ public class UIController : MonoBehaviour
     /// duplicates. With <paramref name="loop"/> true, the entry keeps coming back until
     /// <see cref="HideQueuedNotification"/> is called with the same key.
     /// </summary>
-    public void ShowQueuedNotification(string message, string key = null, bool loop = false)
+    public void ShowQueuedNotification(string message, string key = null, bool loop = false, float repeatGap = -1f)
     {
         if (notificationQueue != null)
-            notificationQueue.Show(key, message, loop);
+            notificationQueue.Show(key, message, loop, repeatGap);
     }
 
     /// <summary>Removes a queued notification by key (fades it out if it is on screen).</summary>
@@ -1013,9 +1038,9 @@ public class UIController : MonoBehaviour
     /// <paramref name="loop"/> true it keeps coming back until
     /// <see cref="HideMailDeliveryNotification"/> is called, e.g. once a player opens the gate.
     /// </summary>
-    public void ShowMailDeliveryNotification(string message, bool loop = false)
+    public void ShowMailDeliveryNotification(string message, bool loop = false, float repeatGap = -1f)
     {
-        ShowQueuedNotification(message, MailDeliveryNotificationKey, loop);
+        ShowQueuedNotification(message, MailDeliveryNotificationKey, loop, repeatGap);
     }
 
     /// <summary>Hides the mail delivery notification.</summary>

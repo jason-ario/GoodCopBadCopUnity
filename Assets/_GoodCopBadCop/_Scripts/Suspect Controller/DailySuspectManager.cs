@@ -673,10 +673,12 @@ public class DailySuspectManager : MonoBehaviour
             if (_doppelgangerSlots.ContainsKey(i)) continue;
             if (_replacementSlotIndices.Contains(i)) continue;
 
-            if (suspect.fullMutantDialogue == null) continue;
-
             SuspectRecord record = runRecords?.GetRecord(suspect);
             if (record == null || !(record.IsFullyMutated || record.isLegacyMutant)) continue;
+
+            // First-time full mutants need their reveal conversation; returning ones skip it and
+            // attack the window immediately, so they don't need a dialogue asset.
+            if (suspect.fullMutantDialogue == null && !record.HasCompletedFullMutantEncounter) continue;
 
             if (runRecords.IsFullMutantInstanceActive(suspect))
             {
@@ -830,6 +832,17 @@ public class DailySuspectManager : MonoBehaviour
         if (!_fullMutantSlotIndices.Contains(lineupIndex)) return false;
         suspectData = lineupIndex < shiftSuspects.Count ? shiftSuspects[lineupIndex] : null;
         return suspectData != null;
+    }
+
+    /// <summary>
+    /// True when the given lineup slot is a full mutant who already had their full-mutant
+    /// conversation on an earlier visit — they skip dialogue/paperwork and attack the window.
+    /// </summary>
+    public bool IsReturningFullMutantSlot(int lineupIndex)
+    {
+        if (!IsFullMutantSlot(lineupIndex, out SuspectData data)) return false;
+        SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(data);
+        return record != null && record.HasCompletedFullMutantEncounter;
     }
 
     public IEnumerable<Texture> GetIdPhotoPool()

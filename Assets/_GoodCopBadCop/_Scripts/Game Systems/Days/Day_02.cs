@@ -1147,10 +1147,10 @@ public class Day_02 : DayBase, IDailyTask
         }
 
         // Ocho is an extra scripted encounter spliced into the lineup on top of the day's normal
-        // suspect count — without this, his intercept would consume the "next" slot a real
-        // suspect was going to occupy, shortening the day by one suspect and ending the shift
-        // (Dusk) early. See DailySuspectManager.AddBonusLineupSlot for the full explanation.
-        //DailySuspectManager.Instance?.AddBonusLineupSlot();
+        // suspect count. His intercept consumes a lineup slot when he spawns, and
+        // OchoBoothEncounter.VerdictRejectedSequence refunds it (SuspectController
+        // .RefundInterceptedLineupSlot) once he despawns, so restoring power continues with the
+        // suspect he displaced instead of ending the shift (Dusk) early.
 
         SuspectController.InterceptNextSuspectSpawn = () =>
         {

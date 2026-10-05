@@ -1304,6 +1304,11 @@ public class ShiftManager : NetworkBehaviour
         // Capture the day being summarised before the campaign advances past it.
         int completedDay = _currentDay;
 
+        // The day is over the moment the player goes to bed — no mutant carries over into the
+        // next day. Done before AdvanceDay so turned suspects are resolved (legacy-mutant records
+        // saved) before the day's run records are advanced and saved.
+        MutantEnemy.DespawnAllForDayTransitionServer();
+
         if (!_campaignAdvancedForCurrentReport && CampaignManager.Instance != null)
         {
             CampaignManager.Instance.AdvanceDay();

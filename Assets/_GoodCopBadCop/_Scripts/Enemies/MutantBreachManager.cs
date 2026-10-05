@@ -679,9 +679,17 @@ public class MutantBreachManager : NetworkBehaviour
             netObj.Spawn(true);
             _activeBreachMutants.Add(netObj);
 
+            if (enemy != null && data.showUniqueMutantBossHealthBar && IsUniquePrefab(data, prefab))
+                enemy.SetBossHealthBar(string.IsNullOrEmpty(data.bossDisplayName) ? data.breachName : data.bossDisplayName);
+
             if (i < spawnQueue.Count - 1)
                 yield return new WaitForSeconds(data.spawnStaggerSeconds);
         }
+    }
+
+    private static bool IsUniquePrefab(MutantBreachData data, GameObject prefab)
+    {
+        return data.uniqueMutantPrefabs != null && System.Array.IndexOf(data.uniqueMutantPrefabs, prefab) >= 0;
     }
 
     /// <summary>

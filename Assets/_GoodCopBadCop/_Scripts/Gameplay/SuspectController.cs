@@ -249,6 +249,13 @@ public class SuspectController : NetworkBehaviour
     /// counted as processed exactly once. Mutant intruders never set it. Server-side only.
     /// </summary>
     private bool _fullMutantEncounterPending = false;
+
+    /// <summary>
+    /// True when the current full-mutant suspect already had their full-mutant conversation on an
+    /// earlier visit. On arrival they skip the booth-ready wait, entry dialogue and paperwork and
+    /// attack the window immediately, like a regular mutant intruder. Server-side only.
+    /// </summary>
+    private bool _currentSuspectIsReturningFullMutant = false;
     FolderController spawnedFolder;
 
     public UnityAction OnTakeFolder;
@@ -280,11 +287,11 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] int couponMaxPercentBonus = 8;
     [Tooltip("Coupons deducted per category the player checked that had no active anomalies.")]
     [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
-    /// <summary>Base reward always paid out regardless of checklist accuracy.</summary>
-    [SerializeField] int couponBaseReward = 3;
+    [Tooltip("Flat base reward always paid out regardless of checklist accuracy. Not scaled by the earnings multiplier.")]
+    [SerializeField] int couponBaseReward = 10;
     [Tooltip("Extra coupons awarded per evidence item placed in the folder for a correctly identified category.")]
     [SerializeField] int couponPerEvidenceItem = 1;
-    [Tooltip("Global economy multiplier applied to every positive payout component (base, percent, perfect, evidence). Penalties are not scaled. 1.5 = +50% earnings.")]
+    [Tooltip("Global economy multiplier applied to positive payout components (percent, perfect, evidence). The base reward and penalties are not scaled. 1.5 = +50% earnings.")]
     [SerializeField, Min(0f)] float couponEarningsMultiplier = 1.5f;
 
     /// <summary>Scales a positive reward amount by couponEarningsMultiplier, rounding half away from zero.</summary>
@@ -495,6 +502,7 @@ public class SuspectController : NetworkBehaviour
 
         _currentSuspectIsFullMutant = isFullMutant;
         _fullMutantEncounterPending = isFullMutant;
+        _currentSuspectIsReturningFullMutant = isFullMutant && dailySuspectManager.IsReturningFullMutantSlot(lineupIndex);
         if (isFullMutant)
         {
             suspectCharacter.ActivateFullMutantForm();
@@ -502,6 +510,10 @@ public class SuspectController : NetworkBehaviour
             // MutantSuspectBehaviour.BeginAtStandPos after the cutscene ends.
             suspectCharacter.SetupFullMutantWindowBreach(
                 standPos, despawnPos, climbThroughTargetPos, shutterController, this);
+
+            // Returning full mutants are pure threats: no conversation, questions or paperwork.
+            if (_currentSuspectIsReturningFullMutant)
+                suspectCharacter.SetInteractionLockedServer(true);
         }
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
@@ -538,6 +550,7 @@ public class SuspectController : NetworkBehaviour
 
         InjectLegacyDependencies(character.gameObject);
         _fullMutantEncounterPending = false;
+        _currentSuspectIsReturningFullMutant = false;
         NetworkObject netObj = character.GetComponent<NetworkObject>();
         if (netObj == null)
         {
@@ -675,6 +688,7 @@ public class SuspectController : NetworkBehaviour
 
         suspectCharacter = spawnedSuspect.GetComponent<SuspectCharacter>();
         suspectCharacter.InitializeAsDoppelganger(doppelgangerData);
+        _currentSuspectIsReturningFullMutant = false;
 
         if (ForceNextSuspectAsFullMutant)
         {
@@ -876,6 +890,18 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
+        // Returning full mutant: attack the window straight away, whether or not anyone is in
+        // the booth or the shutter is open — same as a regular mutant intruder.
+        if (_currentSuspectIsReturningFullMutant)
+        {
+            _currentSuspectIsReturningFullMutant = false;
+            _currentSuspectIsFullMutant = false;
+            ForceNextSuspectSkipEntryDialogue = false;
+            ForceNextSuspectNoPaperwork = false;
+            suspectCharacter.BeginMutantBehavior();
+            return;
+        }
+
         if (IsAnyPlayerInsideBooth() && IsShutterOpen())
             SayEntryDialogue();
         else
@@ -933,11 +959,16 @@ public class SuspectController : NetworkBehaviour
 
         // Full mutant path: SuspectCharacter owns the cutscene reference and the
         // BeginMutantBehavior callback — delegate entirely so no SuspectData is
-        // reached from here.
-        if (!forceSkipEntry && _currentSuspectIsFullMutant)
+        // reached from here. A full mutant never hands over paperwork; skipping the
+        // entry dialogue just skips the cutscene and goes straight to the attack.
+        if (_currentSuspectIsFullMutant)
         {
             _currentSuspectIsFullMutant = false;
-            suspectCharacter.StartFullMutantCutscene();
+            ForceNextSuspectNoPaperwork = false;
+            if (forceSkipEntry)
+                suspectCharacter.BeginMutantBehavior();
+            else
+                suspectCharacter.StartFullMutantCutscene();
             return;
         }
 
@@ -1543,7 +1574,8 @@ public class SuspectController : NetworkBehaviour
         }
 
         evidenceBonus = ScaleEarnings(evidenceBonus);
-        int baseReward = ScaleEarnings(couponBaseReward);
+        // Base reward is a flat payout and is intentionally NOT scaled by couponEarningsMultiplier.
+        int baseReward = couponBaseReward;
 
         int totalCoupons = Mathf.Max(0,
             baseReward + percentReward - falsePenalty + perfectBonusAmount + evidenceBonus);
@@ -1854,6 +1886,22 @@ public class SuspectController : NetworkBehaviour
     /// suspect's booth visit without a real verdict (e.g. <see cref="OchoBoothEncounter"/>).
     /// </summary>
     public void DespawnSuspectWithoutVerdict(SuspectCharacter suspectToDespawn) => DespawnSuspect(suspectToDespawn);
+
+    /// <summary>
+    /// Server-only. Hands back the lineup slot a scripted intercept consumed in
+    /// WaitAndSpawnNextSuspect, so a bonus encounter spliced on top of the day's lineup (e.g.
+    /// <see cref="OchoBoothEncounter"/>) doesn't eat a real suspect's turn. Without this the
+    /// displaced suspect never spawns, the "Process N subjects" counter never completes, and
+    /// <see cref="ShiftManager.SetNextSuspectReady"/> ends the shift early.
+    /// </summary>
+    public void RefundInterceptedLineupSlot()
+    {
+        if (!IsServer) return;
+        if (suspectIndex.Value < 0) return;
+
+        suspectIndex.Value -= 1;
+        Debug.Log($"[SuspectController] Refunded intercepted lineup slot — suspectIndex back to {suspectIndex.Value}.");
+    }
 
     private void CleanupSpawnedFolder()
     {

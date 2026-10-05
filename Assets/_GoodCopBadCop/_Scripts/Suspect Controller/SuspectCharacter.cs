@@ -139,6 +139,35 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
+    /// Server-written, permanent close-out set the moment this suspect hands off to full-mutant
+    /// behaviour (booth window attack or legacy world spawn). A full mutant is a hostile threat,
+    /// not a suspect — no player can start or rejoin any dialogue with them (intro, question
+    /// choices, scripted rejoin) and the reticle can't target them. Only junk collection after
+    /// death remains. Networked because <see cref="_isMutant"/> is server-only.
+    /// </summary>
+    private readonly NetworkVariable<bool> _mutantInteractionClosed = new NetworkVariable<bool>(false);
+
+    /// <summary>True once this suspect has become an active full mutant — see <see cref="_mutantInteractionClosed"/>.</summary>
+    public bool IsMutantInteractionClosed => _mutantInteractionClosed.Value;
+
+    /// <summary>
+    /// Server-only. Permanently closes this suspect out from dialogue once they turn full mutant,
+    /// and tears down any conversation a client currently has open with them.
+    /// </summary>
+    private void CloseForMutantServer()
+    {
+        if (!IsServer) return;
+        _mutantInteractionClosed.Value = true;
+        ForceEndDialogueForMutantClientRpc();
+    }
+
+    [ClientRpc]
+    private void ForceEndDialogueForMutantClientRpc()
+    {
+        ForceEndDialogueForVerdictLocal();
+    }
+
+    /// <summary>
     /// Local, per-client teardown of any dialogue this client is presenting for this suspect:
     /// ends the local player's question conversation (leaving the engagement, hiding the choice
     /// panel, back button, and world subtitle) and clears this suspect's dialogue subtitles.
@@ -155,7 +184,7 @@ public class SuspectCharacter : Interactable
     private bool IsJunkCollectible => _junkItem != null && _junkItem.IsCollectible.Value;
 
     public override bool IsInteractable => base.IsInteractable
-        && ((!_interactionLocked.Value && !_verdictClosed.Value) || IsJunkCollectible);
+        && ((!_interactionLocked.Value && !_verdictClosed.Value && !_mutantInteractionClosed.Value) || IsJunkCollectible);
 
     [SerializeField] private GameObject bloodExplosion;
     public Transform lookPos;
@@ -457,6 +486,7 @@ public class SuspectCharacter : Interactable
         _isMutant = true;
         StopNavigation();
         _suspectUpdateDisabled = true;
+        CloseForMutantServer();
         TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
         SetMutantVoiceClientRpc(true);
 
@@ -465,11 +495,16 @@ public class SuspectCharacter : Interactable
         // of which path below actually enables MutantEnemy, since both fire the same event.
         if (_mutantEnemy != null)
             _mutantEnemy.OnRemovedFromPlay += HandleFullMutantResolved;
+        _fullMutantResolutionPending = true;
 
         // Flag this character as having a live full-mutant instance so no second instance of the
         // same SuspectData can be spawned elsewhere (e.g. a MutantSpawner world spawn) while this
         // booth encounter is still in progress.
         SuspectRunRecords.Instance?.RegisterActiveFullMutant(suspectData);
+
+        // The full-mutant reveal has now happened (cutscene finished, or skipped for a returning
+        // mutant) — every later booth appearance goes straight to the window attack.
+        SuspectRunRecords.Instance?.MarkFullMutantEncounterPlayed(suspectData);
 
         // Preferred path — MutantSuspectBehaviour drives the window-breach sequence and
         // calls MutantEnemy.InitialiseServer() itself after a successful climb-through.
@@ -515,6 +550,8 @@ public class SuspectCharacter : Interactable
     /// </summary>
     private void HandleFullMutantResolved()
     {
+        _fullMutantResolutionPending = false;
+
         if (_mutantEnemy != null)
             _mutantEnemy.OnRemovedFromPlay -= HandleFullMutantResolved;
 
@@ -551,6 +588,7 @@ public class SuspectCharacter : Interactable
         ActivateFullMutantForm();
         _isMutant = true;
         _suspectUpdateDisabled = true;
+        CloseForMutantServer();
         TransitionToMutantBehaviorClientRpc(enableMutantEnemy: false);
         SetMutantVoiceClientRpc(true);
 
@@ -561,6 +599,7 @@ public class SuspectCharacter : Interactable
         }
 
         _mutantEnemy.OnRemovedFromPlay += HandleFullMutantResolved;
+        _fullMutantResolutionPending = true;
 
         // Flag this character as having a live full-mutant instance so no second instance of the
         // same SuspectData can be spawned elsewhere (booth or another MutantSpawner) while this
@@ -948,6 +987,47 @@ public class SuspectCharacter : Interactable
     private bool _isDead;
     private bool _isMutant;
     private bool _hasFled;
+
+    /// <summary>
+    /// Server-only. True between this suspect turning into a full mutant (booth encounter or legacy
+    /// world spawn) and that encounter being resolved via <see cref="HandleFullMutantResolved"/>.
+    /// </summary>
+    private bool _fullMutantResolutionPending;
+
+    /// <summary>
+    /// Server-only. True while this suspect is a full mutant whose encounter has not been resolved
+    /// yet, i.e. a live mutant threat rather than an ordinary suspect. Read by
+    /// <see cref="MutantEnemy.DespawnAllForDayTransitionServer"/>.
+    /// </summary>
+    public bool IsFullMutantInPlay => _isMutant && _fullMutantResolutionPending;
+
+    /// <summary>
+    /// Server-only. Resolves a still-pending full-mutant encounter as an escape (the resident is
+    /// marked as a legacy mutant and its active-instance flag is cleared) without going through
+    /// <see cref="MutantEnemy.OnRemovedFromPlay"/>. Used when the mutant is despawned between days.
+    /// No-op if the encounter has already been resolved.
+    /// </summary>
+    public void ResolveFullMutantAsEscapedServer()
+    {
+        if (!IsServer || !_fullMutantResolutionPending) return;
+        HandleFullMutantResolved();
+    }
+
+    /// <summary>
+    /// A full mutant that gives up at the booth window retreats and is despawned directly by
+    /// <see cref="SuspectController.OnMutantIntruderComplete"/> without
+    /// <see cref="MutantEnemy.OnRemovedFromPlay"/> ever firing. Resolve it as an escape here so the
+    /// active-instance flag is cleared and the resident joins the legacy pool — otherwise the stale
+    /// flag stops the next shift from flagging their slot as a full mutant and they come back as an
+    /// ordinary suspect who hands over paperwork.
+    /// </summary>
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer && _fullMutantResolutionPending)
+            HandleFullMutantResolved();
+
+        base.OnNetworkDespawn();
+    }
 
     /// <summary>
     /// True only while this suspect is the current one standing at the booth window
@@ -1635,6 +1715,10 @@ public class SuspectCharacter : Interactable
         if (_verdictClosed.Value)
             return;
 
+        // An active full mutant (window attack, post-hit hostile AI, legacy spawn) is never talkable.
+        if (_mutantInteractionClosed.Value)
+            return;
+
         // The input that ends a dialogue can also reach world interaction on the same frame.
         // Keep this suspect's dialogue entry paths closed briefly after control is restored.
         if (Time.unscaledTime < _dialogueInteractionBlockedUntil)
@@ -1705,7 +1789,7 @@ public class SuspectCharacter : Interactable
     [ServerRpc(RequireOwnership = false)]
     private void RequestIntroDialogueServerRpc(ServerRpcParams rpcParams = default)
     {
-        if (_verdictClosed.Value) return;
+        if (_verdictClosed.Value || _mutantInteractionClosed.Value) return;
         SuspectEncounterManager.Instance?.TryStartIntroDialogue(this, rpcParams.Receive.SenderClientId);
     }
 

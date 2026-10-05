@@ -41,6 +41,8 @@ public class GuidebookController : MonoBehaviour
     private GameObject _deactivatedHeldObject;
 
     private GuidebookPageController _pageController;
+    private GuidebookPageController _bodyPageController;
+    private int _lastSentPage = -1;
 
     private PlayerInstance _playerInstance;
     private bool _wasInCutsceneOrDialogue;
@@ -68,7 +70,10 @@ public class GuidebookController : MonoBehaviour
         }
 
         if (_bodyGuidebookObject != null)
+        {
+            _bodyPageController = _bodyGuidebookObject.GetComponentInChildren<GuidebookPageController>(true);
             _bodyGuidebookObject.SetActive(false);
+        }
 
         _backButtonAction = CloseGuidebook;
     }
@@ -103,6 +108,7 @@ public class GuidebookController : MonoBehaviour
     private void OnEnable()
     {
         _animationController.OnGuidebookOpenChanged += OnBodyGuidebookOpenChanged;
+        _animationController.OnGuidebookPageChanged += OnBodyGuidebookPageChanged;
 
         _playerInstance = GetComponentInParent<PlayerInstance>();
         if (_playerInstance != null)
@@ -112,6 +118,7 @@ public class GuidebookController : MonoBehaviour
     private void OnDisable()
     {
         _animationController.OnGuidebookOpenChanged -= OnBodyGuidebookOpenChanged;
+        _animationController.OnGuidebookPageChanged -= OnBodyGuidebookPageChanged;
 
         if (_playerInstance != null)
             _playerInstance.OnCutsceneStateChanged -= OnCutsceneStateChanged;
@@ -174,6 +181,18 @@ public class GuidebookController : MonoBehaviour
             OpenGuidebook();
         else if (IsOpen && guidebookInput)
             CloseGuidebook();
+
+        if (IsOpen) SyncPage();
+    }
+
+    /// <summary>Publishes the first-person book's target page so observers flip the body copy to match.</summary>
+    private void SyncPage()
+    {
+        if (_pageController == null) return;
+        int page = _pageController.TargetLeftCount;
+        if (page == _lastSentPage) return;
+        _lastSentPage = page;
+        _animationController.SetGuidebookPage(page);
     }
 
     /// <summary>
@@ -212,6 +231,10 @@ public class GuidebookController : MonoBehaviour
 
         if (_guidebookObject != null)
             _guidebookObject.SetActive(true);
+
+        // Page first, so observers open the body copy straight onto the right spread.
+        _lastSentPage = -1;
+        SyncPage();
 
         // Notify all clients to show the body-space guidebook mesh.
         _animationController.SetGuidebookOpen(true);
@@ -275,5 +298,20 @@ public class GuidebookController : MonoBehaviour
     {
         if (_bodyGuidebookObject == null || _animationController.IsOwner) return;
         _bodyGuidebookObject.SetActive(isOpen);
+
+        // The builder rebuilt the book in OnEnable; lay it out on the owner's current spread.
+        if (isOpen && _bodyPageController != null)
+            _bodyPageController.SnapTo(_animationController.GuidebookPage);
+    }
+
+    /// <summary>
+    /// Fired on all clients when the owner turns a page. Observers play the same flips on the
+    /// body-space guidebook; the owner already sees its own first-person copy.
+    /// </summary>
+    private void OnBodyGuidebookPageChanged(int page)
+    {
+        if (_bodyPageController == null || _animationController.IsOwner) return;
+        if (!_bodyGuidebookObject.activeInHierarchy) return; // snapped on open instead
+        _bodyPageController.TurnTo(page);
     }
 }

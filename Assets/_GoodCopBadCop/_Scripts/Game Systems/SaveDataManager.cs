@@ -374,6 +374,7 @@ public class SaveDataManager : MonoBehaviour
                 QuarantinedOnDay = r.quarantinedOnDay,
                 InfectionScore   = r.infectionScore,
                 IsLegacyMutant   = r.isLegacyMutant,
+                HasPlayedFullMutantEncounter = r.hasPlayedFullMutantEncounter,
                 DaysShown        = r.daysShown,
                 LastDayShown     = r.lastDayShown,
             };
@@ -826,6 +827,9 @@ public class SuspectSaveEntry
     /// than killed) and is currently a candidate for <see cref="MutantSpawner"/>'s legacy-mutant pool.
     /// </summary>
     public bool IsLegacyMutant;
+
+    /// <summary>True once this suspect has played their full-mutant booth conversation.</summary>
+    public bool HasPlayedFullMutantEncounter;
 
     /// <summary>
     /// Number of shifts this suspect has appeared in across the run. Drives "has this suspect been

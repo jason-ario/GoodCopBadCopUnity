@@ -123,7 +123,9 @@ public class DoorController : Interactable, IMutantPassable
     {
         base.Interact(player);
 
-        if (_isLocked.Value)
+        // A locked door can still be shut if something forced it open (e.g. a fleeing mutant
+        // breaking out of the booth) — the lock only blocks opening.
+        if (_isLocked.Value && !_doorOpen.Value)
         {
             if (!_beingInteractedWith)
                 StartCoroutine(TryToOpenLockedDoor());
@@ -336,11 +338,27 @@ public class DoorController : Interactable, IMutantPassable
     public bool IsDoorClosed => !_doorOpen.Value;
 
     /// <inheritdoc/>
+    public bool IsClosedToMutant => IsDoorClosed;
+
+    /// <inheritdoc/>
     public void OpenForMutant()
     {
         if (!IsServer || _isLocked.Value) return;
         ForceOpen();
         Debug.Log($"[DoorController] Door '{gameObject.name}' forced open by mutant.");
+    }
+
+    /// <summary>
+    /// Forces the door open for a fleeing mutant trapped behind it, ignoring the lock (the lock
+    /// stays set, so players can shut it again but not reopen it). Swings away from
+    /// <paramref name="mutantPosition"/>, like a player push. Server only.
+    /// </summary>
+    public void ForceOpenForFleeingMutant(Vector3 mutantPosition)
+    {
+        if (!IsServer || _doorOpen.Value) return;
+        bool openedIn = Vector3.Dot(transform.forward, transform.position - mutantPosition) > 0f;
+        ForceOpen(openedIn);
+        Debug.Log($"[DoorController] Door '{gameObject.name}' forced open by fleeing mutant (locked: {_isLocked.Value}).");
     }
 
     /// <summary>

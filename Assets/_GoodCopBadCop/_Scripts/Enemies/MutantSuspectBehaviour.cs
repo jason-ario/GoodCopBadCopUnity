@@ -62,6 +62,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private bool _isDone;
     private bool _isAtBoothWindowServer;
     private bool _lineupSlotReleasedAtWindow;
+    private bool _defeatRewardArmed;
 
     /// <summary>
     /// Replicated mirror of the server's at-booth-window state. Client-side weapon hit resolution
@@ -144,6 +145,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         base.OnNetworkDespawn();
         _isAtBoothWindowServer = false;
         _postHitLineupReleaseCoroutine = null;
+        DisarmDefeatReward();
         _activeTween?.Kill();
         StopAllCoroutines();
     }
@@ -176,6 +178,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _controller = controller;
 
         SubscribeLineupDeathSafetyNet();
+        ArmDefeatReward();
 
         // Suspend the chase loop before it gets a chance to run (it defers one frame),
         // so MutantSuspectBehaviour has exclusive control during the lineup sequence.
@@ -305,6 +308,59 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             StopCoroutine(_postHitLineupReleaseCoroutine);
         _postHitLineupReleaseCoroutine = null;
         _controller?.OnMutantIntruderComplete(this, brokeThrough: true);
+    }
+
+    // ── Defeat Reward ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Arms the one-time coupon reward for defeating this mutant. Only lineup mutants (those with a
+    /// <see cref="SuspectController"/>: booth intruders and full-mutant suspects) are eligible —
+    /// scripted entrances like Alexei pass a null controller and are skipped. Server only.
+    /// </summary>
+    private void ArmDefeatReward()
+    {
+        DisarmDefeatReward();
+        if (_controller == null || _mutantEnemy == null || _data == null || _data.defeatCouponReward <= 0)
+            return;
+
+        _defeatRewardArmed = true;
+        _mutantEnemy.OnRemovedFromPlay += HandleRemovedFromPlayForDefeatReward;
+    }
+
+    private void DisarmDefeatReward()
+    {
+        _defeatRewardArmed = false;
+        if (_mutantEnemy != null)
+            _mutantEnemy.OnRemovedFromPlay -= HandleRemovedFromPlayForDefeatReward;
+    }
+
+    /// <summary>
+    /// Pays out when the mutant is removed because players beat it — a permanent kill or a
+    /// beaten-and-fled escape (both leave <see cref="MutantEnemy.IsDead"/> true). Removal for any
+    /// other reason pays nothing. Fires at most once per lineup appearance.
+    /// </summary>
+    private void HandleRemovedFromPlayForDefeatReward()
+    {
+        bool wasArmed = _defeatRewardArmed;
+        DisarmDefeatReward();
+
+        if (!IsServer || !wasArmed || _mutantEnemy == null || !_mutantEnemy.IsDead || _data == null)
+            return;
+
+        int reward = _data.defeatCouponReward;
+        if (reward <= 0 || GlobalHostVariables.Instance == null)
+            return;
+
+        GlobalHostVariables.Instance.AddMoney(reward);
+
+        bool isFullMutant = TryGetComponent<SuspectCharacter>(out _);
+        ShowDefeatRewardClientRpc(reward, isFullMutant);
+    }
+
+    [ClientRpc]
+    private void ShowDefeatRewardClientRpc(int amount, bool isFullMutant)
+    {
+        UIController.Instance?.ShowCashPopUpNotification(amount, isFullMutant ? "Full Mutant Defeated" : "Mutant Thwarted");
     }
 
     // ── Safety Net ─────────────────────────────────────────────────────────────
@@ -728,6 +784,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _controller = controller;
 
         SubscribeLineupDeathSafetyNet();
+        ArmDefeatReward();
 
         _mutantEnemy?.SuspendForLineup();
 

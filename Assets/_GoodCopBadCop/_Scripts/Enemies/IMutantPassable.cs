@@ -16,4 +16,16 @@ public interface IMutantPassable
     /// Must only be called on the server.
     /// </summary>
     void OpenForMutant();
+
+    /// <summary>
+    /// True while the obstacle is physically closed (NavMeshObstacle carving), regardless of lock state.
+    /// </summary>
+    bool IsClosedToMutant { get; }
+
+    /// <summary>
+    /// Last-resort breakout for a fleeing mutant with no other escape route: forces the obstacle
+    /// open even if it's locked, swinging away from <paramref name="mutantPosition"/>. The lock
+    /// state itself is left unchanged. Must only be called on the server.
+    /// </summary>
+    void ForceOpenForFleeingMutant(UnityEngine.Vector3 mutantPosition);
 }

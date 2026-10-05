@@ -289,6 +289,11 @@ public class OchoBoothEncounter : NetworkBehaviour
         // standing in the booth for the whole outage. The outage follow-up no longer lives on
         // this component — see PowerOutageAftermath — so it survives the despawn.
         SuspectController.Instance?.DespawnSuspectWithoutVerdict(_self);
+
+        // Ocho is a bonus encounter on top of the day's lineup: give back the slot his intercept
+        // consumed so restoring power re-arms the switch for the suspect he displaced, instead of
+        // SetNextSuspectReady seeing the lineup as exhausted and ending the shift early.
+        SuspectController.Instance?.RefundInterceptedLineupSlot();
     }
 
     private string GetReactionLine(StampContainer.StampType stamp)

@@ -707,52 +707,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BirthDateWrongAnomaly
   reportDisplayName: 
---- !u!1 &3609701965567258146
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 6975137538311554872}
-  - component: {fileID: 8748127185504150103}
-  m_Layer: 11
-  m_Name: uv light
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &6975137538311554872
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3609701965567258146}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.3, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 9165884929875893673}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8748127185504150103
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3609701965567258146}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 90836e53cb8749f4591abbf80579140a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::UVLight
-  coneAngleDegrees: 30
-  range: 3
 --- !u!1 &3868534579613957341
 GameObject:
   m_ObjectHideFlags: 0
@@ -883,7 +837,6 @@ Transform:
   - {fileID: 5330771091470271895}
   - {fileID: 8012428775956440192}
   - {fileID: 2926345404913525736}
-  - {fileID: 6975137538311554872}
   - {fileID: 6537442541130980856}
   - {fileID: 3388929027781793393}
   - {fileID: 1104635056292787089}
@@ -1118,7 +1071,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1640259171
+  GlobalObjectIdHash: 1733597266
   InScenePlacedSourceGlobalObjectIdHash: 1640259171
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -1879,6 +1832,7 @@ MonoBehaviour:
     pendingVaccineReset: 0
     isKilled: 0
     isLegacyMutant: 0
+    hasPlayedFullMutantEncounter: 0
     hasEnteredCity: 0
     populationKillPending: 0
     populationDeathRecorded: 0

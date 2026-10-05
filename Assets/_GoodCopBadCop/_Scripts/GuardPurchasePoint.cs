@@ -4,7 +4,8 @@ using UnityEngine;
 /// <summary>
 /// World interactable that opens the Guard Purchase Screen when the player interacts with it.
 /// Uses NetworkVariables to synchronise purchase and arrival state across all clients.
-/// The guard arrives at the start of the next in-game day after the purchase.
+/// The guard arrives at the start of the next in-game day after the purchase, at which point
+/// the server spawns a fresh <see cref="_guardPrefab"/> instance over the network.
 ///
 /// Locked by default (see <see cref="_unlocked"/>) so it stays hidden and non-interactable
 /// until a day script (e.g. Day_03) calls <see cref="SetUnlocked"/>. This GameObject must
@@ -18,14 +19,25 @@ public class GuardPurchasePoint : Interactable
     [Tooltip("Cost in coupons to purchase a guard.")]
     [SerializeField] private int _guardPrice = 50;
 
+    [Header("Guard Spawning")]
+    [Tooltip("Networked guard prefab spawned by the server when a purchased guard arrives. Must have " +
+             "a NetworkObject and SoldierMutantResponder on its root and be registered in the " +
+             "NetworkPrefabsList (e.g. Suspect_Soldier_At post Variant).")]
+    [SerializeField] private GameObject _guardPrefab;
+    [Tooltip("Optional spawn position/facing for the guard. Defaults to this post's own transform " +
+             "(only its yaw is used, so the guard always stands upright).")]
+    [SerializeField] private Transform _guardSpawnPoint;
+
     [Header("Scene References")]
-    [Tooltip("Child GameObject to activate when the guard arrives the next day.")]
-    [SerializeField] private GameObject _suspectSoldier;
-    [Tooltip("Child GameObject representing the purchase post — deactivated when the guard arrives.")]
+    [Tooltip("Child GameObject representing the purchase post — deactivated while a guard is on duty.")]
     [SerializeField] private GameObject _guardPurchasePost;
     [Tooltip("Child GameObject with the sign mesh and its interaction collider. Hidden and " +
-             "non-interactable while locked, alongside the post and soldier.")]
+             "non-interactable while locked, alongside the post.")]
     [SerializeField] private GameObject _guardSign;
+    [Tooltip("Optional story placeholder guard standing at this post before it unlocks (e.g. the " +
+             "soldier who is dead by Day 3). Deactivated on every peer, including late joiners, as " +
+             "soon as this post is unlocked. Never reactivated.")]
+    [SerializeField] private GameObject _placeholderGuard;
 
     [Header("Pending Arrival Visual")]
     [Tooltip("Renderer of the purchase post sign whose material is swapped while a purchased " +
@@ -65,6 +77,9 @@ public class GuardPurchasePoint : Interactable
     /// persisted — corpses aren't saved, so a reload simply shows the empty, purchasable post.
     /// </summary>
     private bool _guardDead;
+
+    /// <summary>Server-only. The guard instance currently spawned for this post (alive or corpse).</summary>
+    private NetworkObject _spawnedGuard;
 
     /// <summary>
     /// Unlock request received before this NetworkObject spawned (e.g. a day's DayActivated
@@ -107,6 +122,9 @@ public class GuardPurchasePoint : Interactable
                 _unlocked.Value = true;
                 PersistState();
             }
+
+            // A save that already has a guard on duty spawns it straight away.
+            SyncSpawnedGuard();
         }
         _pendingUnlock = false;
 
@@ -121,6 +139,9 @@ public class GuardPurchasePoint : Interactable
 
     public override void OnNetworkDespawn()
     {
+        if (IsServer)
+            DespawnGuard();
+
         base.OnNetworkDespawn();
 
         _guardPurchased.OnValueChanged -= OnGuardPurchasedChanged;
@@ -191,9 +212,9 @@ public class GuardPurchasePoint : Interactable
     }
 
     /// <summary>
-    /// Called on all clients at the start of each day. Sets arrival state on the server. A
-    /// replacement bought while the previous guard's corpse still occupies the slot (arrived
-    /// already true) is delivered by reviving the reused soldier on every peer instead.
+    /// Called on all clients at the start of each day. Sets arrival state on the server, which
+    /// spawns the guard. A replacement bought while the previous guard's corpse still occupies
+    /// the slot (arrived already true) despawns that corpse and spawns a fresh guard instead.
     /// </summary>
     private void OnDayStart()
     {
@@ -205,50 +226,28 @@ public class GuardPurchasePoint : Interactable
             if (!_guardDead) return;
 
             _guardDead = false;
-            ReviveSoldierClientRpc();
+            DespawnGuard();
+            SyncSpawnedGuard();
             PersistState();
             return;
         }
 
         _guardArrived.Value = true;
+        SyncSpawnedGuard();
         PersistState();
-    }
-
-    [ClientRpc]
-    private void ReviveSoldierClientRpc()
-    {
-        RefreshVisualState();
-        ResetSoldierForNewArrival();
     }
 
     private void OnGuardArrivedChanged(bool previousValue, bool newValue)
     {
         RefreshVisualState();
-
-        // The soldier slot reuses one GameObject for every guard. When a new guard arrives
-        // (after the previous one died and its corpse was cleared), revive that object —
-        // after RefreshVisualState has activated it, so its Animator/agent can be reset.
-        if (!previousValue && newValue)
-            ResetSoldierForNewArrival();
+        SyncSpawnedGuard();
     }
 
-    private void ResetSoldierForNewArrival()
+    private void OnUnlockedChanged(bool previousValue, bool newValue)
     {
-        if (_suspectSoldier == null) return;
-
-        SoldierMutantResponder responder = _suspectSoldier.GetComponentInChildren<SoldierMutantResponder>(true);
-        if (responder != null)
-        {
-            responder.ResetForNewArrival();
-            return;
-        }
-
-        SuspectCharacter suspect = _suspectSoldier.GetComponentInChildren<SuspectCharacter>(true);
-        if (suspect != null)
-            suspect.ResetDeathStateForReuse();
+        RefreshVisualState();
+        SyncSpawnedGuard();
     }
-
-    private void OnUnlockedChanged(bool previousValue, bool newValue) => RefreshVisualState();
 
     /// <summary>
     /// Called by <c>SoldierMutantResponder</c> the moment this slot's guard dies. Clears
@@ -268,10 +267,10 @@ public class GuardPurchasePoint : Interactable
     }
 
     /// <summary>
-    /// Called by <c>SoldierMutantResponder</c> once this slot's guard corpse has been bagged as
-    /// trash. Frees the soldier slot (post reappears). Keeps <see cref="_guardPurchased"/> as-is,
-    /// so a replacement already bought while the corpse was lying there still arrives at the
-    /// next day start. Server-only.
+    /// Called by <c>SoldierMutantResponder</c> once this slot's guard corpse has been bagged or
+    /// burned. Frees the slot (post reappears) and despawns the corpse if the JunkItem didn't
+    /// already. Keeps <see cref="_guardPurchased"/> as-is, so a replacement already bought while
+    /// the corpse was lying there still arrives at the next day start. Server-only.
     /// </summary>
     public void NotifyGuardCorpseCollected()
     {
@@ -280,7 +279,71 @@ public class GuardPurchasePoint : Interactable
         _guardDead = false;
         _guardArrived.Value = false;
         _unlocked.Value = true;
+        SyncSpawnedGuard();
         PersistState();
+    }
+
+    // -------------------------------------------------------------------------
+    // Guard spawning (server-only)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only, idempotent. Ensures a guard instance exists exactly while the post is
+    /// unlocked and a guard has arrived (alive or as an uncollected corpse).
+    /// </summary>
+    private void SyncSpawnedGuard()
+    {
+        if (!IsServer) return;
+
+        bool wantGuard = _unlocked.Value && _guardArrived.Value;
+        bool hasGuard = _spawnedGuard != null && _spawnedGuard.IsSpawned;
+
+        if (wantGuard && !hasGuard)
+            SpawnGuard();
+        else if (!wantGuard)
+            DespawnGuard();
+    }
+
+    private void SpawnGuard()
+    {
+        if (_guardPrefab == null)
+        {
+            Debug.LogError("[GuardPurchasePoint] No guard prefab assigned — cannot spawn the purchased guard.", this);
+            return;
+        }
+
+        Transform anchor = _guardSpawnPoint != null ? _guardSpawnPoint : transform;
+        Quaternion rotation = Quaternion.Euler(0f, anchor.eulerAngles.y, 0f);
+
+        GameObject instance = Instantiate(_guardPrefab, anchor.position, rotation);
+        NetworkObject netObj = instance.GetComponent<NetworkObject>();
+        if (netObj == null)
+        {
+            Debug.LogError($"[GuardPurchasePoint] Guard prefab '{_guardPrefab.name}' has no NetworkObject on its root.", this);
+            Destroy(instance);
+            return;
+        }
+
+        SoldierMutantResponder responder = instance.GetComponent<SoldierMutantResponder>();
+        if (responder != null)
+            responder.AssignPurchasePoint(this);
+        else
+            Debug.LogWarning($"[GuardPurchasePoint] Guard prefab '{_guardPrefab.name}' has no SoldierMutantResponder — " +
+                             "its death/corpse won't free this post.", this);
+
+        netObj.Spawn(destroyWithScene: true);
+        _spawnedGuard = netObj;
+    }
+
+    private void DespawnGuard()
+    {
+        if (_spawnedGuard != null && _spawnedGuard.IsSpawned &&
+            NetworkManager != null && !NetworkManager.ShutdownInProgress)
+        {
+            _spawnedGuard.Despawn(destroy: true);
+        }
+
+        _spawnedGuard = null;
     }
 
     // -------------------------------------------------------------------------
@@ -323,29 +386,29 @@ public class GuardPurchasePoint : Interactable
     }
 
     /// <summary>
-    /// Applies the correct visibility for the sign/post/soldier children and the post's material
-    /// based on the current locked/purchased/arrived state:
-    ///   - Locked: sign, post, and soldier all hidden — nothing is visible or interactable.
+    /// Applies the correct visibility for the sign/post children, the post's material and the
+    /// placeholder guard, based on the current locked/purchased/arrived state. Runs on every peer.
+    ///   - Locked: sign and post hidden — nothing is visible or interactable.
     ///   - Unlocked, not purchased, not arrived: sign and post visible (buyable) with the default
-    ///     post material; soldier hidden.
+    ///     post material.
     ///   - Unlocked, purchased, not yet arrived: sign and post visible, post swapped to the
-    ///     pending-arrival material; soldier still hidden.
-    ///   - Unlocked, guard arrived: sign and soldier visible, post hidden.
+    ///     pending-arrival material.
+    ///   - Unlocked, guard arrived: sign visible, post hidden (the spawned guard stands there).
+    ///   - Any unlocked state: the story placeholder guard is deactivated.
     /// </summary>
     private void RefreshVisualState()
     {
-        bool showSoldier = _unlocked.Value && _guardArrived.Value;
         bool showPost = _unlocked.Value && !_guardArrived.Value;
         bool showPendingArrival = showPost && _guardPurchased.Value;
-
-        if (_suspectSoldier != null)
-            _suspectSoldier.SetActive(showSoldier);
 
         if (_guardPurchasePost != null)
             _guardPurchasePost.SetActive(showPost);
 
         if (_guardSign != null)
             _guardSign.SetActive(_unlocked.Value);
+
+        if (_unlocked.Value && _placeholderGuard != null && _placeholderGuard.activeSelf)
+            _placeholderGuard.SetActive(false);
 
         if (_postRenderer != null && _pendingArrivalMaterial != null)
             _postRenderer.sharedMaterial = showPendingArrival ? _pendingArrivalMaterial : _defaultPostMaterial;

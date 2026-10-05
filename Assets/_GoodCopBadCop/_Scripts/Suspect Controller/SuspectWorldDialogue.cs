@@ -346,11 +346,14 @@ public class SuspectWorldDialogue : MonoBehaviour
         StartConversation();
     }
 
-    /// <summary>True when this NPC is a suspect whose verdict has already been delivered.</summary>
+    /// <summary>
+    /// True when this NPC is a suspect closed out from dialogue — a verdict has been delivered,
+    /// or they have turned into an active full mutant.
+    /// </summary>
     private bool IsVerdictClosed()
     {
         SuspectCharacter suspect = GetComponent<SuspectCharacter>();
-        return suspect != null && suspect.IsVerdictClosed;
+        return suspect != null && (suspect.IsVerdictClosed || suspect.IsMutantInteractionClosed);
     }
 
     private void StartConversation()

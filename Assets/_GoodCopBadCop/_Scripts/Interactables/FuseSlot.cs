@@ -66,6 +66,7 @@ public class FuseSlot : Interactable
         _insertedFuse.OnValueChanged += OnInsertedFuseChanged;
         // Sync visuals for late-joining clients.
         ApplySlotState(IsFilled);
+        SetFuseSeated(_insertedFuse.Value, true);
     }
 
     public override void OnNetworkDespawn()
@@ -81,10 +82,21 @@ public class FuseSlot : Interactable
 
         ApplySlotState(nowFilled);
 
+        // Seated fuses stop glowing; an extracted fuse resumes the "find the fuses" glow if active.
+        SetFuseSeated(prev, false);
+        SetFuseSeated(current, true);
+
         if (!wasFilled && nowFilled)
             OnFuseInserted?.Invoke();
         else if (wasFilled && !nowFilled)
             OnFuseExtracted?.Invoke();
+    }
+
+    private static void SetFuseSeated(NetworkObjectReference fuseRef, bool seated)
+    {
+        if (fuseRef.NetworkObjectId == 0) return;
+        if (fuseRef.TryGet(out NetworkObject netObj) && netObj.TryGetComponent(out FusePickup fuse))
+            fuse.SetSeated(seated);
     }
 
     private void ApplySlotState(bool filled)

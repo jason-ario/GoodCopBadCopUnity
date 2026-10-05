@@ -57,6 +57,12 @@ public class MutantIntruderData : ScriptableObject
     [Min(0.5f)]
     public float retreatDespawnTimeout = 2f;
 
+    [Header("Reward")]
+    [Tooltip("Coupons added to the shared pool when players defeat this lineup mutant (killed, or beaten until it flees). " +
+             "Only applies to mutants that came through the booth suspect rotation. Set to 0 to disable.")]
+    [Min(0)]
+    public int defeatCouponReward = 10;
+
     [Header("Animation Triggers")]
     [Tooltip("Animator trigger name played when climbing through the booth window.")]
     public string climbAnimationTrigger = "Climb";

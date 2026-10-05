@@ -213,6 +213,13 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
                 return;
 
+            // Same for the end-of-shift report: late UI teardown (e.g. the non-confirming player's
+            // bed view closing after the report already appeared) must not re-lock the cursor or
+            // hand movement back underneath it. HideEndOfShiftReport clears this before
+            // InBetweenShiftSequence / ForceDismissEndOfShiftReport restore control.
+            if (value && UIController.Instance != null && UIController.Instance.IsEndOfShiftReportOpen)
+                return;
+
             // While paused, gameplay writes go into the pause snapshot so ClosePauseMenu
             // restores the up-to-date value rather than the stale pre-pause one.
             if (UIController.Instance != null && UIController.Instance.TryCaptureControlWhilePaused(this, value))

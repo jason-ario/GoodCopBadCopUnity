@@ -227,6 +227,19 @@ public class PlayerAnimationController : NetworkBehaviour
     public event System.Action<bool> OnGuidebookOpenChanged;
 
     /// <summary>
+    /// Synced page position (left-stack sheet count) of the owner's guidebook, so observers can
+    /// flip the body-space guidebook along with the owner.
+    /// </summary>
+    private NetworkVariable<int> netGuidebookPage =
+        new NetworkVariable<int>(0, writePerm: NetworkVariableWritePermission.Owner);
+
+    /// <summary>Raised on every client when <see cref="netGuidebookPage"/> changes.</summary>
+    public event System.Action<int> OnGuidebookPageChanged;
+
+    /// <summary>The owner's current (target) guidebook page, as last synced.</summary>
+    public int GuidebookPage => netGuidebookPage.Value;
+
+    /// <summary>
     /// Synced world-space position of the right-arm IK target.
     /// Owner writes each frame when <see cref="RightArmIKTarget"/> is assigned;
     /// proxy clients read it to keep <see cref="rightArmRigIKTarget"/> up to date
@@ -534,6 +547,7 @@ public class PlayerAnimationController : NetworkBehaviour
         // All clients (including the owner) react to guidebook open state changes so the
         // body-space guidebook mesh can be shown or hidden correctly on every machine.
         netGuidebookOpen.OnValueChanged += OnNetGuidebookOpenChanged;
+        netGuidebookPage.OnValueChanged += OnNetGuidebookPageChanged;
 
         // Subscribe to the local player spoke event so talking animations fire on dialogue choices.
         DialogueChoiceSystem.OnLocalPlayerSpoke += OnLocalPlayerSpoke;
@@ -594,6 +608,7 @@ public class PlayerAnimationController : NetworkBehaviour
             netRightArmRigActive.OnValueChanged -= OnProxyRightArmRigActiveChanged;
 
         netGuidebookOpen.OnValueChanged -= OnNetGuidebookOpenChanged;
+        netGuidebookPage.OnValueChanged -= OnNetGuidebookPageChanged;
 
         DialogueChoiceSystem.OnLocalPlayerSpoke -= OnLocalPlayerSpoke;
     }
@@ -617,6 +632,11 @@ public class PlayerAnimationController : NetworkBehaviour
     private void OnNetGuidebookOpenChanged(bool previous, bool current)
     {
         OnGuidebookOpenChanged?.Invoke(current);
+    }
+
+    private void OnNetGuidebookPageChanged(int previous, int current)
+    {
+        OnGuidebookPageChanged?.Invoke(current);
     }
 
     /// <summary>
@@ -1298,6 +1318,16 @@ public class PlayerAnimationController : NetworkBehaviour
     {
         if (!IsOwner) return;
         netGuidebookOpen.Value = isOpen;
+    }
+
+    /// <summary>
+    /// Syncs the owner's guidebook page (left-stack sheet count) so observers flip the
+    /// body-space guidebook to match. Must be called by the owner; no-op on proxy clients.
+    /// </summary>
+    public void SetGuidebookPage(int leftCount)
+    {
+        if (!IsOwner || netGuidebookPage.Value == leftCount) return;
+        netGuidebookPage.Value = leftCount;
     }
 
     [ServerRpc]

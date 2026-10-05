@@ -177,7 +177,9 @@ public class GateController : Interactable, IMutantPassable, ILockable
 
     public override void Interact(PlayerInteractionController player)
     {
-        if (IsLocked)
+        // A locked gate that a mutant forced open can still be shut; the lock only blocks opening
+        // (ToggleGateServerRpc applies the same rule server-side).
+        if (IsLocked && !_gateOpen.Value)
         {
             PlayLockedTriedOpeningServerRpc();
             return;
@@ -356,5 +358,20 @@ public class GateController : Interactable, IMutantPassable, ILockable
         if (!IsServer) return;
         OpenGate();
         Debug.Log($"[GateController] Gate '{gameObject.name}' forced open by mutant.");
+    }
+
+    /// <inheritdoc/>
+    public bool IsClosedToMutant => !_gateOpen.Value;
+
+    /// <inheritdoc/>
+    /// Swings away from the mutant (same convention as a player push). The padlock and lock
+    /// flag are untouched, so players can still shut the gate afterwards but not reopen it.
+    public void ForceOpenForFleeingMutant(Vector3 mutantPosition)
+    {
+        if (!IsServer || _gateOpen.Value) return;
+        Vector3 forward = forwardMarker != null ? forwardMarker.forward : transform.forward;
+        bool openedIn = Vector3.Dot(forward, transform.position - mutantPosition) > 0f;
+        ForceOpen(openedIn);
+        Debug.Log($"[GateController] Gate '{gameObject.name}' forced open by fleeing mutant (locked: {IsLocked}).");
     }
 }

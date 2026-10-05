@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using FIMSpace.FProceduralAnimation;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -351,6 +352,12 @@ public class MutantEnemy : NetworkBehaviour
     [Min(1f)]
     [SerializeField] private float fleeDespawnTimeout = 8f;
 
+    [Tooltip("While fleeing with no complete escape path (e.g. trapped inside the booth after climbing " +
+             "through the window), the mutant runs to the nearest closed door within this radius and " +
+             "forces it open — even a locked one.")]
+    [Min(0f)]
+    [SerializeField] private float fleeBreakoutDoorRadius = 8f;
+
     [Header("Friendly Fire")]
     [Tooltip("When true, TakeDamage() is a no-op for this mutant — pistol shots, melee hits (shovel, " +
              "hammer), shotgun pellets, flamethrower ticks, etc. all do nothing, regardless of whether " +
@@ -378,6 +385,7 @@ public class MutantEnemy : NetworkBehaviour
     private NavMeshAgent _agent;
     private Transform _currentTarget;
     private float _health;
+    private float _maxHealth;
     private float _attackCooldownTimer;
     private float _doorOpenCooldownTimer;
     private float _chaseScreamTimer;
@@ -395,6 +403,10 @@ public class MutantEnemy : NetworkBehaviour
     private float _patrolWaitTimer;
     private PerimiterFence _fenceTarget;
     private DoorController _doorTarget;
+
+    // Flee breakout state (server only)
+    private NavMeshPath _fleePath;
+    private bool _fleeBreakoutPending;
 
     // Lose-interest state (server only)
     /// <summary>Seconds accumulated while stuck at an unreachable target (door banging / settled partial path).</summary>
@@ -503,6 +515,21 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     public bool IsActive => _isActive.Value;
 
+    /// <summary>
+    /// True when this mutant has been flagged as a boss (see <see cref="SetBossHealthBar"/>) and
+    /// should drive the screen-top <see cref="BossHealthBarUI"/>. Replicated to every peer.
+    /// </summary>
+    public bool IsBoss => !_bossDisplayName.Value.IsEmpty;
+
+    /// <summary>Boss name shown above the health bar. Empty for non-boss mutants. Replicated.</summary>
+    public string BossDisplayName => _bossDisplayName.Value.ToString();
+
+    /// <summary>
+    /// Current health as 0–1 of max. Only kept in sync for bosses (<see cref="IsBoss"/>) so normal
+    /// mutants don't send per-hit health traffic. Replicated.
+    /// </summary>
+    public float BossHealthNormalized => _bossHealthNormalized.Value;
+
     private MutantSuspectBehaviour _suspectBehaviour;
 
     /// <summary>
@@ -575,6 +602,20 @@ public class MutantEnemy : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    // Boss health bar state. Empty name = not a boss (no bar). Health is 0–1 and only written
+    // while IsBoss. NetworkVariables (not RPCs) so late joiners see the bar mid-fight.
+    private readonly NetworkVariable<FixedString64Bytes> _bossDisplayName = new NetworkVariable<FixedString64Bytes>(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
+    private readonly NetworkVariable<float> _bossHealthNormalized = new NetworkVariable<float>(
+        1f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -630,6 +671,10 @@ public class MutantEnemy : NetworkBehaviour
         _networkLookTargetId.OnValueChanged += OnNetworkLookTargetChanged;
         ApplyLookTarget(_networkLookTargetId.Value);
 
+        // All clients show the screen-top boss health bar while this mutant is flagged as a boss.
+        _bossDisplayName.OnValueChanged += OnBossDisplayNameChanged;
+        RefreshBossHealthBar();
+
         // Server-only: any corpse still lingering (deathBehaviour == PlayAnimation, see Die())
         // gets swept away the next time a day starts, regardless of where it died.
         if (IsServer && ShiftManager.Instance != null)
@@ -642,9 +687,51 @@ public class MutantEnemy : NetworkBehaviour
         _networkSpeed.OnValueChanged -= OnNetworkSpeedChanged;
         _networkGrounded.OnValueChanged -= OnNetworkGroundedChanged;
         _networkLookTargetId.OnValueChanged -= OnNetworkLookTargetChanged;
+        _bossDisplayName.OnValueChanged -= OnBossDisplayNameChanged;
+        BossHealthBarUI.Unregister(this);
 
         if (IsServer && ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= DespawnCorpseOnDayStart;
+    }
+
+    // ── Boss Health Bar ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Flags this mutant as a boss so every client shows its health in the
+    /// screen-top <see cref="BossHealthBarUI"/>. Call after <see cref="NetworkObject.Spawn"/>.
+    /// Pass null/empty to clear.
+    /// </summary>
+    public void SetBossHealthBar(string displayName)
+    {
+        if (!IsServer) return;
+
+        _bossDisplayName.Value = string.IsNullOrEmpty(displayName)
+            ? default
+            : new FixedString64Bytes(displayName.Length > 60 ? displayName.Substring(0, 60) : displayName);
+
+        SyncBossHealth();
+    }
+
+    /// <summary>Server-only: pushes current health to the replicated 0–1 value when this is a boss.</summary>
+    private void SyncBossHealth()
+    {
+        if (!IsServer || !IsSpawned || !IsBoss) return;
+
+        float normalized = _isDead ? 0f : (_maxHealth > 0f ? Mathf.Clamp01(_health / _maxHealth) : 1f);
+        _bossHealthNormalized.Value = normalized;
+    }
+
+    private void OnBossDisplayNameChanged(FixedString64Bytes previous, FixedString64Bytes current)
+    {
+        RefreshBossHealthBar();
+    }
+
+    private void RefreshBossHealthBar()
+    {
+        if (IsBoss)
+            BossHealthBarUI.Register(this);
+        else
+            BossHealthBarUI.Unregister(this);
     }
 
     /// <summary>
@@ -672,6 +759,81 @@ public class MutantEnemy : NetworkBehaviour
 
     /// <summary>True when a permanent death leaves a persisting corpse (not despawned by <see cref="Die"/>).</summary>
     public bool LeavesCorpse => deathBehaviour == DeathBehaviour.PlayAnimation;
+
+    // ── Day-transition cleanup ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Despawns every mutant still in play so no mutant carries over into the next
+    /// day. Called by <see cref="ShiftManager.TriggerEndOfShiftReportServerRpc"/> when the player
+    /// ends the day at the bunk bed, before the campaign advances and the report is shown.
+    /// Covers ambient, pack, breach, legacy, scripted and booth-intruder mutants, mutants mid-flee,
+    /// and suspects that have turned into full mutants. Skipped:
+    ///   • ordinary dormant suspects (owned by <see cref="SuspectController"/>);
+    ///   • resurrected player corpses (owned by ReviveManager / <see cref="CorpseResurrectionController"/>);
+    ///   • permanently-killed corpses (swept by <see cref="DespawnCorpseOnDayStart"/>);
+    ///   • in-scene placed objects, which must not be destroyed by a runtime despawn.
+    /// </summary>
+    /// <returns>Number of mutants despawned.</returns>
+    public static int DespawnAllForDayTransitionServer()
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer) return 0;
+
+        int count = 0;
+        MutantEnemy[] mutants = FindObjectsByType<MutantEnemy>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        foreach (MutantEnemy mutant in mutants)
+        {
+            if (mutant == null || !mutant.ShouldDespawnForDayTransition()) continue;
+            mutant.DespawnForDayTransitionServer();
+            count++;
+        }
+
+        if (count > 0)
+            Debug.Log($"[MutantEnemy] Day transition — despawned {count} leftover mutant(s).");
+        return count;
+    }
+
+    private bool ShouldDespawnForDayTransition()
+    {
+        if (!IsSpawned || NetworkObject == null) return false;
+        if (NetworkObject.IsPlayerObject || NetworkObject.IsSceneObject == true) return false;
+        if (GetComponent<CorpseResurrectionController>() != null) return false;
+        if (DiedPermanently) return false;
+
+        SuspectCharacter suspect = GetComponent<SuspectCharacter>();
+        if (suspect != null)
+            return suspect.IsFullMutantInPlay;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Server-only. Removes this mutant immediately, treating it as having escaped (not killed):
+    /// no kill event, no MutantBit, no corpse. A turned suspect is recorded as a legacy mutant via
+    /// <see cref="SuspectCharacter.ResolveFullMutantAsEscapedServer"/>. Instance listeners are
+    /// dropped instead of invoked so lineup/pack/finale callbacks from the finished day cannot
+    /// advance the next day's state (e.g. ready the next suspect or end a shift).
+    /// </summary>
+    private void DespawnForDayTransitionServer()
+    {
+        bool wasChasing = _currentTarget != null;
+        StopAllCoroutines();
+        _isDead = true;
+        DiedPermanently = false;
+
+        if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
+            _agent.ResetPath();
+
+        GetComponent<SuspectCharacter>()?.ResolveFullMutantAsEscapedServer();
+
+        OnRemovedFromPlay = null;
+        OnFleeStarted = null;
+
+        if (wasChasing)
+            StopChaseMusicClientRpc();
+
+        NetworkObject.Despawn();
+    }
 
     /// <summary>
     /// Configures this MutantEnemy as the dormant brain of a resurrected player corpse
@@ -703,6 +865,8 @@ public class MutantEnemy : NetworkBehaviour
         }
 
         _health = data.maxHealth * (_isFullMutant ? _fullMutantHealthMultiplier : 1f);
+        _maxHealth = _health;
+        SyncBossHealth();
 
         // Marks this mutant as gameplay-active. Does NOT touch this component's Unity
         // enabled flag — that stays permanently true from Awake() onward (see _isActive).
@@ -2064,6 +2228,99 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
+    /// Flee-only breakout. If there's no complete NavMesh path to <paramref name="fleeDestination"/>
+    /// (the mutant is boxed in, e.g. inside the locked booth after climbing through the window, or
+    /// behind a closed gate), it heads for the nearest closed <see cref="IMutantPassable"/> door or
+    /// gate within <see cref="fleeBreakoutDoorRadius"/>. Once in reach it bashes the obstacle open,
+    /// ignoring any lock. Returns true when this tick's movement is handled here, false when there's
+    /// a clear escape route or nothing to force.
+    /// </summary>
+    private bool TryFleeBreakoutThroughDoor(Vector3 fleeDestination)
+    {
+        if (_fleeBreakoutPending || fleeBreakoutDoorRadius <= 0f || !_agent.isOnNavMesh)
+            return false;
+
+        _fleePath ??= new NavMeshPath();
+        if (_agent.CalculatePath(fleeDestination, _fleePath) && _fleePath.status == NavMeshPathStatus.PathComplete)
+            return false;
+
+        IMutantPassable obstacle = FindNearestClosedPassableWithin(fleeBreakoutDoorRadius, out Component obstacleComponent, out float obstacleDistance);
+        if (obstacle == null)
+            return false;
+
+        float reach = Mathf.Max(data.attackRange * 1.5f, 2f);
+        if (obstacleDistance <= reach)
+            StartCoroutine(FleeBreakoutDoorRoutine(obstacle, obstacleComponent));
+        else
+            _agent.SetDestination(obstacleComponent.transform.position); // partial path ends at the carved obstacle
+
+        return true;
+    }
+
+    /// <summary>
+    /// Nearest spawned, physically closed door or gate (locked or not) whose solid colliders come
+    /// within <paramref name="radius"/>. <paramref name="distance"/> is measured to the closest
+    /// collider surface, not the pivot (often at the hinge).
+    /// </summary>
+    private IMutantPassable FindNearestClosedPassableWithin(float radius, out Component component, out float distance)
+    {
+        distance = float.MaxValue;
+        component = null;
+        IMutantPassable nearest = null;
+
+        Collider[] nearby = Physics.OverlapSphere(transform.position, radius, ~0, QueryTriggerInteraction.Ignore);
+        foreach (Collider col in nearby)
+        {
+            IMutantPassable passable = col.GetComponentInParent<IMutantPassable>();
+            if (passable == null || !passable.IsClosedToMutant)
+                continue;
+            if (passable is not NetworkBehaviour behaviour || !behaviour.IsSpawned)
+                continue;
+
+            float d = Vector3.Distance(transform.position, col.ClosestPoint(transform.position));
+            if (d < distance)
+            {
+                distance = d;
+                nearest = passable;
+                component = behaviour;
+            }
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
+    /// Stops, faces the door/gate, plays one attack swing, then on the impact frame plays the bang
+    /// (doors) and forces it open (lock ignored). Holds off flee re-pathing until it's open.
+    /// </summary>
+    private IEnumerator FleeBreakoutDoorRoutine(IMutantPassable obstacle, Component obstacleComponent)
+    {
+        _fleeBreakoutPending = true;
+
+        if (_agent.isOnNavMesh)
+            _agent.ResetPath();
+
+        Vector3 look = obstacleComponent.transform.position - transform.position;
+        look.y = 0f;
+        if (look.sqrMagnitude > 0.0001f)
+            transform.rotation = Quaternion.LookRotation(look);
+
+        TriggerAttackAnimationClientRpc();
+        yield return new WaitForSeconds(attackHitDelay);
+
+        if (obstacleComponent != null && obstacleComponent is NetworkBehaviour nb && nb.IsSpawned && obstacle.IsClosedToMutant)
+        {
+            if (obstacleComponent is DoorController door)
+                door.PlayMutantBangClientRpc();
+            obstacle.ForceOpenForFleeingMutant(transform.position);
+        }
+
+        // Give the obstacle's NavMeshObstacle a frame to un-carve before the flee loop re-paths.
+        yield return null;
+        _fleeBreakoutPending = false;
+    }
+
+    /// <summary>
     /// Searches within <see cref="doorDetectionRadius"/> for any physically-closed
     /// <see cref="DoorController"/> (locked or not) in the direction of <paramref name="target"/>,
     /// and bangs on it at the standard attack rate. Used when the chase path is blocked by a
@@ -2373,6 +2630,7 @@ public class MutantEnemy : NetworkBehaviour
         }
 
         _health -= amount;
+        SyncBossHealth();
 
         // Getting hurt re-notices any player we gave up on, at any distance, if they're reachable.
         _provokedUntil = Time.time + ProvokedDuration;
@@ -2875,6 +3133,7 @@ public class MutantEnemy : NetworkBehaviour
         // standing, solid and un-ragdolled on every screen. Core corpse state therefore runs
         // first, and every side effect is isolated through RunDeathStep.
         _isDead = true;
+        RunDeathStep("zero boss health", SyncBossHealth);
         RunDeathStep("stop agent", () =>
         {
             if (_agent.isOnNavMesh)
@@ -3060,6 +3319,7 @@ public class MutantEnemy : NetworkBehaviour
         if (!IsServer) yield break;
 
         DiedPermanently = false;
+        _fleeBreakoutPending = false;
 
         // Boost speed, stop any attack animation, and stop chase music on all clients.
         _agent.speed = fleeSpeed;
@@ -3086,14 +3346,19 @@ public class MutantEnemy : NetworkBehaviour
 
             // Continuously update destination away from the nearest player.
             Transform player = FindNearestLivingPlayer();
-            if (player != null)
+            if (player != null && !_fleeBreakoutPending)
             {
                 Vector3 awayDir = (transform.position - player.position).normalized;
                 Vector3 fleeTarget = transform.position + awayDir * 20f;
 
                 // Clamp to NavMesh surface.
                 if (UnityEngine.AI.NavMesh.SamplePosition(fleeTarget, out UnityEngine.AI.NavMeshHit hit, 15f, UnityEngine.AI.NavMesh.AllAreas))
-                    _agent.SetDestination(hit.position);
+                {
+                    // Trapped (e.g. inside the locked booth after a window climb-through): no complete
+                    // route exists, so head for the nearest closed door and force it, lock or not.
+                    if (!TryFleeBreakoutThroughDoor(hit.position))
+                        _agent.SetDestination(hit.position);
+                }
             }
 
             elapsed += 0.5f;

@@ -289,11 +289,17 @@ public class Day_03 : DayBase, IDailyTask
     // door opening) just duplicated every row.
 
     [Header("Yard Cleanup Amount")]
-    [Tooltip("Multiplier on the amount of start-of-day mess Day 3 triggers: gore/body-part junk " +
-             "(and the blood decal each one drops) and the number of fence segments freshly broken. " +
-             "1 = the task's full default roll. Fences already broken by an earlier breach still count.")]
+    [Tooltip("Multiplier on the number of fence segments Day 3 freshly breaks at the start of the day " +
+             "(combined with _fenceBreakScale). 1 = the task's full default roll. Fences already broken " +
+             "by an earlier breach still count. Gore uses _goreAmountScale instead.")]
     [Range(0.05f, 1f)]
     [SerializeField] private float _cleanupAmountScale = 0.33f;
+
+    [Tooltip("Multiplier on the start-of-day gore/body-part junk (and the blood decal each one drops), " +
+             "applied to TakeOutTrashTask's _minGoreSpawnCount/_maxGoreSpawnCount roll. 1 = full roll; " +
+             "values above 1 spawn extra. Solo play still halves the result.")]
+    [Range(0.05f, 3f)]
+    [SerializeField] private float _goreAmountScale = 0.5f;
 
     [Tooltip("Extra multiplier applied on top of the cleanup scale for fences only " +
              "(gore is unaffected). 0.5 = half as many fence segments broken.")]
@@ -320,7 +326,7 @@ public class Day_03 : DayBase, IDailyTask
         {
             // Blood decals are purely cosmetic (see MutantEnemy/TakeOutTrashTask) and need no
             // arming — only the trash/gore task and the fences require an explicit trigger.
-            TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true, amountScale: _cleanupAmountScale);
+            TakeOutTrashTask.Instance?.TriggerTask(useGorePrefabs: true, amountScale: _goreAmountScale);
 
             // Randomly breaks a batch of perimeter fence segments so the yard has repair work
             // waiting alongside the gore, mirroring the post-breach fence damage from Day 1

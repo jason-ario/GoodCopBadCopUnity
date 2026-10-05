@@ -105,12 +105,79 @@ public class PlayerInteractionController : NetworkBehaviour
         }
     }
     
+    private PlayerHealth _playerHealth;
+    private Unity.Cinemachine.CinemachineBrain _brain;
+
+    // After a (re)spawn the physical camera's CinemachineBrain can still be rendering — or blending
+    // away from — a spectated teammate's vcam, so `cam` points along that teammate's view for a few
+    // frames. Hover raycasts are suppressed until the brain has settled on this player's own view.
+    private const int SpawnSettleMinFrames = 2;
+    private const float SpawnSettleMaxSeconds = 3f;
+    private bool _spawnViewSettling;
+    private int _spawnSettleFrame;
+    private float _spawnSettleStartTime;
+
     private void Awake()
     {
         playerAnimationController = GetComponent<PlayerAnimationController>();
         playerMovementController = GetComponent<PlayerMovementController>();
         _playerPickupController = GetComponent<PlayerPickupController>();
         _throwController = GetComponent<ThrowController>();
+        _playerHealth = GetComponent<PlayerHealth>();
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (IsLocalPlayer)
+        {
+            _spawnViewSettling = true;
+            _spawnSettleFrame = Time.frameCount;
+            _spawnSettleStartTime = Time.unscaledTime;
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        base.OnNetworkDespawn();
+        ClearHoverState();
+    }
+
+    /// <summary>Releases the current hover highlight / placement-slot preview and any pending hold.</summary>
+    private void ClearHoverState()
+    {
+        CancelHoldInteract();
+
+        if (lastInteractable == null) return;
+
+        lastInteractable.Highlight(false);
+        PlaceObjectSlot slot = lastInteractable.GetComponent<PlaceObjectSlot>();
+        if (slot != null) slot.HidePlacedVisual();
+        lastInteractable = null;
+    }
+
+    /// <summary>
+    /// True while `cam` is not looking through this player's own eyes: the local player is dead or
+    /// spectating (the brain renders the watched teammate's vcam), or a fresh spawn's brain is still
+    /// cutting/blending back from the spectated view. Hover raycasts in that state would highlight
+    /// whatever the teammate is looking at.
+    /// </summary>
+    private bool IsViewNotOwn()
+    {
+        if (_playerHealth != null && _playerHealth.IsDead) return true;
+        if (SpectateManager.Instance != null && SpectateManager.Instance.IsSpectating) return true;
+
+        if (!_spawnViewSettling) return false;
+
+        if (Time.frameCount - _spawnSettleFrame < SpawnSettleMinFrames) return true;
+
+        if (_brain == null && cam != null) _brain = cam.GetComponent<Unity.Cinemachine.CinemachineBrain>();
+        bool stillBlending = _brain != null && _brain.IsBlending;
+        if (stillBlending && Time.unscaledTime - _spawnSettleStartTime < SpawnSettleMaxSeconds) return true;
+
+        _spawnViewSettling = false;
+        return false;
     }
     
     public void SetCanInteract(bool value, string interactText)
@@ -144,6 +211,15 @@ public class PlayerInteractionController : NetworkBehaviour
     {
         if (IsLocalPlayer == false)
         {
+            // A revived player's old body is demoted to a corpse mid-hover; release its
+            // highlight instead of freezing it on whatever it last targeted.
+            if (lastInteractable != null) ClearHoverState();
+            return;
+        }
+
+        if (IsViewNotOwn())
+        {
+            ClearHoverState();
             return;
         }
 

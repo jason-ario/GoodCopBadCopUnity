@@ -29,6 +29,7 @@ public class HUDNotificationQueue : MonoBehaviour
         public string Key;
         public string Message;
         public bool Loop;
+        public float RepeatGap = -1f;
         public float ReadyTime;
         public long Order;
     }
@@ -97,8 +98,10 @@ public class HUDNotificationQueue : MonoBehaviour
     /// <summary>
     /// Queues a notification under <paramref name="key"/>. If an entry with that key already
     /// exists, its message and loop flag are updated in place and no duplicate is added.
+    /// <paramref name="repeatGap"/> overrides <see cref="_repeatGapDuration"/> for this looping
+    /// entry (seconds between fading out and showing again); negative uses the default.
     /// </summary>
-    public void Show(string key, string message, bool loop = false)
+    public void Show(string key, string message, bool loop = false, float repeatGap = -1f)
     {
         if (string.IsNullOrEmpty(key))
             key = message;
@@ -111,6 +114,7 @@ public class HUDNotificationQueue : MonoBehaviour
             bool messageChanged = existing.Message != message;
             existing.Message = message;
             existing.Loop = loop;
+            existing.RepeatGap = repeatGap;
 
             if (existing == _current && messageChanged && _textReveal != null)
                 _textReveal.RevealText(message);
@@ -122,6 +126,7 @@ public class HUDNotificationQueue : MonoBehaviour
                 Key = key,
                 Message = message,
                 Loop = loop,
+                RepeatGap = repeatGap,
                 ReadyTime = 0f,
                 Order = _nextOrder++
             });
@@ -212,7 +217,8 @@ public class HUDNotificationQueue : MonoBehaviour
             {
                 if (next.Loop)
                 {
-                    next.ReadyTime = Time.time + _repeatGapDuration;
+                    float gap = next.RepeatGap >= 0f ? next.RepeatGap : _repeatGapDuration;
+                    next.ReadyTime = Time.time + gap;
                     next.Order = _nextOrder++;
                 }
                 else

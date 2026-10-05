@@ -111,9 +111,6 @@ public class TimecardMachine : Interactable
     [SerializeField] private AudioSource _fanfareSource;
     [Tooltip("Fanfare clip played when the timecard machine is primed for clock-out.")]
     [SerializeField] private AudioClip _fanfareClip;
-    [Tooltip("Play the fanfare as 2D so it's heard wherever the player is. On Day 2+ clock-out " +
-             "usually arms while the player is outside, out of range of the 3D source.")]
-    [SerializeField] private bool _fanfareAudibleEverywhere = true;
 
     [Header("Interact Text")]
     [Tooltip("Text shown on the reticle while the machine is primed for clock-in.")]
@@ -501,11 +498,9 @@ public class TimecardMachine : Interactable
     }
 
     /// <summary>
-    /// Plays the clock-out-ready fanfare on this peer. Day 1 arms clock-out while the player is
-    /// usually inside the booth, but Day 2+ arm it the moment the LAST outdoor task resolves
-    /// (Vlad's trail, trash, fences...) — typically well beyond the 3D source's ~14 m max
-    /// distance, where log rolloff left it inaudible. <see cref="_fanfareAudibleEverywhere"/>
-    /// guarantees the cue is heard whatever the player's position.
+    /// Plays the clock-out-ready fanfare on this peer, positionally from the timecard machine.
+    /// The source's spatial settings (3D blend, rolloff, max distance) are authored in the scene
+    /// and must not be overridden here — the cue is meant to be heard at the machine.
     /// </summary>
     private void PlayClockOutFanfare()
     {
@@ -524,9 +519,6 @@ public class TimecardMachine : Interactable
             Debug.LogWarning("[TimecardMachine] No active AudioSource available for the clock-out fanfare.", this);
             return;
         }
-
-        if (_fanfareAudibleEverywhere)
-            source.spatialBlend = 0f;
 
         source.Stop();
         source.PlayOneShot(_fanfareClip);

@@ -17,9 +17,21 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 0}
     - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
-      propertyPath: _chaseSounds.Array.size
-      value: 0
+      propertyPath: deathSound
+      value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+      propertyPath: _chaseSounds.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+      propertyPath: '_hurtSounds.Array.data[0]'
+      value: 
+      objectReference: {fileID: 8300000, guid: 6a8aa43e78f8aeb4d8409ed4700618c6, type: 3}
+    - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+      propertyPath: '_chaseSounds.Array.data[0]'
+      value: 
+      objectReference: {fileID: 8300000, guid: 02630cf789239da4aa141b48be57e829, type: 3}
     - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: goreDropPrefabs.Array.size
       value: 0
@@ -34,7 +46,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1951861783744858543, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: _Editor_OnValidateTrigger
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1951861783744858543, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: Legs.Array.data[0].BoneEnd
@@ -138,7 +150,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4807087481966983560, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 265087208
+      value: 1503068626
       objectReference: {fileID: 0}
     - target: {fileID: 4807087481966983560, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: SceneMigrationSynchronization
@@ -171,8 +183,37 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 2501469216775164319, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7334183050204928003}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 7307716854411765365, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1742113826045165631}
   m_SourcePrefab: {fileID: 100100000, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+--- !u!1 &2622060696754501229 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7307716854411765365, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+  m_PrefabInstance: {fileID: 4686373152031871000}
+  m_PrefabAsset: {fileID: 0}
+--- !u!135 &1742113826045165631
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2622060696754501229}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 1.35
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!4 &7187278205449716103 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2501469216775164319, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}

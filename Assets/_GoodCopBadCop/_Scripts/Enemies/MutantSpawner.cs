@@ -534,28 +534,46 @@ public class MutantSpawner : NetworkBehaviour
         return false;
     }
 
+    // Shared buffer for the ground probe — avoids per-attempt allocations.
+    private readonly RaycastHit[] _groundProbeHits = new RaycastHit[16];
+
     /// <summary>
-    /// Projects <paramref name="point"/> straight down onto the highest ground below
-    /// <see cref="groundProbeHeight"/>, then snaps to the nearest NavMesh point within a short
-    /// radius. Falls back to a wider vertical-only NavMesh sample when nothing is hit.
+    /// Projects <paramref name="point"/> straight down from <see cref="groundProbeHeight"/> and
+    /// collects every surface along the ray. Of the surfaces that sit on the NavMesh, the one
+    /// vertically closest to <paramref name="point"/> (i.e. the spawner's own height) wins.
+    /// Picking the first/highest hit put mutants on walkable roofs (e.g. the power station)
+    /// when the spawner was placed on the floor inside or beside a building.
+    /// Falls back to a vertical-only NavMesh sample when nothing is hit.
     /// </summary>
     private bool TrySnapToNavMesh(Vector3 point, NavMeshQueryFilter filter, out Vector3 result)
     {
         const float snapRadius = 2f;
 
         Vector3 probeOrigin = new Vector3(point.x, transform.position.y + groundProbeHeight, point.z);
-        if (Physics.Raycast(probeOrigin, Vector3.down, out RaycastHit ground, groundProbeHeight * 2f,
-                            Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        int hitCount = Physics.RaycastNonAlloc(probeOrigin, Vector3.down, _groundProbeHits, groundProbeHeight * 2f,
+                                               Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+        if (hitCount > 0)
         {
-            if (NavMesh.SamplePosition(ground.point, out NavMeshHit hit, snapRadius, filter))
+            bool found = false;
+            float bestDeltaY = float.MaxValue;
+            Vector3 best = point;
+
+            for (int i = 0; i < hitCount; i++)
             {
-                result = hit.position;
-                return true;
+                if (!NavMesh.SamplePosition(_groundProbeHits[i].point, out NavMeshHit hit, snapRadius, filter))
+                    continue; // Not walkable (tree canopy, rock, prop) — try the next surface down.
+
+                float deltaY = Mathf.Abs(hit.position.y - point.y);
+                if (deltaY < bestDeltaY)
+                {
+                    bestDeltaY = deltaY;
+                    best = hit.position;
+                    found = true;
+                }
             }
 
-            // Hit something that isn't walkable (tree canopy, rock, roof) — reject this XZ.
-            result = point;
-            return false;
+            result = best;
+            return found;
         }
 
         if (NavMesh.SamplePosition(point, out NavMeshHit fallback, snapRadius, filter))

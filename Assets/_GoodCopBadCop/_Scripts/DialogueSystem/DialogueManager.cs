@@ -379,6 +379,9 @@ public class DialogueManager : NetworkBehaviour
         dialogueChoiceSystem.StartDialogueChoices(lookTarget,choices);
     }
 
+    /// <summary>The currently displayed choice echo, or null. Lets callers clear only an echo they own.</summary>
+    public GameObject ActiveChoiceEcho => _activeChoiceEcho;
+
     /// <summary>
     /// Spawns a persistent caption showing the resolved player dialogue choice. It stacks above
     /// the NPC response subtitle and normally disappears on its own after a few seconds (see

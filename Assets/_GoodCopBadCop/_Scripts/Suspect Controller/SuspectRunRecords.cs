@@ -84,6 +84,7 @@ public class SuspectRunRecords : MonoBehaviour
             record.quarantinedOnDay        = entry.QuarantinedOnDay;
             record.infectionScore          = entry.InfectionScore;
             record.isLegacyMutant          = entry.IsLegacyMutant;
+            record.hasPlayedFullMutantEncounter = entry.HasPlayedFullMutantEncounter;
             record.daysShown               = entry.DaysShown;
             record.lastDayShown            = entry.LastDayShown;
             applied++;
@@ -243,6 +244,21 @@ public class SuspectRunRecords : MonoBehaviour
             Debug.Log($"[SuspectRunRecords] '{data.name}' escaped as a full mutant — added to the legacy mutant pool.");
         }
 
+        SaveRecords();
+    }
+
+    /// <summary>
+    /// Records that this suspect has turned full mutant at the booth and had their full-mutant
+    /// conversation, so later booth appearances skip straight to the window attack. Persists
+    /// immediately. Server-only.
+    /// </summary>
+    public void MarkFullMutantEncounterPlayed(SuspectData data)
+    {
+        SuspectRecord record = GetRecord(data);
+        if (record == null || record.hasPlayedFullMutantEncounter) return;
+
+        record.hasPlayedFullMutantEncounter = true;
+        Debug.Log($"[SuspectRunRecords] '{data.name}' completed their full-mutant reveal — future booth visits attack immediately.");
         SaveRecords();
     }
 

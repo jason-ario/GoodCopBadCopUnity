@@ -39,6 +39,16 @@ public class TMPTextReveal : MonoBehaviour
         }
     }
 
+    // Unity kills coroutines when the GameObject deactivates but leaves revealRoutine set, so
+    // IsRevealing would stay true forever and stall anything polling it (choice-echo auto-hide,
+    // HasActiveSubtitles). Stop the routine explicitly and snap to the full text instead.
+    private void OnDisable()
+    {
+        if (!IsRevealing) return;
+        StopCurrentRoutine();
+        if (tmp != null && _fullText != null) tmp.text = _fullText;
+    }
+
     IEnumerator RevealAfterEnableCoroutine()
     {
         string text = tmp.text;

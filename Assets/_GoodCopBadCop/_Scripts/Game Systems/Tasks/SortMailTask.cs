@@ -112,6 +112,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Task-list label registered in TaskRegistry while the delivery truck is waiting at the " +
              "closed checkpoint gate. Completed (removed) as soon as the gate opens.")]
     [SerializeField] private string _openGateTaskName = "Open the gate for a shipment";
+    [Tooltip("Seconds between the \"shipment is waiting at the gate\" alert fading out and showing " +
+             "again. It keeps repeating until a player opens the gate.")]
+    [SerializeField, Min(0f)] private float _gateAlertRepeatInterval = 5f;
+
+    private const string GateWaitingMessage = "A shipment is waiting at the gate.";
 
     [Header("Goods Categories")]
     [Tooltip("The full pool of goods categories that can appear on packages. Every delivery, " +
@@ -383,7 +388,10 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             TaskRegistry.Instance?.AddThreat(this);
 
         if (_shipmentWaitingAtGate.Value)
+        {
             TaskRegistry.Instance?.AddThreat(OpenGateTask);
+            SetGateWaitingAlert(true);
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -407,6 +415,30 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             TaskRegistry.Instance?.AddThreat(OpenGateTask);
         else
             TaskRegistry.Instance?.RemoveThreat(OpenGateTask);
+
+        SetGateWaitingAlert(current);
+    }
+
+    /// <summary>
+    /// Local-client side of the waiting-at-gate alert: the looping HUD notification (repeats every
+    /// <see cref="_gateAlertRepeatInterval"/> seconds) plus the gate button's tutorial arrow.
+    /// Driven by the replicated <see cref="_shipmentWaitingAtGate"/> flag so late joiners get it too.
+    /// Idempotent — the notification queue dedupes by key.
+    /// </summary>
+    private void SetGateWaitingAlert(bool waiting)
+    {
+        if (waiting)
+        {
+            UIController.Instance?.ShowMailDeliveryNotification(GateWaitingMessage, loop: true, repeatGap: _gateAlertRepeatInterval);
+            if (_gateButtonInteractable != null)
+                TutorialMarkerManager.Instance?.Mark(_gateButtonInteractable.transform);
+        }
+        else
+        {
+            UIController.Instance?.HideMailDeliveryNotification();
+            if (_gateButtonInteractable != null)
+                TutorialMarkerManager.Instance?.Unmark(_gateButtonInteractable.transform);
+        }
     }
 
     private void OnDestroy()
@@ -1115,10 +1147,8 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [ClientRpc]
     private void NotifyShipmentWaitingAtGateClientRpc()
     {
-        UIController.Instance?.ShowMailDeliveryNotification("A shipment is waiting at the gate.", loop: true);
-
-        if (_gateButtonInteractable != null)
-            TutorialMarkerManager.Instance?.Mark(_gateButtonInteractable.transform);
+        // Also covers peers whose NetworkVariable callback hasn't fired yet; dedupes by key.
+        SetGateWaitingAlert(true);
     }
 
     /// <summary>
@@ -1136,10 +1166,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [ClientRpc]
     private void NotifyShipmentGateOpenedClientRpc()
     {
-        UIController.Instance?.HideMailDeliveryNotification();
-
-        if (_gateButtonInteractable != null)
-            TutorialMarkerManager.Instance?.Unmark(_gateButtonInteractable.transform);
+        SetGateWaitingAlert(false);
     }
 
     /// <summary>

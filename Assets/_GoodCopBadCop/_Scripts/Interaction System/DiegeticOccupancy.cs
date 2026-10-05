@@ -30,7 +30,7 @@ public class DiegeticOccupancy : NetworkBehaviour
     {
         if (IsOccupied)
         {
-            UIController.Instance?.ShowShopNotification(BusyMessage);
+            UIController.Instance?.ShowErrorNotification(BusyMessage);
             return false;
         }
 

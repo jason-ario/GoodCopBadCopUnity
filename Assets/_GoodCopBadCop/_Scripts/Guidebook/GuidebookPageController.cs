@@ -68,6 +68,15 @@ public class GuidebookPageController : MonoBehaviour
     public bool HasPreviousPage => _leftCount > 0;
     public bool IsBusy          => _turnsInFlight > 0 || _isSnapping;
 
+    /// <summary>
+    /// The left-stack count the book is heading to once queued presses and tab jumps finish.
+    /// This is what gets networked, so observers aim for the final page instead of chasing each step.
+    /// </summary>
+    public int TargetLeftCount => _isSnapping ? _snapTarget : _leftCount + _pendingTurns;
+
+    [Tooltip("Remote page changes larger than this many sheets play as a fast tab jump instead of normal turns.")]
+    [SerializeField] private int _maxMirroredTurns = 3;
+
     private readonly List<GuidebookSheet> _sheets = new List<GuidebookSheet>();
 
     private int       _leftCount;
@@ -76,6 +85,7 @@ public class GuidebookPageController : MonoBehaviour
     private int       _pendingTurns;      // queued presses: >0 next, <0 previous
     private float     _lastTurnStartTime = float.NegativeInfinity;
     private bool      _isSnapping;
+    private int       _snapTarget;
     private float     _prevStickX;
     private Coroutine _snapSequence;
 
@@ -102,11 +112,15 @@ public class GuidebookPageController : MonoBehaviour
         bool stickPrev = stickX < -StickThreshold && _prevStickX >= -StickThreshold;
         _prevStickX = stickX;
 
-        if (!InputEnabled || _isSnapping) return;
+        if (_isSnapping) return;
 
-        if (stickNext || NextPressed(gp))      QueueTurn(+1);
-        else if (stickPrev || PrevPressed(gp)) QueueTurn(-1);
+        if (InputEnabled)
+        {
+            if (stickNext || NextPressed(gp))      QueueTurn(+1);
+            else if (stickPrev || PrevPressed(gp)) QueueTurn(-1);
+        }
 
+        // Also runs without input so mirrored copies (see TurnTo) play their queued turns.
         PumpQueuedTurns();
     }
 
@@ -279,8 +293,31 @@ public class GuidebookPageController : MonoBehaviour
         _pendingTurns = 0;
         if (targetLeftCount == _leftCount && !_isSnapping) return;
 
+        _snapTarget = targetLeftCount;
         if (_snapSequence != null) StopCoroutine(_snapSequence);
         _snapSequence = StartCoroutine(AnimatedFlipTo(targetLeftCount));
+    }
+
+    /// <summary>
+    /// Mirrors a page position received from another player: small changes play as normal queued
+    /// turns, large ones (tab jumps) as a fast <see cref="FlipTo"/>. Snaps instantly while inactive.
+    /// </summary>
+    public void TurnTo(int targetLeftCount)
+    {
+        targetLeftCount = Mathf.Clamp(targetLeftCount, 0, _sheets.Count);
+
+        if (!isActiveAndEnabled)
+        {
+            SnapTo(targetLeftCount);
+            return;
+        }
+
+        if (targetLeftCount == TargetLeftCount) return;
+
+        if (_isSnapping || Mathf.Abs(targetLeftCount - _leftCount) > _maxMirroredTurns)
+            FlipTo(targetLeftCount);
+        else
+            _pendingTurns = targetLeftCount - _leftCount;
     }
 
     private IEnumerator AnimatedFlipTo(int target)

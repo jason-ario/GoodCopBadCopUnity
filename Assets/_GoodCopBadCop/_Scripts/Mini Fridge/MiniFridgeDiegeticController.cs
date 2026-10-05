@@ -1,4 +1,3 @@
-using HighlightPlus;
 using UnityEngine;
 
 /// <summary>
@@ -146,12 +145,15 @@ public class MiniFridgeDiegeticController : DiegeticViewController
         _lastHovered = null;
     }
 
+    /// <summary>
+    /// Routes hover through <see cref="Interactable.Highlight"/>, which keeps the
+    /// HighlightEffect enabled and drives visibility via <c>highlighted</c>. Toggling
+    /// <c>enabled</c> directly (the old approach) never set <c>highlighted</c>, so nothing rendered.
+    /// </summary>
     private static void SetHighlight(PickableObject item, bool on)
     {
         if (item == null) return;
-        HighlightEffect effect = item.GetComponent<HighlightEffect>();
-        if (effect != null)
-            effect.enabled = on;
+        item.Highlight(on);
     }
 
     private void TryPickUp(PickableObject item)
