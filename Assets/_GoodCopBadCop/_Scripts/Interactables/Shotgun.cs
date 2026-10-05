@@ -303,7 +303,8 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     {
         shootVFX.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         shootVFX.Play();
-        _cinemachineImpulseSource.GenerateImpulse();
+        // Cosmetic-only replay: no camera impulse (world-space, would shake observers).
+        // The shooter generates it locally in OnStartUse.
         StartCoroutine(LightOnOff());
     }
 

@@ -487,8 +487,9 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     [ClientRpc]
     private void PlayShootFXClientRpc(Vector3 direction, ClientRpcParams clientRpcParams = default)
     {
+        // No camera impulse here: impulses are world-space, so replaying it on observers shook
+        // their camera for someone else's shot. The shooter generates it locally in OnStartUse.
         PlayShootFX(direction);
-        _cinemachineImpulseSource?.GenerateImpulse();
     }
 
     // ── Reloading (KeyCode.R, from PlayerAmmoReserve) ──────────────────────────

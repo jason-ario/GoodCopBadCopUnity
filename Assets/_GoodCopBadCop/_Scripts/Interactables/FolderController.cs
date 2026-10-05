@@ -959,7 +959,12 @@ public class FolderController : PickableObject
         }
 
         yield return new WaitForSeconds(.2f);
-        _impulseSource.GenerateImpulse();
+
+        // Cinemachine impulses are world-space and heard by whichever camera is live on this
+        // machine, so generating on every client (this coroutine runs via ClientRpc) shook
+        // nearby teammates. Only the stamping player's own camera should feel it.
+        if (isStampingLocalPlayer)
+            _impulseSource.GenerateImpulse();
         yield return new WaitForSeconds(.25f);
 
         ppc.PlayerAnimationController.RightArmRigIKTarget?.DORotate(
