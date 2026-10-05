@@ -72,8 +72,14 @@ public class GuardPurchasePoint : Interactable
     /// </summary>
     private bool _pendingUnlock;
 
-    private void Awake()
+    // Must override (not hide) Interactable.Awake: the base caches the HighlightEffect used by
+    // Highlight(). Hiding it left that null, so hovering the post threw a NullReferenceException
+    // inside PlayerInteractionController.HandleReticle, aborting its Update before the Interact
+    // key was processed — the hire screen never opened.
+    protected override void Awake()
     {
+        base.Awake();
+
         if (_postRenderer == null && _guardPurchasePost != null)
             _postRenderer = _guardPurchasePost.GetComponent<Renderer>();
 

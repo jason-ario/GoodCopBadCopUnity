@@ -47,6 +47,10 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("ElectricityController scene object. Assign in Inspector. The B hack calls PowerOn() to guarantee lights are on at Day 4.")]
     [SerializeField] private ElectricityController _electricityController;
 
+    [Header("Lineup Debug")]
+    [Tooltip("SuspectData for Nona. Used by the cheat console's 'Force Nona as Next Suspect'.")]
+    [SerializeField] private SuspectData _nonaSuspectData;
+
     [Header("Power Station Debug")]
     [Tooltip("Spawn point at the power station. Assign 'Player Spawn Pos - At Power Station' from the scene. Used by the P key and the cheat console button.")]
     [SerializeField] private Transform _powerStationSpawnPoint;
@@ -1145,6 +1149,29 @@ public class DebugConsole : MonoBehaviour
 
         SuspectController.ForceNextSuspectAsFullMutant = true;
         Debug.Log("[DebugConsole] Next eligible civilian suspect is armed to spawn as a full mutant (M).");
+    }
+
+    /// <summary>
+    /// Arms <see cref="SuspectController.ForceNextSuspectData"/> with Nona, so the next lineup
+    /// slot to spawn is overwritten with her (whoever held it moves to her later slot if she was
+    /// already in today's lineup, otherwise they're dropped). Host-only, like the other lineup cheats.
+    /// </summary>
+    public void ForceNonaNext()
+    {
+        if (_nonaSuspectData == null)
+        {
+            Debug.LogWarning("[DebugConsole] ForceNonaNext: _nonaSuspectData not assigned in the Inspector.");
+            return;
+        }
+
+        if (ShiftManager.Instance == null || !ShiftManager.Instance.IsServer)
+        {
+            Debug.LogWarning("[DebugConsole] ForceNonaNext: run this cheat on the host.");
+            return;
+        }
+
+        SuspectController.ForceNextSuspectData = _nonaSuspectData;
+        Debug.Log("[DebugConsole] Nona will overwrite the next lineup slot.");
     }
 
     /// <summary>

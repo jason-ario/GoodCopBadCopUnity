@@ -95,6 +95,14 @@ public class SuspectController : NetworkBehaviour
     public static bool ForceNextSuspectAsFullMutant = false;
 
     /// <summary>
+    /// Debug/cheat, server-side. When set, the next lineup slot to spawn is overwritten with this
+    /// suspect (see <see cref="DailySuspectManager.ForceSuspectIntoSlot"/>). Scripted intercepts
+    /// (Alexei, Vlad, the Soldier) still take priority and leave this armed for the following
+    /// slot. Consumed and reset to null after one use. Set by the F12 cheat console.
+    /// </summary>
+    public static SuspectData ForceNextSuspectData = null;
+
+    /// <summary>
     /// Optional server-side intercept for the next suspect spawn. When set, this is invoked
     /// instead of spawning a normal or mutant suspect for that slot. Consumed and reset to null
     /// after one use. Set by day-specific controllers (e.g. Day_01 for the Alexei scripted event).
@@ -350,6 +358,15 @@ public class SuspectController : NetworkBehaviour
             Debug.Log($"[SuspectController] Intercepting suspect spawn at index {suspectIndex.Value} — scripted event.");
             intercept.Invoke();
             yield break;
+        }
+
+        // Cheat: overwrite this slot with a specific character (e.g. "Force Nona Next").
+        if (ForceNextSuspectData != null)
+        {
+            SuspectData forced = ForceNextSuspectData;
+            ForceNextSuspectData = null;
+            if (!dailySuspectManager.ForceSuspectIntoSlot(suspectIndex.Value, forced))
+                Debug.LogWarning($"[SuspectController] ForceNextSuspectData: lineup slot {suspectIndex.Value} is out of range — '{forced.name}' was not forced.");
         }
 
         // Keep trying subsequent lineup slots if a spawn attempt fails for any reason (bad data,

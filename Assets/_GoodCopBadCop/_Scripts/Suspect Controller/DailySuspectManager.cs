@@ -674,6 +674,45 @@ public class DailySuspectManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Debug/cheat, server-side. Overwrites lineup slot <paramref name="lineupIndex"/> with
+    /// <paramref name="suspect"/> as a plain civilian: its mutant-intruder, doppelganger,
+    /// replacement and full-mutant flags are cleared. If <paramref name="suspect"/> already holds
+    /// a later slot, the two slots swap so the forced character never appears twice; the
+    /// displaced character takes that later slot instead. Slot count is unchanged, so
+    /// <see cref="TotalSuspectsThisShift"/> only shifts if a mutant-intruder slot was overwritten.
+    /// Returns false if the index is out of range.
+    /// </summary>
+    public bool ForceSuspectIntoSlot(int lineupIndex, SuspectData suspect)
+    {
+        if (suspect == null || shiftSuspects == null || lineupIndex < 0 || lineupIndex >= shiftSuspects.Count)
+            return false;
+
+        SuspectData displaced = shiftSuspects[lineupIndex];
+        int laterIndex = shiftSuspects.IndexOf(suspect, lineupIndex + 1);
+        if (laterIndex >= 0)
+        {
+            shiftSuspects[laterIndex] = displaced;
+            ClearSlotFlags(laterIndex);
+        }
+
+        shiftSuspects[lineupIndex] = suspect;
+        ClearSlotFlags(lineupIndex);
+
+        Debug.Log($"[DailySuspectManager] Forced '{suspect.name}' into slot {lineupIndex}" +
+                  (displaced != null ? $", replacing '{displaced.name}'" : ", replacing a mutant-intruder slot") +
+                  (laterIndex >= 0 ? $" (swapped with her later slot {laterIndex})." : "."));
+        return true;
+    }
+
+    private void ClearSlotFlags(int lineupIndex)
+    {
+        _mutantSlotIndices.Remove(lineupIndex);
+        _doppelgangerSlots.Remove(lineupIndex);
+        _replacementSlotIndices.Remove(lineupIndex);
+        _fullMutantSlotIndices.Remove(lineupIndex);
+    }
+
+    /// <summary>
     /// Returns true if the given lineup index is a fully-mutated civilian slot.
     /// Outputs the suspect's <see cref="SuspectData"/> so the caller can read it directly.
     /// </summary>
