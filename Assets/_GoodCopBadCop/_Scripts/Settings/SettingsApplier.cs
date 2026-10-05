@@ -1,4 +1,5 @@
 using System;
+using GoodCopBadCop.Audio;
 using R3;
 using VContainer.Unity;
 
@@ -38,18 +39,14 @@ namespace GoodCopBadCop.Settings
                 .Subscribe(value => UnityEngine.AudioListener.volume = value / 100f)
                 .AddTo(ref disposables);
 
+            // Music and SFX drive the MainMix group faders. Voice volume is handled by
+            // VoiceChatSettingsAdapter (VoicePlaybackGain), which can boost above unity.
             model.MusicVolume
-                .Subscribe(value => global::MusicManager.Instance?.SetVolumeScale(value / 100f))
+                .Subscribe(value => GameAudioMixer.SetVolumePercent(EAudioMixChannel.Music, value))
                 .AddTo(ref disposables);
 
             model.SfxVolume
-                .Subscribe(value =>
-                {
-                    if (global::SFXController.Instance != null)
-                    {
-                        global::SFXController.Instance.VolumeScale = value / 100f;
-                    }
-                })
+                .Subscribe(value => GameAudioMixer.SetVolumePercent(EAudioMixChannel.Sfx, value))
                 .AddTo(ref disposables);
         }
 

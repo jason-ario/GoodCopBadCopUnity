@@ -140,6 +140,47 @@ public class SaveDataManager : MonoBehaviour
         Debug.Log($"[SaveDataManager] Anomaly unlocked: '{typeName}'.");
     }
 
+    // -------------------------------------------------------------------------
+    // Guidebook seen state
+    // -------------------------------------------------------------------------
+
+    /// <summary>True once the player has opened the guidebook section containing this anomaly on the active slot.</summary>
+    public bool IsGuidebookAnomalySeen(string typeName)
+    {
+        string[] seen = ActiveSlot?.SeenGuidebookAnomalyTypeNames;
+        return seen != null && Array.IndexOf(seen, typeName) >= 0;
+    }
+
+    /// <summary>
+    /// Marks anomaly guidebook entries as seen. UI meta-state, not progression: it is written to
+    /// the committed checkpoint immediately (like playtime) so a checkpoint revert or a mid-day
+    /// quit doesn't bring old "!" notifications back. Returns true if anything changed.
+    /// </summary>
+    public bool MarkGuidebookAnomaliesSeen(System.Collections.Generic.IEnumerable<string> typeNames)
+    {
+        if (ActiveSlot == null || typeNames == null) return false;
+
+        var live = new System.Collections.Generic.List<string>(ActiveSlot.SeenGuidebookAnomalyTypeNames ?? new string[0]);
+        bool changed = false;
+        foreach (string typeName in typeNames)
+        {
+            if (string.IsNullOrEmpty(typeName) || live.Contains(typeName)) continue;
+            live.Add(typeName);
+            changed = true;
+        }
+        if (!changed) return false;
+
+        ActiveSlot.SeenGuidebookAnomalyTypeNames = live.ToArray();
+
+        SaveSlot committed = _committedData?.Slots[ActiveSlotIndex];
+        if (committed != null && committed.IsOccupied)
+        {
+            committed.SeenGuidebookAnomalyTypeNames = live.ToArray();
+            if (CanSave()) WriteToDisk();
+        }
+        return true;
+    }
+
     /// <summary>
     /// True once the player has completed the full Day 1 tutorial sequence (including tool locker refill).
     /// When true, DayActivated() on Day 1 skips all tutorial gating and runs a free-play shift.
@@ -971,6 +1012,13 @@ public class SaveSlot
     /// persisted independently of day-start checkpoints so reverts never lose time played.
     /// </summary>
     public double PlaytimeSeconds;
+
+    /// <summary>
+    /// Anomaly C# type names whose guidebook section the player has opened. Drives the "!"
+    /// notifications on the HUD guidebook icon and section tabs. Like <see cref="PlaytimeSeconds"/>,
+    /// persisted independently of day-start checkpoints (see <see cref="SaveDataManager.MarkGuidebookAnomaliesSeen"/>).
+    /// </summary>
+    public string[] SeenGuidebookAnomalyTypeNames = new string[0];
 
     /// <summary>ISO-8601 string; use LastSavedTime for a parsed DateTime.</summary>
     public string LastSavedRaw;

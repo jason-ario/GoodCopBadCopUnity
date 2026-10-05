@@ -258,7 +258,7 @@ public class GuidebookController : MonoBehaviour
         if (_guidebookObject != null)
             _guidebookObject.SetActive(false);
 
-        // Disable after deactivation so the builder's OnDisable still marks pages as read.
+        // Disable after deactivation so the builder's OnDisable still sees the local copy.
         if (_pageController != null)
             _pageController.InputEnabled = false;
 

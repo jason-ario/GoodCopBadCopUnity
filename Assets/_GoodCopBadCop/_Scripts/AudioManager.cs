@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using DG.Tweening;
+using Dissonance.Audio.Playback;
 using UnityEngine;
 
 public class AudioManager : MonoBehaviour
@@ -77,8 +78,9 @@ public class AudioManager : MonoBehaviour
 
     /// <summary>
     /// Fades out every playing world AudioSource (ambience, footsteps, hums, mutants, remote
-    /// players, ...) over <paramref name="fadeSeconds"/>, then pauses the AudioListener so
-    /// nothing new can be heard. The <see cref="MusicManager"/> source and any sources under
+    /// player footsteps, ...) over <paramref name="fadeSeconds"/>, then pauses the AudioListener so
+    /// nothing new can be heard. Dissonance voice-chat playback is left untouched (it already
+    /// ignores the listener pause). The <see cref="MusicManager"/> source and any sources under
     /// <paramref name="exemptRoots"/> (e.g. UI) are marked ignoreListenerPause and keep playing.
     /// Used by the Thanks For Playing end screen. Undo with <see cref="RestoreWorldAudio"/>.
     /// </summary>
@@ -112,6 +114,11 @@ public class AudioManager : MonoBehaviour
             // Ambient/rain have their own fade-and-stop (FadeOutAmbientAudio / SetRainAmbience);
             // they're still muted by the listener pause, but their tweens aren't hijacked here.
             if (exempt.Contains(source) || !source.isPlaying || source == ambientAudio || source == rainAmbience)
+                continue;
+
+            // Voice chat must keep working on the end screen. Dissonance playback sources already
+            // ignore the listener pause; just don't fade them out.
+            if (source.TryGetComponent(out VoicePlayback _))
                 continue;
 
             _silencedSources.Add((source, source.volume));

@@ -6,13 +6,12 @@ public class SFXController : MonoBehaviour
 {
     public static SFXController Instance;
 
+    // SFX volume is applied by the MainMix "SFX" group fader (GoodCopBadCop.Audio.GameAudioMixer),
+    // not per source, so world sources without SFXController are covered too.
     private const float DefaultSpatialMaxDistance = 5f;
-    private const string SfxVolumeSettingsKey = "settings.audio.sfxVolume";
 
-    /// <summary>
-    /// Multiplier (0-1) applied to all SFX playback, driven by Settings > Audio > SFX Volume.
-    /// </summary>
-    public float VolumeScale { get; set; } = 1f;
+    /// <summary>Looping 2D music source; routed to the MainMix Music group.</summary>
+    public AudioSource MusicSource => _musicSource;
 
     [Header("Audio Source")]
     [SerializeField] private AudioSource sfxSource;
@@ -30,7 +29,6 @@ public class SFXController : MonoBehaviour
     void Awake()
     {
         Instance = this;
-        VolumeScale = PlayerPrefs.GetFloat(SfxVolumeSettingsKey, 80f) / 100f;
     }
 
     // -----------------------------
@@ -42,7 +40,7 @@ public class SFXController : MonoBehaviour
         if (!clip) return;
 
         sfxSource.pitch = pitch;
-        sfxSource.PlayOneShot(clip, volume * VolumeScale);
+        sfxSource.PlayOneShot(clip, volume);
     }
 
     /// <summary>
@@ -126,8 +124,9 @@ public class SFXController : MonoBehaviour
         emitter.name = $"SFX_{clip.name}";
 
         AudioSource source = emitter.GetComponent<AudioSource>();
+        GoodCopBadCop.Audio.GameAudioMixer.Route(source);
         source.clip = clip;
-        source.volume = volume * VolumeScale;
+        source.volume = volume;
         source.pitch = pitch;
 
         if (maxDistance > 0f)
@@ -147,7 +146,7 @@ public class SFXController : MonoBehaviour
     public void PlayCustomSFX(GameObject customSFXPrefab, AudioClip clip)
     {
         AudioSource source = Instantiate(customSFXPrefab, transform.position, transform.rotation).GetComponent<AudioSource>();
-        source.volume *= VolumeScale;
+        GoodCopBadCop.Audio.GameAudioMixer.Route(source);
         source.PlayOneShot(clip);
     }
 

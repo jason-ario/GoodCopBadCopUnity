@@ -1367,6 +1367,9 @@ public class ShiftManager : NetworkBehaviour
         // the configured fade-in duration) guarantees the screen is truly fully black —
         // otherwise the report can be torn down while the blackout is still translucent,
         // briefly exposing the player's camera before the blackout finishes fading in.
+        // When the report's opaque backdrop (same colour as the blackout) is already covering the
+        // screen, snap the blackout dark underneath it instead — the sweep would be invisible.
+        UIController.Instance.TrySnapToBlackBehindReport();
         yield return UIController.Instance.FadeInAndWait();
 
         // Screen is now fully black — safe to tear down the report overlay.

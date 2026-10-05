@@ -299,7 +299,7 @@ public class Day_03 : DayBase, IDailyTask
              "applied to TakeOutTrashTask's _minGoreSpawnCount/_maxGoreSpawnCount roll. 1 = full roll; " +
              "values above 1 spawn extra. Solo play still halves the result.")]
     [Range(0.05f, 3f)]
-    [SerializeField] private float _goreAmountScale = 0.5f;
+    [SerializeField] private float _goreAmountScale = 1f;
 
     [Tooltip("Extra multiplier applied on top of the cleanup scale for fences only " +
              "(gore is unaffected). 0.5 = half as many fence segments broken.")]

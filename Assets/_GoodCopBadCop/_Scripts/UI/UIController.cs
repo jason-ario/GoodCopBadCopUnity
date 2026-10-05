@@ -676,6 +676,22 @@ public class UIController : MonoBehaviour
     public bool IsEndOfShiftReportVisible =>
         endOfShiftReportUI != null && endOfShiftReportUI.gameObject.activeInHierarchy;
 
+    /// <summary>
+    /// If the end-of-shift report's opaque backdrop is covering the screen, jumps the tentacle
+    /// blackout (which renders beneath overlay UI) straight to fully dark. The backdrop and the
+    /// blackout share the same colour, so removing the report afterwards is seamless and the
+    /// transition doesn't wait on a sweep hidden behind the backdrop.
+    /// Returns false (and does nothing) when the report isn't fully covering the screen.
+    /// </summary>
+    public bool TrySnapToBlackBehindReport()
+    {
+        if (_tentacleBlackout == null || !IsEndOfShiftReportVisible || !endOfShiftReportUI.IsBackdropOpaque)
+            return false;
+
+        _tentacleBlackout.SetProgress(1f);
+        return true;
+    }
+
     private bool _endOfShiftReportOpen;
 
     /// <summary>

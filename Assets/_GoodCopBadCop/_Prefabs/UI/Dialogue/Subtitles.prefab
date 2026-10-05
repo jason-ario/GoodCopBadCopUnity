@@ -185,6 +185,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: 633322603464f5d448dd18acb3fa60de, type: 2}
   playOnEnable: 0
+  animateEmphasis: 1
+  emphasisIntensity: 1
 --- !u!1 &4440882086164474402
 GameObject:
   m_ObjectHideFlags: 0
@@ -425,6 +427,7 @@ GameObject:
   - component: {fileID: 4283958257973559838}
   - component: {fileID: 2866414661492834669}
   - component: {fileID: 836346226640642855}
+  - component: {fileID: 3083821698898966517}
   m_Layer: 0
   m_Name: Name
   m_TagString: Untagged
@@ -551,6 +554,22 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &3083821698898966517
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5140090619571703365}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c27507d999965240b21ed05ea2189d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
+  profile: {fileID: 11400000, guid: 8f88f8454cb22e149bca4aa0be3c5cda, type: 2}
+  playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
 --- !u!1 &6636401719528970236
 GameObject:
   m_ObjectHideFlags: 0
@@ -687,6 +706,7 @@ GameObject:
   - component: {fileID: 6337762392133414049}
   - component: {fileID: 2802909093224754259}
   - component: {fileID: 3662714165540955647}
+  - component: {fileID: 7297367732311955473}
   m_Layer: 0
   m_Name: Name Tag
   m_TagString: Untagged
@@ -826,6 +846,20 @@ CanvasGroup:
   m_Interactable: 0
   m_BlocksRaycasts: 0
   m_IgnoreParentGroups: 0
+--- !u!114 &7297367732311955473
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8041943766825440356}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ee00d2cb17e9547bb841a6e8028edc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIWobble
+  wobbleProfile: {fileID: 11400000, guid: 633322603464f5d448dd18acb3fa60de, type: 2}
+  intensity: 1
 --- !u!1001 &5562566747715548029
 PrefabInstance:
   m_ObjectHideFlags: 0

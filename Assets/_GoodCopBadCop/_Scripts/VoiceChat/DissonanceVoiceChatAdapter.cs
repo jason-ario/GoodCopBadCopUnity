@@ -168,6 +168,9 @@ namespace GoodCopBadCop.VoiceChat
             // No ducking: remote voices were dropped 6 dB whenever the local mic transmitted
             // (including voice-activation false triggers), making voice chat hard to hear.
             settings.VoiceDuckLevel = 1f;
+            // Speaker users: the MainMix master group carries the Dissonance Echo Cancellation
+            // capture filter, so game audio (music) leaking into the mic is subtracted before encoding.
+            settings.AecSuppressionAmount = Dissonance.Audio.Capture.AecSuppressionLevels.Low;
         }
 
         private void ApplyLobbyTriggers(bool enabled, bool muted)

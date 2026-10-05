@@ -222,6 +222,10 @@ public class Day_02 : DayBase, IDailyTask
     [Tooltip("Seconds after the tool locker dialogue before Vlad starts walking to his despawn point.")]
     [SerializeField] private float _vladExitDelay = 1.5f;
 
+    [Tooltip("Seconds the booth door is held open once Vlad starts walking back to the yard after the " +
+             "tool locker talk. After this, players can close the door again (Vlad should be through it by then).")]
+    [SerializeField] private float _vladExitDoorHoldDuration = 3f;
+
     // Guards — prevent re-triggering if a player walks in and out of range.
     private bool _introDialogueTriggered;
     private bool _toolLockerDialogueTriggered;
@@ -775,29 +779,34 @@ public class Day_02 : DayBase, IDailyTask
 
         // The booth door's NavMeshObstacle blocks Vlad's path out of the booth whenever it's
         // closed, so if a player shut it during the tool locker talk he can't path back to the
-        // yard. Force it open and keep it open until he's out and settled.
+        // yard. Force it open and keep it open just long enough for him to walk through it, then
+        // let players interact with it again.
         bool doorWasClosed = _boothDoor != null && _boothDoor.IsDoorClosed;
-        Coroutine holdDoor = StartCoroutine(HoldBoothDoorOpen());
+        float carveClearDelay = doorWasClosed ? 0.25f : 0f;
+        Coroutine holdDoor = StartCoroutine(HoldBoothDoorOpen(carveClearDelay + _vladExitDoorHoldDuration));
 
         // Give the NavMeshObstacle carving a moment to clear before Vlad computes his path.
         if (doorWasClosed)
-            yield return new WaitForSeconds(0.25f);
+            yield return new WaitForSeconds(carveClearDelay);
 
         yield return StartCoroutine(SettleVladInYard(_spawnedVlad));
-        StopCoroutine(holdDoor);
+        if (holdDoor != null) StopCoroutine(holdDoor);
 
         Debug.Log("[Day_02] Opening sequence complete — Vlad has settled in the yard.");
     }
 
     /// <summary>
-    /// Forces <see cref="_boothDoor"/> open and re-opens it if a player closes it, until stopped.
-    /// Used while Vlad walks out of the booth after the tool locker dialogue. Server-side only.
+    /// Forces <see cref="_boothDoor"/> open and re-opens it if a player closes it, for
+    /// <paramref name="duration"/> seconds (or until stopped). Used while Vlad walks out of the
+    /// booth after the tool locker dialogue; once he's through, the door is interactable again.
+    /// Server-side only.
     /// </summary>
-    private IEnumerator HoldBoothDoorOpen()
+    private IEnumerator HoldBoothDoorOpen(float duration)
     {
         if (_boothDoor == null) yield break;
 
-        while (true)
+        float endTime = Time.time + duration;
+        while (Time.time < endTime)
         {
             if (_boothDoor.IsDoorClosed)
                 _boothDoor.ForceOpen(openedIn: true);

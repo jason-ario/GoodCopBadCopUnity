@@ -3457,12 +3457,10 @@ public class MutantEnemy : NetworkBehaviour
         if (clip == null) return;
 
         float pitch = 1f + UnityEngine.Random.Range(-_footstepPitchRandomness, _footstepPitchRandomness);
-        float volumeScale = SFXController.Instance != null ? SFXController.Instance.VolumeScale : 1f;
-
         if (_footstepAudioSource != null)
         {
             _footstepAudioSource.pitch = pitch;
-            _footstepAudioSource.PlayOneShot(clip, _footstepVolume * volumeScale);
+            _footstepAudioSource.PlayOneShot(clip, _footstepVolume);
             return;
         }
 

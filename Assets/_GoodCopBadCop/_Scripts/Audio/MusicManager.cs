@@ -33,7 +33,8 @@ public class MusicManager : MonoBehaviour
 {
     public static MusicManager Instance { get; private set; }
 
-    private const string MusicVolumeSettingsKey = "settings.audio.musicVolume";
+    // Settings > Audio > Music Volume is applied by the MainMix "Music" group fader
+    // (GoodCopBadCop.Audio.GameAudioMixer), so this class only handles relative levels/fades.
 
     [Tooltip("Default duration in seconds for fade-in when calling Play() without an explicit fade.")]
     [SerializeField] private float _defaultFadeInDuration = 1f;
@@ -50,7 +51,6 @@ public class MusicManager : MonoBehaviour
     [SerializeField] private float _ambientVolumeMultiplier = 0.5f;
 
     private AudioSource _source;
-    private float _volumeScale = 1f;
     private MusicPriority _currentPriority = MusicPriority.Ambient;
 
     /// <summary>Priority of the track currently active on the source (or last active one).</summary>
@@ -76,7 +76,6 @@ public class MusicManager : MonoBehaviour
         _source.loop        = true;
         _source.playOnAwake = false;
         _source.spatialBlend = 0f; // Always 2-D / non-spatial.
-        _volumeScale = PlayerPrefs.GetFloat(MusicVolumeSettingsKey, 70f) / 100f;
     }
 
     private void OnDestroy()
@@ -85,21 +84,6 @@ public class MusicManager : MonoBehaviour
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Sets the volume multiplier (0-1) applied on top of <see cref="defaultVolume"/> / fade
-    /// targets, driven by Settings > Audio > Music Volume. Applies immediately if music is
-    /// currently playing (and not mid cross-fade-out).
-    /// </summary>
-    public void SetVolumeScale(float scale01)
-    {
-        _volumeScale = Mathf.Clamp01(scale01);
-
-        if (_source != null && _source.isPlaying && !DOTween.IsTweening(_source))
-        {
-            _source.volume = TargetVolume(_currentPriority);
-        }
-    }
 
     /// <summary>
     /// Plays <paramref name="clip"/> immediately, optionally fading in over
@@ -211,11 +195,11 @@ public class MusicManager : MonoBehaviour
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /// <summary>Effective target volume for <paramref name="priority"/>: <see cref="defaultVolume"/> scaled by
-    /// the settings volume, and further scaled by <see cref="_ambientVolumeMultiplier"/> for Ambient tracks.</summary>
+    /// <summary>Effective target volume for <paramref name="priority"/>: <see cref="defaultVolume"/>, further
+    /// scaled by <see cref="_ambientVolumeMultiplier"/> for Ambient tracks. The settings volume is the mixer fader.</summary>
     private float TargetVolume(MusicPriority priority)
     {
-        float volume = defaultVolume * _volumeScale;
+        float volume = defaultVolume;
         if (priority == MusicPriority.Ambient)
             volume *= _ambientVolumeMultiplier;
         return volume;

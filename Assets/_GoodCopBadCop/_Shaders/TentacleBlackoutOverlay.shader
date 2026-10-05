@@ -141,13 +141,19 @@ Shader "GoodCopBadCop/TentacleBlackoutOverlay"
                 if (_Progress < 0.002)
                     return half4(0, 0, 0, 0);
 
+                // Fully covered — solid colour, no animated edge that could expose the scene.
+                if (_Progress > 0.998)
+                    return half4((half3)_DarkColor.rgb, 1);
+
                 // ── Organic wavefront ──────────────────────────────────────────
                 float warp =
                     fbm(float2(uv.y * 4.2, uv.y * 2.1 + t * 0.18 * _WiggleSpeed)) * 0.17
                   + sin(uv.y * 7.3 + t * 1.15 * _WiggleSpeed) * 0.04
                   + sin(uv.y * 3.1 - t * 0.62 * _WiggleSpeed) * 0.03;
 
-                float wave  = _Progress * 1.28 - 0.14;
+                // warp can reach ~+0.24, so the wave must end past 1.0 + 0.24 + 0.07 (smoothstep
+                // half-width) for the right edge to be fully covered at _Progress = 1.
+                float wave  = _Progress * 1.5 - 0.14;
                 float sweep = 1.0 - smoothstep(wave - 0.07, wave + 0.07, uv.x + warp);
 
                 // ── 6 vortex seeds ─────────────────────────────────────────────
@@ -183,6 +189,8 @@ Shader "GoodCopBadCop/TentacleBlackoutOverlay"
                 // ── Combine ────────────────────────────────────────────────────
                 float vDarkMasked = vDark * smoothstep(0.05, 0.55, sweep);
                 float darkness    = saturate(sweep + vDarkMasked * 0.85 + edgeTend * 0.55);
+                // Hard guarantee: close any remaining gaps over the final few percent.
+                darkness = max(darkness, smoothstep(0.95, 0.998, _Progress));
 
                 // Output: dark color with darkness as alpha, blended over everything below
                 return half4((half3)_DarkColor.rgb, (half)darkness);

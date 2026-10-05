@@ -11,6 +11,8 @@ public class Khinkali : PickableObject
     private const float HealAmount = 100f;
 
     [SerializeField] private float eatDuration = 1f;
+    [SerializeField] private AudioClip healSound;
+    [SerializeField] private float healSoundVolume = 1f;
     // Spoilage - server only
 
     /// <summary>
@@ -96,6 +98,9 @@ public class Khinkali : PickableObject
 
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
         PlayerInstance.Instance.Heal(HealAmount, EffectKeys.FoodHeal);
+
+        if (healSound != null && SFXController.Instance != null)
+            SFXController.Instance.Play(healSound, healSoundVolume);
 
         playerPickupController.DestroyEquippedItem();
     }

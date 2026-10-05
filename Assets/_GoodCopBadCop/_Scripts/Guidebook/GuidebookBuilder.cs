@@ -22,6 +22,10 @@ using UnityEngine;
 ///
 /// Rebuilding happens in <see cref="OnEnable"/> (book opening) — never while the player is reading.
 /// The reading position is kept between opens unless the set of unlocked anomalies changed.
+///
+/// On the local player's first-person copy, tabs of sections with unseen entries show a bobbing
+/// "!". Once the open spread settles inside a section, its entries are marked seen
+/// (<see cref="GuidebookSeenState"/>, saved per slot) and the tab's "!" goes away.
 /// </summary>
 [DefaultExecutionOrder(-10)]
 public class GuidebookBuilder : MonoBehaviour
@@ -48,22 +52,20 @@ public class GuidebookBuilder : MonoBehaviour
     [SerializeField] private float _accentDarken = 0.55f;
     [SerializeField] private Color _rulesAccent = new Color(0.45f, 0.08f, 0.06f, 1f);
 
-    /// <summary>
-    /// Anomaly type names whose page the local player has already had open in front of them.
-    /// Session-scoped and shared by all guidebook instances. Drives the "NEW" stamp.
-    /// </summary>
-    private static readonly HashSet<string> s_seenAnomalies = new HashSet<string>();
-
     private readonly List<GuidebookSheet>      _sheetPool = new List<GuidebookSheet>();
     private readonly List<GuidebookSheet>      _activeSheets = new List<GuidebookSheet>();
     private readonly List<GuidebookSectionTab> _tabPool = new List<GuidebookSectionTab>();
-    private readonly List<string>              _shownAnomalies = new List<string>();
     private readonly List<GuidebookFaceContent> _faces = new List<GuidebookFaceContent>();
-    private readonly List<(int faceIndex, string label, Color color)> _tabs =
-        new List<(int, string, Color)>();
+    // Anomalies is null for sections without anomaly entries (Rules, Integrity, Survival).
+    private readonly List<(int faceIndex, string label, Color color, List<string> anomalies)> _tabs =
+        new List<(int, string, Color, List<string>)>();
     private readonly List<List<int>> _imageGroups = new List<List<int>>();
 
     private string _builtSignature;
+
+    // Seen tracking — only on the local player's first-person copy.
+    private bool _tracksSeen;
+    private int  _lastCheckedLeftCount = -1;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -85,18 +87,67 @@ public class GuidebookBuilder : MonoBehaviour
         bool unlocksChanged = signature != _builtSignature;
         _builtSignature = signature;
 
+        // GuidebookController enables input before activating the local copy.
+        _tracksSeen = _pageController.InputEnabled;
+        _lastCheckedLeftCount = -1;
+
         int leftCount = unlocksChanged ? 0 : _pageController.LeftCount;
         Build();
         _pageController.SetSheets(_activeSheets, leftCount);
+        RefreshTabBadges();
     }
 
-    private void OnDisable()
+    private void Update()
     {
-        // Only the local player's first-person copy marks pages as read.
-        if (_pageController != null && _pageController.InputEnabled)
-            foreach (string typeName in _shownAnomalies)
-                s_seenAnomalies.Add(typeName);
+        if (!_tracksSeen || _pageController == null || _pageController.IsBusy) return;
+
+        int leftCount = _pageController.LeftCount;
+        if (leftCount == _lastCheckedLeftCount) return;
+        _lastCheckedLeftCount = leftCount;
+
+        MarkSectionSeen(leftCount);
     }
+
+    // ── Seen tracking ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The open spread has settled on <paramref name="leftCount"/>: every entry of the section it
+    /// belongs to counts as seen. Pages keep their NEW stamp until the book is next opened.
+    /// </summary>
+    private void MarkSectionSeen(int leftCount)
+    {
+        int section = -1;
+        for (int i = 0; i < _tabs.Count; i++)
+            if (TabTarget(_tabs[i].faceIndex) <= leftCount) section = i;
+
+        if (section < 0) return;
+        List<string> anomalies = _tabs[section].anomalies;
+        if (anomalies == null || !SectionHasNew(anomalies)) return;
+
+        GuidebookSeenState.MarkSeen(anomalies);
+        RefreshTabBadges();
+    }
+
+    private static bool SectionHasNew(List<string> anomalies)
+    {
+        if (anomalies == null) return false;
+        foreach (string typeName in anomalies)
+            if (!GuidebookSeenState.IsSeen(typeName)) return true;
+        return false;
+    }
+
+    private void RefreshTabBadges()
+    {
+        for (int i = 0; i < _tabPool.Count; i++)
+        {
+            bool isNew = _tracksSeen && i < _tabs.Count && SectionHasNew(_tabs[i].anomalies);
+            _tabPool[i].SetNew(isNew);
+        }
+    }
+
+    /// <summary>Left-stack count that opens the section whose first face is <paramref name="faceIndex"/>.</summary>
+    private static int TabTarget(int faceIndex) =>
+        faceIndex % 2 == 1 ? faceIndex / 2 + 1 : faceIndex / 2;
 
     // ── Build ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +155,6 @@ public class GuidebookBuilder : MonoBehaviour
     {
         _faces.Clear();
         _tabs.Clear();
-        _shownAnomalies.Clear();
         _imageGroups.Clear();
 
         AddRules();
@@ -196,7 +246,7 @@ public class GuidebookBuilder : MonoBehaviour
 
         // Open the section as a spread, like the anomaly sections.
         if (_faces.Count % 2 == 0) _faces.Add(NotesFace());
-        _tabs.Add((_faces.Count, _database.IntegrityTabLabel, _database.IntegrityTabColor));
+        _tabs.Add((_faces.Count, _database.IntegrityTabLabel, _database.IntegrityTabColor, null));
         Color  accent       = Accent(_database.IntegrityTabColor);
         string maxDeduction = MaxIntegrityDeductionPercent().ToString();
 
@@ -211,7 +261,7 @@ public class GuidebookBuilder : MonoBehaviour
         if (pages == null || pages.Count == 0) return;
 
         if (_faces.Count % 2 == 0) _faces.Add(NotesFace());
-        _tabs.Add((_faces.Count, _database.SurvivalTabLabel, _database.SurvivalTabColor));
+        _tabs.Add((_faces.Count, _database.SurvivalTabLabel, _database.SurvivalTabColor, null));
         AddAuthoredPages(pages, Accent(_database.SurvivalTabColor));
     }
 
@@ -230,7 +280,7 @@ public class GuidebookBuilder : MonoBehaviour
 
         // Like every other section, open Rules as a spread when something precedes it.
         if (_faces.Count > 0 && _faces.Count % 2 == 0) _faces.Add(NotesFace());
-        _tabs.Add((_faces.Count, _database.RulesTabLabel, _database.RulesTabColor));
+        _tabs.Add((_faces.Count, _database.RulesTabLabel, _database.RulesTabColor, null));
 
         AddAuthoredPages(rules, _rulesAccent);
     }
@@ -293,7 +343,8 @@ public class GuidebookBuilder : MonoBehaviour
             string costText = cost == 1 ? "+1 POINT" : $"+{cost} POINTS";
 
             int introIndex = _faces.Count;
-            _tabs.Add((introIndex, style.TabLabel, style.TabColor));
+            var sectionAnomalies = new List<string>(sectionEntries.Count);
+            _tabs.Add((introIndex, style.TabLabel, style.TabColor, sectionAnomalies));
             _faces.Add(default); // filled below once anomaly page numbers are known
 
             var contents = new StringBuilder();
@@ -313,9 +364,9 @@ public class GuidebookBuilder : MonoBehaviour
                     Badge       = $"{costText} TO RISK SCORE",
                     Body        = body,
                     AccentColor = accent,
-                    IsNew       = !s_seenAnomalies.Contains(entry.AnomalyTypeName),
+                    IsNew       = !GuidebookSeenState.IsSeen(entry.AnomalyTypeName),
                 });
-                _shownAnomalies.Add(entry.AnomalyTypeName);
+                sectionAnomalies.Add(entry.AnomalyTypeName);
             }
 
             var intro = new StringBuilder();
@@ -396,9 +447,9 @@ public class GuidebookBuilder : MonoBehaviour
             tab.gameObject.SetActive(used);
             if (!used) continue;
 
-            (int faceIndex, string label, Color color) = _tabs[i];
+            (int faceIndex, string label, Color color, _) = _tabs[i];
             int sheetIndex = faceIndex / 2;
-            int target     = faceIndex % 2 == 1 ? sheetIndex + 1 : sheetIndex;
+            int target     = TabTarget(faceIndex);
 
             Transform t = tab.transform;
             t.SetParent(_activeSheets[sheetIndex].TabAnchor, false);
@@ -481,9 +532,7 @@ public class GuidebookBuilder : MonoBehaviour
         return c;
     }
 
-    private static bool IsUnlocked(string typeName) =>
-        !string.IsNullOrEmpty(typeName)
-        && (AnomalyUnlockManager.Instance == null || AnomalyUnlockManager.Instance.IsAnomalyUnlocked(typeName));
+    private static bool IsUnlocked(string typeName) => GuidebookSeenState.IsUnlocked(typeName);
 
     private string ComputeUnlockSignature()
     {

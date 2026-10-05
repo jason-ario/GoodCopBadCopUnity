@@ -10,6 +10,8 @@ public class PillBottle : PickableObject, IAmmoProvider
     [SerializeField] Animator _animator;
     private readonly NetworkVariable<int> _usesRemaining = new(MaxUses, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     [SerializeField] private AudioClip drinkSound;
+    [SerializeField] private AudioClip healSound;
+    [SerializeField] private float healSoundVolume = 1f;
     private Coroutine _usePillBottleCoroutine;
 
     // ── IAmmoProvider ─────────────────────────────────────────────────────────
@@ -115,6 +117,9 @@ public class PillBottle : PickableObject, IAmmoProvider
         SetNearClipPlaneTightened(true);
         yield return new WaitForSeconds(2.5f);
         PlayerInstance.Instance.PlayerRadiation.TakeRadiationPill();
+
+        if (healSound != null && SFXController.Instance != null)
+            SFXController.Instance.Play(healSound, healSoundVolume);
         playerPickupController.PlayerAnimationController.SetAnimBool("TakingPill", false);
         _animator.SetBool("TakePill", false);
         SetNearClipPlaneTightened(false);

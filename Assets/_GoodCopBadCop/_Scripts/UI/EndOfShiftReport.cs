@@ -150,6 +150,23 @@ public class EndOfShiftReportUI : MonoBehaviour
     private Vector2 _paperRestPosition;
     private bool _paperRestCaptured;
 
+    /// <summary>
+    /// True while the backdrop fully hides everything behind the report (opaque image at full
+    /// group alpha). Used by the shift transition to snap the blackout dark underneath it instead
+    /// of animating a sweep nobody can see.
+    /// </summary>
+    public bool IsBackdropOpaque
+    {
+        get
+        {
+            if (dimmer == null || !dimmer.gameObject.activeInHierarchy || dimmer.alpha < 0.99f)
+                return false;
+            Graphic graphic = dimmer.GetComponent<Graphic>();
+            return graphic != null && graphic.enabled && graphic.color.a >= 0.99f;
+        }
+    }
+
+
     private void Awake()
     {
         if (rowTemplate != null)
