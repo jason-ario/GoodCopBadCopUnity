@@ -17,9 +17,13 @@ public class NewspaperContentsController : MonoBehaviour
     [SerializeField] TMP_Text footerText;
 
     [Header("Image")]
-    [Tooltip("UI Image that displays each day's newspaper photo. The sprite is assigned as-is; " +
-             "size/aspect come from the Image's own RectTransform and settings.")]
+    [Tooltip("UI Image that displays each day's newspaper photo. It should sit inside a fixed-size, " +
+             "masked frame (RectMask2D) so every photo occupies the same area on the page.")]
     [SerializeField] private Image photoImage;
+
+    [Tooltip("Optional AspectRatioFitter (EnvelopeParent) on photoImage. Its ratio is set to each sprite's " +
+             "native aspect so photos fill the frame without stretching; overflow is cropped by the frame mask.")]
+    [SerializeField] private AspectRatioFitter photoAspectFitter;
 
     [Tooltip("Shown when a day's content has no image assigned.")]
     [SerializeField] private Sprite fallbackImage;
@@ -92,9 +96,10 @@ public class NewspaperContentsController : MonoBehaviour
     }
 
     /// <summary>
-    /// Swaps the day's sprite into <see cref="photoImage"/>. Sizing is left entirely to the Image's
-    /// authored RectTransform/settings. Falls back to <see cref="fallbackImage"/> (or hides the Image
-    /// if none) when the day has no image.
+    /// Swaps the day's sprite into <see cref="photoImage"/>. The on-page footprint is fixed by the
+    /// photo's masked parent frame; <see cref="photoAspectFitter"/> matches the sprite's native aspect
+    /// so it covers that frame without distortion. Falls back to <see cref="fallbackImage"/> (or hides
+    /// the Image if none) when the day has no image.
     /// </summary>
     private void ApplyImage(Sprite daySprite)
     {
@@ -105,6 +110,15 @@ public class NewspaperContentsController : MonoBehaviour
         if (sprite == null) return;
 
         photoImage.sprite = sprite;
+        photoImage.preserveAspect = false;
+
+        if (photoAspectFitter != null && sprite.rect.height > 0f)
+        {
+            photoAspectFitter.aspectRatio = sprite.rect.width / sprite.rect.height;
+            // Apply immediately so the snapshot camera / Edit Mode bake sees the final layout.
+            photoAspectFitter.SetLayoutHorizontal();
+            photoAspectFitter.SetLayoutVertical();
+        }
     }
 
     /// <summary>

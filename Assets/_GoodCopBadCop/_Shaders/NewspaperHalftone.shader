@@ -12,6 +12,7 @@ Shader "GoodCopBadCop/NewspaperHalftone"
         _InkOpacity     ("Ink Opacity",                   Range(0, 1))      = 0.92
 
         // --- Halftone Grid ---
+        _HalftoneAmount ("Halftone Amount (0 = solid ink, 1 = dots)", Range(0, 1)) = 1
         _DotsAcross     ("Dots Across Image Width",       Range(10, 400))   = 90
         _DotSoftness    ("Dot Edge Softness",             Range(0, 1))      = 0.35
         _MaxDotSize     ("Max Dot Size",                  Range(0.5, 1.2))  = 0.78
@@ -83,6 +84,7 @@ Shader "GoodCopBadCop/NewspaperHalftone"
                 float4 _MainTex_TexelSize;
                 half4  _InkColor;
                 half   _InkOpacity;
+                half   _HalftoneAmount;
                 float  _DotsAcross;
                 half   _DotSoftness;
                 half   _MaxDotSize;
@@ -175,6 +177,9 @@ Shader "GoodCopBadCop/NewspaperHalftone"
                 float radius = min(sqrt(dark) * _MaxDotSize, maxRadius);
                 float ink  = 1.0 - smoothstep(radius - soft, radius + soft, dist);
                 ink *= step(1e-3, dark); // no stray specks in culled whites
+
+                // Blend between the dot screen and solid continuous-tone ink.
+                ink = lerp(dark, ink, _HalftoneAmount);
 
                 // --- Uneven ink density, like a cheap press ---
                 float n = ValueNoise(IN.uv * _InkNoiseScale) * 0.65 + ValueNoise(IN.uv * _InkNoiseScale * 3.1) * 0.35;

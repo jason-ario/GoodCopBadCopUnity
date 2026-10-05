@@ -266,6 +266,57 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!1 &3929802352615853199
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8528584849849318274}
+  - component: {fileID: 1134863680883489411}
+  m_Layer: 9
+  m_Name: Newspaper Image Frame
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &8528584849849318274
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3929802352615853199}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.24355438, y: 0.24355438, z: 0.24355438}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 8884099482160286617}
+  m_Father: {fileID: 4633784793630625654}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0.1269, y: -0.17003}
+  m_SizeDelta: {x: 0.909, y: 1}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1134863680883489411
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3929802352615853199}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
+  m_Padding: {x: 0, y: 0, z: 0, w: 0}
+  m_Softness: {x: 0, y: 0}
 --- !u!1 &4196653136388837597
 GameObject:
   m_ObjectHideFlags: 0
@@ -489,6 +540,7 @@ GameObject:
   - component: {fileID: 8884099482160286617}
   - component: {fileID: 1721855299267356158}
   - component: {fileID: 119632266408588699}
+  - component: {fileID: 3566142558067446513}
   m_Layer: 9
   m_Name: Newspaper Image
   m_TagString: Untagged
@@ -505,15 +557,15 @@ RectTransform:
   m_GameObject: {fileID: 4921805111236729927}
   m_LocalRotation: {x: 0, y: 0.99999744, z: 0, w: 0.0022645732}
   m_LocalPosition: {x: 0, y: 0, z: -0.0343}
-  m_LocalScale: {x: 0.26318488, y: 0.24355438, z: 0.24355438}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4633784793630625654}
+  m_Father: {fileID: 8528584849849318274}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0.1269, y: -0.17003}
-  m_SizeDelta: {x: 0.8412, y: 1}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1721855299267356158
 CanvasRenderer:
@@ -535,8 +587,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 0.5137255, g: 0.45882356, b: 0.37254903, a: 1}
+  m_Material: {fileID: 2100000, guid: 7309e24a1a0504d4084cc45ed8de8035, type: 2}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -553,6 +605,20 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &3566142558067446513
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4921805111236729927}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86710e43de46f6f4bac7c8e50813a599, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.AspectRatioFitter
+  m_AspectMode: 4
+  m_AspectRatio: 0.80078125
 --- !u!1 &4951222787921346290
 GameObject:
   m_ObjectHideFlags: 0
@@ -742,7 +808,7 @@ RectTransform:
   - {fileID: 782567489442036182}
   - {fileID: 7827936974524930876}
   - {fileID: 4142536817567645799}
-  - {fileID: 8884099482160286617}
+  - {fileID: 8528584849849318274}
   m_Father: {fileID: 3361654678057665712}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -1237,6 +1303,7 @@ MonoBehaviour:
   descriptionText: {fileID: 1089349725451226679}
   footerText: {fileID: 905892743669458377}
   photoImage: {fileID: 119632266408588699}
+  photoAspectFitter: {fileID: 3566142558067446513}
   fallbackImage: {fileID: 7482667652216324306, guid: 562401fb0ddb67642a5d760f14128816, type: 3}
   _newspaperContentScriptables:
   - {fileID: 11400000, guid: dbe5c8914e85ec041ad8dd0cd4d41a47, type: 2}
