@@ -1,4 +1,5 @@
 using System.Collections;
+using HighlightPlus;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -23,6 +24,10 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
     [Tooltip("The BunkerDoorController to call Open() on when the door is unlocked.")]
     [SerializeField] private BunkerDoorController _bunkerDoor;
+
+    [Tooltip("Hover highlight shown while the cursor is over the wheel (and kept on while dragging) " +
+             "inside the view. Falls back to the HighlightEffect on this GameObject if left empty.")]
+    [SerializeField] private HighlightEffect _wheelHighlight;
 
     [Tooltip("Replicates this wheel's spin across the network so other players see it turn. " +
              "Optional — if unassigned, rotation stays purely local to this client.")]
@@ -116,6 +121,9 @@ public class DoorWheelDiegeticController : DiegeticViewController
     {
         if (_wheelCollider != null)
             _wheelCollider.enabled = false;
+
+        if (_wheelHighlight == null)
+            _wheelHighlight = GetComponent<HighlightEffect>();
     }
 
     protected override void OnOpened()
@@ -132,6 +140,7 @@ public class DoorWheelDiegeticController : DiegeticViewController
     protected override void OnClosed()
     {
         SetDragging(false);
+        SetWheelHighlighted(false);
         _occupancy?.Release();
         _closing = false;
         StopAllCoroutines();
@@ -143,7 +152,11 @@ public class DoorWheelDiegeticController : DiegeticViewController
     protected override void OnUpdate()
     {
         // Waiting out the post-unlock delay: ignore all further input until we close.
-        if (_closing) return;
+        if (_closing)
+        {
+            SetWheelHighlighted(false);
+            return;
+        }
 
         // If the door was opened by another means while this view is active, exit cleanly.
         if (_bunkerDoor != null && _bunkerDoor.IsOpen)
@@ -154,6 +167,10 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
         Camera cam = RaycastCamera;
         if (cam == null || _wheelTransform == null) return;
+
+        // Hover highlight: on while the cursor is over the wheel, and held on for the whole drag
+        // (the cursor often leaves the collider while circling it).
+        SetWheelHighlighted(_isDragging || IsPointerOverWheel(cam));
 
         // Not yet dragging: only a click that actually lands on the wheel starts a drag.
         // Letting go of the mouse elsewhere, or missing the wheel, has no effect — the
@@ -241,6 +258,13 @@ public class DoorWheelDiegeticController : DiegeticViewController
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────
+
+    /// <summary>Local-only hover outline for the wheel; no-op when unchanged.</summary>
+    private void SetWheelHighlighted(bool on)
+    {
+        if (_wheelHighlight == null || _wheelHighlight.highlighted == on) return;
+        _wheelHighlight.SetHighlighted(on);
+    }
 
     /// <summary>
     /// Sets the dragging state. Stops the spin loop sound as a safety net whenever
