@@ -108,15 +108,23 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [SerializeField] private float _joinRadius = 5f;
 
     [Header("Glass Bang")]
-    [Tooltip("Animator trigger that, when used as a node/choice animationTrigger, also plays a " +
-             "damage-free knock on the booth glass (sound + shake) on every client.")]
+    [Tooltip("Animator trigger that, when used as a node/choice animationTrigger, also lands a real " +
+             "hit on the booth window at the impact frame — the same glass damage / shutter feedback " +
+             "a lineup mutant deals — plus a camera impulse.")]
     [SerializeField] private string _glassBangTrigger = "BangOnShutters";
 
-    [Tooltip("Seconds after the trigger fires before the knock plays. Matches the fist-impact " +
+    [Tooltip("Seconds after the trigger fires before the hit lands. Matches the fist-impact " +
              "frame of 'Bang on window.anim' (~0.48s).")]
     [SerializeField] [Min(0f)] private float _glassBangImpactDelay = 0.48f;
 
-    // Client-side: pending cosmetic glass knock, cancelled if the line is skipped first.
+    [Tooltip("If false, a dialogue bang never delivers the final blow: on glass one hit from " +
+             "shattering it only knocks (sound + shake) instead of smashing the window mid-conversation.")]
+    [SerializeField] private bool _glassBangCanSmash = false;
+
+    [Tooltip("Impulse fired on every client when the bang lands (on glass or shutter). Optional.")]
+    [SerializeField] private Unity.Cinemachine.CinemachineImpulseSource _glassBangImpulseSource;
+
+    // Server-side: pending glass hit, cancelled if the line is skipped before the impact frame.
     private Coroutine _glassBangCoroutine;
 
     // -------------------------------------------------------------------------
@@ -592,8 +600,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
             // Reset the previous trigger and force idle before firing the next animation.
             // This prevents a skipped trigger from continuing to play into the new line.
-            ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, node.animationTrigger);
-            _lastAnimTrigger = node.animationTrigger ?? string.Empty;
+            TriggerSpeakerAnimationServer(speakerNetId, node.animationTrigger);
 
             yield return StartCoroutine(SayAndWait(speaker, node.npcLine, node.playLaughSfx));
 
@@ -1237,8 +1244,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         yield return null; // flush the RPC before playing the NPC response
 
-        ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, chosen.animationTrigger);
-        _lastAnimTrigger = chosen.animationTrigger ?? string.Empty;
+        TriggerSpeakerAnimationServer(speakerNetId, chosen.animationTrigger);
 
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse, chosen.playLaughSfx));
     }
@@ -1933,6 +1939,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(newTrigger))
             anim.SetTrigger(newTrigger);
+    }
+
+    /// <summary>
+    /// Server-only. Fires the speaker's animation trigger on every client and, if it is the glass
+    /// bang trigger, schedules the window hit. Cancels any bang still pending from a skipped line.
+    /// </summary>
+    private void TriggerSpeakerAnimationServer(ulong speakerNetId, string trigger)
+    {
+        ResetAndTriggerAnimationClientRpc(speakerNetId, _lastAnimTrigger, trigger);
+        _lastAnimTrigger = trigger ?? string.Empty;
 
         if (_glassBangCoroutine != null)
         {
@@ -1940,19 +1956,58 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             _glassBangCoroutine = null;
         }
 
-        if (!string.IsNullOrEmpty(newTrigger) && newTrigger == _glassBangTrigger)
-            _glassBangCoroutine = StartCoroutine(GlassBangRoutine());
+        if (!string.IsNullOrEmpty(trigger) && trigger == _glassBangTrigger)
+            _glassBangCoroutine = StartCoroutine(GlassBangServerRoutine());
     }
 
     /// <summary>
-    /// Plays a cosmetic glass knock at the bang animation's impact frame. Runs locally on every
-    /// client from <see cref="ResetAndTriggerAnimationClientRpc"/>; never touches glass damage.
+    /// Server-only. At the bang's impact frame, lands the hit exactly like
+    /// <c>MutantSuspectBehaviour.WindowAttackSequence</c>: closed shutter → shutter feedback;
+    /// otherwise <see cref="BreakableGlassController.RegisterHit"/> (replicated + saved) and the
+    /// crack/smash feedback on every client. Already-smashed glass gets no hit and no impulse.
     /// </summary>
-    private IEnumerator GlassBangRoutine()
+    private IEnumerator GlassBangServerRoutine()
     {
         yield return new WaitForSeconds(_glassBangImpactDelay);
         _glassBangCoroutine = null;
-        BreakableGlassController.Instance?.PlayKnockFeedback();
+
+        var shutter = ShutterController.Instance;
+        var glass = BreakableGlassController.Instance;
+
+        if (shutter != null && !shutter.IsOpen)
+        {
+            GlassBangImpactClientRpc(GlassBangResult.Shutter, 0);
+            yield break;
+        }
+
+        if (glass == null || glass.IsSmashed)
+            yield break;
+
+        if (!_glassBangCanSmash && glass.CurrentHits >= glass.MaxHits - 1)
+        {
+            GlassBangImpactClientRpc(GlassBangResult.Knock, glass.CurrentHits);
+            yield break;
+        }
+
+        int newHits = glass.RegisterHit();
+        GlassBangImpactClientRpc(glass.IsSmashed ? GlassBangResult.Smash : GlassBangResult.Crack, newHits);
+    }
+
+    private enum GlassBangResult : byte { Shutter, Knock, Crack, Smash }
+
+    [ClientRpc]
+    private void GlassBangImpactClientRpc(GlassBangResult result, int hitCount)
+    {
+        switch (result)
+        {
+            case GlassBangResult.Shutter: ShutterController.Instance?.OnHitByMutant(); break;
+            case GlassBangResult.Knock:   BreakableGlassController.Instance?.PlayKnockFeedback(); break;
+            case GlassBangResult.Crack:   BreakableGlassController.Instance?.OnHitByMutant(hitCount); break;
+            case GlassBangResult.Smash:   BreakableGlassController.Instance?.ApplySmash(); break;
+        }
+
+        if (_glassBangImpulseSource != null)
+            _glassBangImpulseSource.GenerateImpulse();
     }
 
     private string GetLocalPlayerName()

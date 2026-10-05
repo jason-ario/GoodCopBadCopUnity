@@ -77,6 +77,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 717becc4a9864494996ad245f9d5d809, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  reportDisplayName: 
 --- !u!1 &1642116866602269296
 GameObject:
   m_ObjectHideFlags: 0
@@ -121,6 +122,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 694a38d03686f9849b4a1d584f8504ec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  reportDisplayName: 
 --- !u!1 &1776751332520453208
 GameObject:
   m_ObjectHideFlags: 0
@@ -341,6 +343,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e8709341cae494ea9656fc2695a968, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LesionAnomaly
+  reportDisplayName: 
   renderers: []
   fadeDuration: 2.5
 --- !u!1 &2267770435498252183
@@ -387,6 +390,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 84cd8258d6e5ef1409374d0efbccbfaf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HighRadiationAnomaly
+  reportDisplayName: 
   elevatedRadiation: 85
 --- !u!1 &2558828193893552733
 GameObject:
@@ -432,6 +436,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 94948cc713bee7e478e372d05ae2ec70, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StoryMismatchAnomaly
+  reportDisplayName: 
 --- !u!1 &2670910484236346859
 GameObject:
   m_ObjectHideFlags: 0
@@ -477,10 +482,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a56e3e3522cd99e47a2d8ee1160b31d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  reportDisplayName: 
   vomitPrefab: {fileID: 4928382710320344539}
-  windowDuration: 10
-  minEvents: 1
-  maxEvents: 10
+  initialDelay: 3
+  interval: 10
+  intervalJitter: 2
   vomitAnimTrigger: Vomit
 --- !u!1 &2740253640128778168
 GameObject:
@@ -532,6 +538,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e4204f05a91caa04083f9dc207bad87e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ViolentAnomaly
+  reportDisplayName: 
   animationAdapter: {fileID: 1549626828937643178}
   animationPreset: {fileID: 11400000, guid: 49386df8b4f924de7ad02ac134aaa4dc, type: 2}
 --- !u!114 &555522683728953335
@@ -546,6 +553,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 86ff3136ff55d5644943eb7d22164de1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DizzyAnomaly
+  reportDisplayName: 
   animationAdapter: {fileID: 1549626828937643178}
   animationPreset: {fileID: 11400000, guid: f4de074581d5544fab3cfff13a0b8d6f, type: 2}
 --- !u!114 &5653249742997793896
@@ -560,6 +568,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 41c9ed56876612e4c924f1712cdc1c25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LaughingAnomaly
+  reportDisplayName: 
   animationAdapter: {fileID: 1549626828937643178}
   animationPreset: {fileID: 11400000, guid: 09d1c1ab2fea84fb1b987c78e266ed95, type: 2}
 --- !u!114 &5659597818471058011
@@ -574,6 +583,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1197acdae24b514e836fc23bbbea25c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FearfulAnomaly
+  reportDisplayName: 
   animationAdapter: {fileID: 1549626828937643178}
   animationPreset: {fileID: 11400000, guid: a4fe2a9ddb6fd49bb966aef8e208f46a, type: 2}
 --- !u!114 &619112708616219180
@@ -588,6 +598,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a18ed567bc5ca6f4f871611910a368c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ParanoidAnomaly
+  reportDisplayName: 
   animationAdapter: {fileID: 1549626828937643178}
   animationPreset: {fileID: 11400000, guid: 8db89775958d04044963008b89776187, type: 2}
 --- !u!114 &7574246671978669981
@@ -602,6 +613,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 428aceecce9171f47a4a0694e3715d71, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DistractedAnomaly
+  reportDisplayName: 
   animationAdapter: {fileID: 1549626828937643178}
   animationPreset: {fileID: 11400000, guid: 35f41f48e8d1645b4b8701ab97e05d79, type: 2}
 --- !u!114 &6982761950585747525
@@ -616,6 +628,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12d6501abc7f8f142add061b881fa30e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HyperactiveAnomaly
+  reportDisplayName: 
   animationAdapter: {fileID: 1549626828937643178}
   animationPreset: {fileID: 11400000, guid: 61848c2b15d1249de8cf4e26aeb3af50, type: 2}
 --- !u!1 &2879629145379069694
@@ -693,6 +706,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 65e69ade54c24f24e81dbf9115d6eb22, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BirthDateWrongAnomaly
+  reportDisplayName: 
 --- !u!1 &3609701965567258146
 GameObject:
   m_ObjectHideFlags: 0
@@ -1104,12 +1118,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1581978614
+  GlobalObjectIdHash: 1640259171
   InScenePlacedSourceGlobalObjectIdHash: 1640259171
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -1134,7 +1150,12 @@ MonoBehaviour:
   - {fileID: 11400000, guid: f5217ba507173ee419b1f7965e8e5f88, type: 2}
   - {fileID: 11400000, guid: 92d7f584cbed9394aac938b01265850f, type: 2}
   interactText: 
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   suspectData: {fileID: 0}
   InfectionScore: 0
   lookAnimator: {fileID: 253971976340002767}
@@ -1143,6 +1164,7 @@ MonoBehaviour:
   speaking: {fileID: 7888620099599006139}
   interactionCollider: {fileID: 0}
   worldDialogue: {fileID: 0}
+  _dialogueInteractionDisabled: 0
   bloodExplosion: {fileID: 8015446583675946598}
   lookPos: {fileID: 5330771091470271895}
   standPosOffset: {x: 0, y: 0, z: 0}
@@ -1260,115 +1282,17 @@ MonoBehaviour:
   - IsCrossFadeExit: 0
     Layer: 0
     OriginatingState: 2081823275
-    DestinationState: 471178500
-    TransitionDuration: 0.25
-    TriggerNameHash: 117766982
-    TransitionIndex: 2
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -2006730689
-    TransitionDuration: 0.25
-    TriggerNameHash: 1652864696
-    TransitionIndex: 3
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -1586271636
-    TransitionDuration: 0.25
-    TriggerNameHash: 1247194270
-    TransitionIndex: 4
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: 1191107839
-    TransitionDuration: 0.25
-    TriggerNameHash: -1407593864
-    TransitionIndex: 5
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -440307239
-    TransitionDuration: 0.25
-    TriggerNameHash: -205858835
-    TransitionIndex: 6
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -1586341821
-    TransitionDuration: 0.25
-    TriggerNameHash: 1268078276
-    TransitionIndex: 7
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: 577845019
-    TransitionDuration: 0.25
-    TriggerNameHash: 959393126
-    TransitionIndex: 8
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -631893458
-    TransitionDuration: 0.25
-    TriggerNameHash: -2062647880
-    TransitionIndex: 9
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -1438696685
-    TransitionDuration: 0.25
-    TriggerNameHash: 932452850
-    TransitionIndex: 10
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: 795618194
-    TransitionDuration: 0.25
-    TriggerNameHash: -1045351539
-    TransitionIndex: 11
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: 532282436
-    TransitionDuration: 0.25
-    TriggerNameHash: -1846816292
-    TransitionIndex: 12
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
     DestinationState: -331495428
     TransitionDuration: 0.25
     TriggerNameHash: -984792713
-    TransitionIndex: 13
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: 1940389213
-    TransitionDuration: 0.25
-    TriggerNameHash: 506564194
-    TransitionIndex: 14
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -357651225
-    TransitionDuration: 0.25
-    TriggerNameHash: -2026315816
-    TransitionIndex: 15
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -1649828751
-    TransitionDuration: 0.25
-    TriggerNameHash: -264245426
-    TransitionIndex: 16
+    TransitionIndex: 2
   - IsCrossFadeExit: 0
     Layer: 0
     OriginatingState: 2081823275
     DestinationState: 1654612129
     TransitionDuration: 0.25
     TriggerNameHash: 1654612129
-    TransitionIndex: 17
+    TransitionIndex: 3
   - IsCrossFadeExit: 0
     Layer: 0
     OriginatingState: 607913104
@@ -1376,6 +1300,104 @@ MonoBehaviour:
     TransitionDuration: 0.25
     TriggerNameHash: 904796290
     TransitionIndex: 1
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: 471178500
+    TransitionDuration: 0.25
+    TriggerNameHash: 117766982
+    TransitionIndex: 0
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: -2006730689
+    TransitionDuration: 0.25
+    TriggerNameHash: 1652864696
+    TransitionIndex: 1
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: -1586271636
+    TransitionDuration: 0.25
+    TriggerNameHash: 1247194270
+    TransitionIndex: 2
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: 1191107839
+    TransitionDuration: 0.25
+    TriggerNameHash: -1407593864
+    TransitionIndex: 3
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: -440307239
+    TransitionDuration: 0.25
+    TriggerNameHash: -205858835
+    TransitionIndex: 4
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: -1586341821
+    TransitionDuration: 0.25
+    TriggerNameHash: 1268078276
+    TransitionIndex: 5
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: 577845019
+    TransitionDuration: 0.25
+    TriggerNameHash: 959393126
+    TransitionIndex: 6
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: -631893458
+    TransitionDuration: 0.25
+    TriggerNameHash: -2062647880
+    TransitionIndex: 7
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: -1438696685
+    TransitionDuration: 0.25
+    TriggerNameHash: 932452850
+    TransitionIndex: 8
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: 795618194
+    TransitionDuration: 0.25
+    TriggerNameHash: -1045351539
+    TransitionIndex: 9
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: 532282436
+    TransitionDuration: 0.25
+    TriggerNameHash: -1846816292
+    TransitionIndex: 10
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: 1940389213
+    TransitionDuration: 0.25
+    TriggerNameHash: 506564194
+    TransitionIndex: 11
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: -357651225
+    TransitionDuration: 0.25
+    TriggerNameHash: -2026315816
+    TransitionIndex: 12
+  - IsCrossFadeExit: 0
+    Layer: 3
+    OriginatingState: -1459219776
+    DestinationState: -1649828751
+    TransitionDuration: 0.25
+    TriggerNameHash: -264245426
+    TransitionIndex: 13
   AnimatorParameterEntries:
     ParameterEntries:
     - name: Walking
@@ -1884,6 +1906,7 @@ MonoBehaviour:
   dialogueChoices: []
   suspectData: {fileID: 0}
   lookTarget: {fileID: 5330771091470271895}
+  _worldAdvanceTimeoutSeconds: 1.5
 --- !u!114 &5215549252601529994
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1900,8 +1923,15 @@ MonoBehaviour:
   itemsThatCanInteractWith:
   - {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   interactText: Dispose of Body
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   _destroyOnCollect: 1
+  _kickable: 1
+  _burnable: 0
 --- !u!195 &3045864538941643365
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -1971,6 +2001,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd6e62d712305ef45997421f00f4e611, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SexWrongAnomaly
+  reportDisplayName: 
 --- !u!114 &6601203301002003002
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1983,6 +2014,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0ce0fcc2ddaa4d548afe8a8bcbe5a1b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhotoIDMismatchAnomaly
+  reportDisplayName: 
 --- !u!114 &6601203301002003003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1995,6 +2027,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd5ebd98be74f68428e32cf25cc7c251, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExpirationDateAnomaly
+  reportDisplayName: 
 --- !u!114 &6601203301002003004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2007,6 +2040,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a2f800d0ebe8954bac061b75ee24346, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MissingDocumentAnomaly
+  reportDisplayName: 
 --- !u!114 &8788856222738495992
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2019,6 +2053,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ceb9ef748ef040a43b9971e6c9725e0f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FakeIdAnomaly
+  reportDisplayName: 
 --- !u!114 &1549626828937643178
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2083,6 +2118,8 @@ MonoBehaviour:
   goreLandingSound: {fileID: 0}
   corpseJunkItem: {fileID: 0}
   corpseJunkInteractionCollider: {fileID: 0}
+  fitCorpseColliderToPose: 1
+  corpseColliderPadding: 0.3
   canAggro: 1
   aggroTarget: {fileID: 0}
   deathBehaviour: 0
@@ -2093,6 +2130,17 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 8092c5cd55ab6f24b8dceb547858e77b, type: 3}
   _chaseScreamIntervalMin: 3
   _chaseScreamIntervalMax: 6
+  _chaseFirstGruntDelay: {x: 0.3, y: 1.2}
+  _vocalVolume: 1
+  _vocalMinDistance: 2.5
+  _vocalMaxDistance: 18
+  _deathMinDistance: 3.5
+  _deathMaxDistance: 26
+  _vocalPriority: 48
+  _hurtSoundCooldown: 0.35
+  _hurtFallbackPitch: 1.2
+  _deathFallbackPitch: 0.75
+  _vocalPitchRandomness: 0.08
   _chaseMusicFadeOutSeconds: 2
   _outsideFootstepClips:
   - {fileID: 8300000, guid: c4d7bef07abcfa94f971d78ab7c74dc1, type: 3}
@@ -2107,12 +2155,18 @@ MonoBehaviour:
   _footstepInterval: 0.5
   _footstepMovementThreshold: 0.1
   _footstepPitchRandomness: 0.1
+  _footstepAudioSource: {fileID: 0}
+  _footstepVolume: 1
+  _footstepMinDistance: 4
+  _footstepMaxDistance: 24
+  _footstepReferenceSpeed: 3.5
   _isOutside: 1
   fleeInsteadOfDie: 1
   fleeSpeed: 12
   fleeDespawnTimeout: 8
   _ignoreFriendlyFireDamage: 0
   _autoInitialiseOnSpawn: 1
+  _fullMutantHealthMultiplier: 2
 --- !u!114 &8154835080764322672
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2145,6 +2199,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fb205490f4df42643a3c9aec675c8df8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HeartRateAnomaly
+  reportDisplayName: 
   elevatedHeartRateBpm: 140
 --- !u!114 &9123456789012345
 MonoBehaviour:
@@ -2735,6 +2790,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a177afaadc263a4db620c6654c29d75, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  reportDisplayName: 
   suspectCharacter: {fileID: 6270557809546838554}
   animatorIntParameter: RandomTwitch
   animationCount: 5
@@ -2785,6 +2841,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2baaf31117900f4fb31aab22c60d4d7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FlickeringLightsAnomaly
+  reportDisplayName: 
   lightsController: {fileID: 0}
 --- !u!1 &5231750380208789831
 GameObject:
@@ -2830,6 +2887,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c2cc48afeb13a1b47bc0506ec477a375, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HighTemperatureAnomaly
+  reportDisplayName: 
   elevatedTemperature: 45.5
   jitterRange: 1.5
 --- !u!1 &5417930054641599086
@@ -2843,6 +2901,7 @@ GameObject:
   - component: {fileID: 3388929027781793393}
   - component: {fileID: 2079919003721247383}
   - component: {fileID: 5126475703375461802}
+  - component: {fileID: 2015404558859417141}
   m_Layer: 0
   m_Name: Suspect Face Cam
   m_TagString: Untagged
@@ -2925,6 +2984,30 @@ MonoBehaviour:
   AmplitudeGain: 1
   FrequencyGain: 1
   m_NoiseOffsets: {x: 0, y: 0, z: 0}
+--- !u!114 &2015404558859417141
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5417930054641599086}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00b2d199b96b516448144ab30fb26aed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseListener
+  ApplyAfter: 2
+  ChannelMask: 1
+  Gain: 1
+  Use2DDistance: 0
+  UseCameraSpace: 1
+  SignalCombinationMode: 0
+  ReactionSettings:
+    m_SecondaryNoise: {fileID: 11400000, guid: 69ce8388f6785dd4c8c39915efece2f4, type: 2}
+    AmplitudeGain: 0.5
+    FrequencyGain: 3
+    Duration: 0.4
+    m_NoiseOffsets: {x: 0, y: 0, z: 0}
 --- !u!1 &5613700858023179488
 GameObject:
   m_ObjectHideFlags: 0
@@ -2969,6 +3052,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0de91e64bcebe0c4cbab155ebc8c3add, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlackEyesAnomaly
+  reportDisplayName: 
   headRenderer: {fileID: 0}
   fadeDuration: 2.5
 --- !u!1 &6161195448105621045
@@ -3494,7 +3578,7 @@ MonoBehaviour:
   baseTransform: {fileID: 9165884929875893673}
   Hips: {fileID: 8083501322154822045}
   ScaleReferenceMode: 3
-  finalScaleReference: 1.5121138
+  finalScaleReference: 1.5121241
   finalScaleReferenceSqrt: 0.1
   customScaleReferenceValue: 0.5
   DelayedInitialization: 0
@@ -3576,6 +3660,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0d4a87f77061e524ea807eb73f6f2bb8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  reportDisplayName: 
   tumors:
   - {fileID: 2063604386356704529}
   - {fileID: 8400783937221651255}
@@ -3585,6 +3670,8 @@ MonoBehaviour:
   - {fileID: 3274641356003753117}
   - {fileID: 7246911114181465321}
   parentBones: []
+  minActiveTumors: 1
+  maxActiveTumors: 3
 --- !u!1 &6711763605911860997
 GameObject:
   m_ObjectHideFlags: 0
@@ -3631,6 +3718,7 @@ GameObject:
   - component: {fileID: 6537442541130980856}
   - component: {fileID: 6769716935137745684}
   - component: {fileID: 8222923844822350539}
+  - component: {fileID: 1225551934373155205}
   m_Layer: 0
   m_Name: Suspect Cam
   m_TagString: Untagged
@@ -3713,6 +3801,30 @@ MonoBehaviour:
   AmplitudeGain: 1
   FrequencyGain: 1
   m_NoiseOffsets: {x: 0, y: 0, z: 0}
+--- !u!114 &1225551934373155205
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7165712762372772399}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00b2d199b96b516448144ab30fb26aed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineImpulseListener
+  ApplyAfter: 2
+  ChannelMask: 1
+  Gain: 1
+  Use2DDistance: 0
+  UseCameraSpace: 1
+  SignalCombinationMode: 0
+  ReactionSettings:
+    m_SecondaryNoise: {fileID: 11400000, guid: 69ce8388f6785dd4c8c39915efece2f4, type: 2}
+    AmplitudeGain: 0.5
+    FrequencyGain: 3
+    Duration: 0.4
+    m_NoiseOffsets: {x: 0, y: 0, z: 0}
 --- !u!1 &7224344999863162575
 GameObject:
   m_ObjectHideFlags: 0
@@ -3757,6 +3869,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c863de4edf364d40aa1e12cda9a56ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  reportDisplayName: 
 --- !u!1 &7812797876559283808
 GameObject:
   m_ObjectHideFlags: 0
@@ -3808,6 +3921,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a32d8cbdf67c15499a4529e20ff6501, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  reportDisplayName: 
   tentacles:
   - {fileID: 4053158995909016784}
   - {fileID: 5264322582943848716}
@@ -3904,6 +4018,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ff3f4244c3b20a4fa6dfd6dd433bca1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GlitchingAnomaly
+  reportDisplayName: 
 --- !u!1 &8845115931742292278
 GameObject:
   m_ObjectHideFlags: 0
@@ -3948,6 +4063,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6c389343c4553346a313845053f190e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlueVeinsAnomaly
+  reportDisplayName: 
   renderers: []
   _previewInEditor: 1
 --- !u!1 &9210434822996015810
