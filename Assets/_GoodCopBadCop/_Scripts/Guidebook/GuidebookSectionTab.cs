@@ -27,9 +27,9 @@ public class GuidebookSectionTab : MonoBehaviour, IClickable
     [Tooltip("Optional \"!\" text. Left empty, one is created at runtime from the first label.")]
     [SerializeField] private TMP_Text _newBadge;
     [SerializeField] private Color    _newBadgeColor    = new Color(0.85f, 0.1f, 0.08f, 1f);
-    [SerializeField] private float    _newBadgeFontSize = 0.6f;
+    [SerializeField] private float    _newBadgeFontSize = 1.2f;
     [Tooltip("Distance above the tab (along the camera's up axis), in tab-local units.")]
-    [SerializeField] private float    _newBadgeHeight   = 0.12f;
+    [SerializeField] private float    _newBadgeHeight   = 0.2f;
     [Tooltip("Pulls the badge toward the camera so it never sinks into the paper.")]
     [SerializeField] private float    _newBadgeLift     = 0.03f;
     [SerializeField] private float    _bobAmplitude     = 0.025f;
@@ -102,7 +102,8 @@ public class GuidebookSectionTab : MonoBehaviour, IClickable
         badge.alignment = TextAlignmentOptions.Center;
         badge.color = _newBadgeColor;
         badge.raycastTarget = false;
-        badge.rectTransform.sizeDelta = new Vector2(0.15f, 0.2f);
+        // Rect scales with the glyph so a larger badge never clips or wraps.
+        badge.rectTransform.sizeDelta = new Vector2(0.25f, 0.34f) * _newBadgeFontSize;
         badge.transform.localScale = Vector3.one;
         _newBadge = badge;
     }
