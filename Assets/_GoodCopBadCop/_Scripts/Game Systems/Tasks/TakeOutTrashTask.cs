@@ -128,6 +128,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
              "unreachable item still required). Mirrors MutantEnemy's goreMaxFallDistance.")]
     [Min(0f)]
     [SerializeField] private float _goreMaxFallDistance = 15f;
+    [Tooltip("Sideways velocity change (m/s) given to the highest limb of a ragdolled gore piece " +
+             "on spawn so it tips over and lies naturally instead of standing in its spawn pose. " +
+             "0 = ragdoll only, no push.")]
+    [Min(0f)]
+    [SerializeField] private float _goreSpawnToppleSpeed = 1.5f;
+
+
 
     // ── Networked state ──────────────────────────────────────────────────────
 
@@ -1077,6 +1084,11 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // The server is the authority, so it is the peer that actually simulates the drop.
         rb.isKinematic = false;
+
+        // Gore spawns only _spawnHeightOffset above the ground, too slow to auto-wake the
+        // ragdoll, so ragdoll it explicitly and let it slump instead of standing stiff.
+        if (piece.TryGetComponent(out KickablePhysicsBody kickable))
+            kickable.DropFreshSpawnServer(_goreSpawnToppleSpeed);
 
         StartCoroutine(MonitorGoreJunkItem(netObj, rb, spawnPos.y - _goreMaxFallDistance));
     }

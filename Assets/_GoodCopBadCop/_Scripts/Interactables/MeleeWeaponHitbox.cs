@@ -198,8 +198,9 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             // PlayerHealth (which silently no-ops all further damage) and the resurrected mutant
             // would never take damage or even flinch. Checking MutantEnemy/SuspectCharacter first
             // ensures an active mutant is always damaged as a mutant, tag notwithstanding.
+            // CanBeDamagedByPlayers also admits dormant lineup mutants attacking the booth window.
             MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
-            if (enemy != null && enemy.IsActive)
+            if (enemy != null && enemy.CanBeDamagedByPlayers)
             {
                 target   = enemy;
                 hitPoint = col.ClosestPoint(attackOrigin);

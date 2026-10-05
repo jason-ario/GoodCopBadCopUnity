@@ -1,5 +1,73 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4142648226562444582
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8675910809303327865}
+  - component: {fileID: 6337182358889223970}
+  - component: {fileID: 5973677256696953113}
+  m_Layer: 0
+  m_Name: Collider
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8675910809303327865
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4142648226562444582}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8583951457602806920}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &6337182358889223970
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4142648226562444582}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 2.23
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &5973677256696953113
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4142648226562444582}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 8840603839447056517}
+  ShopItem: {fileID: 0}
 --- !u!1001 &8118559816145814371
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -70,7 +138,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 2605c2bf084859c459d6de8a8f0d3059, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8675910809303327865}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 2605c2bf084859c459d6de8a8f0d3059, type: 3}
       insertIndex: -1
@@ -94,6 +165,11 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 17983374010692109}
   m_SourcePrefab: {fileID: 100100000, guid: 2605c2bf084859c459d6de8a8f0d3059, type: 3}
+--- !u!4 &8583951457602806920 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 2605c2bf084859c459d6de8a8f0d3059, type: 3}
+  m_PrefabInstance: {fileID: 8118559816145814371}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &8965403460936465970 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 2605c2bf084859c459d6de8a8f0d3059, type: 3}
@@ -403,12 +479,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4139426883
+  GlobalObjectIdHash: 1334138915
   InScenePlacedSourceGlobalObjectIdHash: 2920507264
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -431,7 +509,12 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: 
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   _couponAmount: 1
   _pickupSound: {fileID: 8300000, guid: 8a45ea65eb0db124ea164783986b1985, type: 3}
 --- !u!54 &3882126012006445154

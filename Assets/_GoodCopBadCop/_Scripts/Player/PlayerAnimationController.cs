@@ -339,8 +339,8 @@ public class PlayerAnimationController : NetworkBehaviour
 
     /// <summary>
     /// Freezes/unfreezes the body and arm animators in place by toggling their Unity 'enabled'
-    /// flag. Used for scripted moments (e.g. the Thanks For Playing end screen) where no
-    /// animation — including stray hit reactions — should play while the player is locked.
+    /// flag. Note: this freezes the CURRENT pose (e.g. mid-walk) — to stop movement animation,
+    /// lock control via PlayerMovementController.SetCanControl(false) instead so it blends to idle.
     /// </summary>
     public void SetAnimatorsEnabled(bool enabled)
     {
@@ -674,7 +674,9 @@ public class PlayerAnimationController : NetworkBehaviour
         currentMoveX = Mathf.Lerp(currentMoveX, _playerMovementController.MoveXRaw, Time.deltaTime * moveAnimSmoothSpeed);
         currentMoveZ = Mathf.Lerp(currentMoveZ, _playerMovementController.MoveZRaw, Time.deltaTime * moveAnimSmoothSpeed);
 
-        bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        // Held Shift must not keep the run pose while control is locked (end screen, cutscenes).
+        bool isRunning = _playerMovementController.CanControl
+            && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
 
         netMoveX.Value = currentMoveX;
         netMoveZ.Value = currentMoveZ;

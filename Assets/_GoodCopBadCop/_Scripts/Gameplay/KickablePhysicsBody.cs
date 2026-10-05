@@ -360,6 +360,49 @@ public class KickablePhysicsBody : MonoBehaviour
     }
 
     /// <summary>
+    /// Server-only. Drops a freshly spawned piece as a live ragdoll. Gore spawned just above the
+    /// ground never falls fast enough to pass <see cref="_wakeSpeed"/>, so without this an
+    /// auto-rigged piece (Soldier/Guard gore) settles as one stiff body in its spawn pose, e.g. a
+    /// spine standing upright. Turns the ragdoll on right away and nudges the highest limb
+    /// sideways by <paramref name="toppleSpeed"/> (m/s) so it slumps onto the ground. Pieces
+    /// without a rig just drop as a single body.
+    /// </summary>
+    public void DropFreshSpawnServer(float toppleSpeed)
+    {
+        if (!IsServerRole || _rootRb == null || _isHeld) return;
+
+        if (!HasRig || !AnyColliderEnabled())
+        {
+            _rootRb.isKinematic = false;
+            _rootRb.WakeUp();
+            return;
+        }
+
+        ActivateRagdollServer();
+
+        if (toppleSpeed <= 0f) return;
+
+        Rigidbody top = null;
+        float topY = float.MinValue;
+        foreach (Rigidbody rb in _boneBodies)
+        {
+            if (rb == null || rb.isKinematic) continue;
+            float y = rb.worldCenterOfMass.y;
+            if (y > topY)
+            {
+                topY = y;
+                top = rb;
+            }
+        }
+        if (top == null) top = _rootRb;
+
+        Vector2 dir = Random.insideUnitCircle;
+        if (dir.sqrMagnitude < 0.0001f) dir = Vector2.right;
+        dir.Normalize();
+        top.AddForce(new Vector3(dir.x, 0f, dir.y) * toppleSpeed, ForceMode.VelocityChange);
+    }
+
+    /// <summary>
     /// True when limb Rigidbodies exist and are jointed to the root (authored ragdolls, or
     /// auto-built ones after their first wake). Such a rig can't move its root on its own.
     /// </summary>

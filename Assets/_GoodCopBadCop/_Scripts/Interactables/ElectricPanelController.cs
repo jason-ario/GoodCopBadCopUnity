@@ -69,27 +69,46 @@ public class ElectricPanelController : Interactable
         NetworkVariableWritePermission.Server
     );
 
+    /// <summary>
+    /// Bitmask of circuit switch states (bit i = <see cref="_switches"/>[i] is On). Server-owned;
+    /// clients request changes via ServerRpc. Defaults to all On, matching the default power state.
+    /// </summary>
+    private NetworkVariable<int> _switchMask = new NetworkVariable<int>(
+        -1,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     // ─── Runtime state ────────────────────────────────────────────────────────
 
     private Coroutine _doorCoroutine;
+
+    private int AllSwitchesOnMask =>
+        _switches == null || _switches.Length >= 32 ? -1 : (1 << _switches.Length) - 1;
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        _isDoorOpen.OnValueChanged += OnDoorStateChanged;
+        _isDoorOpen.OnValueChanged  += OnDoorStateChanged;
+        _switchMask.OnValueChanged  += OnSwitchMaskChanged;
 
         // Snap the door to its correct visual state for late-joining clients.
         SnapDoor(_isDoorOpen.Value);
 
-        // Snap the switches to match the current power state for late-joining clients.
-        SyncSwitchesToPowerState();
+        // Server seeds the switch mask from the current power state; everyone then snaps to it
+        // (late-joining clients receive the mask with the spawn payload).
+        if (IsServer)
+            _switchMask.Value = IsPowerOn ? AllSwitchesOnMask : 0;
+
+        SnapSwitchesToMask(_switchMask.Value);
     }
 
     public override void OnNetworkDespawn()
     {
         _isDoorOpen.OnValueChanged -= OnDoorStateChanged;
+        _switchMask.OnValueChanged -= OnSwitchMaskChanged;
     }
 
     // ─── Interactable override ────────────────────────────────────────────────
@@ -132,6 +151,8 @@ public class ElectricPanelController : Interactable
         _nob?.SnapToOff();
         PlayAllSwitchesResetSound();
 
+        if (IsServer) _switchMask.Value = 0;
+
         // If the local player is currently inside this view, close it.
         if (DiegeticViewController.Current == _diegeticController)
             _diegeticController?.Close();
@@ -143,7 +164,32 @@ public class ElectricPanelController : Interactable
     /// visually reflect that power is flowing (e.g. right after the puzzle is solved, or for
     /// late-joining clients when power is already on).
     /// </summary>
-    public void OnPowerOn() => SyncSwitchesToPowerState();
+    public void OnPowerOn()
+    {
+        SyncSwitchesToPowerState();
+        if (IsServer && IsPowerOn) _switchMask.Value = AllSwitchesOnMask;
+    }
+
+    /// <summary>
+    /// Called by <see cref="ElectricPanelDiegeticController"/> right after the local player flipped
+    /// <paramref name="sw"/> (already applied locally). Replicates the new state to everyone.
+    /// </summary>
+    public void NotifySwitchFlipped(CircuitSwitch sw)
+    {
+        int index = _switches != null ? System.Array.IndexOf(_switches, sw) : -1;
+        if (index < 0 || index >= 32) return;
+        SetSwitchStateServerRpc(index, sw.IsOn);
+    }
+
+    /// <summary>
+    /// Called by <see cref="ElectricPanelDiegeticController"/> after it locally reset every switch
+    /// to Off (failed attempt). Replicates the reset and the reset cue to other players.
+    /// </summary>
+    public void NotifySwitchesReset()
+    {
+        ResetSwitchesServerRpc();
+        PlayAllSwitchesResetSoundRpc();
+    }
 
     /// <summary>
     /// Called by <see cref="ElectricPanelDiegeticController"/> when the player messes with a
@@ -187,13 +233,35 @@ public class ElectricPanelController : Interactable
     private void CloseDoorServerRpc() => _isDoorOpen.Value = false;
 
     [ServerRpc(RequireOwnership = false)]
+    private void SetSwitchStateServerRpc(int index, bool isOn)
+    {
+        if (index < 0 || index >= 32) return;
+        int bit = 1 << index;
+        _switchMask.Value = isOn ? (_switchMask.Value | bit) : (_switchMask.Value & ~bit);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void ResetSwitchesServerRpc() => _switchMask.Value = 0;
+
+    [Rpc(SendTo.NotMe)]
+    private void PlayAllSwitchesResetSoundRpc() => PlayAllSwitchesResetSound();
+
+    [ServerRpc(RequireOwnership = false)]
     private void RestorePowerServerRpc()
     {
-        if (_electricityController == null) return;
+        if (_electricityController == null)
+        {
+            Debug.LogWarning("[ElectricPanelController] RestorePower rejected: no ElectricityController assigned.", this);
+            return;
+        }
 
         // Blocked while a fuse-box-required outage (e.g. Day 3/4) is active — the player
         // must travel to the power station, find the fuses, and use the PowerSwitch there.
-        if (_electricityController.RequiresFuseBoxRestore) return;
+        if (_electricityController.RequiresFuseBoxRestore)
+        {
+            Debug.LogWarning("[ElectricPanelController] RestorePower rejected: current outage requires the fuse box.", this);
+            return;
+        }
 
         _electricityController.PowerOn();
     }
@@ -219,6 +287,35 @@ public class ElectricPanelController : Interactable
 
         if (newValue && _audioSource != null && _doorOpenSound != null)
             _audioSource.PlayOneShot(_doorOpenSound);
+    }
+
+    /// <summary>
+    /// Applies only the bits that changed. The flipping player already applied its change locally,
+    /// so its switches already match and nothing re-triggers; remote players see and hear the flip.
+    /// </summary>
+    private void OnSwitchMaskChanged(int oldMask, int newMask)
+    {
+        if (_switches == null) return;
+
+        int changed = oldMask ^ newMask;
+        for (int i = 0; i < _switches.Length && i < 32; i++)
+        {
+            if ((changed & (1 << i)) == 0 || _switches[i] == null) continue;
+            _switches[i].ApplyNetworkState((newMask & (1 << i)) != 0, playSound: true);
+        }
+    }
+
+    private void SnapSwitchesToMask(int mask)
+    {
+        if (_switches == null) return;
+
+        for (int i = 0; i < _switches.Length && i < 32; i++)
+        {
+            CircuitSwitch sw = _switches[i];
+            if (sw == null) continue;
+            if ((mask & (1 << i)) != 0) sw.SetSwitchOn();
+            else sw.ApplyNetworkState(false, playSound: false);
+        }
     }
 
     // ─── Door animation ───────────────────────────────────────────────────────

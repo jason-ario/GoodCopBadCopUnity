@@ -260,6 +260,9 @@ public class SuspectCharacter : Interactable
         // NetworkVariable instead, which InitialiseServer() sets. It already defaults to
         // false, so there is nothing to reset here before InitialiseServer() runs.
 
+        // Full mutants start with boosted health (see MutantEnemy._fullMutantHealthMultiplier).
+        _mutantEnemy?.MarkAsFullMutant();
+
         AssignMutatedAnimator();
         ActivateFullMutantFormClientRpc();
     }

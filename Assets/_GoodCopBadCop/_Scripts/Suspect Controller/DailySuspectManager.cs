@@ -24,8 +24,9 @@ public class DailySuspectManager : MonoBehaviour
     /// Task Page total (<see cref="ProcessResidentsTask"/>). Deliberately EXCLUDES injected mutant
     /// intruder slots (<see cref="_mutantSlotIndices"/>): mutants are a random combat threat added
     /// on top of the shift, never a "suspect to process", and must never affect this total or the
-    /// displayed X/Y count. Doppelganger and full-mutant slots DO count — both stand in for a real
-    /// suspect and are resolved through the normal folder verdict flow.
+    /// displayed X/Y count. Doppelganger and full-mutant slots DO count — both are real suspects.
+    /// Full mutants, and suspects melee-killed or fled before a verdict, are counted as processed
+    /// via ShiftManager.SuspectResolvedWithoutVerdict so the counter still reaches this total.
     /// Returns 0 before the lineup has been populated for the day.
     ///
     /// MULTIPLAYER: only authoritative ON THE SERVER. Every peer runs PopulateShiftCharacters with its

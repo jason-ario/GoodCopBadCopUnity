@@ -208,8 +208,9 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 // perfectly living player would always be misclassified as a mutant hit and
                 // silently swallowed by MutantEnemy's own dormancy guard, never reaching
                 // PlayerHealth at all.
+                // CanBeDamagedByPlayers = IsActive, plus dormant lineup mutants attacking the booth window.
                 MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-                if (enemy != null && enemy.IsActive)
+                if (enemy != null && enemy.CanBeDamagedByPlayers)
                 {
                     if (enemy.NetworkObject != null)
                     {

@@ -7,8 +7,8 @@ using UnityEngine;
 /// contain one or more <see cref="ParticleSystem"/> components across its children.
 ///
 /// On activation the prefab is reparented to the closest humanoid bone, then
-/// a coroutine fires all particle systems 1–2 times at random intervals spread
-/// across a 60-second window.
+/// a coroutine fires all particle systems repeatedly at regular intervals
+/// (with a small random jitter) for as long as the anomaly stays active.
 /// </summary>
 public class VomitAnomaly : VitalsAnomaly
 {
@@ -16,14 +16,14 @@ public class VomitAnomaly : VitalsAnomaly
     [SerializeField] private GameObject vomitPrefab;
 
     [Header("Timing")]
-    [Tooltip("Total duration (seconds) over which vomit events are distributed.")]
-    [SerializeField] private float windowDuration = 60f;
+    [Tooltip("Delay (seconds) before the first vomit event after activation.")]
+    [SerializeField] private float initialDelay = 3f;
 
-    [Tooltip("Minimum number of vomit events during the window.")]
-    [SerializeField] private int minEvents = 1;
+    [Tooltip("Base interval (seconds) between consecutive vomit events.")]
+    [SerializeField] private float interval = 10f;
 
-    [Tooltip("Maximum number of vomit events during the window.")]
-    [SerializeField] private int maxEvents = 2;
+    [Tooltip("Random +/- variation (seconds) applied to each interval so it doesn't feel mechanical.")]
+    [SerializeField] private float intervalJitter = 2f;
 
     [Header("Animation")]
     [Tooltip("Animator trigger fired on the suspect each time a vomit event plays.")]
@@ -32,6 +32,7 @@ public class VomitAnomaly : VitalsAnomaly
     private ParticleSystem[] _particles;
     private Coroutine _activeCoroutine;
     private SuspectCharacter _suspect;
+    private bool _isActive;
 
     private void Awake()
     {
@@ -55,9 +56,8 @@ public class VomitAnomaly : VitalsAnomaly
     {
         base.ActivateAnomaly();
 
-        if (_particles == null || _particles.Length == 0) return;
-
-        _activeCoroutine = StartCoroutine(ScheduleVomitEvents());
+        _isActive = true;
+        StartVomitLoop();
     }
 
     /// <inheritdoc/>
@@ -65,11 +65,10 @@ public class VomitAnomaly : VitalsAnomaly
     {
         base.DeactivateAnomaly();
 
-        if (_activeCoroutine != null)
-        {
-            StopCoroutine(_activeCoroutine);
-            _activeCoroutine = null;
-        }
+        _isActive = false;
+        StopVomitLoop();
+
+        if (_particles == null) return;
 
         foreach (ParticleSystem ps in _particles)
         {
@@ -78,58 +77,66 @@ public class VomitAnomaly : VitalsAnomaly
         }
     }
 
-    /// <summary>
-    /// Picks 1–2 random timestamps within <see cref="windowDuration"/> and plays
-    /// the particle system at each one.
-    /// </summary>
-    private IEnumerator ScheduleVomitEvents()
+    private void OnEnable()
     {
-        int eventCount = Random.Range(minEvents, maxEvents + 1);
+        // Coroutines die when the GameObject is disabled; resume the loop if still active.
+        if (_isActive)
+            StartVomitLoop();
+    }
 
-        // Build sorted event times so they don't overlap awkwardly.
-        float[] eventTimes = BuildSortedRandomTimes(eventCount, windowDuration);
+    private void OnDisable()
+    {
+        _activeCoroutine = null;
+    }
 
-        float elapsed = 0f;
+    private void StartVomitLoop()
+    {
+        if (_particles == null || _particles.Length == 0) return;
+        if (!isActiveAndEnabled) return;
 
-        for (int i = 0; i < eventCount; i++)
+        StopVomitLoop();
+        _activeCoroutine = StartCoroutine(VomitLoop());
+    }
+
+    private void StopVomitLoop()
+    {
+        if (_activeCoroutine != null)
         {
-            float waitUntil = eventTimes[i];
+            StopCoroutine(_activeCoroutine);
+            _activeCoroutine = null;
+        }
+    }
 
-            while (elapsed < waitUntil)
-            {
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
+    /// <summary>
+    /// Plays a vomit event after <see cref="initialDelay"/>, then repeats every
+    /// <see cref="interval"/> ± <see cref="intervalJitter"/> seconds until deactivated.
+    /// </summary>
+    private IEnumerator VomitLoop()
+    {
+        yield return new WaitForSeconds(Mathf.Max(0f, initialDelay));
 
-            if (_particles != null && _particles.Length > 0)
-            {
-                foreach (ParticleSystem ps in _particles)
-                {
-                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                    ps.Play();
-                }
-            }
+        while (_isActive)
+        {
+            PlayVomitEvent();
 
-            if (_suspect != null && !string.IsNullOrEmpty(vomitAnimTrigger))
-                _suspect.FireAnimatorTrigger(vomitAnimTrigger);
+            float wait = interval + Random.Range(-intervalJitter, intervalJitter);
+            yield return new WaitForSeconds(Mathf.Max(1f, wait));
         }
 
         _activeCoroutine = null;
     }
 
-    /// <summary>
-    /// Returns <paramref name="count"/> distinct timestamps sorted ascending,
-    /// distributed randomly within [0, <paramref name="duration"/>].
-    /// </summary>
-    private static float[] BuildSortedRandomTimes(int count, float duration)
+    private void PlayVomitEvent()
     {
-        float[] times = new float[count];
+        foreach (ParticleSystem ps in _particles)
+        {
+            if (ps == null) continue;
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            ps.Play();
+        }
 
-        for (int i = 0; i < count; i++)
-            times[i] = Random.Range(0f, duration);
-
-        System.Array.Sort(times);
-        return times;
+        if (_suspect != null && !string.IsNullOrEmpty(vomitAnimTrigger))
+            _suspect.FireAnimatorTrigger(vomitAnimTrigger);
     }
 
     /// <summary>

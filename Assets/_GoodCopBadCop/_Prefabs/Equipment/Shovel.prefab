@@ -46,7 +46,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MeleeWeaponHitbox
   ShowTopMostFoldoutHeaderGroup: 1
-  hitRadius: 1.18
+  hitRadius: 1.61
   _hitEffectPrefab: {fileID: 2995841491401614156, guid: 6ab320a6234520243ab1407c39004056, type: 3}
   _environmentHitEffectPrefab: {fileID: 2995841491401614156, guid: 6ab320a6234520243ab1407c39004056, type: 3}
   _hitEffectSpawnPoint: {fileID: 5217946408870908105}
@@ -204,12 +204,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3544040233
+  GlobalObjectIdHash: 3369425109
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 1
   SpawnWithObservers: 1
@@ -232,7 +234,12 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Pick Up
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   itemData: {fileID: 11400000, guid: 9702efa9c91aa7e4da5d898cc5f7fa61, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5

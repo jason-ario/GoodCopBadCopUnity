@@ -56,6 +56,18 @@ public class CircuitSwitch : MonoBehaviour, IClickable
         ApplyAnimator();
     }
 
+    /// <summary>
+    /// Applies a state received over the network (another player flipped this switch).
+    /// No-op when already in that state; plays the flip sound when <paramref name="playSound"/> is set.
+    /// </summary>
+    public void ApplyNetworkState(bool on, bool playSound)
+    {
+        if (IsOn == on) return;
+        IsOn = on;
+        ApplyAnimator();
+        if (playSound) PlaySwitchSound();
+    }
+
     // ─── IClickable ──────────────────────────────────────────────────────────
 
     /// <summary>Toggles the switch on click from within the diegetic view.</summary>

@@ -239,7 +239,7 @@ public class SaveDataManager : MonoBehaviour
     /// persisted at the next day-start checkpoint — the same moment a "purchased but not yet
     /// arrived" guard resolves into an arrival. Safe to call repeatedly; updates the entry in place.
     /// </summary>
-    public void SaveGuardPurchasePointState(string pointId, bool purchased, bool arrived)
+    public void SaveGuardPurchasePointState(string pointId, bool purchased, bool arrived, bool unlocked)
     {
         if (ActiveSlot == null || string.IsNullOrEmpty(pointId)) return;
 
@@ -253,9 +253,10 @@ public class SaveDataManager : MonoBehaviour
         }
         entry.Purchased = purchased;
         entry.Arrived = arrived;
+        entry.Unlocked = unlocked;
 
         ActiveSlot.GuardPurchasePoints = list.ToArray();
-        Debug.Log($"[SaveDataManager] Guard purchase point updated: '{pointId}' (purchased={purchased}, arrived={arrived}).");
+        Debug.Log($"[SaveDataManager] Guard purchase point updated: '{pointId}' (purchased={purchased}, arrived={arrived}, unlocked={unlocked}).");
     }
 
     // -------------------------------------------------------------------------
@@ -857,6 +858,12 @@ public class GuardPurchasePointSaveEntry
 
     /// <summary>True once the purchased guard has arrived (spawned) in the world.</summary>
     public bool Arrived;
+
+    /// <summary>
+    /// True once a day script (or a cleared corpse) has unlocked this point. Persisted so a save
+    /// resumed on a later day than the one that unlocked it still shows the post.
+    /// </summary>
+    public bool Unlocked;
 }
 
 [Serializable]

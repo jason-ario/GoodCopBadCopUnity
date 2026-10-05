@@ -254,19 +254,19 @@ public class MutantEnemy : NetworkBehaviour
 
     [Tooltip("Distance (m) within which hurt / chase vocals play at full volume.")]
     [Min(0.01f)]
-    [SerializeField] private float _vocalMinDistance = 4f;
+    [SerializeField] private float _vocalMinDistance = 2.5f;
 
     [Tooltip("Distance (m) at which hurt / chase vocals fade to silence (linear rolloff).")]
     [Min(0.1f)]
-    [SerializeField] private float _vocalMaxDistance = 32f;
+    [SerializeField] private float _vocalMaxDistance = 18f;
 
     [Tooltip("Distance (m) within which the death sound plays at full volume.")]
     [Min(0.01f)]
-    [SerializeField] private float _deathMinDistance = 6f;
+    [SerializeField] private float _deathMinDistance = 3.5f;
 
     [Tooltip("Distance (m) at which the death sound fades to silence (linear rolloff).")]
     [Min(0.1f)]
-    [SerializeField] private float _deathMaxDistance = 45f;
+    [SerializeField] private float _deathMaxDistance = 26f;
 
     [Range(0, 256)]
     [Tooltip("AudioSource priority for vocals (0 = highest). Kept above default (128) so grunts, hurt " +
@@ -364,7 +364,16 @@ public class MutantEnemy : NetworkBehaviour
              "after its booth cutscene completes. Call InitialiseServer() manually via SuspectCharacter.BeginMutantBehavior().")]
     [SerializeField] private bool _autoInitialiseOnSpawn = true;
 
+    [Header("Full Mutant")]
+    [Tooltip("Multiplier applied to MutantEnemyData.maxHealth when this enemy is a suspect that has " +
+             "turned into a full mutant (set via MarkAsFullMutant() from SuspectCharacter.ActivateFullMutantForm). " +
+             "2 = +100% health.")]
+    [Min(0.01f)]
+    [SerializeField] private float _fullMutantHealthMultiplier = 2f;
+
     // ── State ──────────────────────────────────────────────────────────────────
+
+    private bool _isFullMutant;
 
     private NavMeshAgent _agent;
     private Transform _currentTarget;
@@ -494,6 +503,17 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     public bool IsActive => _isActive.Value;
 
+    private MutantSuspectBehaviour _suspectBehaviour;
+
+    /// <summary>
+    /// True when player weapons should treat this as a mutant hit: active mutants, plus dormant
+    /// lineup mutants banging on the booth window (the hit hands them to hostile AI in
+    /// <see cref="TakeDamage"/>). Replicated, so it is safe for client-side hit resolution.
+    /// Dormant player-corpse mutants stay false so shots still reach PlayerHealth.
+    /// </summary>
+    public bool CanBeDamagedByPlayers =>
+        _isActive.Value || (_suspectBehaviour != null && _suspectBehaviour.IsWindowAttackHittable);
+
     /// <summary>
     /// Server-side: whether this active mutant currently has a living player or responder target.
     /// Callers can use this to distinguish active pursuit/attack from aggroing on static world targets.
@@ -560,6 +580,7 @@ public class MutantEnemy : NetworkBehaviour
     private void Awake()
     {
         _agent = GetComponent<NavMeshAgent>();
+        _suspectBehaviour = GetComponent<MutantSuspectBehaviour>();
 
         if (goreCollider == null)
             goreCollider = GetComponent<CapsuleCollider>() as Collider ?? GetComponent<Collider>();
@@ -681,7 +702,7 @@ public class MutantEnemy : NetworkBehaviour
             return;
         }
 
-        _health = data.maxHealth;
+        _health = data.maxHealth * (_isFullMutant ? _fullMutantHealthMultiplier : 1f);
 
         // Marks this mutant as gameplay-active. Does NOT touch this component's Unity
         // enabled flag — that stays permanently true from Awake() onward (see _isActive).
@@ -725,6 +746,13 @@ public class MutantEnemy : NetworkBehaviour
     /// <see cref="SuspectCharacter.BeginMutantBehavior"/> fires.
     /// </summary>
     public void DisableAutoInit() => _autoInitialiseOnSpawn = false;
+
+    /// <summary>
+    /// Flags this enemy as a suspect that has turned into a full mutant, so the next
+    /// <see cref="InitialiseServer"/> scales starting health by <see cref="_fullMutantHealthMultiplier"/>.
+    /// Server-only; called from <see cref="SuspectCharacter.ActivateFullMutantForm"/>.
+    /// </summary>
+    public void MarkAsFullMutant() => _isFullMutant = true;
 
     // ── Server Loops ───────────────────────────────────────────────────────────
 
@@ -2340,8 +2368,7 @@ public class MutantEnemy : NetworkBehaviour
 
         if (!_isActive.Value)
         {
-            MutantSuspectBehaviour suspectBehaviour = GetComponent<MutantSuspectBehaviour>();
-            if (suspectBehaviour == null || !suspectBehaviour.TryActivateFromWindowHit())
+            if (_suspectBehaviour == null || !_suspectBehaviour.TryActivateFromWindowHit())
                 return;
         }
 

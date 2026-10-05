@@ -59,6 +59,19 @@ public class GuardPurchasePoint : Interactable
     private readonly NetworkVariable<bool> _unlocked = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Server-only. True while this slot's guard is dead but its corpse still occupies the slot
+    /// (<see cref="_guardArrived"/> stays true so the body remains visible/collectible). Not
+    /// persisted — corpses aren't saved, so a reload simply shows the empty, purchasable post.
+    /// </summary>
+    private bool _guardDead;
+
+    /// <summary>
+    /// Unlock request received before this NetworkObject spawned (e.g. a day's DayActivated
+    /// running before NGO spawns scene objects). Applied in <see cref="OnNetworkSpawn"/> on the server.
+    /// </summary>
+    private bool _pendingUnlock;
+
     private void Awake()
     {
         if (_postRenderer == null && _guardPurchasePost != null)
@@ -80,7 +93,16 @@ public class GuardPurchasePoint : Interactable
         // NetworkVariables below — so a guard purchased but not yet arrived resumes correctly
         // (still scheduled to arrive at the next OnDayStart) instead of the purchase being lost.
         if (IsServer)
+        {
             ApplySavedPurchaseState();
+
+            if (_pendingUnlock && !_unlocked.Value)
+            {
+                _unlocked.Value = true;
+                PersistState();
+            }
+        }
+        _pendingUnlock = false;
 
         // Apply state immediately for late-joining clients.
         RefreshVisualState();
@@ -128,8 +150,15 @@ public class GuardPurchasePoint : Interactable
     /// </summary>
     public void SetUnlocked(bool unlocked)
     {
-        if (!IsServer) return;
+        if (!IsSpawned)
+        {
+            _pendingUnlock = unlocked;
+            return;
+        }
+
+        if (!IsServer || _unlocked.Value == unlocked) return;
         _unlocked.Value = unlocked;
+        PersistState();
     }
 
     private void OnPurchaseConfirmed()
@@ -155,14 +184,35 @@ public class GuardPurchasePoint : Interactable
         UIController.Instance.ShowPurchaseNotification("Guard hired! Will arrive tomorrow.");
     }
 
-    /// <summary>Called on all clients at the start of each day. Sets arrival state on the server.</summary>
+    /// <summary>
+    /// Called on all clients at the start of each day. Sets arrival state on the server. A
+    /// replacement bought while the previous guard's corpse still occupies the slot (arrived
+    /// already true) is delivered by reviving the reused soldier on every peer instead.
+    /// </summary>
     private void OnDayStart()
     {
         if (!IsServer) return;
-        if (!_guardPurchased.Value || _guardArrived.Value) return;
+        if (!_guardPurchased.Value) return;
+
+        if (_guardArrived.Value)
+        {
+            if (!_guardDead) return;
+
+            _guardDead = false;
+            ReviveSoldierClientRpc();
+            PersistState();
+            return;
+        }
 
         _guardArrived.Value = true;
         PersistState();
+    }
+
+    [ClientRpc]
+    private void ReviveSoldierClientRpc()
+    {
+        RefreshVisualState();
+        ResetSoldierForNewArrival();
     }
 
     private void OnGuardArrivedChanged(bool previousValue, bool newValue)
@@ -195,35 +245,34 @@ public class GuardPurchasePoint : Interactable
     private void OnUnlockedChanged(bool previousValue, bool newValue) => RefreshVisualState();
 
     /// <summary>
-    /// Called by the guard's own combat script (<c>SoldierMutantResponder</c>) once its corpse
-    /// has actually been picked up and thrown away as trash (a <see cref="JunkItem"/> collected
-    /// into a <see cref="TrashBag"/>) — not merely on death. Until this fires, the dead guard's
-    /// body keeps occupying the soldier slot (still "arrived") so it stays visible and
-    /// collectible; only once it's cleared away does the purchase post reappear and a new guard
-    /// become buyable. Forces <see cref="_unlocked"/> to true so the post reappears even if this
-    /// point was never explicitly unlocked by a day script (e.g. a default guard placed directly
-    /// under a GuardPurchasePoint from Day 1) — a dead guard's slot must always become
-    /// re-purchasable, regardless of day-gating history. Server-only.
-    /// </summary>
-    /// <summary>
-    /// Called by <c>SoldierMutantResponder</c> the moment this slot's guard dies. Persists the
-    /// slot as empty (not purchased, not arrived) without touching the NetworkVariables, so the
-    /// corpse stays visible/collectible in the current session, but a reload after the next
-    /// day-start checkpoint no longer restores a living guard. Corpses aren't persisted, so on
-    /// reload the purchase post is shown and a replacement can be bought. Server-only.
+    /// Called by <c>SoldierMutantResponder</c> the moment this slot's guard dies. Clears
+    /// <see cref="_guardPurchased"/> immediately so interacting with the post opens the hire
+    /// screen right away, while <see cref="_guardArrived"/> stays true so the corpse remains
+    /// visible/collectible this session. Persists the slot as empty (not purchased, not arrived)
+    /// so a reload never restores a living guard — corpses aren't saved. Server-only.
     /// </summary>
     public void NotifyGuardDied()
     {
         if (!IsServer) return;
-        PersistState(purchased: false, arrived: false);
+
+        _guardDead = true;
+        _guardPurchased.Value = false;
+        _unlocked.Value = true;
+        PersistState();
     }
 
+    /// <summary>
+    /// Called by <c>SoldierMutantResponder</c> once this slot's guard corpse has been bagged as
+    /// trash. Frees the soldier slot (post reappears). Keeps <see cref="_guardPurchased"/> as-is,
+    /// so a replacement already bought while the corpse was lying there still arrives at the
+    /// next day start. Server-only.
+    /// </summary>
     public void NotifyGuardCorpseCollected()
     {
         if (!IsServer) return;
 
+        _guardDead = false;
         _guardArrived.Value = false;
-        _guardPurchased.Value = false;
         _unlocked.Value = true;
         PersistState();
     }
@@ -248,18 +297,23 @@ public class GuardPurchasePoint : Interactable
 
         _guardPurchased.Value = saved.Purchased;
         _guardArrived.Value = saved.Arrived;
+        if (saved.Unlocked)
+            _unlocked.Value = true;
     }
 
     /// <summary>
-    /// Server-only. Persists the current purchased/arrived state for <see cref="_guardPointId"/>
-    /// to the save file, if a persistent ID is configured. No-op otherwise.
+    /// Server-only. Persists the current purchased/arrived/unlocked state for <see cref="_guardPointId"/>
+    /// to the save file, if a persistent ID is configured. A dead guard's corpse is saved as
+    /// "not arrived" so it never comes back alive on reload. No-op without an ID.
     /// </summary>
-    private void PersistState() => PersistState(_guardPurchased.Value, _guardArrived.Value);
-
-    private void PersistState(bool purchased, bool arrived)
+    private void PersistState()
     {
         if (string.IsNullOrEmpty(_guardPointId) || SaveDataManager.Instance == null) return;
-        SaveDataManager.Instance.SaveGuardPurchasePointState(_guardPointId, purchased, arrived);
+        SaveDataManager.Instance.SaveGuardPurchasePointState(
+            _guardPointId,
+            _guardPurchased.Value,
+            _guardArrived.Value && !_guardDead,
+            _unlocked.Value);
     }
 
     /// <summary>

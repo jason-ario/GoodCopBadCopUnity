@@ -233,6 +233,14 @@ public class SuspectController : NetworkBehaviour
     /// <see cref="SayEntryDialogue"/>.
     /// </summary>
     private bool _currentSuspectIsFullMutant = false;
+
+    /// <summary>
+    /// True while the current lineup slot is a full-mutant suspect whose booth encounter has not
+    /// yet resolved. Unlike <see cref="_currentSuspectIsFullMutant"/> (consumed when the cutscene
+    /// starts), this stays set until <see cref="OnMutantIntruderComplete"/>, so a full mutant is
+    /// counted as processed exactly once. Mutant intruders never set it. Server-side only.
+    /// </summary>
+    private bool _fullMutantEncounterPending = false;
     FolderController spawnedFolder;
 
     public UnityAction OnTakeFolder;
@@ -268,6 +276,12 @@ public class SuspectController : NetworkBehaviour
     [SerializeField] int couponBaseReward = 3;
     [Tooltip("Extra coupons awarded per evidence item placed in the folder for a correctly identified category.")]
     [SerializeField] int couponPerEvidenceItem = 1;
+    [Tooltip("Global economy multiplier applied to every positive payout component (base, percent, perfect, evidence). Penalties are not scaled. 1.5 = +50% earnings.")]
+    [SerializeField, Min(0f)] float couponEarningsMultiplier = 1.5f;
+
+    /// <summary>Scales a positive reward amount by couponEarningsMultiplier, rounding half away from zero.</summary>
+    private int ScaleEarnings(int amount) =>
+        (int)System.Math.Round(amount * couponEarningsMultiplier, System.MidpointRounding.AwayFromZero);
     
     private void Awake()
     {
@@ -462,6 +476,7 @@ public class SuspectController : NetworkBehaviour
         }
 
         _currentSuspectIsFullMutant = isFullMutant;
+        _fullMutantEncounterPending = isFullMutant;
         if (isFullMutant)
         {
             suspectCharacter.ActivateFullMutantForm();
@@ -504,6 +519,7 @@ public class SuspectController : NetworkBehaviour
         }
 
         InjectLegacyDependencies(character.gameObject);
+        _fullMutantEncounterPending = false;
         NetworkObject netObj = character.GetComponent<NetworkObject>();
         if (netObj == null)
         {
@@ -646,6 +662,7 @@ public class SuspectController : NetworkBehaviour
         {
             ForceNextSuspectAsFullMutant = false;
             _currentSuspectIsFullMutant = true;
+            _fullMutantEncounterPending = true;
             suspectCharacter.ActivateFullMutantForm();
             suspectCharacter.SetupFullMutantWindowBreach(
                 standPos, despawnPos, climbThroughTargetPos, shutterController, this);
@@ -653,6 +670,7 @@ public class SuspectController : NetworkBehaviour
         else
         {
             _currentSuspectIsFullMutant = false;
+            _fullMutantEncounterPending = false;
         }
 
         _currentSuspectNetworkObjectId = netObj.NetworkObjectId;
@@ -1477,7 +1495,9 @@ public class SuspectController : NetworkBehaviour
             : (_categoriesFalsePositive == 0 ? 1f : 0f);
 
         // Reward scales linearly from 0 to couponMaxPercentBonus based on percent caught.
-        int percentReward = Mathf.RoundToInt(percentCaught * couponMaxPercentBonus);
+        int percentReward = (int)System.Math.Round(
+            percentCaught * couponMaxPercentBonus * couponEarningsMultiplier,
+            System.MidpointRounding.AwayFromZero);
 
         // Penalty for falsely claimed categories (checking a box when there is no anomaly there).
         int falsePenalty = _categoriesFalsePositive * couponPenaltyPerFalsePositiveAnomaly;
@@ -1486,7 +1506,7 @@ public class SuspectController : NetworkBehaviour
         int perfectBonusAmount = (_categoriesCorrect == _totalActiveCategories
                                   && _categoriesFalsePositive == 0
                                   && _totalActiveCategories > 0)
-            ? couponPerfectAnomaliesBonus
+            ? ScaleEarnings(couponPerfectAnomaliesBonus)
             : 0;
 
         // Evidence bonus: extra coupons per proof document filed for a correctly identified category.
@@ -1504,8 +1524,11 @@ public class SuspectController : NetworkBehaviour
             }
         }
 
+        evidenceBonus = ScaleEarnings(evidenceBonus);
+        int baseReward = ScaleEarnings(couponBaseReward);
+
         int totalCoupons = Mathf.Max(0,
-            couponBaseReward + percentReward - falsePenalty + perfectBonusAmount + evidenceBonus);
+            baseReward + percentReward - falsePenalty + perfectBonusAmount + evidenceBonus);
 
         int couponsDispensed = 0;
         if (ATM.Instance != null)
@@ -1516,7 +1539,7 @@ public class SuspectController : NetworkBehaviour
         Debug.Log(
             $"Payout — Correct categories: {_categoriesCorrect}/{_totalActiveCategories}, " +
             $"Percent caught: {percentCaught:P0}, False positives: {_categoriesFalsePositive}, " +
-            $"Base: +{couponBaseReward}, Percent reward: +{percentReward}, " +
+            $"Earnings x{couponEarningsMultiplier:0.##}, Base: +{baseReward}, Percent reward: +{percentReward}, " +
             $"False penalty: -{falsePenalty}, Perfect bonus: +{perfectBonusAmount}, " +
             $"Evidence bonus: +{evidenceBonus}, Total: {totalCoupons}");
 
@@ -1912,6 +1935,12 @@ public class SuspectController : NetworkBehaviour
             _reportRecordedFor = killed;
             ShiftManager.Instance?.RecordSubjectResult(BuildSubjectResult(
                 killed, ShiftSubjectResult.NotAssessed, 0, 0, ShiftSubjectVerdict.Killed));
+
+            // No verdict was delivered, so this suspect hasn't been counted yet — count it now
+            // so the "Process N subjects" counter still reaches its total. Clears the full-mutant
+            // flag so a full-mutant slot struck down here is never counted a second time.
+            _fullMutantEncounterPending = false;
+            ShiftManager.Instance?.SuspectResolvedWithoutVerdict();
         }
 
         StartCoroutine(KilledByPlayerSequence(killed));
@@ -1960,6 +1989,17 @@ public class SuspectController : NetworkBehaviour
         yield return new WaitForSeconds(1.5f);
 
         CleanupSpawnedFolder();
+
+        // Count the subject as processed (no verdict was delivered) unless a verdict already
+        // counted it, or it's the Day 1 tutorial suspect. Clears the full-mutant flag so the
+        // same slot is never counted twice.
+        bool alreadyCounted = _reportRecordedFor == fled;
+        if (!IsScriptedDay1TutorialSuspect && !alreadyCounted)
+        {
+            _fullMutantEncounterPending = false;
+            ShiftManager.Instance.SuspectResolvedWithoutVerdict();
+        }
+
         _reportRecordedFor = fled;
         ShiftManager.Instance.RecordSubjectResult(BuildSubjectResult(
             fled, ShiftSubjectResult.NotAssessed, 0, 0, ShiftSubjectVerdict.Fled));
@@ -1972,6 +2012,7 @@ public class SuspectController : NetworkBehaviour
     {
         suspectIndex.Value = -1;
         _currentSuspectInitialized = false;
+        _fullMutantEncounterPending = false;
         _currentSuspectNetworkObjectId = ulong.MaxValue;
         suspectCharacter = null;
         spawnedFolder = null;
@@ -1989,6 +2030,7 @@ public class SuspectController : NetworkBehaviour
 
         // Clear any leftover suspect reference so verdict/interact code sees null for this slot.
         suspectCharacter = null;
+        _fullMutantEncounterPending = false;
 
         GameObject mutantObj = Instantiate(prefab.gameObject, position, rotation);
         NetworkObject netObj = mutantObj.GetComponent<NetworkObject>();
@@ -2052,9 +2094,17 @@ public class SuspectController : NetworkBehaviour
                 netObj.Despawn();
         }
 
+        // Full-mutant suspects also end here. They are real suspects and count toward
+        // DailySuspectManager.TotalSuspectsThisShift, so tally them as processed (once).
         // Mutant intruder slots are excluded from the suspect total entirely (they're a random
-        // combat threat, not a "suspect to process") — do NOT fire OnSuspectProcessed here. This
-        // only advances the lineup slot count so the shift still ends at the right time.
+        // combat threat, not a "suspect to process") — they only advance the lineup slot count
+        // so the shift still ends at the right time.
+        if (_fullMutantEncounterPending)
+        {
+            _fullMutantEncounterPending = false;
+            ShiftManager.Instance.SuspectResolvedWithoutVerdict();
+        }
+
         ShiftManager.Instance.SetNextSuspectReady();
     }
 

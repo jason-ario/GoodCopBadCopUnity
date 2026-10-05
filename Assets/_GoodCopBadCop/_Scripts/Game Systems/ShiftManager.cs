@@ -1104,6 +1104,20 @@ public class ShiftManager : NetworkBehaviour
         OnSuspectProcessed?.Invoke();
     }
 
+    /// <summary>
+    /// Records a lineup suspect that was resolved WITHOUT a folder verdict — melee-killed by a
+    /// player, fled from wounds, or a full-mutant whose booth encounter ended (broke through,
+    /// retreated, fled or was killed). These are still real suspects counted in
+    /// <see cref="DailySuspectManager.TotalSuspectsThisShift"/>, so without this the
+    /// "Process N subjects" counter could never reach its total. Does not touch the
+    /// correct/wrong verdict tallies. Server-only; called from <see cref="SuspectController"/>.
+    /// </summary>
+    public void SuspectResolvedWithoutVerdict()
+    {
+        suspectsProcessed += 1;
+        OnSuspectProcessed?.Invoke();
+    }
+
     public void StartNewShift()
     {
         ResetEverything();

@@ -215,6 +215,8 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
         // source of truth also used by DayBase's objective counter — it deliberately EXCLUDES
         // mutant intruder slots, which are a random combat threat and never a "suspect to
         // process" (ShiftManager's end-of-shift check uses a separate, mutant-inclusive count).
+        // Full mutants and melee-killed/fled suspects DO count and are tallied via
+        // ShiftManager.SuspectResolvedWithoutVerdict.
         int total = activeDay != null && activeDay.SubjectsToProcessOverrideForDisplay >= 0
             ? activeDay.SubjectsToProcessOverrideForDisplay
             : (DailySuspectManager.Instance != null ? DailySuspectManager.Instance.TotalSuspectsThisShift : 0);

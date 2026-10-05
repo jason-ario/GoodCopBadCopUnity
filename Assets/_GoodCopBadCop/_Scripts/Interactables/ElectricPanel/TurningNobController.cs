@@ -98,9 +98,10 @@ public class TurningNobController : MonoBehaviour
 
     /// <summary>
     /// Called when the player releases the drag. Always springs the knob back to Off,
-    /// even after reaching the On position — callers should check <see cref="IsAtOnPosition"/>
-    /// immediately after calling this (before the spring-back coroutine has a chance to run)
-    /// to decide whether the puzzle was solved.
+    /// even after reaching the On position. Callers must sample <see cref="IsAtOnPosition"/>
+    /// BEFORE calling this: StartCoroutine runs the spring-back's first step synchronously,
+    /// so progress has already dropped by springSpeed * deltaTime when this returns
+    /// (enough to fall below the On threshold at low framerates).
     /// </summary>
     public void OnRelease()
     {

@@ -10,6 +10,15 @@ public class ThanksForPlayingUI : MonoBehaviour
     [Tooltip("Steam store page URL to open when the player clicks Wishlist on Steam.")]
     [SerializeField] private string _steamWishlistUrl = "https://store.steampowered.com/app/APPID/";
 
+    // ─── Lifecycle ───────────────────────────────────────────────────────────
+
+    private void OnDisable()
+    {
+        // The end screen pauses world audio via AudioListener.pause (global) — always undo it
+        // when this screen goes away, however it was closed.
+        AudioManager.Instance?.RestoreWorldAudio();
+    }
+
     // ─── Button Handlers ─────────────────────────────────────────────────────
 
     /// <summary>Called by the Wishlist on Steam button's OnClick event.</summary>

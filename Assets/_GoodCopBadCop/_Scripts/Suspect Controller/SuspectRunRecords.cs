@@ -19,6 +19,12 @@ public class SuspectRunRecords : MonoBehaviour
              "player has had a chance to process them.")]
     [Range(0, 100)] public int neverSeenInfectionCap = 70;
 
+    [Tooltip("Multiplier on daily infection growth for suspects the player has already seen (not killed). " +
+             "Doesn't apply on the night of a quarantine verdict, when the score resets instead. Makes passing a suspect " +
+             "visibly worse than catching them: with SuspectData.dailyInfectionProgression 8–18 and a 2.5x " +
+             "multiplier, a passed suspect gains roughly 2–4 anomaly-budget points per night.")]
+    [Min(0f)] public float passedInfectionGrowthMultiplier = 2.5f;
+
     [Header("Replacement System")]
     [Tooltip("Number of days after a suspect is killed before their replacement version activates and re-enters the shift pool.")]
     [Min(1)] public int replacementWindowDays = 7;
@@ -349,10 +355,11 @@ public class SuspectRunRecords : MonoBehaviour
 
     /// <summary>
     /// Advances each living suspect's infection score by a per-character random amount.
-    /// Quarantine-treated suspects have their score reset instead — unless they are fully mutated,
-    /// in which case the quarantine has no effect.
+    /// Quarantined suspects have their score reset on the verdict night. The score holds through the next
+    /// day, then grows again from that night onward. A fully mutated suspect isn't affected by quarantine.
+    /// Seen suspects grow faster (× <see cref="passedInfectionGrowthMultiplier"/>).
     /// Suspects who have never been shown to the player (<see cref="SuspectRecord.daysShown"/> == 0)
-    /// still progress every day, capped at <see cref="neverSeenInfectionCap"/>.
+    /// still progress every day at the base rate, capped at <see cref="neverSeenInfectionCap"/>.
     /// Checks whether any killed suspect has waited long enough to have their replacement activate.
     /// Persists all changes to disk after advancing.
     /// Call this before DailySuspectManager populates the next shift.
@@ -392,7 +399,13 @@ public class SuspectRunRecords : MonoBehaviour
             // more infected suspects. Never-seen suspects are capped below the full-mutant threshold.
             bool neverSeen = record.daysShown <= 0;
 
-            if (record.pendingVaccineReset)
+            // currentDay is still the day that just ended (CampaignManager applies the new day after this).
+            // Quarantine treats only the verdict night: the score resets, and the suspect stays at that
+            // score through the next day (quarantine day 2). Growth resumes that night as usual.
+            // The quarantinedOnDay check also covers saves, where pendingVaccineReset isn't stored.
+            bool quarantinedToday = record.pendingVaccineReset || (currentDay >= 0 && record.quarantinedOnDay == currentDay);
+
+            if (quarantinedToday)
             {
                 record.pendingVaccineReset = false;
 
@@ -410,12 +423,13 @@ public class SuspectRunRecords : MonoBehaviour
             {
                 Vector2Int range = record.SuspectData.dailyInfectionProgression;
                 int baseIncrease = UnityEngine.Random.Range(range.x, range.y + 1);
-                int increase = Mathf.RoundToInt(baseIncrease * dayMultiplier);
+                float statusMultiplier = neverSeen ? 1f : passedInfectionGrowthMultiplier;
+                int increase = Mathf.RoundToInt(baseIncrease * dayMultiplier * statusMultiplier);
                 int cap = neverSeen
                     ? Mathf.Max(record.infectionScore, Mathf.Min(neverSeenInfectionCap, AnomalyController.FULLY_MUTATED_THRESHOLD - 1))
                     : 100;
                 record.infectionScore = Mathf.Clamp(record.infectionScore + increase, 0, cap);
-                Debug.Log($"[SuspectRunRecords] '{record.SuspectData.name}' infection +{increase} (base {baseIncrease} × {dayMultiplier:F2}) → {record.infectionScore}{(record.IsFullyMutated ? " [FULLY MUTATED]" : "")}.");
+                Debug.Log($"[SuspectRunRecords] '{record.SuspectData.name}' infection +{increase} (base {baseIncrease} × {dayMultiplier:F2} × {statusMultiplier:F2}{(neverSeen ? " never-seen" : " passed")}) → {record.infectionScore}{(record.IsFullyMutated ? " [FULLY MUTATED]" : "")}.");
             }
         }
 

@@ -315,23 +315,7 @@ public abstract class DayBase : MonoBehaviour
     {
         Debug.Log($"[Day {DayNumber}] Day activated.");
 
-        if (DefaultGuardsToDeactivate != null)
-        {
-            foreach (GameObject guard in DefaultGuardsToDeactivate)
-            {
-                if (guard != null)
-                    guard.SetActive(false);
-            }
-        }
-
-        if (GuardPurchasePointsToActivate != null)
-        {
-            foreach (GuardPurchasePoint purchasePoint in GuardPurchasePointsToActivate)
-            {
-                if (purchasePoint != null)
-                    purchasePoint.SetUnlocked(true);
-            }
-        }
+        ApplyCumulativeGuardSetup();
 
         // Best-effort immediate attempt — works on the normal (non-debug-skip) day-advance path.
         RestorePowerIfNoOutageIntended();
@@ -368,6 +352,42 @@ public abstract class DayBase : MonoBehaviour
 
         OnDayStart?.Invoke();
     }
+    /// <summary>
+    /// Applies <see cref="DefaultGuardsToDeactivate"/> and <see cref="GuardPurchasePointsToActivate"/>
+    /// from this day AND every earlier day. These are permanent world changes, so a save resumed
+    /// on (or debug-skipped to) a later day must still hide the default guards and unlock the
+    /// purchase points that an earlier day (e.g. Day 3) set up — otherwise the default guard
+    /// reappears at the guard post and the post stays locked/non-interactable.
+    /// </summary>
+    private void ApplyCumulativeGuardSetup()
+    {
+        IEnumerable<DayBase> days = CampaignManager.Instance != null
+            ? CampaignManager.Instance.GetDaysUpTo(DayNumber)
+            : new[] { this };
+
+        foreach (DayBase day in days)
+        {
+            if (day.DefaultGuardsToDeactivate != null)
+            {
+                foreach (GameObject guard in day.DefaultGuardsToDeactivate)
+                {
+                    if (guard != null)
+                        guard.SetActive(false);
+                }
+            }
+
+            if (day.GuardPurchasePointsToActivate != null)
+            {
+                foreach (GuardPurchasePoint purchasePoint in day.GuardPurchasePointsToActivate)
+                {
+                    if (purchasePoint != null)
+                        purchasePoint.SetUnlocked(true);
+                }
+            }
+        }
+    }
+
+
 
     // -------------------------------------------------------------------------
     // Day Schedule — Task Triggers

@@ -60,8 +60,33 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private Tween _activeTween;
     private Coroutine _postHitLineupReleaseCoroutine;
     private bool _isDone;
-    private bool _isAtBoothWindow;
+    private bool _isAtBoothWindowServer;
     private bool _lineupSlotReleasedAtWindow;
+
+    /// <summary>
+    /// Replicated mirror of the server's at-booth-window state. Client-side weapon hit resolution
+    /// reads it (via <see cref="MutantEnemy.CanBeDamagedByPlayers"/>) so a dormant window-banging
+    /// mutant is reported as a mutant hit and the server can hand it to hostile AI.
+    /// </summary>
+    private readonly NetworkVariable<bool> _windowAttackHittable = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    /// <summary>True on every peer while this mutant is attacking the booth window and can be hit to provoke it.</summary>
+    public bool IsWindowAttackHittable => _windowAttackHittable.Value;
+
+    /// <summary>Server-side at-window state; writes keep <see cref="_windowAttackHittable"/> in sync.</summary>
+    private bool _isAtBoothWindow
+    {
+        get => _isAtBoothWindowServer;
+        set
+        {
+            _isAtBoothWindowServer = value;
+            if (IsServer && IsSpawned && _windowAttackHittable.Value != value)
+                _windowAttackHittable.Value = value;
+        }
+    }
+
+    private const float WindowHitNavMeshSnapDistance = 3f;
 
     private const float PostHitNoCombatReleaseSeconds = 5f;
 
@@ -117,7 +142,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
-        _isAtBoothWindow = false;
+        _isAtBoothWindowServer = false;
         _postHitLineupReleaseCoroutine = null;
         _activeTween?.Kill();
         StopAllCoroutines();
@@ -199,6 +224,15 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_agent != null && !_agent.enabled)
             _agent.enabled = true;
+
+        // The stand position sits at the booth wall, possibly just off the Mutant NavMesh.
+        // InitialiseServer writes agent.isStopped immediately, which throws off-mesh.
+        if (_agent != null && !_agent.isOnNavMesh)
+        {
+            var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, WindowHitNavMeshSnapDistance, filter))
+                _agent.Warp(navHit.position);
+        }
 
         // Match the normal climb-through handoff: the mutant is hostile immediately, while its
         // standard target selection still prioritises nearby players over the booth target.
@@ -351,16 +385,10 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_isDone) yield break;
 
-        if (canClimb && _shutterController != null && _shutterController.IsOpen)
-        {
-            // Glass is exposed (shutter up). If it's already smashed, climb straight through;
-            // otherwise attack it until it breaks or we give up.
-            var glass = BreakableGlassController.Instance;
-            if (glass == null || glass.IsSmashed)
-                yield return StartCoroutine(ClimbThroughSequence());
-            else
-                yield return StartCoroutine(GlassAttackSequence());
-        }
+        // Climbing mutants share one window-attack loop that handles shutter, glass and
+        // climb-through; non-climbing mutants bang and lose interest.
+        if (canClimb)
+            yield return StartCoroutine(WindowAttackSequence());
         else
             yield return StartCoroutine(ShutterBangSequence());
     }
@@ -443,9 +471,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     }
 
     /// <summary>
-    /// Attacks the closed shutter window.
-    /// Climbing mutants bang a fixed number of times, climb through opportunistically if the shutter opens, then retreat.
-    /// Non-climbing mutants attack for a fixed duration, then lose interest and retreat.
+    /// Attacks the booth window. Non-climbing mutants attack for a fixed duration, then lose
+    /// interest and retreat. Climbing mutants are routed to <see cref="WindowAttackSequence"/>.
     /// </summary>
     private IEnumerator ShutterBangSequence()
     {
@@ -494,99 +521,61 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             yield break;
         }
 
-        // Climbing mutant: bang a fixed number of times, checking each cycle for an opened shutter.
-        for (int i = 0; i < _data.shutterBangCount; i++)
-        {
-            if (_isDone) yield break;
-
-            // Shutter opened mid-bang — break through if the glass is already gone/smashed,
-            // otherwise the glass is still intact behind it so switch to attacking that instead
-            // of climbing straight through it.
-            if (_shutterController != null && _shutterController.IsOpen)
-            {
-                var glass = BreakableGlassController.Instance;
-                if (glass == null || glass.IsSmashed)
-                    yield return StartCoroutine(ClimbThroughSequence());
-                else
-                    yield return StartCoroutine(GlassAttackSequence());
-                yield break;
-            }
-
-            if (HasBarrierToBangOn()) SetAttackClientRpc(true);
-            yield return new WaitForSeconds(ImpactDelay);
-            if (_isDone) yield break;
-
-            // Shutter opened during the wind-up — the blow lands on the glass behind it (or on
-            // nothing), not the shutter. Skip the shutter impact; the next iteration hands off.
-            if (_shutterController == null || !_shutterController.IsOpen)
-                HitShutterClientRpc();
-
-            yield return new WaitForSeconds(PostImpactAnimRemainder);
-            SetAttackClientRpc(false);
-            yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
-        }
-
-        if (_isDone) yield break;
-
-        // Give up: brief pause, then either despawn or retreat.
-        yield return new WaitForSeconds(GiveUpPauseDuration);
-
-        if (_isDone) yield break;
-
-        if (DespawnInsteadOfRetreat)
-        {
-            _isDone = true;
-            _controller?.OnMutantIntruderComplete(this, brokeThrough: false);
-            OnSequenceComplete?.Invoke(false);
-            if (NetworkObject.IsSpawned) NetworkObject.Despawn();
-            yield break;
-        }
-
-        yield return StartCoroutine(RetreatingSequence(notifyController: true));
+        // Climbing mutant: shared window-attack loop (shutter and glass).
+        yield return StartCoroutine(WindowAttackSequence());
     }
 
     /// <summary>
-    /// Attacks the exposed glass when the shutter is open.
-    /// Each bang deals one hit to <see cref="BreakableGlassController"/>. If the glass shatters,
-    /// the mutant immediately transitions to <see cref="ClimbThroughSequence"/>. If the glass
-    /// survives all bangs or the shutter closes during the attack, the mutant retreats.
-    /// Damage accumulates across visits — the glass health persists until
-    /// <see cref="BreakableGlassController.ResetGlass"/> is called.
+    /// Window attack for climbing mutants (lineup intruders, full-mutant suspects, Alexei).
+    /// Bangs on whatever currently blocks the booth window — the closed shutter, or the exposed
+    /// glass when the shutter is up — for ONE shared budget of
+    /// <see cref="MutantIntruderData.shutterBangCount"/> bangs (≈ count × bangIntervalSeconds).
+    /// The shutter opening or closing mid-attack only switches the target surface; it never ends
+    /// the attack early or resets the budget, so every climbing mutant stays at the window for the
+    /// same several seconds before giving up. Each glass hit deals one hit to
+    /// <see cref="BreakableGlassController"/> (damage persists across visits until
+    /// <see cref="BreakableGlassController.ResetGlass"/>). If the shutter is open and the glass is
+    /// gone/smashed, the mutant climbs through immediately.
     /// </summary>
-    private IEnumerator GlassAttackSequence()
+    private IEnumerator WindowAttackSequence()
     {
         if (!IsServer || _isDone) yield break;
 
         _isAtBoothWindow = true;
 
         var glass = BreakableGlassController.Instance;
+        int bangsRemaining = Mathf.Max(1, _data.shutterBangCount);
 
-        for (int i = 0; i < _data.shutterBangCount; i++)
+        while (bangsRemaining > 0)
         {
             if (_isDone) yield break;
 
-            // Player closed the shutter mid-attack — glass is now protected.
-            if (_shutterController != null && !_shutterController.IsOpen)
-                break;
+            bool shutterOpen = _shutterController != null && _shutterController.IsOpen;
+
+            // Window fully exposed (shutter up, glass gone) — break through.
+            if (shutterOpen && (glass == null || glass.IsSmashed))
+            {
+                yield return StartCoroutine(ClimbThroughSequence());
+                yield break;
+            }
+
+            bool swingAtGlass = shutterOpen;
 
             SetAttackClientRpc(true);
-
-            // Wait for the animation to reach the impact point, then register the hit.
             yield return new WaitForSeconds(ImpactDelay);
             if (_isDone) yield break;
 
-            // Player closed the shutter during the wind-up — the shutter starts moving (and
-            // ShutterController.IsOpen flips) the instant the switch is hit, well before the
-            // panel is visually all the way down. Treat that as fully closed immediately so a
-            // blow already mid-swing doesn't land on the glass behind a shutter that is on its
-            // way down. Abort this hit and retreat instead of following through.
-            if (_shutterController != null && !_shutterController.IsOpen)
-            {
-                SetAttackClientRpc(false);
-                break;
-            }
+            // Re-check at the impact point: ShutterController.IsOpen flips the instant the switch
+            // is hit, well before the panel visually finishes moving, so treat it as already in
+            // its new state.
+            bool shutterOpenAtImpact = _shutterController != null && _shutterController.IsOpen;
 
-            if (glass != null)
+            if (!shutterOpenAtImpact)
+            {
+                // Shutter is (or just became) closed — the blow lands on the shutter.
+                HitShutterClientRpc();
+            }
+            else if (swingAtGlass && glass != null)
             {
                 int newHits = glass.RegisterHit();
 
@@ -599,21 +588,23 @@ public class MutantSuspectBehaviour : NetworkBehaviour
                     yield return StartCoroutine(ClimbThroughSequence());
                     yield break;
                 }
-                else
-                {
-                    // Intermediate hit — update crack visual on all clients.
-                    UpdateGlassClientRpc(newHits);
-                }
+
+                // Intermediate hit — update crack visual on all clients.
+                UpdateGlassClientRpc(newHits);
             }
+            // else: shutter opened during a swing aimed at the shutter — the blow lands on nothing;
+            // the next iteration retargets the glass.
 
             yield return new WaitForSeconds(PostImpactAnimRemainder);
             SetAttackClientRpc(false);
             yield return new WaitForSeconds(Mathf.Max(0f, _data.bangIntervalSeconds - _data.attackAnimDurationSeconds));
+
+            bangsRemaining--;
         }
 
         if (_isDone) yield break;
 
-        // Exhausted attack budget without breaking the glass — give up and retreat.
+        // Exhausted the shared attack budget without getting in — give up.
         yield return new WaitForSeconds(GiveUpPauseDuration);
 
         if (_isDone) yield break;
@@ -640,6 +631,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private IEnumerator RetreatingSequence(bool notifyController)
     {
         if (_isDone) yield break;
+
+        // Leaving the window — no longer provokable by a hit.
+        _isAtBoothWindow = false;
 
         float retreatDeadline = Time.time + _data.retreatDespawnTimeout;
 
@@ -767,14 +761,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
         if (_isDone) yield break;
 
-        if (canClimb && _shutterController != null && _shutterController.IsOpen)
-        {
-            var glass = BreakableGlassController.Instance;
-            if (glass == null || glass.IsSmashed)
-                yield return StartCoroutine(ClimbThroughSequence());
-            else
-                yield return StartCoroutine(GlassAttackSequence());
-        }
+        if (canClimb)
+            yield return StartCoroutine(WindowAttackSequence());
         else
             yield return StartCoroutine(ShutterBangSequence());
     }
@@ -877,7 +865,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
     /// <summary>
     /// Updates the glass crack overlay to the given intermediate hit count on all clients.
-    /// Called after every non-smashing hit in <see cref="GlassAttackSequence"/>.
+    /// Called after every non-smashing hit in <see cref="WindowAttackSequence"/>.
     /// </summary>
     [ClientRpc]
     private void UpdateGlassClientRpc(int hitCount)
@@ -887,7 +875,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
     /// <summary>
     /// Transitions the glass to the fully smashed state on all clients (hides normal glass,
-    /// activates broken shards). Called on the final blow in <see cref="GlassAttackSequence"/>.
+    /// activates broken shards). Called on the final blow in <see cref="WindowAttackSequence"/>.
     /// </summary>
     [ClientRpc]
     private void SmashGlassClientRpc()

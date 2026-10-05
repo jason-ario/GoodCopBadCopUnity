@@ -323,7 +323,7 @@ public class PlayerInteractionController : NetworkBehaviour
         foreach (RaycastHit hit in hits)
         {
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            if (enemy != null && enemy.IsActive)
+            if (enemy != null && enemy.CanBeDamagedByPlayers)
             {
                 if (enemy.IsDead) return false;
                 distance = hit.distance;

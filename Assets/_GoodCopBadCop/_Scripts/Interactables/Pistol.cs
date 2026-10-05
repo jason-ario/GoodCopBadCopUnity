@@ -235,8 +235,9 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             // still alive/uninfected. Without the IsActive check, a shot at a perfectly living
             // player would always be misclassified as a mutant hit and silently swallowed by
             // MutantEnemy's own dormancy guard, never reaching PlayerHealth at all.
+            // CanBeDamagedByPlayers = IsActive, plus dormant lineup mutants attacking the booth window.
             MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
-            if (enemy != null && enemy.IsActive)
+            if (enemy != null && enemy.CanBeDamagedByPlayers)
             {
                 if (enemy.NetworkObject != null)
                     return new FireHit(ShotKind.Mutant, new NetworkObjectReference(enemy.NetworkObject), hit.point);

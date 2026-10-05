@@ -168,6 +168,16 @@ public class CampaignManager : NetworkBehaviour
 
     // -------------------------------------------------------------------------
     // Public API
+
+    /// <summary>Returns every collected day whose DayNumber is less than or equal to <paramref name="day"/>.</summary>
+    public IEnumerable<DayBase> GetDaysUpTo(int day)
+    {
+        foreach (KeyValuePair<int, DayBase> pair in _days)
+        {
+            if (pair.Key <= day && pair.Value != null)
+                yield return pair.Value;
+        }
+    }
     // -------------------------------------------------------------------------
 
     /// <summary>

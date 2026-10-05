@@ -52,6 +52,8 @@ public class UIController : MonoBehaviour
     [SerializeField] private EndDayPopupUI _endDayPopupUI;
     [SerializeField] private GameObject _thanksForPlayingPanel;
     [SerializeField] private ThanksForPlayingUI _thanksForPlayingUI;
+    [Tooltip("Seconds to fade out all world audio (footsteps, ambience, etc.) when the Thanks For Playing screen opens.")]
+    [SerializeField] private float _endOfDemoWorldAudioFadeSeconds = 1f;
 
     /// <summary>The <see cref="ScreenDamage"/> component driving the screen hurt overlay.</summary>
     public ScreenDamage ScreenDamage => _screenDamage;
@@ -1126,19 +1128,29 @@ public class UIController : MonoBehaviour
     // ─── Thanks For Playing ───────────────────────────────────────────────────
 
     /// <summary>
-    /// Locks the local player's movement/interaction/look, freezes their animations, and marks
-    /// them invincible so no stray hit/damage animation can play. Idempotent — safe to call
-    /// repeatedly.
+    /// Locks the local player's movement/interaction/look and marks them invincible so no
+    /// stray hit/damage animation can play. Uses <see cref="PlayerMovementController.SetCanControl"/>
+    /// (not the raw CanControl property) so cached movement input is cleared — otherwise
+    /// footsteps keep ticking and the walk animation keeps playing (locally and on proxies).
+    /// Animators stay enabled so the body blends back to idle. Idempotent — safe to call repeatedly.
     /// </summary>
     private void LockPlayerForEndOfDemo()
     {
         if (PlayerInstance.Instance == null)
             return;
 
-        PlayerInstance.Instance.CanControl = false;
+        PlayerMovementController movement = PlayerInstance.Instance.GetComponent<PlayerMovementController>();
+        if (movement != null)
+        {
+            movement.SetCanControl(false);
+            movement.SetCanLook(false);
+        }
+        else
+        {
+            PlayerInstance.Instance.CanControl = false;
+        }
+
         PlayerInstance.Instance.PlayerInteractionController?.SetCanInteract(false, string.Empty);
-        PlayerInstance.Instance.GetComponent<PlayerMovementController>()?.SetCanLook(false);
-        PlayerInstance.Instance.GetComponent<PlayerAnimationController>()?.SetAnimatorsEnabled(false);
 
         PlayerHealth playerHealth = PlayerInstance.Instance.GetComponent<PlayerHealth>();
         if (playerHealth != null)
@@ -1186,17 +1198,29 @@ public class UIController : MonoBehaviour
         if (MainMenuController.Instance != null)
             MainMenuController.Instance.PlayMainMenuMusic();
 
+        // Main theme now owns MusicManager at Encounter priority; also drop any pending
+        // ambient-music playback so the director's schedule can't sneak back in.
+        AmbientMusicManager.Instance?.StopSynced();
+
         if (AudioManager.Instance != null)
         {
+            // Fade + pause every world sound (footsteps, ambience, hums, mutants, remote
+            // players); only the main theme and UI keep playing.
+            AudioManager.Instance.SilenceWorldAudio(
+                _endOfDemoWorldAudioFadeSeconds,
+                transform,
+                MainMenuController.Instance != null ? MainMenuController.Instance.transform : null);
             AudioManager.Instance.FadeOutAmbientAudio();
             AudioManager.Instance.SetRainAmbience(false);
         }
     }
 
-    /// <summary>Hides the thanks-for-playing screen.</summary>
+    /// <summary>Hides the thanks-for-playing screen and restores world audio.</summary>
     public void HideThanksForPlayingScreen()
     {
         if (_thanksForPlayingPanel != null)
             _thanksForPlayingPanel.SetActive(false);
+
+        AudioManager.Instance?.RestoreWorldAudio();
     }
 }

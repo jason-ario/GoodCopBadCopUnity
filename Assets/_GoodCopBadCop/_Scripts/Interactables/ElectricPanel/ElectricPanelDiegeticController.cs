@@ -1,3 +1,4 @@
+using HighlightPlus;
 using UnityEngine;
 
 /// <summary>
@@ -36,6 +37,7 @@ public class ElectricPanelDiegeticController : DiegeticViewController
 
     private bool _isDraggingNob;
     private float _lastMouseAngle;
+    private HighlightEffect _hoveredHighlight;
 
     // ─── DiegeticViewController overrides ────────────────────────────────────
 
@@ -58,6 +60,8 @@ public class ElectricPanelDiegeticController : DiegeticViewController
             _isDraggingNob = false;
             _nob?.OnRelease();
         }
+
+        SetHoveredHighlight(null);
 
         if (_panelCollider != null) _panelCollider.enabled = true;
 
@@ -86,9 +90,16 @@ public class ElectricPanelDiegeticController : DiegeticViewController
         Ray ray = cam.ScreenPointToRay(Input.mousePosition);
         bool didHit = Physics.Raycast(ray, out RaycastHit hit, 100f, ~0, QueryTriggerInteraction.Collide);
 
-        if (!Input.GetMouseButtonDown(0) || !didHit) return;
+        bool hitNob = didHit && _nobCollider != null && hit.collider == _nobCollider;
+        CircuitSwitch switchHit = didHit && !hitNob ? hit.collider.GetComponentInParent<CircuitSwitch>() : null;
 
-        bool hitNob = _nobCollider != null && hit.collider == _nobCollider;
+        // Hover highlight: knob or switch under the cursor.
+        HighlightEffect hoverTarget = null;
+        if (hitNob)                 hoverTarget = _nobCollider.GetComponent<HighlightEffect>();
+        else if (switchHit != null) hoverTarget = switchHit.GetComponent<HighlightEffect>();
+        SetHoveredHighlight(hoverTarget);
+
+        if (!Input.GetMouseButtonDown(0) || !didHit) return;
 
         if (hitNob)
         {
@@ -96,10 +107,10 @@ public class ElectricPanelDiegeticController : DiegeticViewController
         }
         else
         {
-            CircuitSwitch switchHit = hit.collider.GetComponentInParent<CircuitSwitch>();
             if (switchHit == null) return;
 
             switchHit.OnClick();
+            _panelController?.NotifySwitchFlipped(switchHit);
 
             // Touching a breaker switch while power is already on trips the breaker and cuts
             // power entirely, same as a real panel.
@@ -126,8 +137,14 @@ public class ElectricPanelDiegeticController : DiegeticViewController
         if (Input.GetMouseButtonUp(0))
         {
             _isDraggingNob = false;
+
+            // Sample BEFORE OnRelease: StartCoroutine runs the spring-back's first step
+            // synchronously, which already pulls progress down by springSpeed * deltaTime.
+            // On lower-framerate peers (typically clients) that dropped it below the On
+            // threshold, so the solve silently failed even with every switch On.
+            bool reachedOn = _nob != null && _nob.IsAtOnPosition;
             _nob?.OnRelease();
-            CheckPuzzleSolved();
+            CheckPuzzleSolved(reachedOn);
             return;
         }
 
@@ -142,9 +159,11 @@ public class ElectricPanelDiegeticController : DiegeticViewController
 
     // ─── Puzzle check ─────────────────────────────────────────────────────────
 
-    private void CheckPuzzleSolved()
+    private void CheckPuzzleSolved() => CheckPuzzleSolved(_nob != null && _nob.IsAtOnPosition);
+
+    private void CheckPuzzleSolved(bool nobAtOn)
     {
-        if (_nob == null || !_nob.IsAtOnPosition) return;
+        if (_nob == null || !nobAtOn) return;
 
         bool allSwitchesOn = true;
         if (_switches != null)
@@ -186,9 +205,24 @@ public class ElectricPanelDiegeticController : DiegeticViewController
         // Extra one-shot cue on top of the individual switch-flip sounds, signalling that
         // the whole panel just failed and reset.
         _panelController?.PlayAllSwitchesResetSound();
+
+        // Replicate the reset (switch states + cue) to the other players.
+        _panelController?.NotifySwitchesReset();
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Moves the hover highlight to <paramref name="target"/> (null clears it). While dragging
+    /// the knob, hover isn't re-evaluated, so the knob stays highlighted until release.
+    /// </summary>
+    private void SetHoveredHighlight(HighlightEffect target)
+    {
+        if (_hoveredHighlight == target) return;
+        if (_hoveredHighlight != null) _hoveredHighlight.SetHighlighted(false);
+        _hoveredHighlight = target;
+        if (_hoveredHighlight != null) _hoveredHighlight.SetHighlighted(true);
+    }
 
     private float ScreenAngleAroundNob(Camera cam)
     {
