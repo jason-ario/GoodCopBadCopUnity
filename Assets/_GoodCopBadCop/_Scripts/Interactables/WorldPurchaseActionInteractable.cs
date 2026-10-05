@@ -215,6 +215,7 @@ public class WorldPurchaseActionInteractable : Interactable
         UIController.Instance.HideBackButton();
         UIController.Instance.ShowBackButton(ClosePurchaseView);
         UIController.OnPauseMenuOpened += ClosePurchaseView;
+        DialogueChoiceSystem.OnDialogueModeEntering += ClosePurchaseView;
 
         ActivateZoomCamera();
         string title = string.IsNullOrEmpty(_popupTitle) ? _shopItem.Name : _popupTitle;
@@ -229,6 +230,7 @@ public class WorldPurchaseActionInteractable : Interactable
         _shopItem.SetHighlightBlocked(false);
 
         UIController.OnPauseMenuOpened -= ClosePurchaseView;
+        DialogueChoiceSystem.OnDialogueModeEntering -= ClosePurchaseView;
 
         if (_itemZoomCamera != null)
             _itemZoomCamera.gameObject.SetActive(false);

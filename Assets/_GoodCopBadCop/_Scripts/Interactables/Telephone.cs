@@ -71,15 +71,18 @@ public class Telephone : Interactable
     [Tooltip("When true, the phone filter settings below are applied to the voice AudioSource's filter " +
              "chain on Awake (filters are added if missing).")]
     [SerializeField] private bool _applyPhoneFilterPreset = true;
-    [SerializeField] private float _phoneHighPassCutoff = 750f;
-    [SerializeField] private float _phoneHighPassResonance = 1.8f;
-    [SerializeField] private float _phoneLowPassCutoff = 2600f;
-    [SerializeField] private float _phoneLowPassResonance = 2.2f;
-    [SerializeField, Range(0f, 1f)] private float _phoneDistortionLevel = 0.5f;
+    [SerializeField] private float _phoneHighPassCutoff = 1200f;
+    [SerializeField] private float _phoneHighPassResonance = 2.5f;
+    [SerializeField] private float _phoneLowPassCutoff = 1800f;
+    [SerializeField] private float _phoneLowPassResonance = 3f;
+    [SerializeField, Range(0f, 1f)] private float _phoneDistortionLevel = 0.85f;
     [Tooltip("Volume of the voice while the local player holds the handset (played 2D, in-ear).")]
     [SerializeField, Range(0f, 1f)] private float _inEarVolume = 1f;
     [Tooltip("Stereo pan while in-ear. Negative = left ear (the handset is held in the left hand).")]
     [SerializeField, Range(-1f, 1f)] private float _inEarStereoPan = -0.25f;
+    [Tooltip("Volume for players NOT holding the handset during scripted calls (e.g. Day 3's HQ call). " +
+             "Scripted calls play 2D for everyone so the whole team hears them, just quieter than in-ear.")]
+    [SerializeField, Range(0f, 1f)] private float _scriptedCallBystanderVolume = 0.6f;
 
     /// <summary>Voice clips for scripted calls; empty when none are assigned.</summary>
     public AudioClip[] ScriptedCallVoiceClips => _scriptedCallVoiceClips ?? Array.Empty<AudioClip>();
@@ -233,9 +236,11 @@ public class Telephone : Interactable
     /// Local, per client. Configures <see cref="VoiceAudioSource"/> for the local listener and
     /// returns it: when the local player is holding the handset the voice plays 2D at top
     /// priority, full volume, bypassing reverb (right in the player's ear); everyone else hears
-    /// it with the source's original 3D settings from the phone's position.
+    /// it with the source's original 3D settings from the phone's position — unless
+    /// <paramref name="audibleToEveryone"/> is set (scripted calls), in which case non-holders
+    /// also hear it 2D at <see cref="_scriptedCallBystanderVolume"/> regardless of distance.
     /// </summary>
-    public AudioSource PrepareVoiceSourceForLocalListener()
+    public AudioSource PrepareVoiceSourceForLocalListener(bool audibleToEveryone = false)
     {
         if (_voiceAudioSource == null) return null;
 
@@ -249,6 +254,15 @@ public class Telephone : Interactable
             _voiceAudioSource.priority = 0;
             _voiceAudioSource.volume = _inEarVolume;
             _voiceAudioSource.panStereo = _inEarStereoPan;
+            _voiceAudioSource.bypassReverbZones = true;
+            _voiceAudioSource.dopplerLevel = 0f;
+        }
+        else if (audibleToEveryone)
+        {
+            _voiceAudioSource.spatialBlend = 0f;
+            _voiceAudioSource.priority = 0;
+            _voiceAudioSource.volume = _scriptedCallBystanderVolume;
+            _voiceAudioSource.panStereo = 0f;
             _voiceAudioSource.bypassReverbZones = true;
             _voiceAudioSource.dopplerLevel = 0f;
         }

@@ -28,8 +28,20 @@ public class MutantSpawnerZoneTrigger : MonoBehaviour
              "regardless of zone occupancy or time of day.")]
     [SerializeField] private bool _deactivateWhenAllPlayersLeave = false;
 
-    // How many player objects are currently inside the trigger volume.
-    private int _playersInZone;
+    // Player colliders currently inside the trigger volume. Tracked as a set (not a raw counter)
+    // and pruned of destroyed/disabled colliders, because disabled or teleported colliders never
+    // receive OnTriggerExit — a raw counter would stay stuck above zero and never re-trigger.
+    private readonly System.Collections.Generic.HashSet<Collider> _playerCollidersInZone =
+        new System.Collections.Generic.HashSet<Collider>();
+
+    private int PlayersInZone
+    {
+        get
+        {
+            _playerCollidersInZone.RemoveWhere(c => c == null || !c.enabled || !c.gameObject.activeInHierarchy);
+            return _playerCollidersInZone.Count;
+        }
+    }
 
     private void Awake()
     {
@@ -47,10 +59,12 @@ public class MutantSpawnerZoneTrigger : MonoBehaviour
         if (!IsServer()) return;
         if (!IsPlayer(other)) return;
 
-        _playersInZone++;
-        Debug.Log($"[MutantSpawnerZoneTrigger] Player entered zone '{name}'. Players in zone: {_playersInZone}.", this);
+        bool wasEmpty = PlayersInZone == 0;
+        if (!_playerCollidersInZone.Add(other)) return;
 
-        if (_playersInZone == 1)
+        Debug.Log($"[MutantSpawnerZoneTrigger] Player entered zone '{name}'. Player colliders in zone: {_playerCollidersInZone.Count}.", this);
+
+        if (wasEmpty)
             _spawner?.ActivateFromZone();
     }
 
@@ -59,10 +73,11 @@ public class MutantSpawnerZoneTrigger : MonoBehaviour
         if (!IsServer()) return;
         if (!IsPlayer(other)) return;
 
-        _playersInZone = Mathf.Max(0, _playersInZone - 1);
-        Debug.Log($"[MutantSpawnerZoneTrigger] Player left zone '{name}'. Players in zone: {_playersInZone}.", this);
+        _playerCollidersInZone.Remove(other);
+        int remaining = PlayersInZone;
+        Debug.Log($"[MutantSpawnerZoneTrigger] Player left zone '{name}'. Player colliders in zone: {remaining}.", this);
 
-        if (_playersInZone == 0 && _deactivateWhenAllPlayersLeave)
+        if (remaining == 0 && _deactivateWhenAllPlayersLeave)
             _spawner?.DeactivateFromZone();
     }
 

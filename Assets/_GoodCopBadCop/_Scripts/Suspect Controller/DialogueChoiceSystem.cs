@@ -17,6 +17,14 @@ public class DialogueChoiceSystem : NetworkBehaviour
     public static event Action OnLocalPlayerSpoke;
 
     /// <summary>
+    /// Fired on the local client when any dialogue mode (player-initiated, scripted booth, or
+    /// scripted outside) is being entered, before the player lock is applied. Overlay screens
+    /// that aren't diegetic views (e.g. the world purchase popups for the radio/PC terminal)
+    /// subscribe while open so a forced dialogue tears them down instead of leaving them on screen.
+    /// </summary>
+    public static event Action OnDialogueModeEntering;
+
+    /// <summary>
     /// True while the local player is locked into an active dialogue session with a suspect.
     /// Used by <see cref="SuspectController"/> to prevent the arrival cam from closing while
     /// dialogue mode is holding it open.
@@ -140,6 +148,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
         // Exit any open diegetic view (tool locker, mini fridge, etc.) before locking the player.
         DiegeticViewController.Current?.Close();
+        OnDialogueModeEntering?.Invoke();
 
         // Hang up the phone / close the HQ Order Screen before the dialogue lock is applied.
         Telephone.Instance?.ForceHangUpForDialogue();
@@ -260,6 +269,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
         // Exit any open diegetic view (tool locker, mini fridge, etc.) before locking the player.
         DiegeticViewController.Current?.Close();
+        OnDialogueModeEntering?.Invoke();
 
         // Hang up the phone / close the HQ Order Screen before the dialogue lock is applied.
         Telephone.Instance?.ForceHangUpForDialogue();
@@ -336,6 +346,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         PlayerInstance.Instance?.SetIsInCutscene(true);
 
         DiegeticViewController.Current?.Close();
+        OnDialogueModeEntering?.Invoke();
 
         // Hang up the phone / close the HQ Order Screen before the dialogue lock is applied.
         Telephone.Instance?.ForceHangUpForDialogue();

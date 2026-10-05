@@ -99,6 +99,10 @@ public class PlayerRadiation : NetworkBehaviour
 
     private void Update()
     {
+        // Gain rate is measured on every peer from the replicated value so client-side
+        // feedback (GlitchController, IrradiatedOverlay) works for non-host players too.
+        UpdateRadiationRate();
+
         // Only the server drives radiation damage to avoid per-frame ServerRpc spam.
         if (!IsServer)
             return;
@@ -130,17 +134,25 @@ public class PlayerRadiation : NetworkBehaviour
                 isTakingPill = false;
         }
 
-        UpdateRadiationRate();
         ApplyRadiationDamage();
     }
 
     /// <summary>
     /// Tracks how fast radiation is currently being gained (units/sec), independent of the
     /// accrued total. Pill drain (a decrease) is clamped to zero so it never registers as a gain.
+    /// Runs on every peer against the replicated value; inactive players report zero.
     /// </summary>
     private void UpdateRadiationRate()
     {
         float currentRadiation = _networkRadiation.Value;
+
+        if (!IsActivePlayer || Time.deltaTime <= 0f)
+        {
+            _previousRadiationForRate = currentRadiation;
+            _smoothedRadiationRate = 0f;
+            return;
+        }
+
         float instantRate = (currentRadiation - _previousRadiationForRate) / Time.deltaTime;
         _previousRadiationForRate = currentRadiation;
 

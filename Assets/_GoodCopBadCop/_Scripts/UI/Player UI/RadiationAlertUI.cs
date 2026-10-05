@@ -133,7 +133,9 @@ public class RadiationAlertUI : MonoBehaviour
                                  MainMenuController.Instance.mainMenu != null &&
                                  MainMenuController.Instance.mainMenu.activeSelf;
 
-        bool shouldShow = _radiationIsHigh && !isDead && !isPaused && !isMainMenuActive;
+        bool isSpectating = SpectateManager.Instance != null && SpectateManager.Instance.IsSpectating;
+
+        bool shouldShow = _radiationIsHigh && !isDead && !isPaused && !isMainMenuActive && !isSpectating;
 
         if (shouldShow == _alertShown) return;
 

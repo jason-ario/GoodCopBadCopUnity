@@ -558,11 +558,11 @@ public class Day_03 : DayBase, IDailyTask
             _powerOutageThreat = null;
         }
 
-        // One-shot bottom-centre alert, reusing the same reveal-and-fade notification style as
-        // the "shipment is waiting at the gate" alert -- loop: false so it shows once and goes
-        // away for good rather than resurfacing. Runs on every client since this method already
-        // fires locally on each one via ElectricityController.OnPowerRestoredAllClients.
-        UIController.Instance?.ShowMailDeliveryNotification("Power Restored", loop: false);
+        // One-shot alert on the shared bottom-centre notification queue. It gets its own key
+        // (the message), so it doesn't replace a pending shipment alert. Runs on every client
+        // because this method already fires locally on each one via
+        // ElectricityController.OnPowerRestoredAllClients.
+        UIController.Instance?.ShowQueuedNotification("Power Restored");
 
         Debug.Log("[Day_03] Post-shift power outage resolved -- fuse box repaired.");
         OnDailyTaskCompleted?.Invoke();

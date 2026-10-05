@@ -44,10 +44,9 @@ public class UIController : MonoBehaviour
     [SerializeField] private GameObject inviteFriendsPanel;
     [SerializeField] private CashNotificationPopupManager cashNotificationPopupManager;
     [SerializeField] private ShopNotificationManager shopNotificationManager;
-    [SerializeField] private BoothWaitingNotification boothWaitingNotification;
-    [SerializeField] private BoothWaitingNotification mailDeliveryNotification;
-    [SerializeField] private BoothWaitingNotification radiationAlertNotification;
-    [SerializeField] private BoothWaitingNotification lowHealthAlertNotification;
+    [Tooltip("The single bottom-centre notification slot. Booth, shipment, radiation, low-health and one-shot alerts all queue here so they never overlap.")]
+    [FormerlySerializedAs("boothWaitingNotification")]
+    [SerializeField] private HUDNotificationQueue notificationQueue;
     [SerializeField] private DeathScreenUI deathScreenUI;
     [SerializeField] private GameObject _endDayPopup;
     [SerializeField] private EndDayPopupUI _endDayPopupUI;
@@ -332,7 +331,55 @@ public class UIController : MonoBehaviour
         if (pauseMenuOpened)
             playerUIWasActiveBeforePaused = false;
 
+        // Gameplay explicitly hid the HUD during the Day number pop-up — don't bring it back
+        // when the pop-up ends.
+        if (_dayNumberHudHidden)
+            _restoreHudAfterDayNumber = false;
+
         playerUI.SetActive(false);
+    }
+
+    // ── Day number pop-up HUD suppression ────────────────────────────────────
+
+    private bool _dayNumberHudHidden;
+    private bool _restoreHudAfterDayNumber;
+
+    /// <summary>True while the Day number pop-up is holding the HUD hidden.</summary>
+    public bool IsDayNumberHudHidden => _dayNumberHudHidden;
+
+    /// <summary>
+    /// Hides the HUD for the Day number pop-up (<see cref="StartShiftScreen"/>). Any
+    /// <see cref="ShowPlayerUI"/> call made while the pop-up plays is deferred until
+    /// <see cref="EndDayNumberHudHide"/>, so the HUD reliably stays hidden for the whole reveal
+    /// regardless of which day-start path triggered it. Idempotent.
+    /// </summary>
+    public void BeginDayNumberHudHide()
+    {
+        if (_dayNumberHudHidden) return;
+
+        _restoreHudAfterDayNumber = pauseMenuOpened ? playerUIWasActiveBeforePaused : playerUI.activeSelf;
+        _dayNumberHudHidden = true;
+
+        if (pauseMenuOpened)
+            playerUIWasActiveBeforePaused = false;
+        playerUI.SetActive(false);
+    }
+
+    /// <summary>
+    /// Ends the Day number HUD suppression and restores the HUD if it was visible before the
+    /// pop-up, or if something requested it during the pop-up. The restore goes through
+    /// <see cref="ShowPlayerUI"/> so its dialogue/diegetic/phone/pause guards still apply.
+    /// </summary>
+    public void EndDayNumberHudHide()
+    {
+        if (!_dayNumberHudHidden) return;
+
+        _dayNumberHudHidden = false;
+        bool restore = _restoreHudAfterDayNumber;
+        _restoreHudAfterDayNumber = false;
+
+        if (restore)
+            ShowPlayerUI();
     }
     
     public void ShowPlayerUI()
@@ -364,6 +411,20 @@ public class UIController : MonoBehaviour
         // ShowPlayerUI() a frame before the auto hang-up, which would otherwise flash the HUD.
         if (IsPhoneCallBackdropVisible)
             return;
+
+        // Guard: the HUD stays hidden for the whole spectate session (dead player or dev
+        // spectator). Respawn/revive call SpectateManager.StopSpectating() before ShowPlayerUI().
+        if (SpectateManager.Instance != null && SpectateManager.Instance.IsSpectating)
+            return;
+
+        // The Day number pop-up keeps the HUD hidden for its whole reveal. Day-start paths
+        // (save resume, debug skips, OnDayStart listeners) call ShowPlayerUI() around the
+        // fanfare; record the request and apply it when the pop-up ends.
+        if (_dayNumberHudHidden)
+        {
+            _restoreHudAfterDayNumber = true;
+            return;
+        }
 
         // While paused, defer the reveal to ClosePauseMenu (e.g. the intro cutscene ending
         // while the settings menu is open) instead of popping the HUD over the pause menu.
@@ -815,7 +876,17 @@ public class UIController : MonoBehaviour
             _applyingPauseState = false;
         }
 
-        playerUI.SetActive(playerUIWasActiveBeforePaused);
+        // Don't pop the HUD back over a Day number pop-up that is still playing; hand the
+        // pending reveal to EndDayNumberHudHide instead.
+        if (_dayNumberHudHidden)
+        {
+            if (playerUIWasActiveBeforePaused)
+                _restoreHudAfterDayNumber = true;
+        }
+        else
+        {
+            playerUI.SetActive(playerUIWasActiveBeforePaused);
+        }
 
         pauseMenuOpened = false;
         pauseMenu.SetActive(false);
@@ -893,81 +964,92 @@ public class UIController : MonoBehaviour
         shopNotificationManager.ShowErrorNotification(message);
     }
 
+    private const string BoothWaitingNotificationKey = "BoothWaiting";
+    private const string MailDeliveryNotificationKey = "MailDelivery";
+    private const string RadiationAlertNotificationKey = "RadiationAlert";
+    private const string LowHealthAlertNotificationKey = "LowHealthAlert";
+    private const string BoothWaitingMessage = "Someone is waiting at the booth";
+
     /// <summary>
-    /// Shows the "someone is waiting at the booth" notification in the bottom-centre of the screen.
-    /// Call this only on the local client and only when the player is away from the booth.
+    /// Queues a message on the shared bottom-centre notification slot (see
+    /// <see cref="HUDNotificationQueue"/>). Notifications play one at a time and never overlap.
+    /// <paramref name="key"/> identifies the entry so it can be updated or hidden later. When
+    /// null, the message itself is the key, so repeating the same message does not stack
+    /// duplicates. With <paramref name="loop"/> true, the entry keeps coming back until
+    /// <see cref="HideQueuedNotification"/> is called with the same key.
+    /// </summary>
+    public void ShowQueuedNotification(string message, string key = null, bool loop = false)
+    {
+        if (notificationQueue != null)
+            notificationQueue.Show(key, message, loop);
+    }
+
+    /// <summary>Removes a queued notification by key (fades it out if it is on screen).</summary>
+    public void HideQueuedNotification(string key)
+    {
+        if (notificationQueue != null)
+            notificationQueue.Hide(key);
+    }
+
+    /// <summary>
+    /// Queues the "someone is waiting at the booth" notification. Call this only on the local
+    /// client and only when the player is away from the booth.
     /// </summary>
     public void ShowBoothWaitingNotification()
     {
-        if (boothWaitingNotification != null)
-            boothWaitingNotification.Show();
+        ShowQueuedNotification(BoothWaitingMessage, BoothWaitingNotificationKey);
     }
 
     /// <summary>Hides the booth waiting notification.</summary>
     public void HideBoothWaitingNotification()
     {
-        if (boothWaitingNotification != null)
-            boothWaitingNotification.Hide();
+        HideQueuedNotification(BoothWaitingNotificationKey);
     }
 
     /// <summary>
-    /// Shows the same bottom-centre reveal-and-fade notification style as the booth waiting
-    /// alert, but with a caller-supplied message. Used by tasks (e.g. Sort Mail) that need an
-    /// unobtrusive popup that can appear at any time, independent of the booth-waiting alert.
-    /// If <paramref name="loop"/> is true, the notification keeps fading out and back in
-    /// (rather than disappearing for good) until <see cref="HideMailDeliveryNotification"/> is
-    /// called — e.g. for the "shipment is waiting at the gate" alert, which should keep
-    /// resurfacing until a player actually opens the gate.
+    /// Queues the mail/shipment notification (e.g. "A shipment is waiting at the gate."). With
+    /// <paramref name="loop"/> true it keeps coming back until
+    /// <see cref="HideMailDeliveryNotification"/> is called, e.g. once a player opens the gate.
     /// </summary>
     public void ShowMailDeliveryNotification(string message, bool loop = false)
     {
-        if (mailDeliveryNotification != null)
-            mailDeliveryNotification.Show(message, loop);
+        ShowQueuedNotification(message, MailDeliveryNotificationKey, loop);
     }
 
     /// <summary>Hides the mail delivery notification.</summary>
     public void HideMailDeliveryNotification()
     {
-        if (mailDeliveryNotification != null)
-            mailDeliveryNotification.Hide();
+        HideQueuedNotification(MailDeliveryNotificationKey);
     }
 
     /// <summary>
-    /// Shows the bottom-centre "Radiation high. Take pills to reduce." alert, using the same
-    /// looping reveal-and-fade style as the "shipment is waiting at the gate" notification.
-    /// Call this only on the local client once radiation crosses the high threshold; it keeps
-    /// resurfacing until <see cref="HideRadiationAlert"/> is called (i.e. once radiation drops
-    /// back below the threshold).
+    /// Queues the looping "Radiation high" alert. Call this only on the local client. It keeps
+    /// coming back until <see cref="HideRadiationAlert"/> is called.
     /// </summary>
     public void ShowRadiationAlert(string message = "Radiation high. Take pills to reduce.")
     {
-        if (radiationAlertNotification != null)
-            radiationAlertNotification.Show(message, loop: true);
+        ShowQueuedNotification(message, RadiationAlertNotificationKey, loop: true);
     }
 
     /// <summary>Hides the radiation alert notification.</summary>
     public void HideRadiationAlert()
     {
-        if (radiationAlertNotification != null)
-            radiationAlertNotification.Hide();
+        HideQueuedNotification(RadiationAlertNotificationKey);
     }
 
     /// <summary>
-    /// Shows the bottom-centre low-health alert, using the same looping reveal-and-fade style as
-    /// the radiation and shipment notifications. Driven by <see cref="LowHealthAlertUI"/>; keeps
-    /// resurfacing until <see cref="HideLowHealthAlert"/> is called.
+    /// Queues the looping low-health alert. Driven by <see cref="LowHealthAlertUI"/>. It keeps
+    /// coming back until <see cref="HideLowHealthAlert"/> is called.
     /// </summary>
     public void ShowLowHealthAlert(string message = "Health low. Find a way to heal.")
     {
-        if (lowHealthAlertNotification != null)
-            lowHealthAlertNotification.Show(message, loop: true);
+        ShowQueuedNotification(message, LowHealthAlertNotificationKey, loop: true);
     }
 
     /// <summary>Hides the low-health alert notification.</summary>
     public void HideLowHealthAlert()
     {
-        if (lowHealthAlertNotification != null)
-            lowHealthAlertNotification.Hide();
+        HideQueuedNotification(LowHealthAlertNotificationKey);
     }
 
     private Coroutine _showDeathScreenRoutine;

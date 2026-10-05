@@ -88,6 +88,13 @@ public class MutantSpawner : NetworkBehaviour
              "always populate their area, e.g. the power plant during the Day 3 power outage.")]
     [SerializeField] private bool exemptFromDailyCap = false;
 
+    [Header("Scripted Events")]
+    [Tooltip("When enabled, a burst fires the instant a fuse-required power outage starts " +
+             "(ElectricityController.OnFuseRequiredOutageStarted, e.g. Day 3's post-shift outage), " +
+             "bypassing any burst-only cooldown so the area is always populated when players arrive. " +
+             "Still respects First Active Day and the active-enemy cap.")]
+    [SerializeField] private bool burstOnFuseOutage = false;
+
     [Header("Activation")]
     [Tooltip("The first campaign day on which this spawner becomes active.")]
     [SerializeField] private int firstActiveDay = 2;
@@ -152,6 +159,7 @@ public class MutantSpawner : NetworkBehaviour
     private bool _isOnBurstCooldown;
     private Coroutine _burstCooldownCoroutine;
     private bool _registeredInBudget;
+    private ElectricityController _subscribedElectricity;
 
     // ── Shared Daily Budget ────────────────────────────────────────────────────
 
@@ -191,6 +199,15 @@ public class MutantSpawner : NetworkBehaviour
 
         CampaignManager.OnDayChanged += OnDayChanged;
 
+        if (burstOnFuseOutage)
+        {
+            _subscribedElectricity = ElectricityController.Instance;
+            if (_subscribedElectricity != null)
+                _subscribedElectricity.OnFuseRequiredOutageStarted += OnFuseOutageStarted;
+            else
+                Debug.LogWarning($"[MutantSpawner] {name}: burstOnFuseOutage is set but no ElectricityController.Instance exists.", this);
+        }
+
         // First spawner of a new session resets the shared map-wide budget.
         if (s_activeSpawnerCount == 0)
         {
@@ -217,6 +234,12 @@ public class MutantSpawner : NetworkBehaviour
         CampaignManager.OnDayChanged -= OnDayChanged;
         _isRunning = false;
         CancelBurstCooldown();
+
+        if (_subscribedElectricity != null)
+        {
+            _subscribedElectricity.OnFuseRequiredOutageStarted -= OnFuseOutageStarted;
+            _subscribedElectricity = null;
+        }
 
         if (_registeredInBudget)
         {
@@ -246,6 +269,27 @@ public class MutantSpawner : NetworkBehaviour
             BeginSpawning();
             Debug.Log($"[MutantSpawner] Spawning started — day threshold reached (Day {newDay}).");
         }
+    }
+
+    /// <summary>
+    /// Server-only <see cref="ElectricityController.OnFuseRequiredOutageStarted"/> handler (only
+    /// subscribed when <see cref="burstOnFuseOutage"/> is set). Fires a burst immediately,
+    /// cancelling any burst-only cooldown left over from an earlier zone entry, so the area is
+    /// populated by the time players arrive to fix the fuse box.
+    /// </summary>
+    private void OnFuseOutageStarted()
+    {
+        if (!IsServer) return;
+
+        if (CurrentCampaignDay < firstActiveDay)
+        {
+            Debug.Log($"[MutantSpawner] {name}: fuse outage started but Day {CurrentCampaignDay} < firstActiveDay {firstActiveDay} — no burst.", this);
+            return;
+        }
+
+        CancelBurstCooldown();
+        _burstCooldownCoroutine = StartCoroutine(BurstOnceAndCooldown());
+        Debug.Log($"[MutantSpawner] {name}: fuse outage started — firing outage burst.", this);
     }
 
     private void BeginSpawning()
@@ -347,20 +391,31 @@ public class MutantSpawner : NetworkBehaviour
         int effectiveBurstMax = Mathf.RoundToInt(Mathf.Lerp(sparseBurstCountMax, burstCountMax, intensity));
         int effectiveCap = Mathf.RoundToInt(Mathf.Lerp(sparseMaxActiveEnemies, maxActiveEnemies, intensity));
         int count = Random.Range(effectiveBurstMin, effectiveBurstMax + 1);
+        int spawned = 0;
 
         for (int i = 0; i < count; i++)
         {
             if (!_isRunning || !HasDailySpawnBudget())
+            {
+                Debug.Log($"[MutantSpawner] {name}: burst stopped early ({spawned}/{count}) — running={_isRunning}, daily budget {s_spawnsToday}/{MaxAmbientSpawnsPerDay}, exempt={exemptFromDailyCap}.", this);
                 yield break;
+            }
 
             PruneDeadEnemies();
 
-            if (_activeEnemies.Count < effectiveCap && SpawnSingleEnemy() && !exemptFromDailyCap)
-                s_spawnsToday++;
+            if (_activeEnemies.Count < effectiveCap && SpawnSingleEnemy())
+            {
+                spawned++;
+                if (!exemptFromDailyCap)
+                    s_spawnsToday++;
+            }
 
             if (i < count - 1)
                 yield return new WaitForSeconds(burstSpawnDelay);
         }
+
+        if (spawned < count)
+            Debug.Log($"[MutantSpawner] {name}: burst spawned {spawned}/{count} (active {_activeEnemies.Count}/{effectiveCap}).", this);
     }
 
     /// <summary>

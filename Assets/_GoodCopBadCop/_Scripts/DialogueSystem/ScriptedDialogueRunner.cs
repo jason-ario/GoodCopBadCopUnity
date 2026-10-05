@@ -1156,9 +1156,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         if (useTelephoneAudioSource)
         {
             // Phone calls use the handset's own voice clips (when assigned) and play in-ear for
-            // whoever is holding the handset; everyone else hears it 3D from the phone.
+            // whoever is holding the handset; everyone else hears it 2D at a lower volume so the
+            // whole team hears the call (subtitles are already shown to every client).
             var phone = Telephone.Instance;
-            source = phone != null ? phone.PrepareVoiceSourceForLocalListener() : null;
+            source = phone != null ? phone.PrepareVoiceSourceForLocalListener(audibleToEveryone: true) : null;
             if (phone != null && phone.ScriptedCallVoiceClips.Length > 0)
                 clips = phone.ScriptedCallVoiceClips;
         }

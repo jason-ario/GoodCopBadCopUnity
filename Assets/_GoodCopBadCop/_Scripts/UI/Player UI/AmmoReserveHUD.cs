@@ -1,5 +1,3 @@
-using GoodCopBadCop.Input;
-using GoodCopBadCop.UI;
 using UnityEngine;
 
 /// <summary>
@@ -19,19 +17,9 @@ public class AmmoReserveHUD : MonoBehaviour
     [Tooltip("One row per ammo type.")]
     [SerializeField] private AmmoReserveRowUI[] _rows;
 
-    [Tooltip("Reload helper icon (child of the panel, above its top-right corner). Shown only while the " +
-             "weapon in hand isn't full and the reserve has its ammo type.")]
-    [SerializeField] private GameObject _reloadHint;
+    // The "[R] to reload" prompt lives in HeldItemReloadPrompt (Right HUD Stack, above the use prompt).
 
     private PlayerAmmoReserve _reserve;
-
-    private void Awake()
-    {
-        // Pin the icon to Reload in code (same pattern as PlayerUI's zoom icon) so the prompt always
-        // tracks the live binding and swaps to the gamepad Y sprite with the active device.
-        if (_reloadHint != null && _reloadHint.TryGetComponent(out HelperIconKeyDisplay keyDisplay))
-            keyDisplay.SetAction(GameAction.Reload);
-    }
 
     private void OnEnable()
     {
@@ -45,29 +33,6 @@ public class AmmoReserveHUD : MonoBehaviour
         PlayerAmmoReserve target = ResolveReserve();
         if (_reserve != target)
             Bind(target);
-
-        RefreshReloadHint();
-    }
-
-    private void RefreshReloadHint()
-    {
-        if (_reloadHint == null) return;
-
-        bool show = ShouldShowReloadHint();
-        if (_reloadHint.activeSelf != show)
-            _reloadHint.SetActive(show);
-    }
-
-    private bool ShouldShowReloadHint()
-    {
-        // The held item is only known locally, so hide the hint while mirroring a teammate.
-        if (_reserve == null || SpectateManager.IsHudMirroringTarget) return false;
-
-        PlayerInstance player = PlayerInstance.Instance;
-        PlayerPickupController pickup = player != null ? player.PlayerPickupController : null;
-        if (pickup == null || !(pickup.HeldObject is IInventoryReloadable weapon)) return false;
-
-        return weapon.NeedsReload && _reserve.Get(weapon.ReserveAmmoType) > 0;
     }
 
     private static PlayerAmmoReserve ResolveReserve()

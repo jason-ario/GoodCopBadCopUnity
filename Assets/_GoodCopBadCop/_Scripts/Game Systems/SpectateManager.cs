@@ -102,6 +102,10 @@ public class SpectateManager : MonoBehaviour
         if (spectatorUI != null)
             spectatorUI.gameObject.SetActive(true);
 
+        // The HUD stays hidden for the whole spectate session (UIController.ShowPlayerUI is
+        // also blocked while IsSpectating).
+        UIController.Instance?.ClosePlayerUI();
+
         SpectateNext();
     }
 
@@ -170,9 +174,6 @@ public class SpectateManager : MonoBehaviour
             _currentTarget.SetSpectatorAudioListener(true);
         RefreshLocalAudioListener();
 
-        // Show the HUD mirroring the watched teammate (widgets rebind via HudSubject).
-        UIController.Instance?.ShowPlayerUI();
-
         Debug.Log($"[SpectateManager] Now spectating {_currentTarget.name}.");
     }
 
@@ -209,10 +210,6 @@ public class SpectateManager : MonoBehaviour
         _currentTarget = null;
         RefreshLocalAudioListener();
 
-        // Nobody to mirror: hide the HUD rather than showing the dead local player's stats.
-        if (_isSpectating)
-            UIController.Instance?.ClosePlayerUI();
-
         Debug.Log("[SpectateManager] No spectatable teammates available.");
     }
 
@@ -224,8 +221,8 @@ public class SpectateManager : MonoBehaviour
         ClearCurrentTarget();
         RefreshLocalAudioListener();
 
-        // The HUD was mirroring a teammate. A live local player (respawn/revive) re-shows its own
-        // HUD through its restore path; otherwise (dev spectator, still dead) hide it.
+        // The HUD was hidden while spectating. A live local player (respawn/revive) re-shows its
+        // own HUD through its restore path; otherwise (dev spectator, still dead) keep it hidden.
         var local = PlayerInstance.Instance;
         if (wasSpectating && (local == null || local.PlayerHealth == null || local.PlayerHealth.IsDead))
             UIController.Instance?.ClosePlayerUI();

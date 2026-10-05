@@ -44,6 +44,16 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         _UVGlowFalloff            ("UV Glow Falloff",       Range(0.5, 4))       = 1.0
         // 1 = fully invisible outside UV light cones; inside, only the UV glow colour shows.
         [ToggleUI] _UVOnly        ("UV Only (Invisible Unless UV Lit)", Float)  = 0.0
+        // UV-only reveal shaping: the cone mask is dissolved through world-space noise so the
+        // reveal edge breaks up instead of a clean gradient.
+        _RevealNoiseScale         ("UV Reveal Noise Scale",    Range(0.5, 20))   = 4.0
+        _RevealNoiseSoftness      ("UV Reveal Noise Softness", Range(0.01, 0.5)) = 0.12
+        // Texture alpha below this is treated as empty in UV-only mode, so faint residual alpha
+        // in the splatter texture can't glow (HDR glow makes near-zero alpha visible).
+        _UVAlphaThreshold         ("UV Alpha Threshold",       Range(0, 0.5))    = 0.0
+        // Noisy fade toward the projection box walls (fraction of the box). 0 = hard box clip.
+        _BoxEdgeFade              ("Box Edge Fade (XZ)",       Range(0, 0.5))    = 0.0
+        _BoxEdgeFadeY             ("Box Edge Fade (Height)",   Range(0, 1))      = 0.0
     }
 
     SubShader
@@ -137,6 +147,11 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half   _UVGlowEdgeSoftness;
                 half   _UVGlowFalloff;
                 half   _UVOnly;
+                half   _RevealNoiseScale;
+                half   _RevealNoiseSoftness;
+                half   _UVAlphaThreshold;
+                half   _BoxEdgeFade;
+                half   _BoxEdgeFadeY;
             CBUFFER_END
 
             // UV light cone data — GLOBAL shader properties set by UVLight.PushShaderGlobals.
@@ -400,7 +415,28 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                     half uvMask = (_UVGlowIntensity > 0.0) ? UVGlowMask(positionWS) : 0.0;
                     finalRGB = lerp(_UVGlowColor.rgb * _UVGlowIntensity,
                                     _FoamColor.rgb * _FoamBrightness, foamMask);
-                    alpha   *= uvMask;
+
+                    // Drop faint residual texture alpha so it can't glow as a square.
+                    half texCoverage = smoothstep(_UVAlphaThreshold, _UVAlphaThreshold + 0.15, texColor.a);
+                    alpha = holeMask * texColor.a * texCoverage;
+
+                    // Noisy dissolve of the cone mask: a slowly morphing world-space threshold.
+                    float revealNoise = MorphFractal(positionWS.xz * _RevealNoiseScale, nt * 0.5);
+                    float revealThr   = lerp(0.1, 0.9, revealNoise);
+                    half  reveal      = saturate((uvMask - revealThr) / max(_RevealNoiseSoftness, 0.01) + 0.5);
+                    alpha *= reveal;
+                }
+
+                // Noisy fade toward the projection box walls so the box outline never reads
+                // as a hard square (e.g. on grass blades standing inside the volume).
+                if (_BoxEdgeFade > 0.0 || _BoxEdgeFadeY > 0.0)
+                {
+                    float2 xzDist = 0.5 - abs(positionOS.xz);
+                    float  dXZ = (_BoxEdgeFade  > 0.0) ? min(xzDist.x, xzDist.y) / _BoxEdgeFade : 1.0;
+                    float  dY  = (_BoxEdgeFadeY > 0.0) ? (0.5 - abs(positionOS.y)) / (0.5 * _BoxEdgeFadeY) : 1.0;
+                    float  e   = saturate(min(dXZ, dY));
+                    float  edgeNoise = MorphFractal(positionWS.xz * (_RevealNoiseScale * 2.0) + positionWS.y * 3.1, 0.0);
+                    alpha *= smoothstep(0.0, 1.0, saturate(e * 1.6 - edgeNoise * 0.6));
                 }
 
                 return half4(finalRGB, alpha);

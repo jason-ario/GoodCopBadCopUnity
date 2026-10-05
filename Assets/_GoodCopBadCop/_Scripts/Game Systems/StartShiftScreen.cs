@@ -12,6 +12,7 @@ public class StartShiftScreen : MonoBehaviour
     [SerializeField] float dayNumberDuration = 4f;
 
     private Animator _animator;
+    private Coroutine _routine;
 
     private void Awake()
     {
@@ -24,7 +25,17 @@ public class StartShiftScreen : MonoBehaviour
         // must be explicitly re-activated before starting the reveal coroutine again.
         dayNumberText.gameObject.SetActive(true);
         gameObject.SetActive(true);
-        StartCoroutine(StartShift(dayNumber));
+
+        // Restart cleanly if a previous reveal is still running (no overlapping coroutines).
+        if (_routine != null)
+            StopCoroutine(_routine);
+
+        // Hide the HUD for the whole reveal. UIController defers any ShowPlayerUI() made by
+        // the day-start path until EndDayNumberHudHide, so this is consistent on every path.
+        if (UIController.Instance != null)
+            UIController.Instance.BeginDayNumberHudHide();
+
+        _routine = StartCoroutine(StartShift(dayNumber));
     }
 
     IEnumerator StartShift(int dayNumber = 1)
@@ -39,6 +50,23 @@ public class StartShiftScreen : MonoBehaviour
 
         if (_animator != null)
             _animator.SetBool(BlackBarsOn, false);
+
+        _routine = null;
+        EndHudHide();
+    }
+
+    private void OnDisable()
+    {
+        // Disabling the object kills the coroutine — never leave the HUD stuck hidden.
+        if (_routine == null) return;
+        _routine = null;
+        EndHudHide();
+    }
+
+    private static void EndHudHide()
+    {
+        if (UIController.Instance != null)
+            UIController.Instance.EndDayNumberHudHide();
     }
     
 }

@@ -44,8 +44,30 @@ public class PlayerHealth : NetworkBehaviour
 
     // Networked State
 
-    private readonly NetworkVariable<float> _networkHealth = new NetworkVariable<float>(
-        DefaultMaxHealth,
+    /// <summary>
+    /// Health and the effect key that caused its latest change, replicated as ONE value.
+    /// They used to be two NetworkVariables; clients deserialized health first and fired
+    /// OnHealthChanged while the key was still stale, so a hit after a heal/reset replayed
+    /// the green Heal preset. Keeping them together makes the pair atomic on every client.
+    /// </summary>
+    private struct HealthState : INetworkSerializable, System.IEquatable<HealthState>
+    {
+        public float Health;
+        public FixedString64Bytes EffectKey;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref Health);
+            serializer.SerializeValue(ref EffectKey);
+        }
+
+        public bool Equals(HealthState other) => Health.Equals(other.Health) && EffectKey.Equals(other.EffectKey);
+        public override bool Equals(object obj) => obj is HealthState other && Equals(other);
+        public override int GetHashCode() => System.HashCode.Combine(Health, EffectKey);
+    }
+
+    private readonly NetworkVariable<HealthState> _networkHealth = new NetworkVariable<HealthState>(
+        new HealthState { Health = DefaultMaxHealth, EffectKey = EffectKeys.DefaultPlayerDamage },
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
@@ -54,22 +76,17 @@ public class PlayerHealth : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    private readonly NetworkVariable<FixedString64Bytes> _lastHealthEffectKey = new NetworkVariable<FixedString64Bytes>(
-        EffectKeys.DefaultPlayerDamage,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server);
-
 
     // Local accessors
 
     /// <summary>Current health, readable on all clients.</summary>
-    public float Health => _networkHealth.Value;
+    public float Health => _networkHealth.Value.Health;
 
     /// <summary>Whether this player is dead, readable on all clients.</summary>
     public bool IsDead => _networkIsDead.Value;
 
     /// <summary>The gameplay effect key associated with the latest health mutation.</summary>
-    public string LastHealthEffectKey => _lastHealthEffectKey.Value.ToString();
+    public string LastHealthEffectKey => _networkHealth.Value.EffectKey.ToString();
 
     /// <summary>When true, all incoming damage is ignored. Server-side only.</summary>
     public bool IsInvincible { get; set; }
@@ -192,8 +209,7 @@ public class PlayerHealth : NetworkBehaviour
         if (_playerInstance != null && _playerInstance.IsProtectedFromHarm)
             return;
 
-        _lastHealthEffectKey.Value = ToNetworkEffectKey(effectKey, EffectKeys.DefaultPlayerDamage);
-        _networkHealth.Value = UnityEngine.Mathf.Clamp(_networkHealth.Value - damage, 0f, DefaultMaxHealth);
+        SetHealthServer(Health - damage, ToNetworkEffectKey(effectKey, EffectKeys.DefaultPlayerDamage));
 
         // Blood/impact feedback plays on every real hit, whether or not it's the killing blow —
         // mirrors MutantEnemy.TakeDamage / SuspectCharacter.TakeDamage.
@@ -201,7 +217,7 @@ public class PlayerHealth : NetworkBehaviour
         if (effectKey != EffectKeys.RadiationTickDamage)
             SpawnHitEffectClientRpc(hitPoint);
 
-        if (_networkHealth.Value <= 0f)
+        if (Health <= 0f)
             _networkIsDead.Value = true;
     }
 
@@ -210,15 +226,23 @@ public class PlayerHealth : NetworkBehaviour
         if (_networkIsDead.Value)
             return;
 
-        _lastHealthEffectKey.Value = ToNetworkEffectKey(effectKey, EffectKeys.PlayerHeal);
-        _networkHealth.Value = UnityEngine.Mathf.Clamp(_networkHealth.Value + healAmount, 0f, DefaultMaxHealth);
+        SetHealthServer(Health + healAmount, ToNetworkEffectKey(effectKey, EffectKeys.PlayerHeal));
     }
 
     private void ApplyResetServer()
     {
         _networkIsDead.Value = false;
-        _lastHealthEffectKey.Value = EffectKeys.PlayerHeal;
-        _networkHealth.Value = DefaultMaxHealth;
+        SetHealthServer(DefaultMaxHealth, EffectKeys.PlayerHeal);
+    }
+
+    /// <summary>Writes health and its cause together so clients never see one without the other.</summary>
+    private void SetHealthServer(float health, FixedString64Bytes effectKey)
+    {
+        _networkHealth.Value = new HealthState
+        {
+            Health = UnityEngine.Mathf.Clamp(health, 0f, DefaultMaxHealth),
+            EffectKey = effectKey
+        };
     }
 
     private static FixedString64Bytes ToNetworkEffectKey(string effectKey, string fallback)
@@ -256,7 +280,7 @@ public class PlayerHealth : NetworkBehaviour
 
     // NetworkVariable callbacks
 
-    private void HandleHealthChanged(float previousValue, float newValue)
+    private void HandleHealthChanged(HealthState previousValue, HealthState newValue)
     {
         OnHealthChanged?.Invoke();
     }

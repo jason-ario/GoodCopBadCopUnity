@@ -111,6 +111,9 @@ public class TimecardMachine : Interactable
     [SerializeField] private AudioSource _fanfareSource;
     [Tooltip("Fanfare clip played when the timecard machine is primed for clock-out.")]
     [SerializeField] private AudioClip _fanfareClip;
+    [Tooltip("Play the fanfare as 2D so it's heard wherever the player is. On Day 2+ clock-out " +
+             "usually arms while the player is outside, out of range of the 3D source.")]
+    [SerializeField] private bool _fanfareAudibleEverywhere = true;
 
     [Header("Interact Text")]
     [Tooltip("Text shown on the reticle while the machine is primed for clock-in.")]
@@ -463,11 +466,12 @@ public class TimecardMachine : Interactable
 
         if (armed)
         {
+            // Fanfare FIRST: the objective row below only runs on Day 2+, so anything that goes
+            // wrong in the objective overlay must never be able to swallow the stinger.
+            if (playFeedback)
+                PlayClockOutFanfare();
+
             AddObjectiveIfNotDay1(ref _clockOutObjective, _clockOutObjectiveText);
-
-            if (playFeedback && _fanfareSource != null && _fanfareClip != null)
-                _fanfareSource.PlayOneShot(_fanfareClip);
-
             return;
         }
 
@@ -494,6 +498,39 @@ public class TimecardMachine : Interactable
             _animator.SetTrigger(PunchTrigger);
 
         OnClockOutAllClients?.Invoke();
+    }
+
+    /// <summary>
+    /// Plays the clock-out-ready fanfare on this peer. Day 1 arms clock-out while the player is
+    /// usually inside the booth, but Day 2+ arm it the moment the LAST outdoor task resolves
+    /// (Vlad's trail, trash, fences...) — typically well beyond the 3D source's ~14 m max
+    /// distance, where log rolloff left it inaudible. <see cref="_fanfareAudibleEverywhere"/>
+    /// guarantees the cue is heard whatever the player's position.
+    /// </summary>
+    private void PlayClockOutFanfare()
+    {
+        if (_fanfareClip == null)
+        {
+            Debug.LogWarning("[TimecardMachine] Clock-out fanfare clip is not assigned.", this);
+            return;
+        }
+
+        AudioSource source = _fanfareSource;
+        if (source == null || !source.isActiveAndEnabled)
+            source = _audioSource;
+
+        if (source == null || !source.isActiveAndEnabled)
+        {
+            Debug.LogWarning("[TimecardMachine] No active AudioSource available for the clock-out fanfare.", this);
+            return;
+        }
+
+        if (_fanfareAudibleEverywhere)
+            source.spatialBlend = 0f;
+
+        source.Stop();
+        source.PlayOneShot(_fanfareClip);
+        Debug.Log($"[TimecardMachine] Clock-out fanfare played (Day {ShiftManager.Instance?.CurrentDay ?? -1}).");
     }
 
     /// <summary>Sets the 'Ready' bool on the small light animator to drive the blink animation.</summary>

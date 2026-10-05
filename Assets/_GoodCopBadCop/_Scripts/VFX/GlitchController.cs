@@ -74,10 +74,10 @@ public class GlitchController : MonoBehaviour
 
     [Header("High-Velocity Irradiation")]
     [Tooltip("Radiation gain rate (units/sec, see PlayerRadiation.RadiationRate) at which this signal starts contributing.")]
-    [SerializeField] private float _irradiationRateThreshold = 8f;
+    [SerializeField] private float _irradiationRateThreshold = 1f;
 
     [Tooltip("Radiation gain rate (units/sec) at which this signal reaches full intensity.")]
-    [SerializeField] private float _irradiationRateMax = 25f;
+    [SerializeField] private float _irradiationRateMax = 5f;
 
     // ── Debug ─────────────────────────────────────────────────────────────────
 
