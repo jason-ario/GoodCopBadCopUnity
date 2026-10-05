@@ -62,6 +62,13 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     /// </summary>
     public event Action OnEnvironmentHit;
 
+    /// <summary>
+    /// Fired on every NON-swinging client when another player's swing connects. Args: whether it
+    /// was a geometry/prop hit (true) or a live target hit (false), and the world-space impact
+    /// point. Lets the weapon play its impact sound as a spatial world sound for other players.
+    /// </summary>
+    public event Action<bool, Vector3> OnRemoteImpact;
+
 
     // Internal
 
@@ -125,6 +132,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         {
             SpawnHitEffect(_hitEffectPrefab, effectOrigin);
             OnHit?.Invoke();
+        }
+
+        // Relay the impact so every other client hears/sees it as a world event at the weapon tip.
+        if (kind != HitKind.None)
+        {
+            bool isEnvironment = kind == HitKind.Environment || kind == HitKind.Prop;
+            if (IsServer) RelayImpact(isEnvironment, effectOrigin, NetworkManager.Singleton.LocalClientId);
+            else          ReportImpactServerRpc(isEnvironment, effectOrigin);
         }
 
         if (kind == HitKind.Prop)
@@ -392,6 +407,29 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         });
     }
 
+    /// <summary>Server-side relay of a swing's impact feedback (sound + particles) to every other client.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ReportImpactServerRpc(bool isEnvironment, Vector3 point, ServerRpcParams rpcParams = default)
+    {
+        RelayImpact(isEnvironment, point, rpcParams.Receive.SenderClientId);
+    }
+
+    private void RelayImpact(bool isEnvironment, Vector3 point, ulong senderClientId)
+    {
+        if (!IsServer) return;
+
+        List<ulong> targets = new List<ulong>();
+        foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
+            if (id != senderClientId) targets.Add(id);
+
+        if (targets.Count == 0) return;
+
+        ImpactClientRpc(isEnvironment, point, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = targets }
+        });
+    }
+
     /// <summary>Resolves a component on a reported target, tolerating it living on a child of the NetworkObject.</summary>
     private static T FindOn<T>(NetworkObject netObj) where T : Component
     {
@@ -427,6 +465,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     private void PropHitClientRpc(Vector3 hitPoint, Vector3 direction, ClientRpcParams clientRpcParams = default)
     {
         HittableProp.TryHitAt(hitPoint, direction);
+    }
+
+    /// <summary>Replays a swing's impact particles and world sound on non-swinging clients.</summary>
+    [ClientRpc]
+    private void ImpactClientRpc(bool isEnvironment, Vector3 point, ClientRpcParams clientRpcParams = default)
+    {
+        SpawnHitEffect(isEnvironment ? _environmentHitEffectPrefab : _hitEffectPrefab, point);
+        OnRemoteImpact?.Invoke(isEnvironment, point);
     }
 
 

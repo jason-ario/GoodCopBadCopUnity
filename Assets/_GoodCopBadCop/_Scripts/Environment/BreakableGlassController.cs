@@ -584,6 +584,23 @@ public class BreakableGlassController : MonoBehaviour
         _crackRenderer.SetPropertyBlock(_mpb);
     }
 
+    /// <summary>
+    /// Cosmetic, damage-free knock on the intact pane (hit sound + shake). Local to the calling
+    /// peer — callers broadcast it themselves (e.g. a scripted dialogue line where a suspect bangs
+    /// on the glass). No-op while the window is smashed or hidden.
+    /// </summary>
+    public void PlayKnockFeedback()
+    {
+        if (!IsWindowVisible) return;
+
+        if (_audioSource != null && _hitClip != null)
+            _audioSource.PlayOneShot(_hitClip, _hitVolume);
+
+        var target = _shakeTarget != null ? _shakeTarget : _normalGlass.transform;
+        _shakeTween?.Kill(complete: true);
+        _shakeTween = target.DOShakePosition(_shakeDuration, _shakeStrength, _shakeVibrato);
+    }
+
     private void PlayHitFeedback()
     {
         if (_audioSource != null && _hitClip != null)

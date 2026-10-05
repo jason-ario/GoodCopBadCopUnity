@@ -36,6 +36,9 @@ public class Shovel : PickableObject
     [Tooltip("Played when the swing connects with geometry but not an enemy.")]
     [SerializeField] private AudioClip _environmentHitSound;
 
+    [Tooltip("Audible range (metres) of the impact sound heard by other players as a world sound.")]
+    [SerializeField] private float _worldSoundMaxDistance = 20f;
+
     // ── Internal ───────────────────────────────────────────────────────────────
 
     private bool _isAttacking;
@@ -59,6 +62,7 @@ public class Shovel : PickableObject
         {
             _hitbox.OnHit            += OnEnemyHit;
             _hitbox.OnEnvironmentHit += OnEnvironmentHit;
+            _hitbox.OnRemoteImpact   += OnRemoteImpact;
         }
         else
         {
@@ -75,6 +79,7 @@ public class Shovel : PickableObject
         {
             _hitbox.OnHit            -= OnEnemyHit;
             _hitbox.OnEnvironmentHit -= OnEnvironmentHit;
+            _hitbox.OnRemoteImpact   -= OnRemoteImpact;
         }
 
         if (_durability != null)
@@ -193,6 +198,14 @@ public class Shovel : PickableObject
             SFXController.Instance.Play(_environmentHitSound);
 
         _durability?.RegisterHit();
+    }
+
+    /// <summary>Another player's swing connected: play the impact as a spatial world sound.</summary>
+    private void OnRemoteImpact(bool isEnvironment, Vector3 point)
+    {
+        AudioClip clip = isEnvironment ? _environmentHitSound : _impactSound;
+        if (clip != null && SFXController.Instance != null)
+            SFXController.Instance.PlayAtPosition(clip, point, 1f, 1f, _worldSoundMaxDistance);
     }
 
     // ── Durability ─────────────────────────────────────────────────────────────

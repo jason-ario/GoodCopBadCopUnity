@@ -172,6 +172,14 @@ public class PlayerInstance : NetworkBehaviour
             }
 
             SpectateManager.Instance?.StopSpectating();
+
+            // A revive keeps the previous PlayerObject alive as a corpse. Its physical Camera +
+            // CinemachineBrain were the local player's, so nothing else turns them off; left on,
+            // the scene renders twice per frame after every revive.
+            if (s_retiredLocalPlayer != null && s_retiredLocalPlayer != this)
+                s_retiredLocalPlayer.ForceDisableAsRemoteCamera();
+            s_retiredLocalPlayer = null;
+
             UIController.Instance?.HideDeathScreen();
             RestoreLocalGameplayStateAfterSpawn();
 
@@ -186,6 +194,10 @@ public class PlayerInstance : NetworkBehaviour
     }
 
     private Coroutine _audioListenerEnforcementRoutine;
+
+    /// <summary>The previous local PlayerObject, retained as a corpse by a revive, whose camera rig
+    /// the replacement local player must switch off on spawn.</summary>
+    private static PlayerInstance s_retiredLocalPlayer;
 
     /// <summary>
     /// Guarantees this client always has exactly one active AudioListener: the local player's
@@ -248,24 +260,16 @@ public class PlayerInstance : NetworkBehaviour
         const int maxAttempts = 60; // Covers detach/spawn and scene UI initialization races at low frame rates.
         int attempts = 0;
 
-        while (attempts < maxAttempts)
+        // Only wait on cheap static flags. The reticle is not a readiness signal: Die() leaves it
+        // inactive, so an active-only lookup never succeeded and stalled the HUD for every attempt.
+        // EnableReticle() below finds it even while inactive.
+        while (attempts < maxAttempts &&
+               (ScriptedDialogueRunner.IsScriptedModeActive ||
+                DialogueChoiceSystem.IsInDialogueMode ||
+                UIController.Instance == null))
         {
-            if (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
-            {
-                attempts++;
-                yield return null;
-                continue;
-            }
-
-            if (UIController.Instance == null ||
-                GameObject.FindFirstObjectByType<ReticleController>() == null)
-            {
-                attempts++;
-                yield return null;
-                continue;
-            }
-
-            break;
+            attempts++;
+            yield return null;
         }
 
         // If a scripted/dialogue mode is genuinely still active after the grace period, respect it —
@@ -316,7 +320,22 @@ public class PlayerInstance : NetworkBehaviour
         if (spectateCamera != null) spectateCamera.gameObject.SetActive(false);
 
         if (Instance != this)
+        {
+            // The replacement already spawned locally before this detach arrived; shut this
+            // rig off now since the replacement's spawn-time cleanup could not see it.
+            // _audioListenerEnforcementRoutine is only ever started on the local player.
+            if (Instance != null && _audioListenerEnforcementRoutine != null)
+            {
+                ForceDisableAsRemoteCamera();
+                StopCoroutine(_audioListenerEnforcementRoutine);
+                _audioListenerEnforcementRoutine = null;
+            }
             return;
+        }
+
+        // The replacement's OnNetworkSpawn disables this rig, so the screen never goes black
+        // between this detach and the new player's spawn.
+        s_retiredLocalPlayer = this;
 
         // This object is about to become a corpse; the replacement player object's camera owns
         // the listener from its spawn onwards. If spectating, the teammate's listener stays live

@@ -107,6 +107,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
              "intros disable proximity joining: the other player joins only by interacting with the suspect.")]
     [SerializeField] private float _joinRadius = 5f;
 
+    [Header("Glass Bang")]
+    [Tooltip("Animator trigger that, when used as a node/choice animationTrigger, also plays a " +
+             "damage-free knock on the booth glass (sound + shake) on every client.")]
+    [SerializeField] private string _glassBangTrigger = "BangOnShutters";
+
+    [Tooltip("Seconds after the trigger fires before the knock plays. Matches the fist-impact " +
+             "frame of 'Bang on window.anim' (~0.48s).")]
+    [SerializeField] [Min(0f)] private float _glassBangImpactDelay = 0.48f;
+
+    // Client-side: pending cosmetic glass knock, cancelled if the line is skipped first.
+    private Coroutine _glassBangCoroutine;
+
     // -------------------------------------------------------------------------
     // Server-side state — advance gate
     // -------------------------------------------------------------------------
@@ -1921,6 +1933,26 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(newTrigger))
             anim.SetTrigger(newTrigger);
+
+        if (_glassBangCoroutine != null)
+        {
+            StopCoroutine(_glassBangCoroutine);
+            _glassBangCoroutine = null;
+        }
+
+        if (!string.IsNullOrEmpty(newTrigger) && newTrigger == _glassBangTrigger)
+            _glassBangCoroutine = StartCoroutine(GlassBangRoutine());
+    }
+
+    /// <summary>
+    /// Plays a cosmetic glass knock at the bang animation's impact frame. Runs locally on every
+    /// client from <see cref="ResetAndTriggerAnimationClientRpc"/>; never touches glass damage.
+    /// </summary>
+    private IEnumerator GlassBangRoutine()
+    {
+        yield return new WaitForSeconds(_glassBangImpactDelay);
+        _glassBangCoroutine = null;
+        BreakableGlassController.Instance?.PlayKnockFeedback();
     }
 
     private string GetLocalPlayerName()
