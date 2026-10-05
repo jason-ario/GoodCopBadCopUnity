@@ -511,7 +511,7 @@ public class PlayerPickupController : NetworkBehaviour
             // Guard BEFORE spawning: if we let the server spawn the item and only rejected the
             // pickup afterwards (in PickUpObject), the freshly spawned object would just fall to
             // the ground instead of never existing. See PickUpObject for the matching guard.
-            UIController.Instance?.ShowShopNotification("Inventory full");
+            UIController.Instance?.ShowErrorNotification("Inventory full");
             return;
         }
         if (itemData == null || itemData.PickUpPrefab == null) return;
@@ -695,7 +695,7 @@ public class PlayerPickupController : NetworkBehaviour
             // Hands are already full — this is the only real inventory limit: a hotbar slot only
             // ever holds a STOWED item, so an empty hand can always pick something up even if
             // both slots are already stowed (see PlayerInventory.HandleHeldObjectChanged).
-            UIController.Instance?.ShowShopNotification("Inventory full");
+            UIController.Instance?.ShowErrorNotification("Inventory full");
             return;
         }
 

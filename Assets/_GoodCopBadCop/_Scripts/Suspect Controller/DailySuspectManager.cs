@@ -161,8 +161,17 @@ public class DailySuspectManager : MonoBehaviour
         }
 
         int suspectAmount = GetSuspectAmountForToday();
+        DayBase today = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
 
-        List<SuspectData> randomSuspects = GetRandomSuspects(suspectAmount);
+        List<SuspectData> guaranteed = GetGuaranteedSuspectsForToday(today);
+        List<SuspectData> randomSuspects = GetRandomSuspects(Mathf.Max(0, suspectAmount - guaranteed.Count), today, guaranteed);
+        foreach (SuspectData g in guaranteed)
+        {
+            int insertAt = UnityEngine.Random.Range(0, randomSuspects.Count + 1);
+            randomSuspects.Insert(insertAt, g);
+            Debug.Log($"[DailySuspectManager] Day {today?.DayNumber} guaranteed suspect '{g.name}' placed at base slot {insertAt}.");
+        }
+
         foreach (SuspectData suspectData in randomSuspects)
         {
             int slotIndex = shiftSuspects.Count;
@@ -297,6 +306,12 @@ public class DailySuspectManager : MonoBehaviour
         if (doppelgangerData.targetSuspect.CharacterPrefab == null)
         {
             Debug.LogWarning($"[DailySuspectManager] DoppelgangerData target '{doppelgangerData.targetSuspect.name}' has no CharacterPrefab — skipping injection.");
+            return;
+        }
+
+        if (IsExcludedToday(CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null, doppelgangerData.targetSuspect))
+        {
+            Debug.Log($"[DailySuspectManager] Doppelganger target '{doppelgangerData.targetSuspect.name}' is excluded today — skipping injection.");
             return;
         }
 
@@ -607,6 +622,7 @@ public class DailySuspectManager : MonoBehaviour
             if (runRecords.IsFullMutantInstanceActive(record.SuspectData)) continue;
             if (shiftSuspects.Contains(record.SuspectData)) continue;
             if (record.IsOnQuarantineCooldown(currentDay)) continue;
+            if (IsExcludedToday(activeDay, record.SuspectData)) continue;
             if (runRecords.GetRemainingQuarantineDays(record, currentDay) > 0) continue;
 
             bool seen = record.daysShown > 0;
@@ -671,6 +687,98 @@ public class DailySuspectManager : MonoBehaviour
             _fullMutantSlotIndices.Add(i);
             Debug.Log($"[DailySuspectManager] '{suspect.name}' is {(record.IsFullyMutated ? "fully mutated" : "a legacy mutant")} — slot {i} flagged as full mutant.");
         }
+    }
+
+    private static bool IsExcludedToday(DayBase today, SuspectData suspect) =>
+        today != null && today.ExcludedSuspects != null && Array.IndexOf(today.ExcludedSuspects, suspect) >= 0;
+
+    private static bool IsGuaranteedToday(DayBase today, SuspectData suspect) =>
+        suspect != null && today != null && today.GuaranteedSuspects != null && Array.IndexOf(today.GuaranteedSuspects, suspect) >= 0;
+
+    /// <summary>
+    /// Valid, de-duplicated <see cref="DayBase.GuaranteedSuspects"/> for today. Applies the same
+    /// kill / quarantine-cooldown rules as the random draw — a guaranteed suspect who is dead
+    /// (and not a replacement) or quarantined is skipped with a warning rather than resurrected.
+    /// </summary>
+    private List<SuspectData> GetGuaranteedSuspectsForToday(DayBase today)
+    {
+        var result = new List<SuspectData>();
+        if (today == null || today.GuaranteedSuspects == null) return result;
+
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+
+        foreach (SuspectData suspect in today.GuaranteedSuspects)
+        {
+            if (suspect == null || result.Contains(suspect)) continue;
+
+            if (suspect.CharacterPrefab == null)
+            {
+                Debug.LogWarning($"[DailySuspectManager] Guaranteed suspect '{suspect.name}' has no CharacterPrefab — skipped.");
+                continue;
+            }
+
+            if (IsExcludedToday(today, suspect))
+            {
+                Debug.LogWarning($"[DailySuspectManager] '{suspect.name}' is both guaranteed and excluded on day {today.DayNumber} — exclusion wins.");
+                continue;
+            }
+
+            SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspect);
+            if (record != null && record.isKilled && !record.isReplacement)
+            {
+                Debug.LogWarning($"[DailySuspectManager] Guaranteed suspect '{suspect.name}' is dead — skipped on day {today.DayNumber}.");
+                continue;
+            }
+
+            if (record != null && record.IsOnQuarantineCooldown(currentDay))
+            {
+                Debug.LogWarning($"[DailySuspectManager] Guaranteed suspect '{suspect.name}' is on quarantine cooldown — skipped on day {today.DayNumber}.");
+                continue;
+            }
+
+            result.Add(suspect);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Server-side. Called right before a scripted intercept (e.g. Ocho) consumes lineup slot
+    /// <paramref name="consumedIndex"/>. If that slot holds one of today's guaranteed suspects,
+    /// she is swapped with the next later plain-civilian slot, so the intercept eats that
+    /// suspect's turn instead and the guaranteed appearance still happens.
+    /// </summary>
+    public void PreserveGuaranteedSuspectFromIntercept(int consumedIndex)
+    {
+        if (shiftSuspects == null || consumedIndex < 0 || consumedIndex >= shiftSuspects.Count) return;
+
+        DayBase today = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
+        SuspectData guaranteed = shiftSuspects[consumedIndex];
+        if (!IsGuaranteedToday(today, guaranteed) || _doppelgangerSlots.ContainsKey(consumedIndex)) return;
+
+        for (int j = consumedIndex + 1; j < shiftSuspects.Count; j++)
+        {
+            SuspectData other = shiftSuspects[j];
+            if (other == null || _mutantSlotIndices.Contains(j) || _doppelgangerSlots.ContainsKey(j) || IsGuaranteedToday(today, other))
+                continue;
+
+            shiftSuspects[consumedIndex] = other;
+            shiftSuspects[j] = guaranteed;
+            SwapMembership(_replacementSlotIndices, consumedIndex, j);
+            SwapMembership(_fullMutantSlotIndices, consumedIndex, j);
+            Debug.Log($"[DailySuspectManager] Intercept at slot {consumedIndex} — moved guaranteed '{guaranteed.name}' to slot {j}; '{other.name}' loses the turn instead.");
+            return;
+        }
+
+        Debug.LogWarning($"[DailySuspectManager] Intercept at slot {consumedIndex} consumes guaranteed '{guaranteed.name}' — no later civilian slot to swap with.");
+    }
+
+    private static void SwapMembership(HashSet<int> set, int a, int b)
+    {
+        bool hasA = set.Remove(a);
+        bool hasB = set.Remove(b);
+        if (hasA) set.Add(b);
+        if (hasB) set.Add(a);
     }
 
     /// <summary>
@@ -740,7 +848,7 @@ public class DailySuspectManager : MonoBehaviour
         }
     }
 
-    private List<SuspectData> GetRandomSuspects(int amount)
+    private List<SuspectData> GetRandomSuspects(int amount, DayBase today, List<SuspectData> alreadyPicked)
     {
         List<SuspectData> randomSuspects = new List<SuspectData>();
         List<SuspectData> availableSuspects = new List<SuspectData>();
@@ -754,6 +862,9 @@ public class DailySuspectManager : MonoBehaviour
                 Debug.LogWarning($"[DailySuspectManager] SuspectSet '{allSuspects.name}' contains a null SuspectData entry — skipping.");
                 continue;
             }
+
+            if (IsExcludedToday(today, suspect) || alreadyPicked.Contains(suspect))
+                continue;
 
             if (suspect.CharacterPrefab == null)
             {

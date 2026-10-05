@@ -356,6 +356,7 @@ public class SuspectController : NetworkBehaviour
             var intercept = InterceptNextSuspectSpawn;
             InterceptNextSuspectSpawn = null;
             Debug.Log($"[SuspectController] Intercepting suspect spawn at index {suspectIndex.Value} — scripted event.");
+            dailySuspectManager.PreserveGuaranteedSuspectFromIntercept(suspectIndex.Value);
             intercept.Invoke();
             yield break;
         }

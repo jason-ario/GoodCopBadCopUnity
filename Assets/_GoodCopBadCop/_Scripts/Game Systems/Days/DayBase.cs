@@ -47,6 +47,16 @@ public abstract class DayBase : MonoBehaviour
     [Min(0)]
     public int SuspectsToProcess = 5;
 
+    [Tooltip("Suspects that can never appear in this day's lineup: excluded from the random draw, " +
+             "the forced early full-mutant pick, and doppelganger injection.")]
+    public SuspectData[] ExcludedSuspects;
+
+    [Tooltip("Suspects that always appear in this day's lineup, at a random position among the " +
+             "base suspects. They count toward SuspectsToProcess (fewer random draws are made). " +
+             "Skipped with a warning if killed (and not a replacement) or on quarantine cooldown. " +
+             "If a scripted intercept (e.g. Ocho) lands on their slot, they're swapped to a later one.")]
+    public SuspectData[] GuaranteedSuspects;
+
     /// <summary>
     /// How many of this day's populated lineup slots (<see cref="DailySuspectManager.shiftSuspects"/>)
     /// actually represent a "subject to process" for HUD/objective display purposes — read by
