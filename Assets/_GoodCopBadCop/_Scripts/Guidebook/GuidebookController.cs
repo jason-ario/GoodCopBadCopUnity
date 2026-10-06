@@ -9,7 +9,8 @@ using UnityEngine.InputSystem;
 /// HUD and takes over the Back button (Escape / click closes the book; the exit prompt next to it
 /// shows the Tab / View key).
 /// On close: reverses all of the above. The book is also put away automatically when a cutscene
-/// or dialogue the player is in starts or ends (it may still be reopened during one).
+/// or dialogue the player is in starts or ends, or when the first-person rig holding it is hidden
+/// (intro cutscene camera / dialogue arms hide). It can't be opened while that rig is hidden.
 /// The body guidebook mesh (<see cref="_bodyGuidebookObject"/>) is activated on all clients
 /// via <see cref="PlayerAnimationController.SetGuidebookOpen"/> so other players can see it.
 /// </summary>
@@ -75,7 +76,33 @@ public class GuidebookController : MonoBehaviour
             _bodyGuidebookObject.SetActive(false);
         }
 
-        _backButtonAction = CloseGuidebook;
+        _backButtonAction = () => CloseGuidebook();
+    }
+
+    /// <summary>
+    /// Closes the local player's guidebook if it is open. Call from cutscene entry paths that
+    /// take over the camera without going through <see cref="PlayerInstance.SetIsInCutscene"/>
+    /// (e.g. the intro cutscene), before they apply their own control lock.
+    /// </summary>
+    public static void CloseLocalGuidebook()
+    {
+        if (Local != null && Local.IsOpen) Local.CloseGuidebook();
+    }
+
+    /// <summary>
+    /// False while the first-person rig holding the book is hidden — the intro cutscene disables
+    /// the player's CinemachineCamera and dialogue mode disables Player_Arms. While hidden the book
+    /// can't be seen, and re-enabling the rig resets the arms Animator (dropping HoldingGuidebook)
+    /// while the book object stays active, so the book must not be open across that.
+    /// </summary>
+    private bool IsFirstPersonRigVisible
+    {
+        get
+        {
+            if (_guidebookObject == null) return true;
+            Transform parent = _guidebookObject.transform.parent;
+            return parent == null || parent.gameObject.activeInHierarchy;
+        }
     }
 
     private static bool IsInCutsceneOrDialogue() =>
@@ -158,13 +185,23 @@ public class GuidebookController : MonoBehaviour
             return;
         }
 
-        // Put the book away automatically when a cutscene or dialogue ends.
+        // Put the book away automatically when a cutscene or dialogue starts or ends
+        // (start is normally handled by OnCutsceneStateChanged; this covers any path that skips it).
         bool inScene = IsInCutsceneOrDialogue();
-        bool sceneEnded = _wasInCutsceneOrDialogue && !inScene;
+        bool sceneChanged = _wasInCutsceneOrDialogue != inScene;
         _wasInCutsceneOrDialogue = inScene;
-        if (sceneEnded && IsOpen)
+        if (sceneChanged && IsOpen)
         {
             CloseGuidebook();
+            return;
+        }
+
+        // Safety net: the rig holding the book was hidden by something that didn't close it first.
+        // Whatever hid the rig owns player control now, so don't hand it back here.
+        bool rigVisible = IsFirstPersonRigVisible;
+        if (IsOpen && !rigVisible)
+        {
+            CloseGuidebook(restorePlayerControl: false);
             return;
         }
 
@@ -177,7 +214,7 @@ public class GuidebookController : MonoBehaviour
         bool guidebookInput = Input.GetButtonDown(InputButton)
                               || (Gamepad.current?.selectButton.wasPressedThisFrame ?? false);
 
-        if (!IsOpen && guidebookInput)
+        if (!IsOpen && guidebookInput && rigVisible)
             OpenGuidebook();
         else if (IsOpen && guidebookInput)
             CloseGuidebook();
@@ -201,7 +238,7 @@ public class GuidebookController : MonoBehaviour
     /// </summary>
     public void OpenGuidebook()
     {
-        if (IsOpen || !IsLocalPlayersController) return;
+        if (IsOpen || !IsLocalPlayersController || !IsFirstPersonRigVisible) return;
         IsOpen = true;
         Local = this;
 
@@ -244,8 +281,10 @@ public class GuidebookController : MonoBehaviour
 
     /// <summary>
     /// Closes the guidebook and restores full player state.
+    /// Pass <paramref name="restorePlayerControl"/> = false when another system has already
+    /// taken over the player (movement / look / control are then left as that system set them).
     /// </summary>
-    public void CloseGuidebook()
+    public void CloseGuidebook(bool restorePlayerControl = true)
     {
         if (!IsOpen) return;
         IsOpen = false;
@@ -282,6 +321,8 @@ public class GuidebookController : MonoBehaviour
             // Nothing held — clear all arm layers.
             _animationController.DisableRightArmMask();
         }
+
+        if (!restorePlayerControl) return;
 
         // Restore look first so SetCanControl finds CanLook == true and re-enables the reticle.
         _movementController.SetCanLook(true);

@@ -1765,6 +1765,11 @@ public class ShiftManager : NetworkBehaviour
         // had pressed Start Shift too.
         UIController.Instance.CloseStartShiftScreen();
 
+        // Put the guidebook away before the camera (and the arms holding the book) is disabled
+        // and before the control lock below — the intro never sets PlayerInstance.IsInCutscene,
+        // so GuidebookController wouldn't close it on its own.
+        GuidebookController.CloseLocalGuidebook();
+
         // Disable the local player's own CinemachineCamera immediately, in the same frame the
         // cutscene sequence begins — before the screen fade even starts. ForceExitSoldierDialogueBeforeCutscene
         // (called moments earlier on the server, same RPC batch as this sequence's trigger) may have just

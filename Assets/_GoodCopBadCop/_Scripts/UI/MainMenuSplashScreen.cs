@@ -280,6 +280,11 @@ public class MainMenuSplashScreen : MonoBehaviour
         else
             yield return Wait(menuFadeInDuration);
 
+        // Don't hand input back while a skip input (click/key/button) is still held, or its
+        // release would land on the freshly enabled menu.
+        while (SkipInputHeld())
+            yield return null;
+
         Finish();
         _onComplete?.Invoke();
     }
@@ -328,10 +333,35 @@ public class MainMenuSplashScreen : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    /// <summary>
+    /// Toggles the EventSystem AND its input modules. Disabling only the EventSystem leaves
+    /// InputSystemUIInputModule's action callbacks recording pointer presses/releases that are
+    /// never processed; on re-enable that stale state was replayed as a click on whatever was
+    /// under the cursor (usually Continue). Disabling the module resets its pointer state.
+    /// </summary>
     private void SetMenuInputEnabled(bool enabled)
     {
-        if (eventSystem != null)
-            eventSystem.enabled = enabled;
+        if (eventSystem == null)
+            return;
+
+        BaseInputModule[] modules = eventSystem.GetComponents<BaseInputModule>();
+
+        if (enabled)
+        {
+            foreach (BaseInputModule module in modules)
+                module.enabled = true;
+
+            eventSystem.enabled = true;
+            eventSystem.SetSelectedGameObject(null);
+        }
+        else
+        {
+            eventSystem.SetSelectedGameObject(null);
+            eventSystem.enabled = false;
+
+            foreach (BaseInputModule module in modules)
+                module.enabled = false;
+        }
     }
 
     // ---------------------------------------------------------------------------
