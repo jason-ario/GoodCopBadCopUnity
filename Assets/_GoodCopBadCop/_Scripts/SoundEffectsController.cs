@@ -39,8 +39,48 @@ public class SFXController : MonoBehaviour
     {
         if (!clip) return;
 
-        sfxSource.pitch = pitch;
-        sfxSource.PlayOneShot(clip, volume);
+        // AudioSource.pitch applies to every one-shot still playing on that source, so changing
+        // the shared source's pitch would warp unrelated sounds mid-playback (e.g. the bunk-bed
+        // end-of-day SFX getting re-pitched by the shift report's randomised row sounds).
+        // The shared source stays at 1; pitched one-shots get their own pooled source.
+        if (Mathf.Approximately(pitch, 1f))
+        {
+            sfxSource.pitch = 1f;
+            sfxSource.PlayOneShot(clip, volume);
+            return;
+        }
+
+        AudioSource source = GetPitchedSource();
+        source.pitch = pitch;
+        source.PlayOneShot(clip, volume);
+    }
+
+    private readonly List<AudioSource> _pitchedSources = new();
+
+    private AudioSource GetPitchedSource()
+    {
+        foreach (AudioSource pooled in _pitchedSources)
+        {
+            if (pooled != null && !pooled.isPlaying)
+                return pooled;
+        }
+
+        var go = new GameObject($"PitchedSFX_{_pitchedSources.Count}");
+        go.transform.SetParent(transform, false);
+        AudioSource source = go.AddComponent<AudioSource>();
+        source.playOnAwake = false;
+        source.outputAudioMixerGroup = sfxSource.outputAudioMixerGroup;
+        source.spatialBlend = sfxSource.spatialBlend;
+        source.priority = sfxSource.priority;
+        source.ignoreListenerPause = sfxSource.ignoreListenerPause;
+        source.ignoreListenerVolume = sfxSource.ignoreListenerVolume;
+        source.bypassEffects = sfxSource.bypassEffects;
+        source.bypassListenerEffects = sfxSource.bypassListenerEffects;
+        source.bypassReverbZones = sfxSource.bypassReverbZones;
+        source.reverbZoneMix = sfxSource.reverbZoneMix;
+
+        _pitchedSources.Add(source);
+        return source;
     }
 
     /// <summary>

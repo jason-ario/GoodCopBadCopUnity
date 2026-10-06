@@ -222,14 +222,37 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Removes yesterday's box and only the items still sitting in it. Items a player has taken
+    /// out (claiming an item clears its replicated supply-box containment flag in
+    /// PickableObject.OnHoldingClientChanged) now belong to the world and must never be
+    /// despawned here — previously every delivered item was despawned, including ones in
+    /// players' hands, a few seconds into the next day.
+    /// </summary>
     private void DespawnPreviousDelivery()
     {
+        int despawned = 0, kept = 0;
         foreach (NetworkObject item in _spawnedItems)
         {
-            if (item != null && item.IsSpawned)
+            if (item == null || !item.IsSpawned) continue;
+
+            PickableObject pickable = item.GetComponent<PickableObject>();
+            bool stillInBox = pickable != null && pickable.IsContainedInSupplyBox && !pickable.IsHeld;
+
+            if (stillInBox)
+            {
                 item.Despawn();
+                despawned++;
+            }
+            else
+            {
+                kept++;
+            }
         }
         _spawnedItems.Clear();
+
+        if (despawned > 0 || kept > 0)
+            Debug.Log($"[SupplyBoxDeliveryController] Previous delivery cleanup: despawned {despawned} unclaimed item(s), kept {kept} item(s) taken by players.", this);
 
         if (_activeBox != null)
             _activeBox.ClearRegisteredItems();

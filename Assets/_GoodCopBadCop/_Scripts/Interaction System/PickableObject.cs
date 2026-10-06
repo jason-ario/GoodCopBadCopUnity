@@ -281,6 +281,24 @@ public class PickableObject : Interactable
     /// </summary>
     private void OnIsStowedChanged(bool previousValue, bool newValue)
     {
+        // The requesting peer already applied its stow/unstow locally. A replicated value that
+        // disagrees with its most recent request is a stale echo of an earlier request (fast
+        // hotbar toggling, or a slot swap followed by a quick placement) — applying it would
+        // hide an item that's back in hand, or re-show a stowed one, which PlayerInventory
+        // then treats as "released to the world" and silently drops from its slot.
+        if (_pendingStowIntent.HasValue)
+        {
+            if (newValue == _pendingStowIntent.Value || Time.unscaledTime > _pendingStowIntentExpiry)
+            {
+                _pendingStowIntent = null;
+            }
+            else
+            {
+                Debug.LogWarning($"[PickableObject] Ignored stale stowed={newValue} echo on '{name}' (latest local request: stowed={_pendingStowIntent.Value}).", this);
+                return;
+            }
+        }
+
         // Deactivating kills any coroutine mid-flight on every peer, so drop the busy latches
         // here as well as in the owner's stow path — otherwise the item comes back "busy".
         if (newValue) ForceClearUseState();
@@ -409,7 +427,19 @@ public class PickableObject : Interactable
     /// (see <see cref="PlayerPickupController.StowCurrentItemToPoint"/> /
     /// <see cref="PlayerPickupController.UnstowItemToHand"/>).
     /// </summary>
-    public void RequestSetStowedNetworked(bool stowed) => SetStowedServerRpc(stowed);
+    public void RequestSetStowedNetworked(bool stowed)
+    {
+        // Remember the latest local intent so OnIsStowedChanged can ignore out-of-date echoes.
+        // Expires so a coalesced (never-echoed) request can't block later server-forced changes
+        // such as a death drop or disconnect rescue.
+        _pendingStowIntent = stowed;
+        _pendingStowIntentExpiry = Time.unscaledTime + StowIntentTimeout;
+        SetStowedServerRpc(stowed);
+    }
+
+    private const float StowIntentTimeout = 3f;
+    private bool? _pendingStowIntent;
+    private float _pendingStowIntentExpiry;
 
     [ServerRpc(RequireOwnership = false)]
     private void SetStowedServerRpc(bool stowed)
@@ -542,6 +572,7 @@ public class PickableObject : Interactable
             return;
         }
 
+        _pendingStowIntent = null;
         if (_isStowed.Value)
             _isStowed.Value = false;
         gameObject.SetActive(true);
@@ -883,6 +914,7 @@ public class PickableObject : Interactable
         }
 
         // Clear the hidden state first so the object is visible/active again on every client.
+        _pendingStowIntent = null;
         if (_isStowed.Value) _isStowed.Value = false;
         gameObject.SetActive(true);
 
@@ -930,6 +962,7 @@ public class PickableObject : Interactable
             return;
         }
 
+        _pendingStowIntent = null;
         if (_isStowed.Value) _isStowed.Value = false;
         gameObject.SetActive(true);
 
@@ -1698,13 +1731,29 @@ public class PickableObject : Interactable
     /// Called on the local holder just before the guidebook opens and hides this held item
     /// (local <c>SetActive(false)</c>, no drop/stow). Override to leave any use / inspect mode and
     /// hide extra visuals that are not children of this object.
+    /// Base drops the item's hold-pose bool: hold states (e.g. Holding Exam Notebook, Folder Closed)
+    /// only exit back to the arms layer's None state when their bool clears, and HoldingGuidebook is
+    /// only reachable from None — leaving the bool set keeps the arms stuck in the item pose.
     /// </summary>
-    public virtual void OnHiddenForGuidebook() { }
+    public virtual void OnHiddenForGuidebook()
+    {
+        SetHoldPoseBool(false);
+    }
 
     /// <summary>
     /// Called on the local holder right after the guidebook closes and re-activates this held item.
+    /// Base restores the hold-pose bool cleared in <see cref="OnHiddenForGuidebook"/>.
     /// </summary>
-    public virtual void OnShownAfterGuidebook() { }
+    public virtual void OnShownAfterGuidebook()
+    {
+        SetHoldPoseBool(true);
+    }
+
+    private void SetHoldPoseBool(bool value)
+    {
+        if (playerPickupController == null || itemData == null || string.IsNullOrEmpty(itemData.pickupAnimBool)) return;
+        playerPickupController.PlayerAnimationController.SetAnimBool(itemData.pickupAnimBool, value);
+    }
 
     public virtual void OnStartUse()
     {

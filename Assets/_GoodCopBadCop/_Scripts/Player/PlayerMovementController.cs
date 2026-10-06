@@ -237,11 +237,30 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             }
             else
             {
+                // Every disable path (SetCanControl, the end-of-shift report, cutscenes writing the
+                // property directly) must drop cached input, otherwise Move() stops refreshing it and
+                // FootstepsAudio / PlayerAnimationController keep reading the last walk values.
+                ClearMovementInput();
+
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
                 GetComponent<PlayerInteractionController>().SetReticleActive(false);
             }
         }
+    }
+
+    /// <summary>
+    /// Zeroes cached raw input and running state so footsteps, walk/run animation and running
+    /// camera effects stop while movement isn't being processed.
+    /// </summary>
+    private void ClearMovementInput()
+    {
+        MoveXRaw = 0f;
+        MoveZRaw = 0f;
+        IsRunning = false;
+        _sprintToggleActive = false;
+        if (_playerCameraController != null)
+            _playerCameraController.UpdateMovementShake(false, false);
     }
 
     private PlayerAnimationController _playerAnimationController;
@@ -744,19 +763,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         cameraTransform.DOKill();
         transform.DOKill();
 
+        // Input clearing on disable happens in the CanControl setter. CanMove is deliberately
+        // left unchanged — it's separate state that must survive the cutscene and be restored on exit.
         if (!value)
-        {
-            // Clear the cached raw-input values so FootstepsAudio and the animation
-            // controller don't read stale non-zero movement while controls are suspended.
-            // CanMove is deliberately left unchanged — it's separate state that must
-            // survive the cutscene and be restored on exit.
-            MoveXRaw = 0f;
-            MoveZRaw = 0f;
-            IsRunning = false;
-            _sprintToggleActive = false;
-            if (_playerCameraController != null)
-                _playerCameraController.UpdateMovementShake(false, false);
-        }
+            ClearMovementInput();
     }
 
     public void SetCanMove(bool value)
@@ -764,14 +774,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         CanMove = value;
 
         if (!value)
-        {
-            MoveXRaw = 0f;
-            MoveZRaw = 0f;
-            IsRunning = false;
-            _sprintToggleActive = false;
-            if (_playerCameraController != null)
-                _playerCameraController.UpdateMovementShake(false, false);
-        }
+            ClearMovementInput();
     }
 
     public void SetCanLook(bool value)
@@ -812,6 +815,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     {
         CanMove = !locked;
         CanLook = true;
+        if (locked)
+            ClearMovementInput();
     }
 
     public void LookAtTarget(Transform target)

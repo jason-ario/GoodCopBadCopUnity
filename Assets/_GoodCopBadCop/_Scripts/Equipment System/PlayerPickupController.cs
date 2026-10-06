@@ -391,6 +391,9 @@ public class PlayerPickupController : NetworkBehaviour
     {
         if (Input.GetMouseButtonDown(1)) return;
         if (HeldObject == null) return;
+        // Hidden in hand (guidebook open): starting use would latch animator bools like UsingTool
+        // and fail to start the item's use coroutine on the inactive object.
+        if (!HeldObject.gameObject.activeInHierarchy) return;
         if (PickUpCooldownComplete == false) return;
 
         // Failsafe: an item whose NetworkObject ownership drifted away from us (ownership race

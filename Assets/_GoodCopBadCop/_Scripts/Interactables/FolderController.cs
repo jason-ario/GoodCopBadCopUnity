@@ -299,6 +299,30 @@ public class FolderController : PickableObject
     }
 
     /// <summary>
+    /// The guidebook takes over the hands: drop the open-folder pose too (Folder Open only exits
+    /// when both hold bools clear), cancel a pending open (deactivation would kill the coroutine
+    /// and leave isOpeningOrClosing latched), and hide filed documents — they follow slots via
+    /// SocketFollow rather than being children, so they'd otherwise float next to the book.
+    /// </summary>
+    public override void OnHiddenForGuidebook()
+    {
+        base.OnHiddenForGuidebook();
+        StopAllCoroutines();
+        isOpeningOrClosing = false;
+        playerPickupController?.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", false);
+        SetDocumentsActive(false);
+    }
+
+    public override void OnShownAfterGuidebook()
+    {
+        base.OnShownAfterGuidebook();
+        if (isOpen.Value)
+            playerPickupController?.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", true);
+        SetDocumentsActive(true);
+        SyncOpenVisual();
+    }
+
+    /// <summary>
     /// Runs on every machine (including late updates on the owner) whenever the authoritative
     /// stowed state changes, keeping filed documents' visibility in sync with the folder.
     /// </summary>

@@ -266,6 +266,14 @@ public class GuidebookController : MonoBehaviour
         if (_pickupController.HeldObject != null)
         {
             PickableObject held = _pickupController.HeldObject;
+
+            // End any in-progress use exactly like releasing LMB (e.g. opening the book mid-mop).
+            // Otherwise UsingTool stays set and the arms stay pinned in the item's use/hold states
+            // (Using Mop -> Holding Mop only exits when UsingTool clears), and the deactivation
+            // kills the use coroutine so nothing ever clears it.
+            _pickupController.ForceStopUse();
+            held.ForceClearUseState();
+
             held.OnHiddenForGuidebook();
             _deactivatedHeldObject = held.gameObject;
             _deactivatedHeldObject.SetActive(false);
