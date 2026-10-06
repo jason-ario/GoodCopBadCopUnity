@@ -83,6 +83,14 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Y offset above the terrain surface applied to every spawned blood splatter.")]
     [SerializeField] private float _endBloodSplatterGroundOffset = 0.02f;
 
+    [Tooltip("When off (default), end-of-trail splatters ignore the UV flashlight and stay plain red, " +
+             "so they read as ordinary blood rather than the UV-only trail blood.")]
+    [SerializeField] private bool _endSplattersGlowUnderUV = false;
+
+    [Tooltip("When on (default), UV trail particles are not spawned within End Blood Splatter Radius of " +
+             "the destination, so the end of the trail is marked only by the normal red splatters.")]
+    [SerializeField] private bool _clearTrailAroundEndSplatters = true;
+
     [Header("Off-Trail Radiation")]
     [Tooltip("When assigned, the active location's Trail is dynamically registered as a safe " +
              "corridor on this OffTrailRadiation zone for the duration of the event, then removed " +
@@ -781,6 +789,22 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         else
         {
             List<Vector3> spawnPositions = location.Trail.GetSpawnPositions();
+
+            // Keep the UV-only trail out of the end-splatter area so the destination shows only
+            // normal red blood (the trail's last waypoint is usually the destination itself).
+            if (_clearTrailAroundEndSplatters && location.DestinationPoint != null
+                && _endBloodSplatterPrefabs != null && _endBloodSplatterPrefabs.Length > 0
+                && _endBloodSplatterCount > 0)
+            {
+                Vector3 dest = location.DestinationPoint.position;
+                float sqrRadius = _endBloodSplatterRadius * _endBloodSplatterRadius;
+                spawnPositions.RemoveAll(p =>
+                {
+                    float dx = p.x - dest.x, dz = p.z - dest.z;
+                    return dx * dx + dz * dz <= sqrRadius;
+                });
+            }
+
             for (int i = 0; i < spawnPositions.Count; i++)
                 spawnPositions[i] = SnapToTerrain(spawnPositions[i], _trailGroundOffset);
             Debug.Log($"[FollowTrailThreat] Spawning {spawnPositions.Count} trail particles.", this);
@@ -1221,6 +1245,10 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
                 Destroy(splatter);
                 continue;
             }
+
+            // Must be set before Spawn() so the flag rides the spawn payload to every peer.
+            if (!_endSplattersGlowUnderUV && splatter.TryGetComponent(out GraffitiInteractable graffiti))
+                graffiti.SetSuppressUVGlow(true);
 
             netObj.Spawn(true);
             _spawnedBloodSplatters.Add(netObj);

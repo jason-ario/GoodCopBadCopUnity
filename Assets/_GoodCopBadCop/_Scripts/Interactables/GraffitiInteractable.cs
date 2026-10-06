@@ -65,6 +65,26 @@ public class GraffitiInteractable : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// When true, this instance's UV-light fluorescent glow is switched off (per-renderer
+    /// <c>_UVGlowIntensity</c> = 0 via the MaterialPropertyBlock), so a blood decal reads as plain
+    /// red even under the UV flashlight. Server-written — set it BEFORE <c>Spawn()</c> via
+    /// <see cref="SetSuppressUVGlow"/> so the value ships in the spawn payload to every peer,
+    /// late joiners included. Used for the Follow Trail end-of-trail splatters so they don't look
+    /// like the UV-only trail blood.
+    /// </summary>
+    private NetworkVariable<bool> _suppressUVGlow = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Server only. Call before spawning to make this instance ignore UV light.</summary>
+    public void SetSuppressUVGlow(bool suppress)
+    {
+        if (NetworkManager != null && NetworkManager.IsListening && !NetworkManager.IsServer) return;
+        _suppressUVGlow.Value = suppress;
+    }
+
     /// <summary>Current replicated scrub progress for persistence and late restoration.</summary>
     public float ScrubProgress => _scrubProgress.Value;
 
@@ -172,6 +192,7 @@ public class GraffitiInteractable : NetworkBehaviour
     // ── Visual ─────────────────────────────────────────────────────────────────
 
     private const string ScrubProgressProperty = "_ScrubProgress";
+    private const string UVGlowIntensityProperty = "_UVGlowIntensity";
 
     private void OnScrubProgressChanged(float previous, float current)
     {
@@ -201,6 +222,8 @@ public class GraffitiInteractable : NetworkBehaviour
         MaterialPropertyBlock block = new MaterialPropertyBlock();
         _graffitiRenderer.GetPropertyBlock(block);
         block.SetFloat(ScrubProgressProperty, visual);
+        if (_suppressUVGlow.Value)
+            block.SetFloat(UVGlowIntensityProperty, 0f);
         _graffitiRenderer.SetPropertyBlock(block);
     }
 

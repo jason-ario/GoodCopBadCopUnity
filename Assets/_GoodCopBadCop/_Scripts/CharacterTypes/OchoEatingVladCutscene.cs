@@ -163,6 +163,12 @@ public class OchoEatingVladCutscene : NetworkBehaviour
              "ground. Leave unassigned to disable.")]
     [SerializeField] private AudioClip _pieceLandingSound;
 
+    [Tooltip("Max seconds to wait for a dropped Vlad piece to come to rest before it is handed " +
+             "to TakeOutTrashTask (which grants the gore objective highlight + compass marker " +
+             "if it settled inside the CheckpointCleanupArea).")]
+    [Min(0f)]
+    [SerializeField] private float _pieceSettleTimeout = 5f;
+
     // ── Inspector — Jump Sequence ─────────────────────────────────────────────
 
     [Header("Jump Sequence")]
@@ -691,7 +697,45 @@ public class OchoEatingVladCutscene : NetworkBehaviour
                 ? _spawnedPieceRigidbodies[i]
                 : null;
             ReleasePieceServer(constraint.gameObject, rb);
+
+            NetworkObject pieceNetObj = constraint.GetComponent<NetworkObject>();
+            if (pieceNetObj != null)
+                StartCoroutine(RegisterPieceAsGoreWhenSettled(pieceNetObj, rb));
         }
+    }
+
+    /// <summary>
+    /// SERVER ONLY — once a dropped piece comes to rest (or <see cref="_pieceSettleTimeout"/>
+    /// elapses), hands it to <see cref="TakeOutTrashTask.RegisterExternalJunkItem"/> exactly like
+    /// mutant gore. That call owns the cleanup-region test: a piece resting inside the
+    /// <see cref="CheckpointCleanupArea"/> becomes task-required (objective highlight + compass
+    /// marker via <see cref="JunkPickupHighlightService"/>, and starts a trash task if none is
+    /// running); one outside stays baggable but unhighlighted. Waiting for settle matters because
+    /// the release pose is up on the roof, not where the piece ends up.
+    /// </summary>
+    private IEnumerator RegisterPieceAsGoreWhenSettled(NetworkObject netObj, Rigidbody rb)
+    {
+        float elapsed = 0f;
+
+        // Let physics take over for at least one step before sampling sleep state.
+        yield return new WaitForFixedUpdate();
+
+        while (elapsed < _pieceSettleTimeout)
+        {
+            if (netObj == null || !netObj.IsSpawned)
+                yield break;
+
+            if (rb == null || rb.isKinematic || rb.IsSleeping())
+                break;
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (netObj == null || !netObj.IsSpawned)
+            yield break;
+
+        TakeOutTrashTask.Instance?.RegisterExternalJunkItem(netObj);
     }
 
     /// <summary>SERVER ONLY — freezes a spawned piece double while it's carried by its constraint.</summary>
