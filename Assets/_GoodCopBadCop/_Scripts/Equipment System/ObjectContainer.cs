@@ -83,6 +83,7 @@ public class ObjectContainer : MonoBehaviour
         for (var i = 0; i < itemsHeld.Length; i++)
         {
             var itemHeld = itemsHeld[i];
+            if (itemHeld == null) continue;
             if (itemData == itemHeld.ItemData)
             {
                 currentlyEquippedItem = itemHeld;
@@ -130,7 +131,10 @@ public class ObjectContainer : MonoBehaviour
     {
         for (int i = 0; i < itemsHeld.Length; i++)
         {
-            if (itemsHeld[i].ItemData == itemData)
+            // Null entries (missing Inspector references) are skipped rather than throwing:
+            // this runs inside PlayerPickupController.PickUpObject after _heldObject is set, so
+            // an exception here left the player "holding" an item the inventory never received.
+            if (itemsHeld[i] != null && itemsHeld[i].ItemData == itemData)
             {
                 return i;
             }
@@ -141,7 +145,8 @@ public class ObjectContainer : MonoBehaviour
 
     public PickableItemData GetItemData(int newValue)
     {
-        return itemsHeld[newValue].ItemData;
+        if (itemsHeld == null || newValue < 0 || newValue >= itemsHeld.Length) return null;
+        return itemsHeld[newValue] != null ? itemsHeld[newValue].ItemData : null;
     }
 
     /// <summary>

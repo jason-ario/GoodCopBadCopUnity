@@ -278,6 +278,11 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
+        // Runs before every gate: a held item that was despawned/destroyed out from under the
+        // hand must be released locally, otherwise HeldObject reads "null" while the arm rig,
+        // containers and PlayerInventory still think it's held.
+        ReconcileLostHeldObject();
+
         // Runs BEFORE any gating early-return below: a "currently in use" latch must never be
         // able to survive the button being released, even when pickup/place input is locked
         // (notebook draw mode, dialogue, cutscene) or the item was deactivated mid-use.
@@ -820,6 +825,8 @@ public class PlayerPickupController : NetworkBehaviour
         }
 
         pickableObject.OnPickedUp();
+        if (!pickableObject.TryGetComponent<HeldItemDisableProbe>(out _))
+            pickableObject.gameObject.AddComponent<HeldItemDisableProbe>();
         _heldObjectRef.Value = new NetworkObjectReference(pickableObject.NetworkObject);
         OnHeldObjectChanged?.Invoke(_heldObject);
 
@@ -1366,6 +1373,25 @@ public class PlayerPickupController : NetworkBehaviour
         // so any other caller can't silently make the item vanish onto the stow point.
         if (_heldObject.ItemData != null && !_heldObject.ItemData.canBeStowed) return null;
 
+        IsStowingHeldItem = true;
+        try
+        {
+            return StowCurrentItemToPointInternal(stowPoint);
+        }
+        finally
+        {
+            IsStowingHeldItem = false;
+        }
+    }
+
+    /// <summary>
+    /// True only while <see cref="StowCurrentItemToPoint"/> is hiding the held item, so
+    /// <see cref="HeldItemDiagnostics"/> can tell a legitimate stow from an unexpected deactivation.
+    /// </summary>
+    public bool IsStowingHeldItem { get; private set; }
+
+    private PickableObject StowCurrentItemToPointInternal(Transform stowPoint)
+    {
         PickableObject stowed = _heldObject;
         _useAllowedTime = Time.time + pickUpUseCooldownTimer;
         DisableArmIKs();
@@ -1443,6 +1469,46 @@ public class PlayerPickupController : NetworkBehaviour
         }
 
         PickableObjectRegistry.SpawnRuntimeItemServer(data, position, rotation);
+    }
+
+    /// <summary>
+    /// Owner-only safety net. If the held item was despawned or destroyed by some other system
+    /// (no drop/stow path ran), <c>_heldObject</c> becomes a Unity "fake null": pickups work again
+    /// but the arm rig, equip containers, replicated held reference and <see cref="PlayerInventory"/>
+    /// are left pointing at a dead item. Tears the local hold state down and fires
+    /// <see cref="OnHeldObjectChanged"/>(null) so every listener (hotbar, HUD) clears it too.
+    /// Sends no RPCs to the dead object.
+    /// </summary>
+    private void ReconcileLostHeldObject()
+    {
+        if (ReferenceEquals(_heldObject, null)) return;
+        if (_heldObject != null && _heldObject.IsSpawned) return;
+
+        Debug.LogWarning("[PlayerPickupController] Held item was despawned/destroyed without a drop — " +
+                         "clearing local hold state so the hand and hotbar don't stay desynced.");
+
+        foreach (var objectContainer in objectContainers)
+            objectContainer.UnequipItem(this);
+
+        if (rightArmBodyObjectContainer.CurrentlyEquippedItem != null)
+            rightArmBodyObjectContainer.CurrentlyEquippedItem.OnDroppedFromBody();
+        if (leftArmBodyObjectContainer.CurrentlyEquippedItem != null)
+            leftArmBodyObjectContainer.CurrentlyEquippedItem.OnDroppedFromBody();
+
+        _playerAnimationController.SetRightArmRigWeightSmooth(0, .25f);
+        _playerAnimationController.RightArmIKTarget = null;
+        _playerAnimationController.SetLeftArmRigWeightSmooth(0, .25f);
+        _playerAnimationController.LeftArmIKTarget = null;
+        _playerAnimationController.SetAimRigWeightSmooth(0, .2f);
+
+        _camEquippedItem = null;
+        _bodyCurrentlyEquippedItem = null;
+        _heldObject = null;
+        _heldObjectRef.Value = default;
+        itemEquippedIndex.Value = -1;
+        _playerAnimationController.DisableRightArmMask();
+        ObjectPlacer.Instance?.DeactivatePlacer();
+        OnHeldObjectChanged?.Invoke(null);
     }
 
     public void DestroyEquippedItem()

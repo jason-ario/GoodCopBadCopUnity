@@ -213,7 +213,7 @@ public class MailCubbySlot : MonoBehaviour
         // authoritative and applies the same lock networked, for every other client.
         bool isCorrectResident = _assignedResident != null && _assignedResident == package.AssignedResident;
         if (isCorrectResident)
-            package.LockInteractable();
+            package.LockAsSorted();
 
         if (_placementSlot != null)
         {

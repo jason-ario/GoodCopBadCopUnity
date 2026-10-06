@@ -127,8 +127,46 @@ public class MailPackageItem : PickableObject
 
     public bool IsPinnedToCrate => _pinnedToCrate.Value;
 
+    /// <summary>
+    /// Replicated "correctly sorted" flag (set in <see cref="ResolveAndSettle"/>). Gates
+    /// <see cref="IsInteractable"/> on every peer, including late joiners. Collider-based locking
+    /// alone is not enough: <see cref="PickableColliderController.SetReleased"/> (from
+    /// <see cref="PickableObject.OnDropped"/> and the held→released <c>_holdingClientId</c>
+    /// change) re-enables the root physics colliders right after the lock is applied, and
+    /// <see cref="PickableObject.Interact"/> treats any enabled root collider as pickable.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isSorted = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Local optimistic sorted flag set by <see cref="LockAsSorted"/> before the server confirms.</summary>
+    private bool _sortedLocally;
+
+    /// <summary>True once this package has been sorted (server-confirmed or optimistically on this peer). Sorted packages can never be picked up again.</summary>
+    public bool IsSorted => _isSorted.Value || _sortedLocally;
+
+    public override bool IsInteractable => base.IsInteractable && !IsSorted;
+
     /// <summary>True once this package has been correctly sorted and is pending despawn. Server-only guard against double-counting.</summary>
     public bool IsResolved { get; private set; }
+
+    /// <summary>
+    /// Local, optimistic: immediately makes this package non-interactable on this peer the moment
+    /// it is placed in its addressee's cubby, before the server's <see cref="MarkDelivered"/>
+    /// confirmation replicates. See <see cref="MailCubbySlot.HandleItemPlaced"/>.
+    /// </summary>
+    public void LockAsSorted()
+    {
+        _sortedLocally = true;
+        LockInteractable();
+    }
+
+    public override void Interact(PlayerInteractionController player)
+    {
+        if (IsSorted) return;
+        base.Interact(player);
+    }
 
     public string ResidentName => _residentName.Value.ToString();
     public string GoodsLabel   => _goodsLabel.Value.ToString();
@@ -185,6 +223,7 @@ public class MailPackageItem : PickableObject
         _deliveryHighlightActive.Value = highlight;
         ApplyDeliveryHighlight(highlight);
         IsResolved                 = false;
+        _isSorted.Value            = false;
 
         RefreshLabel();
     }
@@ -373,6 +412,7 @@ public class MailPackageItem : PickableObject
         _deliveryHighlightActive.Value = false;
         ApplyDeliveryHighlight(false);
         MarkResolved();
+        _isSorted.Value = true;
         LockInteractableNetworked();
         PlaySortSuccessSfx();
     }

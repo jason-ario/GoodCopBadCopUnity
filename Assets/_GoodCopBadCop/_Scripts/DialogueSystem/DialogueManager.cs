@@ -45,6 +45,14 @@ public class DialogueManager : NetworkBehaviour
     [SerializeField] private Subtitles playerSubtitlesPrefab;
     [SerializeField] RectTransform subtitlesContainer;
 
+    [Tooltip("Wobble applied to every subtitle (NPC, player, choice echo, in-world bubble) unless a " +
+             "scripted line primes its own via SetNextLineWobbleProfile. Should match " +
+             "ScriptedDialogueRunner's default so all dialogue looks the same.")]
+    [SerializeField] private TMPWobbleProfile defaultWobbleProfile;
+
+    /// <summary>Wobble used by subtitles that aren't primed by a scripted line (see <see cref="defaultWobbleProfile"/>).</summary>
+    public TMPWobbleProfile DefaultWobbleProfile => defaultWobbleProfile;
+
     [Tooltip("CanvasGroup on this same GameObject (the dialogue system's root Canvas), used to " +
              "visually hide all subtitles and dialogue choices — without touching their own " +
              "active-state bookkeeping — while the pause menu is open.")]
@@ -401,6 +409,7 @@ public class DialogueManager : NetworkBehaviour
 
         Subtitles echo = Instantiate(playerSubtitlesPrefab, subtitlesContainer);
         echo.SetText(text, playerName, color);
+        echo.SetWobble(defaultWobbleProfile);
         echo.transform.SetAsFirstSibling();
         OverhearSubtitleGate.Attach(echo.gameObject, overhearSource, participantsAlwaysSee);
 
@@ -473,11 +482,18 @@ public class DialogueManager : NetworkBehaviour
 
         subtitles.SetText(text, characterName, nameColor);
 
-        // Apply wobble effect and font override to NPC lines. Each is consumed once per subtitle spawn.
+        // Wobble: NPC lines consume a scripted priming (which may be an explicit null to suppress);
+        // everything else (booth/world dialogue, barks, player lines) falls back to the default.
+        TMPWobbleProfile wobble = defaultWobbleProfile;
+        if (!isPlayer && _nextLineWobblePrimed)
+            wobble = _nextLineWobbleProfile;
+        subtitles.SetWobble(wobble);
+
+        // Font override for NPC lines. Each priming is consumed once per subtitle spawn.
         if (!isPlayer)
         {
-            subtitles.SetWobble(_nextLineWobbleProfile);
             _nextLineWobbleProfile = null;
+            _nextLineWobblePrimed = false;
             subtitles.SetFontOverride(_nextLineFontOverride);
             _nextLineFontOverride = null;
         }
@@ -542,14 +558,20 @@ public class DialogueManager : NetworkBehaviour
     // -------------------------------------------------------------------------
 
     private TMPWobbleProfile _nextLineWobbleProfile;
+    private bool _nextLineWobblePrimed;
 
     /// <summary>
     /// Primes the next NPC subtitle spawned via <see cref="SpawnSubtitles"/> to use the
     /// given wobble <paramref name="profile"/>. Pass <c>null</c> to suppress wobble on the
-    /// next line. The value is consumed and cleared on use.
+    /// next line. The value is consumed and cleared on use; unprimed lines use
+    /// <see cref="DefaultWobbleProfile"/>.
     /// Called by <see cref="ScriptedDialogueRunner"/> via ClientRpc before each line.
     /// </summary>
-    public void SetNextLineWobbleProfile(TMPWobbleProfile profile) => _nextLineWobbleProfile = profile;
+    public void SetNextLineWobbleProfile(TMPWobbleProfile profile)
+    {
+        _nextLineWobbleProfile = profile;
+        _nextLineWobblePrimed = true;
+    }
 
     // -------------------------------------------------------------------------
     // Font override — consumed once when the next NPC subtitle is spawned.

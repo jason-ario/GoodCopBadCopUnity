@@ -1403,7 +1403,9 @@ public class ShiftManager : NetworkBehaviour
         {
             Transform bunkerSpawn = PlayerSpawner.Instance.GetInsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
             PlayerInstance.Instance.SetPosition(bunkerSpawn);
-            PlayerInstance.Instance.SetIsOutside(false);
+            // Request variant: _isOutside is server-write, so a non-host client calling
+            // SetIsOutside directly fails the write (permission error) during this transition.
+            PlayerInstance.Instance.RequestSetIsOutside(false);
         }
         _bunkerDoorController?.Reset();
 

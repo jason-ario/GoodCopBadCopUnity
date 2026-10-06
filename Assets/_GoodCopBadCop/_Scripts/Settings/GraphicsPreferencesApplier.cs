@@ -17,20 +17,23 @@ namespace GoodCopBadCop.Settings
     /// overriding it at runtime made objects cull much closer than in the editor.
     /// Shadow distance/cascades are set on the active URP asset (URP ignores the QualitySettings
     /// equivalents) and restored on dispose so Editor play sessions don't dirty the asset.
-    /// Brightness/Film Grain drive overrides on the always-on global Volume
-    /// identified by <see cref="GraphicsPreferencesVolumeAnchor"/>.
+    /// Brightness is a final-image gamma adjustment applied after all post-processing by
+    /// <see cref="ScreenBrightnessRenderer"/> (it never touches exposure/bloom/tonemapping).
+    /// Film Grain drives an override on the always-on global Volume identified by
+    /// <see cref="GraphicsPreferencesVolumeAnchor"/>.
     /// </summary>
     public sealed class GraphicsPreferencesApplier : IInitializable, IDisposable
     {
-        private const float MinExposure = -2f;
-        private const float MaxExposure = 2f;
         private const float DefaultFilmGrainIntensity = 0.2f;
+
+        // Slider 0..100, 50 = neutral. Gamma = 2^(-range * (t*2-1)): ~0.57 (brighter) .. ~1.74 (darker).
+        private const float BrightnessGammaRange = 0.8f;
 
         private readonly ISettingsModel model;
         private readonly GraphicsPreferencesVolumeAnchor volumeAnchor;
         private DisposableBag disposables;
 
-        private ColorAdjustments colorAdjustments;
+        private ScreenBrightnessRenderer brightnessRenderer;
         private FilmGrain filmGrain;
         private float filmGrainMaxIntensity = DefaultFilmGrainIntensity;
 
@@ -49,22 +52,18 @@ namespace GoodCopBadCop.Settings
             CacheRenderPipelineDefaults();
             model.QualityPreset.Subscribe(ApplyQualityPreset).AddTo(ref disposables);
 
+            brightnessRenderer = new ScreenBrightnessRenderer();
+            model.Brightness.Subscribe(ApplyBrightness).AddTo(ref disposables);
+
             Volume volume = volumeAnchor != null ? volumeAnchor.Volume : null;
             VolumeProfile profile = volume != null ? volume.profile : null;
             if (profile == null)
             {
                 Debug.LogWarning(
                     "[GraphicsPreferencesApplier] No Volume assigned via GraphicsPreferencesVolumeAnchor; " +
-                    "Brightness/Film Grain will not be applied.");
+                    "Film Grain will not be applied.");
                 return;
             }
-
-            if (!profile.TryGet(out colorAdjustments))
-            {
-                colorAdjustments = profile.Add<ColorAdjustments>(true);
-            }
-            colorAdjustments.active = true;
-            colorAdjustments.postExposure.overrideState = true;
 
             if (!profile.TryGet(out filmGrain))
             {
@@ -76,24 +75,26 @@ namespace GoodCopBadCop.Settings
                 ? filmGrain.intensity.value
                 : DefaultFilmGrainIntensity;
 
-            model.Brightness.Subscribe(ApplyBrightness).AddTo(ref disposables);
             model.FilmGrainEnabled.Subscribe(ApplyFilmGrain).AddTo(ref disposables);
         }
 
         public void Dispose()
         {
             disposables.Dispose();
+            brightnessRenderer?.Dispose();
+            brightnessRenderer = null;
             RestoreRenderPipelineDefaults();
         }
 
         private void ApplyBrightness(float value)
         {
-            if (colorAdjustments == null)
+            if (brightnessRenderer == null)
             {
                 return;
             }
 
-            colorAdjustments.postExposure.value = Mathf.Lerp(MinExposure, MaxExposure, Mathf.Clamp01(value / 100f));
+            float signed = Mathf.Clamp01(value / 100f) * 2f - 1f;
+            brightnessRenderer.SetGamma(Mathf.Pow(2f, -BrightnessGammaRange * signed));
         }
 
         private void ApplyFilmGrain(bool isEnabled)

@@ -246,6 +246,10 @@ public class PickableObject : Interactable
 
     public override void OnNetworkDespawn()
     {
+        // Diagnostics: OnNetworkDespawn runs synchronously inside the Despawn() call on the host,
+        // so the logged stack names whatever despawned an item the local player is carrying.
+        HeldItemDiagnostics.ReportIfOwnedByLocalPlayer(this, "despawned");
+
         // Run the "about to despawn" cleanup hook here — rather than only at the single
         // DespawnServerRpc call site — so it fires for EVERY despawn path (checkpoint/save
         // restore forcing a non-existent item away via ApplySaveData, DailyPickupSpawnManager

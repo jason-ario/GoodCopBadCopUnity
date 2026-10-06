@@ -21,6 +21,10 @@ public class InWorldSubtitle : MonoBehaviour
     [SerializeField] private Image background;
     [SerializeField] private int maxCharactersPerLine = 28;
 
+    [Tooltip("TMPWobbleText on the bubble text. Uses DialogueManager.DefaultWobbleProfile so bubbles " +
+             "wobble like the screen subtitles. Auto-found on the text if left empty.")]
+    [SerializeField] private TMPWobbleText wobbleText;
+
     [Tooltip("Seconds the bubble stays visible after the line finishes revealing, unless replaced sooner.")]
     [SerializeField] private float autoHideSeconds = 4f;
 
@@ -36,6 +40,7 @@ public class InWorldSubtitle : MonoBehaviour
     private void Awake()
     {
         if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
+        if (wobbleText == null && textReveal != null) wobbleText = textReveal.GetComponent<TMPWobbleText>();
         SetVisible(false);
     }
 
@@ -76,8 +81,25 @@ public class InWorldSubtitle : MonoBehaviour
 
         string wrapped = WrapText(text, maxCharactersPerLine);
         textReveal.RevealText(wrapped);
+        ApplyWobble();
 
         _autoHideRoutine = StartCoroutine(AutoHideRoutine());
+    }
+
+    private void ApplyWobble()
+    {
+        if (wobbleText == null) return;
+
+        TMPWobbleProfile profile = DialogueManager.Instance != null ? DialogueManager.Instance.DefaultWobbleProfile : null;
+        if (profile != null)
+        {
+            wobbleText.SetProfile(profile, restartSeeds: true);
+            wobbleText.StartWobble();
+        }
+        else
+        {
+            wobbleText.StopWobble();
+        }
     }
 
     /// <summary>Immediately hides the bubble.</summary>

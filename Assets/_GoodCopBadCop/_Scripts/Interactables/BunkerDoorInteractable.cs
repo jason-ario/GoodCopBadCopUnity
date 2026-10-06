@@ -61,6 +61,14 @@ public class BunkerDoorInteractable : Interactable
         nearestView.Open(player);
     }
 
+    /// <summary>
+    /// Hides (or restores) this door's persistent hold highlight (e.g. the Day 1 "open the bunker"
+    /// tutorial arrow) while a wheel diegetic view is open. The door's HighlightEffect uses the
+    /// <c>Children</c> group, so its outline encloses the wheel renderers and swallows the wheel's
+    /// own hover outline. Any claimed hold is kept, so the glow returns on close if still required.
+    /// </summary>
+    public void SetWheelViewOpen(bool open) => SetHoldHighlightSuppressed(open);
+
     // ─── MonoBehaviour ────────────────────────────────────────────────────────
 
     protected override void Awake()

@@ -143,7 +143,8 @@ namespace GoodCopBadCop.Settings
             new("settings.graphics.qualityPreset", EQualityPreset.High);
 
         public readonly PersistentReactiveProperty<float> BrightnessMutable =
-            new("settings.graphics.brightness", 100f);
+            // v2: brightness became a final-image gamma (50 = neutral); old key stored post-exposure values.
+            new("settings.graphics.brightness.v2", 50f);
 
         public readonly PersistentReactiveProperty<bool> FilmGrainEnabledMutable =
             new("settings.graphics.filmGrainEnabled", true);

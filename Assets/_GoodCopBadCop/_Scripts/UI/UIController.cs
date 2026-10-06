@@ -164,7 +164,20 @@ public class UIController : MonoBehaviour
         // the report's Continue button is always reachable for both players.
         if (IsEndOfShiftReportOpen && (!Cursor.visible || Cursor.lockState == CursorLockMode.Locked))
             ShowCursor();
+
+        // Failsafe: the HUD must always be hidden while the local player is in a dialogue
+        // cutscene (scripted/megaphone/booth). Catches any late or direct reveal that slips past
+        // ShowPlayerUI's guard, e.g. a delayed panel close landing just after the enter RPC.
+        if (IsDialogueCutsceneActive && playerUI != null && playerUI.activeSelf)
+            ClosePlayerUI();
     }
+
+    /// <summary>
+    /// True while the local player is a participant in a dialogue cutscene. The HUD is always
+    /// hidden in this state; the dialogue exit paths clear these flags before restoring it.
+    /// </summary>
+    public static bool IsDialogueCutsceneActive =>
+        ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode;
 
     // ── Back button / HUD avoidance ──────────────────────────────────────────
     // The Back button and the Geiger counter share the bottom-left corner. While both are
@@ -257,7 +270,7 @@ public class UIController : MonoBehaviour
     public void CloseLevelSelectUI()
     {
         levelSelectUI.SetActive(false);
-        playerUI.SetActive(true);
+        ShowPlayerUI();
     }
     
     private ToolsLocker _activeToolsLocker;
@@ -283,7 +296,7 @@ public class UIController : MonoBehaviour
     public void CloseToolShopUI()
     {
         toolShopUI.SetActive(false);
-        playerUI.SetActive(true);
+        ShowPlayerUI();
         PlayerInstance.Instance.SetCanInteract(true);
         PlayerInstance.Instance.GetComponent<PlayerMovementController>().SetCanControl(true);
 
@@ -312,7 +325,9 @@ public class UIController : MonoBehaviour
     public void CloseHQOrderScreen()
     {
         hqOrderScreenUI.SetActive(false);
-        playerUI.SetActive(true);
+        // Routed through ShowPlayerUI so a put-down that lands after a dialogue cutscene has
+        // started (e.g. a megaphone sequence) can't pop the HUD back up mid-sequence.
+        ShowPlayerUI();
         HideCursor();
         PlayerInstance.Instance.ClosedUIPanel();
     }
@@ -398,7 +413,7 @@ public class UIController : MonoBehaviour
         // (e.g. during the Alexei cutscene) well before movement is actually restored.
         // The scripted/dialogue exit paths always clear these flags before calling ShowPlayerUI(),
         // so this never blocks the legitimate restore.
-        if (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode)
+        if (IsDialogueCutsceneActive)
             return;
 
         // Guard: never reveal the HUD while any diegetic view (bunker door wheel, tool locker,
@@ -928,7 +943,7 @@ public class UIController : MonoBehaviour
         }
         else
         {
-            playerUI.SetActive(playerUIWasActiveBeforePaused);
+            playerUI.SetActive(playerUIWasActiveBeforePaused && !IsDialogueCutsceneActive);
         }
 
         pauseMenuOpened = false;

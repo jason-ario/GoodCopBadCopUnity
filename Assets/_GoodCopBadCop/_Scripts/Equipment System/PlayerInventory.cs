@@ -204,6 +204,10 @@ public class PlayerInventory : NetworkBehaviour
     {
         if (!IsOwner) return;
 
+        // Runs before every input gate (cutscenes, end-of-shift report, pause) so the hotbar can
+        // never stay desynced from the real hand while control is locked.
+        ReconcileSlotState();
+
         // A locked hotbar (unslotted item in hand) still receives legacy hotkey and wheel input.
         // Ignore it so an unseen 1/2 or wheel press cannot stow/swap an item and leave the hotbar
         // in an unexpected state when normal gameplay resumes.
@@ -539,6 +543,115 @@ public class PlayerInventory : NetworkBehaviour
 
         _unslottedHeld = null;
         SetActiveSlot(-1);
+    }
+
+    // ── Self-healing ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Owner-only, every frame. The hotbar only learns about hand changes through
+    /// <see cref="PlayerPickupController.OnHeldObjectChanged"/> and its own stow calls, so any
+    /// system that removes, hides or releases an item through another path (despawn, forced
+    /// release, scripted transition) used to leave a slot claiming "in hand" while the hand was
+    /// empty. Pressing that slot's key then tried to STOW an empty hand and did nothing, so the
+    /// item looked lost while its icon stayed in the HUD. This re-derives a consistent state:
+    /// <list type="bullet">
+    /// <item>destroyed/despawned item → slot cleared;</item>
+    /// <item>stowed item that reappeared in the world (force-released) → slot cleared;</item>
+    /// <item>"in hand" item that isn't actually held → hidden: treated as stowed (or put straight
+    /// back in an empty hand); still registered to us in the world: back to an empty hand or
+    /// dropped; claimed by someone else: slot cleared.</item>
+    /// </list>
+    /// </summary>
+    private void ReconcileSlotState()
+    {
+        if (_pickup == null) return;
+
+        PickableObject held = _pickup.HeldObject;
+
+        for (int i = 0; i < _slots.Length; i++)
+        {
+            PickableObject item = _slots[i];
+            if (ReferenceEquals(item, null)) continue;
+
+            if (item == null || !item.IsSpawned)
+            {
+                Debug.LogWarning($"[PlayerInventory] Slot {i + 1} item was despawned/destroyed while in the inventory — clearing slot.");
+                ForgetSlot(i);
+                continue;
+            }
+
+            if (_stowed[i])
+            {
+                // Stowing deactivates the item synchronously on the owner, so an active "stowed"
+                // item means another system released it back into the world.
+                if (item.gameObject.activeSelf)
+                {
+                    Debug.LogWarning($"[PlayerInventory] Stowed '{item.name}' (slot {i + 1}) was released to the world externally — clearing slot.");
+                    ForgetSlot(i);
+                }
+                continue;
+            }
+
+            if (held == item) continue;
+
+            bool hiddenOnBody   = !item.gameObject.activeSelf;
+            bool heldByAnother  = item.HolderClientId != ulong.MaxValue && item.HolderClientId != OwnerClientId;
+
+            Debug.LogWarning($"[PlayerInventory] Slot {i + 1} '{item.name}' was marked in-hand but the hand holds " +
+                             $"'{(held != null ? held.name : "nothing")}' (itemActive={!hiddenOnBody}, holder={item.HolderClientId}). Repairing hotbar state.");
+
+            if (heldByAnother)
+            {
+                ForgetSlot(i);
+                continue;
+            }
+
+            if (hiddenOnBody)
+            {
+                // Recoverable: make it a proper stowed item, and if the hand is free put it back.
+                _stowed[i] = true;
+                if (_activeSlot == i) SetActiveSlot(-1);
+                if (held == null && _unslottedHeld == null)
+                {
+                    _pickup.UnstowItemToHand(item);   // HandleHeldObjectChanged re-marks it active
+                    held = _pickup.HeldObject;
+                }
+                continue;
+            }
+
+            if (held == null && _unslottedHeld == null && item.HolderClientId == OwnerClientId)
+            {
+                _stowed[i] = true;
+                if (_activeSlot == i) SetActiveSlot(-1);
+                _pickup.UnstowItemToHand(item);
+                held = _pickup.HeldObject;
+                continue;
+            }
+
+            if (item.HolderClientId == OwnerClientId)
+            {
+                // Still registered to us but the hand is busy — release it where it is.
+                item.RemoveParent();
+                item.ReleaseHolderServerRpc();
+                item.DropServerRpc(item.transform.position, item.transform.rotation);
+                item.OnDropped();
+            }
+
+            ForgetSlot(i);
+        }
+
+        // An unslotted item that is no longer in hand must not keep the hotbar locked.
+        if (!ReferenceEquals(_unslottedHeld, null) && (_unslottedHeld == null || _pickup.HeldObject != _unslottedHeld))
+            _unslottedHeld = null;
+
+        if (_activeSlot >= 0 && (_slots[_activeSlot] == null || _stowed[_activeSlot] || _pickup.HeldObject != _slots[_activeSlot]))
+            SetActiveSlot(-1);
+    }
+
+    private void ForgetSlot(int index)
+    {
+        ClearSlot(index);
+        if (_activeSlot == index) SetActiveSlot(-1);
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────

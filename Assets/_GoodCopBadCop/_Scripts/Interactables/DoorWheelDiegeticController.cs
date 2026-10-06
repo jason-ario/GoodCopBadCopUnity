@@ -94,6 +94,12 @@ public class DoorWheelDiegeticController : DiegeticViewController
     /// <summary>Monotonically increasing sum of all CCW rotation this session. Used for unlock detection.</summary>
     private float _totalCCWDegrees;
 
+    /// <summary>
+    /// The door's interactable. Its Children-group HighlightEffect covers this wheel's renderers, so any
+    /// persistent hold glow on the door is suppressed while this view is open (see <see cref="OnOpened"/>).
+    /// </summary>
+    private BunkerDoorInteractable _doorInteractable;
+
     // ─── DiegeticViewController overrides ────────────────────────────────────
 
     /// <summary>Suppress the camera pan while the player is actively dragging the wheel,
@@ -124,6 +130,10 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
         if (_wheelHighlight == null)
             _wheelHighlight = GetComponent<HighlightEffect>();
+
+        _doorInteractable = _bunkerDoor != null
+            ? _bunkerDoor.GetComponent<BunkerDoorInteractable>()
+            : GetComponentInParent<BunkerDoorInteractable>();
     }
 
     protected override void OnOpened()
@@ -135,12 +145,20 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
         if (_wheelCollider != null)
             _wheelCollider.enabled = true;
+
+        // The door's persistent glow (e.g. Day 1 tutorial arrow) would otherwise mask the wheel hover outline.
+        if (_doorInteractable != null)
+            _doorInteractable.SetWheelViewOpen(true);
     }
 
     protected override void OnClosed()
     {
         SetDragging(false);
         SetWheelHighlighted(false);
+
+        if (_doorInteractable != null)
+            _doorInteractable.SetWheelViewOpen(false);
+
         _occupancy?.Release();
         _closing = false;
         StopAllCoroutines();
