@@ -90,6 +90,9 @@ public class TutorialObjectiveItem : MonoBehaviour
         if (checkboxUnchecked != null) checkboxUnchecked.SetActive(false);
         if (checkboxChecked != null) checkboxChecked.SetActive(true);
 
+        // Saved-day resume: rows torn down by state sync aren't player completions (see ShiftManager).
+        if (TaskSuccessCue.IsCompletionSuppressed) return;
+
         // Routed through TaskSuccessCue so a cleanup item cue for the task-finishing item yields to it.
         TaskSuccessCue.PlayCompletion(completeSound, completeSoundVolume);
     }

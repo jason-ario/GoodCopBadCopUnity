@@ -33,16 +33,37 @@ public static class TaskSuccessCue
     public const float CompletionSettleDelay = 0.25f;
 
     private static float _lastCueTime = float.NegativeInfinity;
+    private static float _completionSuppressedUntil = float.NegativeInfinity;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStatics() => _lastCueTime = float.NegativeInfinity;
+    private static void ResetStatics()
+    {
+        _lastCueTime = float.NegativeInfinity;
+        _completionSuppressedUntil = float.NegativeInfinity;
+    }
 
     private static bool PlayedWithin(float window) => Time.unscaledTime - _lastCueTime < window;
+
+    /// <summary>
+    /// True while objective completions are state-sync artifacts rather than player achievements
+    /// (see <see cref="SuppressCompletionCuesFor"/>).
+    /// </summary>
+    public static bool IsCompletionSuppressed => Time.unscaledTime < _completionSuppressedUntil;
+
+    /// <summary>
+    /// Silences <see cref="PlayCompletion"/> for the next <paramref name="seconds"/> (unscaled),
+    /// replacing any previous window. Used by <see cref="ShiftManager"/> while a saved day is being
+    /// resumed: rows are added and removed by several systems (timecard reset/restore, HUDTaskList
+    /// registry sync, task restores) before the player has control, and none of those removals is
+    /// a real completion. Time-bounded so an interrupted resume can never mute the chime for good.
+    /// </summary>
+    public static void SuppressCompletionCuesFor(float seconds) =>
+        _completionSuppressedUntil = Time.unscaledTime + Mathf.Max(0f, seconds);
 
     /// <summary>Plays <paramref name="clip"/> unless another task cue played within <see cref="DedupeWindow"/>.</summary>
     public static bool TryPlay(AudioClip clip, float volume)
     {
-        if (clip == null || PlayedWithin(DedupeWindow)) return false;
+        if (clip == null || IsCompletionSuppressed || PlayedWithin(DedupeWindow)) return false;
 
         _lastCueTime = Time.unscaledTime;
         SFXController.Instance?.Play(clip, volume);
@@ -52,7 +73,7 @@ public static class TaskSuccessCue
     /// <summary>Always plays the completion chime and records it so a trailing item cue yields to it.</summary>
     public static void PlayCompletion(AudioClip clip, float volume)
     {
-        if (clip == null) return;
+        if (clip == null || IsCompletionSuppressed) return;
 
         _lastCueTime = Time.unscaledTime;
         SFXController.Instance?.Play(clip, volume);
@@ -66,7 +87,7 @@ public static class TaskSuccessCue
     /// <param name="completesTask">True when this item finished the whole task; see class remarks.</param>
     public static void PlayCleanupItemCue(MonoBehaviour host, AudioClip clip, float volume, bool completesTask)
     {
-        if (clip == null) return;
+        if (clip == null || IsCompletionSuppressed) return;
 
         if (!completesTask || host == null || !host.isActiveAndEnabled)
         {
@@ -83,7 +104,7 @@ public static class TaskSuccessCue
 
         // A completion chime (or any other cue) around the moment this item finished the task
         // already announced it — don't stack a second sound on top.
-        if (PlayedWithin(CompletionSettleDelay + DedupeWindow)) yield break;
+        if (IsCompletionSuppressed || PlayedWithin(CompletionSettleDelay + DedupeWindow)) yield break;
 
         _lastCueTime = Time.unscaledTime;
         SFXController.Instance?.Play(clip, volume);

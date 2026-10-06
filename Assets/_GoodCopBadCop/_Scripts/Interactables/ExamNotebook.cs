@@ -205,6 +205,9 @@ public class ExamNotebook : PickableObject
         OverrideInteractableColliders(notebookOnly);
     }
 
+    /// <summary>True only while <see cref="RestoreMutableSaveData"/> writes saved page bitmasks (server).</summary>
+    private bool _isRestoringSaveState;
+
     protected override void CaptureMutableSaveData(PickableObjectSaveData data)
     {
         data.IntegerState = new[]
@@ -226,12 +229,22 @@ public class ExamNotebook : PickableObject
     {
         if (data.IntegerState != null && data.IntegerState.Length >= 6)
         {
-            _currentPage.Value = Mathf.Clamp(data.IntegerState[0], 0, 4);
-            _pageBitmask0.Value = data.IntegerState[1];
-            _pageBitmask1.Value = data.IntegerState[2];
-            _pageBitmask2.Value = data.IntegerState[3];
-            _pageBitmask3.Value = data.IntegerState[4];
-            _pageBitmask4.Value = data.IntegerState[5];
+            // Restored ticks aren't player actions — OnValueChanged fires synchronously on the
+            // host for each write below, so mute the pen sound for exactly this block.
+            _isRestoringSaveState = true;
+            try
+            {
+                _currentPage.Value = Mathf.Clamp(data.IntegerState[0], 0, 4);
+                _pageBitmask0.Value = data.IntegerState[1];
+                _pageBitmask1.Value = data.IntegerState[2];
+                _pageBitmask2.Value = data.IntegerState[3];
+                _pageBitmask3.Value = data.IntegerState[4];
+                _pageBitmask4.Value = data.IntegerState[5];
+            }
+            finally
+            {
+                _isRestoringSaveState = false;
+            }
         }
 
         _pendingRippedPages = data.BooleanState ?? System.Array.Empty<bool>();
@@ -558,11 +571,15 @@ public class ExamNotebook : PickableObject
             pages[p].BuildChecklistFromCategory(categoryName);
             pages[p].InitializeChecklistIndices();
 
-            pages[capturedPage].ApplyBitmask(_pageBitmasks[capturedPage].Value, captureSnapshot: false);
+            // Seeding inherited state (late join / spawn) — show the ticks, don't play the pen sound.
+            pages[capturedPage].ApplyBitmask(_pageBitmasks[capturedPage].Value, captureSnapshot: false, playSound: false);
 
             _pageBitmasks[p].OnValueChanged += (_, newValue) =>
             {
-                pages[capturedPage].ApplyBitmask(newValue);
+                // Silent for save-restore writes: the host flag covers the synchronous callback,
+                // and the saved-day resume window covers remote clients receiving it later.
+                bool playSound = !_isRestoringSaveState && !TaskSuccessCue.IsCompletionSuppressed;
+                pages[capturedPage].ApplyBitmask(newValue, playSound: playSound);
                 // Fire after ApplyBitmask so IsChecked reflects the new state.
                 // Setting AnyBoxChecked here fires on all clients via this NetworkVariable callback
                 // so server-side tutorial gates work regardless of who clicked the checkbox.

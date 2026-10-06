@@ -391,6 +391,21 @@ public class GameManager : NetworkBehaviour
         PlayerSpawner.Instance.SpawnPlayerAtLobby(clientId, isSinglePlayer);
     }
 
+    /// <summary>
+    /// Spawns a single late-joining player at the inside-bunker spawn point (Day 2+ sessions).
+    /// Refreshes the replicated single-player flag first so the joiner gets a multiplayer
+    /// bunker point instead of the host's single-player one.
+    /// SERVER ONLY.
+    /// </summary>
+    public void SpawnPlayerInBunkerServer(ulong clientId)
+    {
+        if (!IsServer) return;
+
+        _networkIsSinglePlayer.Value = DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) == 1;
+
+        PlayerSpawner.Instance.SpawnPlayerAtInsideBunker(clientId);
+    }
+
     private void SpawnAllPlayersAtLobby()
     {
         bool isSinglePlayer = DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) == 1;

@@ -843,7 +843,11 @@ public class ExamPage : FolderItem
     /// sequenced capture pass right after this seeding step — so the seed step itself only needs
     /// to apply the checkbox states, not open any cameras.
     /// </param>
-    public void ApplyBitmask(int bitmask, bool captureSnapshot = true)
+    /// <param name="playSound">
+    /// False when the bitmask is restored/seeded rather than ticked by a player — newly checked
+    /// boxes still animate in, but without the pen "draw" sound.
+    /// </param>
+    public void ApplyBitmask(int bitmask, bool captureSnapshot = true, bool playSound = true)
     {
         for (int i = 0; i < _checklistItems.Length; i++)
         {
@@ -854,7 +858,7 @@ public class ExamPage : FolderItem
             }
 
             bool isChecked = (bitmask & (1 << i)) != 0;
-            _checklistItems[i].ApplyCheckedState(isChecked);
+            _checklistItems[i].ApplyCheckedState(isChecked, playSound);
 
             if (_visualItems != null && i < _visualItems.Length && _visualItems[i] != null)
                 _visualItems[i].SetChecked(isChecked);

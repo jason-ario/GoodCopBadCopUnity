@@ -777,7 +777,19 @@ public class LobbyManager : MonoBehaviour
 
         Debug.Log($"[Host] HasGameStarted={GameManager.Instance.HasGameStarted} IsTransitioningToLobby={GameManager.Instance.IsTransitioningToLobby}");
 
-        if (GameManager.Instance.HasGameStarted && GameManager.Instance.HasIntroCutsceneStarted)
+        bool isLaterDay = CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay > 1;
+
+        if (GameManager.Instance.HasGameStarted && isLaterDay)
+        {
+            // Day 2+ late joiners always wake up inside the bunker, regardless of where the host
+            // is. This must be checked before the intro-cutscene branches: HasIntroCutsceneStarted
+            // is only set by the Day 1 intro, so on a resumed/retried Day 2+ session it stays
+            // false and the joiner would otherwise fall into the lobby-joiner path below.
+            Debug.Log($"[Host] Game started on Day {CampaignManager.Instance.CurrentDay} — spawning late joiner inside bunker for clientId={clientId}");
+            GameManager.Instance.SpawnPlayerInBunkerServer(clientId);
+            GameManager.Instance.InitializeLateJoinClient(clientId);
+        }
+        else if (GameManager.Instance.HasGameStarted && GameManager.Instance.HasIntroCutsceneStarted)
         {
             // Spawn relative to where the host currently is.
             // Read IsOutside from the host's networked PlayerObject directly rather than
@@ -813,17 +825,8 @@ public class LobbyManager : MonoBehaviour
             }
             else
             {
-                bool isLaterDay = CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay > 1;
-                if (isLaterDay)
-                {
-                    Debug.Log($"[Host] Game started on Day {CampaignManager.Instance.CurrentDay} — spawning late joiner inside bunker for clientId={clientId}");
-                    PlayerSpawner.Instance.SpawnPlayerAtInsideBunker(clientId);
-                }
-                else
-                {
-                    Debug.Log($"[Host] Game started, host is at booth — spawning client at booth for clientId={clientId}");
-                    PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
-                }
+                Debug.Log($"[Host] Game started, host is at booth — spawning client at booth for clientId={clientId}");
+                PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
             }
             GameManager.Instance.InitializeLateJoinClient(clientId);
         }

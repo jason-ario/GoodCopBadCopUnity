@@ -179,12 +179,12 @@ public class ChecklistItem : MonoBehaviour
     /// already-checked item on the page too, replaying its draw animation, draw sound, and arm-IK
     /// trigger, and restarting its WaitAndShowCheckmark coroutine, for no reason.
     /// </summary>
-    public void ApplyCheckedState(bool value)
+    public void ApplyCheckedState(bool value, bool playSound = true)
     {
         if (checkbox.IsChecked == value) return;
 
         if (value)
-            checkbox.CheckVisual();
+            checkbox.CheckVisual(playSound);
         else
             checkbox.Uncheck();
     }

@@ -33,18 +33,23 @@ public class Checkbox : MonoBehaviour, IClickable
     /// Shows the checkmark sprite. Called on all clients via ExamNotebook's NetworkVariable callback.
     /// Does NOT trigger the IK arm animation — that is local-only and fires in OnClick instead.
     /// </summary>
-    public void CheckVisual()
+    /// <param name="playSound">
+    /// False for state that is being restored/synced rather than ticked by a player (save resume,
+    /// spawn seeding), so loading a notebook with checked boxes doesn't play the pen sound.
+    /// </param>
+    public void CheckVisual(bool playSound = true)
     {
         IsChecked = true;
         ikAnimationTarget.SetTrigger("Check");
-        StartCoroutine(WaitAndShowCheckmark());
+        StartCoroutine(WaitAndShowCheckmark(playSound));
     }
 
-    private IEnumerator WaitAndShowCheckmark()
+    private IEnumerator WaitAndShowCheckmark(bool playSound)
     {
         yield return new WaitForSeconds(.15f);
         checkmark.SetActive(true);
-        SFXController.Instance.Play(drawSound, drawVolume);
+        if (playSound)
+            SFXController.Instance.Play(drawSound, drawVolume);
     }
 
     /// <summary>Hides the checkmark sprite and clears the checked state.</summary>

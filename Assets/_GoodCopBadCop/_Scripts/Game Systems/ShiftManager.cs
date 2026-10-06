@@ -2037,6 +2037,12 @@ public class ShiftManager : NetworkBehaviour
 
     private IEnumerator ResumeSavedDaySequence()
     {
+        // Objective rows are added and torn down by several systems while the day bootstraps
+        // (timecard reset/restore, HUDTaskList registry sync, task restores). None of those
+        // removals is a player completion, so mute the completion chime until things settle.
+        // Upper bound only — EndResumeCueSuppressionWhenSettled shortens it once restore is done.
+        TaskSuccessCue.SuppressCompletionCuesFor(ResumeCueSuppressionMaxSeconds);
+
         MainMenuController.Instance.TransitionToGameplay();
         MainMenuController.Instance.FadeOutCutsceneMusic();
         MainMenuController.Instance.StopMainMenuMusic();
@@ -2128,7 +2134,31 @@ public class ShiftManager : NetworkBehaviour
         // now instead of relying on OnEnable's one-shot Rebuild catching them.
         FindObjectOfType<HUDTaskList>(true)?.ForceRebuild();
 
+        StartCoroutine(EndResumeCueSuppressionWhenSettled());
+
         Debug.Log($"[ShiftManager] ResumeSavedDay — resumed on Day {_currentDay} inside the bunker.");
+    }
+
+    /// <summary>Hard cap on the resume chime mute, in case the resume sequence is interrupted.</summary>
+    private const float ResumeCueSuppressionMaxSeconds = 20f;
+
+    /// <summary>
+    /// Extra unscaled time the chime stays muted after the host restore finishes, covering
+    /// restored NetworkVariables (e.g. the timecard's clock-in flag) replicating to clients.
+    /// </summary>
+    private const float ResumeCueSuppressionGraceSeconds = 0.75f;
+
+    /// <summary>
+    /// Waits for the host-side workday restore (<see cref="RestoreWorkdaySaveState"/>) to finish,
+    /// then lifts the completion-chime mute after a short replication grace period.
+    /// </summary>
+    private IEnumerator EndResumeCueSuppressionWhenSettled()
+    {
+        yield return new WaitWhile(() =>
+            IsRestoringWorkdayState ||
+            (CampaignManager.Instance != null && CampaignManager.Instance.HasPendingWorkdayRestore));
+
+        TaskSuccessCue.SuppressCompletionCuesFor(ResumeCueSuppressionGraceSeconds);
     }
 
     /// <summary>
