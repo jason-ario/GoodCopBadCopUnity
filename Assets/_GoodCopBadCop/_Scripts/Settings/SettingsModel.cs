@@ -140,7 +140,7 @@ namespace GoodCopBadCop.Settings
             new("settings.voiceChat.microphoneName", string.Empty);
 
         public readonly PersistentReactiveProperty<EQualityPreset> QualityPresetMutable =
-            new("settings.graphics.qualityPreset", EQualityPreset.High);
+            new("settings.graphics.qualityPreset", EQualityPreset.Ultra);
 
         public readonly PersistentReactiveProperty<float> BrightnessMutable =
             // v2: brightness became a final-image gamma (50 = neutral); old key stored post-exposure values.

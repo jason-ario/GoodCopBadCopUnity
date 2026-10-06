@@ -128,7 +128,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("Resolution", "resolution", "1920 x 1080", "1600 x 900", "1280 x 720"),
             new Setting("VSync", "vsync", "Off", "On"),
             new Setting("FPS Limit", "fps_limit", "Unlimited", "30", "60", "120", "144"),
-            new Setting("Quality Preset", "quality", "Low", "Medium", "High", "Ultra"),
+            new Setting("Quality Preset", "quality", "Low", "Medium", "High", "Ultra").WithDefaultIndex(3),
             new Setting("Brightness", "brightness", 50f),
             new Setting("Film Grain", "film_grain", "Off", "On")
         };

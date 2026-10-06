@@ -175,7 +175,20 @@ public class PC : Interactable
     private bool _serverRestoring;
 
     // ── Local, per-player state ──────────────────────────────────────────────────
-    private bool pcActive;
+    /// <summary>True while the local player is operating any PC terminal (blocks the guidebook, etc.).</summary>
+    public static bool IsLocalPlayerUsingTerminal { get; private set; }
+
+    private bool _pcActive;
+    private bool pcActive
+    {
+        get => _pcActive;
+        set
+        {
+            if (_pcActive == value) return;
+            _pcActive = value;
+            IsLocalPlayerUsingTerminal = value;
+        }
+    }
     private int _debugCurrentDayOverride = -1;
     private PlayerInteractionController _player;
     private Coroutine _idleFadeCoroutine;
@@ -186,12 +199,14 @@ public class PC : Interactable
     {
         CloseAllScreens();
         SetScreenRenderCameraActive(false);
+        SetComputerCameraActive(false);
         if (fileListView != null)
             fileListView.SearchQueryChanged += HandleSearchQueryChanged;
     }
 
     public override void OnDestroy()
     {
+        pcActive = false;
         if (fileListView != null)
             fileListView.SearchQueryChanged -= HandleSearchQueryChanged;
         base.OnDestroy();
@@ -232,6 +247,7 @@ public class PC : Interactable
         }
         if (computerCamera != null)
             player.playerMovementController.MoveCameraTo(computerCamera.transform);
+        SetComputerCameraActive(true);
 
         pcActive = true;
         _player = player;
@@ -989,6 +1005,7 @@ public class PC : Interactable
     private void ExitPC()
     {
         pcActive = false;
+        SetComputerCameraActive(false);
         if (UIController.Instance != null) UIController.Instance.HideBackButton();
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
@@ -1055,6 +1072,16 @@ public class PC : Interactable
     {
         if (screenRenderCamera != null)
             screenRenderCamera.SetActive(active);
+    }
+
+    /// <summary>
+    /// Toggles the local-only CinemachineCamera that frames the monitor. Only the interacting
+    /// client calls this (from Interact/ExitPC), so other players' views are unaffected.
+    /// </summary>
+    private void SetComputerCameraActive(bool active)
+    {
+        if (computerCamera != null && computerCamera.activeSelf != active)
+            computerCamera.SetActive(active);
     }
 
     private int GetCurrentDay()

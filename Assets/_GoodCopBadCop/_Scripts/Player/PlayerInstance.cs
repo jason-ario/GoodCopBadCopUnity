@@ -104,6 +104,13 @@ public class PlayerInstance : NetworkBehaviour
     /// </summary>
     public void SetPlayerLightActive(bool active) => playerLight?.SetActive(active);
 
+    /// <summary>
+    /// Restores the player light to its location-driven state (on outside, off inside the booth),
+    /// matching <see cref="SetIsOutside"/>. Use this when ending a view/cutscene that temporarily
+    /// changed the light — never force it on, or it will light up the booth (and nearby documents).
+    /// </summary>
+    public void RestorePlayerLightForLocation() => SetPlayerLightActive(_isOutsideLocal);
+
     private void Awake()
     {
         _playerMovementController = GetComponent<PlayerMovementController>();

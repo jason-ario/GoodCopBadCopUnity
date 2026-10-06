@@ -771,6 +771,29 @@ public class ExamNotebook : PickableObject
         ExitDrawMode(restorePlayerControl: !IsDialogueCutsceneActive());
     }
 
+    /// <summary>
+    /// The guidebook takes over the hands: leave draw mode (it locks control itself and then owns
+    /// the Back button) and hide the spawned pages, which are separate objects and would otherwise
+    /// keep floating in front of the camera next to the book.
+    /// </summary>
+    public override void OnHiddenForGuidebook()
+    {
+        base.OnHiddenForGuidebook();
+        ExitDrawMode(restorePlayerControl: false);
+
+        // Deactivation kills TurnRightArmRigOff mid-way; don't leave the check latch stuck.
+        IsChecking = false;
+
+        SetPagesActive(false);
+    }
+
+    public override void OnShownAfterGuidebook()
+    {
+        base.OnShownAfterGuidebook();
+        SetPagesActive(true);
+        SnapshotAllPages();
+    }
+
     private void SubscribeToCutsceneState()
     {
         PlayerInstance player = PlayerInstance.Instance;

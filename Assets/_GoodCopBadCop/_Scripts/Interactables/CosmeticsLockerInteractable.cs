@@ -167,7 +167,7 @@ public class CosmeticsLockerInteractable : Interactable
             _interactingPlayer.playerMovementController?.SetCanControl(true);
 
             // Restore the player's point light now that the cosmetics view is closed.
-            _interactingPlayer.GetComponent<PlayerInstance>()?.SetPlayerLightActive(true);
+            _interactingPlayer.GetComponent<PlayerInstance>()?.RestorePlayerLightForLocation();
 
             _interactingPlayer = null;
         }

@@ -208,7 +208,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
 
         ShowPlayerBody();
-        player.SetPlayerLightActive(true);
+        player.RestorePlayerLightForLocation();
 
         if (SuspectController.Instance != null)
             SuspectController.Instance.SetSuspectCamActive(false);
@@ -402,13 +402,13 @@ public class DialogueChoiceSystem : NetworkBehaviour
         player.GetComponent<PlayerInteractionController>()?.SetSuspectCamMode(false);
 
         ShowPlayerBody();
-        player.SetPlayerLightActive(true);
+        player.RestorePlayerLightForLocation();
 
         // This must be last: restoring the player and its UI can update cursor state as part
         // of their own teardown. Outside-world dialogue always returns to locked mouse look.
         UIController.Instance.HideCursor();
 
-        Debug.Log("[DialogueChoiceSystem] ExitScriptedDialogueModeOutside — movement restored, interaction enabled, light on.");
+        Debug.Log("[DialogueChoiceSystem] ExitScriptedDialogueModeOutside — movement restored, interaction enabled, light restored for location.");
     }
 
     /// <summary>

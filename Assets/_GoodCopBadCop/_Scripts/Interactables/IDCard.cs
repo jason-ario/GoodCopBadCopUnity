@@ -20,6 +20,11 @@ public class IDCard : FolderItem
    [SerializeField] private Texture fakeCardTexture;
    [SerializeField] private Sprite defaultSealSprite;
    [SerializeField] private Sprite fakeSealSprite;
+   [Tooltip("Base color multiplier used while the fake card texture is shown. The fake texture is much paler than the aged one, so this darkens/warms it to match the real ID's brightness.")]
+   [SerializeField] private Color fakeCardTint = new Color(0.76f, 0.72f, 0.68f, 1f);
+
+   private Color defaultCardColor = Color.white;
+   private bool hasDefaultCardColor;
 
    private readonly NetworkVariable<FixedString512Bytes> syncedFullName = new(new FixedString512Bytes(string.Empty));
    private readonly NetworkVariable<FixedString512Bytes> syncedBirthDate = new(new FixedString512Bytes(string.Empty));
@@ -32,6 +37,8 @@ public class IDCard : FolderItem
 
    private const string BaseMapProperty = "_BaseMap";
    private const string MainTexProperty = "_MainTex";
+   private const string BaseColorProperty = "_BaseColor";
+   private const string ColorProperty = "_Color";
 
    public override void OnNetworkSpawn()
    {
@@ -233,6 +240,12 @@ public class IDCard : FolderItem
       if (surfaceRenderer != null && defaultCardTexture == null)
          defaultCardTexture = GetMaterialTexture(surfaceRenderer.material);
 
+      if (surfaceRenderer != null && !hasDefaultCardColor)
+      {
+         defaultCardColor = GetMaterialColor(surfaceRenderer.material);
+         hasDefaultCardColor = true;
+      }
+
       SpriteRenderer renderer = GetSealRenderer();
       if (renderer != null && defaultSealSprite == null)
          defaultSealSprite = renderer.sprite;
@@ -244,7 +257,12 @@ public class IDCard : FolderItem
 
       MeshRenderer surfaceRenderer = GetCardSurfaceRenderer();
       if (surfaceRenderer != null)
-         SetMaterialTexture(surfaceRenderer.material, isFakeId && fakeCardTexture != null ? fakeCardTexture : defaultCardTexture);
+      {
+         bool useFakeTexture = isFakeId && fakeCardTexture != null;
+         Material surfaceMaterial = surfaceRenderer.material;
+         SetMaterialTexture(surfaceMaterial, useFakeTexture ? fakeCardTexture : defaultCardTexture);
+         SetMaterialColor(surfaceMaterial, useFakeTexture ? fakeCardTint : defaultCardColor);
+      }
 
       SpriteRenderer renderer = GetSealRenderer();
       if (renderer != null)
@@ -322,6 +340,32 @@ public class IDCard : FolderItem
 
       if (!assigned)
          material.mainTexture = texture;
+   }
+
+   private static Color GetMaterialColor(Material material)
+   {
+      if (material == null)
+         return Color.white;
+
+      if (material.HasProperty(BaseColorProperty))
+         return material.GetColor(BaseColorProperty);
+
+      if (material.HasProperty(ColorProperty))
+         return material.GetColor(ColorProperty);
+
+      return Color.white;
+   }
+
+   private static void SetMaterialColor(Material material, Color color)
+   {
+      if (material == null)
+         return;
+
+      if (material.HasProperty(BaseColorProperty))
+         material.SetColor(BaseColorProperty, color);
+
+      if (material.HasProperty(ColorProperty))
+         material.SetColor(ColorProperty, color);
    }
 
    private static FixedString512Bytes ToFixedString(string value)

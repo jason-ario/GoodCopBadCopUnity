@@ -211,8 +211,14 @@ public class MailCubbySlot : MonoBehaviour
         // under us. The eventual server confirmation
         // (MarkDelivered -> LockInteractableNetworked -> _networkInteractableOverride) is still
         // authoritative and applies the same lock networked, for every other client.
-        bool isCorrectResident = _assignedResident != null && _assignedResident == package.AssignedResident;
-        if (isCorrectResident)
+        // Must mirror SortMailTask.EvaluateSort exactly: contraband/quarantine packages still carry
+        // a real addressee, so a resident match alone is NOT a correct delivery. Locking on the
+        // resident match only left a wrongly-cubbied contraband package permanently locked on this
+        // peer after the server rejected it.
+        bool isCorrectDelivery = package.CorrectBin == MailSortBinType.Delivery &&
+                                 _assignedResident != null &&
+                                 _assignedResident == package.AssignedResident;
+        if (isCorrectDelivery)
             package.LockAsSorted();
 
         if (_placementSlot != null)

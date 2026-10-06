@@ -1694,6 +1694,18 @@ public class PickableObject : Interactable
     /// </summary>
     public virtual void OnStowed() { }
 
+    /// <summary>
+    /// Called on the local holder just before the guidebook opens and hides this held item
+    /// (local <c>SetActive(false)</c>, no drop/stow). Override to leave any use / inspect mode and
+    /// hide extra visuals that are not children of this object.
+    /// </summary>
+    public virtual void OnHiddenForGuidebook() { }
+
+    /// <summary>
+    /// Called on the local holder right after the guidebook closes and re-activates this held item.
+    /// </summary>
+    public virtual void OnShownAfterGuidebook() { }
+
     public virtual void OnStartUse()
     {
         isUsing = true;

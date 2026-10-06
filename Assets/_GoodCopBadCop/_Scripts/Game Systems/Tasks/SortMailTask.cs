@@ -901,6 +901,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         {
             Vector3 away = package.transform.position - (_crateSpawnPoint != null ? _crateSpawnPoint.position : package.transform.position);
             if (away.sqrMagnitude < 0.01f) away = UnityEngine.Random.insideUnitSphere;
+            package.ClearOptimisticSortLock();
             package.RejectFromBin(away);
 
             string slotResidentName = slotResident != null ? $"{slotResident.FirstName} {slotResident.LastName}".Trim() : "(none)";

@@ -222,6 +222,14 @@ public class GuidebookController : MonoBehaviour
         if (IsOpen) SyncPage();
     }
 
+    /// <summary>
+    /// True while the local player is using the PC terminal or a diegetic view (tool locker,
+    /// panels, etc.). Held-item zoom is excluded on purpose: Tab leaves the zoom and opens the book.
+    /// </summary>
+    private static bool IsBlockedByView =>
+        PC.IsLocalPlayerUsingTerminal ||
+        (DiegeticViewController.IsAnyViewActive && !(DiegeticViewController.Current is HeldItemZoomView));
+
     /// <summary>Publishes the first-person book's target page so observers flip the body copy to match.</summary>
     private void SyncPage()
     {
@@ -238,7 +246,7 @@ public class GuidebookController : MonoBehaviour
     /// </summary>
     public void OpenGuidebook()
     {
-        if (IsOpen || !IsLocalPlayersController || !IsFirstPersonRigVisible) return;
+        if (IsOpen || !IsLocalPlayersController || !IsFirstPersonRigVisible || IsBlockedByView) return;
         IsOpen = true;
         Local = this;
 
@@ -248,10 +256,18 @@ public class GuidebookController : MonoBehaviour
 
         OnGuidebookOpened?.Invoke();
 
-        // Deactivate held object without dropping or despawning it.
+        // Leave held-item zoom first. Otherwise it notices the hidden item next frame and closes
+        // itself, re-enabling control and the HUD while the book is open.
+        if (DiegeticViewController.Current is HeldItemZoomView zoom)
+            zoom.Close();
+
+        // Deactivate held object without dropping or despawning it. The item gets a chance to
+        // leave its own use / inspect mode first (e.g. exam notebook draw mode and its pages).
         if (_pickupController.HeldObject != null)
         {
-            _deactivatedHeldObject = _pickupController.HeldObject.gameObject;
+            PickableObject held = _pickupController.HeldObject;
+            held.OnHiddenForGuidebook();
+            _deactivatedHeldObject = held.gameObject;
             _deactivatedHeldObject.SetActive(false);
         }
 
@@ -309,6 +325,9 @@ public class GuidebookController : MonoBehaviour
             _deactivatedHeldObject.SetActive(true);
 
             PickableObject pickable = _deactivatedHeldObject.GetComponent<PickableObject>();
+            if (pickable != null && _pickupController.HeldObject == pickable)
+                pickable.OnShownAfterGuidebook();
+
             if (pickable != null && pickable.ItemData.usesTwoArms)
                 _animationController.EnableHoldObjectTwoArmsMask();
             else

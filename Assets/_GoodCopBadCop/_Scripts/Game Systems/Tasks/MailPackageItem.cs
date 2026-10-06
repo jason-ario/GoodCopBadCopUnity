@@ -162,6 +162,38 @@ public class MailPackageItem : PickableObject
         LockInteractable();
     }
 
+    /// <summary>
+    /// Server-only. Called from <see cref="SortMailTask.EvaluateSort"/>'s reject branch: undoes any
+    /// optimistic <see cref="LockAsSorted"/> a peer applied for this placement, so a package the
+    /// server refused can always be picked back up. Safety net for any client/server disagreement
+    /// about correctness — without it a rejected package stayed locked forever on the placing peer.
+    /// </summary>
+    public void ClearOptimisticSortLock()
+    {
+        if (!IsServer) return;
+        ClearOptimisticSortLockLocal();
+        ClearOptimisticSortLockClientRpc();
+    }
+
+    [ClientRpc]
+    private void ClearOptimisticSortLockClientRpc()
+    {
+        if (IsServer) return;
+        ClearOptimisticSortLockLocal();
+    }
+
+    private void ClearOptimisticSortLockLocal()
+    {
+        // Only undo what LockAsSorted did — never a server-confirmed sort, a crate pin, or a
+        // MailSortBin trigger lock (which doesn't set _sortedLocally).
+        if (!_sortedLocally || _isSorted.Value || _pinnedToCrate.Value) return;
+
+        _sortedLocally = false;
+        // Re-derives the lock/collider state from the networked override and holder, so this
+        // never enables colliders on a package someone is already carrying again.
+        ApplyNetworkInteractableState();
+    }
+
     public override void Interact(PlayerInteractionController player)
     {
         if (IsSorted) return;

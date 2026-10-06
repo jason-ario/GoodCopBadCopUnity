@@ -382,12 +382,30 @@ public class PlayerInventory : NetworkBehaviour
         if (!IsOwner) return;
         if (slotIndex < 0 || slotIndex >= 2) return;
 
+        // Self-heal a stale hand lock: an empty hand can never be "holding" an unslotted item.
+        // Without this, a lock left behind by any release path that skipped the inventory
+        // refused every hotbar press until a fresh pickup happened to reset it.
+        if (IsHandLocked && _pickup.HeldObject == null)
+        {
+            Debug.LogWarning($"[PlayerInventory] Cleared stale hand lock ('{(_unslottedHeld != null ? _unslottedHeld.name : "destroyed")}') on an empty hand while equipping slot {slotIndex + 1}.");
+            _unslottedHeld = null;
+        }
+
         // An unslotted item in hand locks the hotbar — equipping anything else would require
         // stowing it, which it does not support. The player must place or drop it first.
         if (IsHandLocked) return;
 
         PickableObject target = _slots[slotIndex];
         if (target == null) return;   // empty slot — nothing to do
+
+        // Stale "in hand" flag on a slot whose item isn't actually in the (empty) hand: treat it
+        // as stowed so the press brings it back instead of trying to stow an empty hand.
+        if (_activeSlot == slotIndex && !_stowed[slotIndex] && _pickup.HeldObject == null)
+        {
+            Debug.LogWarning($"[PlayerInventory] Slot {slotIndex + 1} '{target.name}' was flagged in-hand with an empty hand — re-equipping it.");
+            _stowed[slotIndex] = true;
+            SetActiveSlot(-1);
+        }
 
         int otherIndex = slotIndex == 0 ? 1 : 0;
         bool otherOccupied = _slots[otherIndex] != null;
@@ -421,6 +439,7 @@ public class PlayerInventory : NetworkBehaviour
             {
                 _pickup.UnstowItemToHand(target);
                 // _stowed and _activeSlot updated in HandleHeldObjectChanged.
+                WarnIfUnstowFailed(slotIndex, target);
                 return;
             }
 
@@ -433,13 +452,38 @@ public class PlayerInventory : NetworkBehaviour
             }
 
             int currentSlot = _activeSlot;
+            if (currentSlot < 0 || currentSlot == slotIndex)
+            {
+                // Hand holds something the hotbar doesn't own as the active slot — stowing it
+                // would orphan it. Refuse loudly instead of indexing _stowed[-1].
+                Debug.LogWarning($"[PlayerInventory] Can't equip slot {slotIndex + 1}: hand holds '{_pickup.HeldObject.name}' which isn't the active slot item (activeSlot={_activeSlot}).");
+                return;
+            }
+
             PickableObject stowedItem = _pickup.StowCurrentItemToPoint(stowPoint);
-            if (stowedItem != null)
-                _stowed[currentSlot] = true;
+            if (stowedItem == null) return;   // couldn't free the hand — leave both items as they were
+            _stowed[currentSlot] = true;
+            SetActiveSlot(-1);
 
             _pickup.UnstowItemToHand(target);
             // _stowed[slotIndex] = false and SetActiveSlot handled in HandleHeldObjectChanged.
+            WarnIfUnstowFailed(slotIndex, target);
         }
+    }
+
+    /// <summary>
+    /// <see cref="PlayerPickupController.UnstowItemToHand"/> can bail out silently (e.g. the item
+    /// reads as held by another client). Log the state so a "slot won't equip" repro names the
+    /// cause instead of looking like a dead key.
+    /// </summary>
+    private void WarnIfUnstowFailed(int slotIndex, PickableObject target)
+    {
+        if (target == null || _pickup.HeldObject == target) return;
+
+        Debug.LogWarning($"[PlayerInventory] Slot {slotIndex + 1} '{target.name}' failed to come to hand " +
+                         $"(held='{(_pickup.HeldObject != null ? _pickup.HeldObject.name : "nothing")}', " +
+                         $"holder={target.HolderClientId}, local={NetworkManager.Singleton.LocalClientId}, " +
+                         $"active={target.gameObject.activeSelf}, stowed={_stowed[slotIndex]}).");
     }
 
     // ── Death drop ────────────────────────────────────────────────────────────
