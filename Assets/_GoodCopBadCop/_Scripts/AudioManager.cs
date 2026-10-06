@@ -10,8 +10,17 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioSource ambientAudio;
     [SerializeField] private AudioSource rainAmbience;
     [SerializeField] private float rainAmbienceFadeSeconds = 2f;
+    [Tooltip("Seconds to fade the wasteland ambient music out when a mutant breach starts (breach music replaces it).")]
+    [SerializeField] private float breachAmbientFadeOutSeconds = 1.5f;
+    [Tooltip("Seconds to fade the wasteland ambient music back in after a mutant breach is cleared.")]
+    [SerializeField] private float breachAmbientFadeInSeconds = 4f;
     private float ambientAudioOriginalVolume;
     private float rainAmbienceOriginalVolume;
+
+    // Breach music replaces the wasteland music. The fade ends in AudioSource.mute (not a held
+    // volume of 0) so IndoorAmbienceAdapter / UnderwaterAmbienceAdapter can keep owning volume.
+    private bool _ambientSilencedForBreach;
+    private float _preBreachAmbientVolume;
 
     // World-audio silence state (see SilenceWorldAudio / RestoreWorldAudio).
     private bool _worldAudioSilenced;
@@ -24,6 +33,67 @@ public class AudioManager : MonoBehaviour
         ambientAudioOriginalVolume = ambientAudio.volume;
         rainAmbienceOriginalVolume = rainAmbience != null ? rainAmbience.volume : 1f;
         Instance = this;
+    }
+
+    private void OnEnable()
+    {
+        MutantBreachManager.OnBreachStartedAllClients += HandleBreachStarted;
+        MutantBreachManager.OnBreachClearedAllClients += HandleBreachCleared;
+    }
+
+    private void OnDisable()
+    {
+        MutantBreachManager.OnBreachStartedAllClients -= HandleBreachStarted;
+        MutantBreachManager.OnBreachClearedAllClients -= HandleBreachCleared;
+
+        if (_ambientSilencedForBreach && ambientAudio != null)
+        {
+            ambientAudio.mute = false;
+            _ambientSilencedForBreach = false;
+        }
+    }
+
+    private void HandleBreachStarted()
+    {
+        if (ambientAudio == null || _ambientSilencedForBreach) return;
+
+        _ambientSilencedForBreach = true;
+        _preBreachAmbientVolume = ambientAudio.volume;
+
+        if (!ambientAudio.isPlaying)
+        {
+            ambientAudio.mute = true;
+            return;
+        }
+
+        float restoreVolume = _preBreachAmbientVolume;
+        ambientAudio.DOKill();
+        ambientAudio.DOFade(0f, breachAmbientFadeOutSeconds).OnComplete(() =>
+        {
+            ambientAudio.mute = true;
+            ambientAudio.volume = restoreVolume;
+        });
+    }
+
+    private void HandleBreachCleared()
+    {
+        if (ambientAudio == null || !_ambientSilencedForBreach) return;
+
+        _ambientSilencedForBreach = false;
+
+        // Fully muted: other systems may have changed volume meanwhile, so fade back to that.
+        // Still mid fade-out: fade back to the volume captured at breach start.
+        float target = ambientAudio.mute ? ambientAudio.volume : _preBreachAmbientVolume;
+        ambientAudio.DOKill();
+
+        if (ambientAudio.mute)
+            ambientAudio.volume = 0f;
+        ambientAudio.mute = false;
+
+        // Ambience was stopped meanwhile (e.g. end-of-day FadeOutAmbientAudio). Leave it stopped.
+        if (!ambientAudio.isPlaying) return;
+
+        ambientAudio.DOFade(target, breachAmbientFadeInSeconds);
     }
 
     private void OnDestroy()

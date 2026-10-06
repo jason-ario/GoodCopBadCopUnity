@@ -88,7 +88,10 @@ public class HandOffPoint : PlacementBoard
     /// </summary>
     public static void TryHandOffRestingFolder(FolderController folder)
     {
-        if (folder == null || folder.IsHeld || folder.IsHandedOff || !folder.IsStamped) return;
+        if (folder == null || folder.IsHeld || folder.IsHandedOff || folder.HandOffRequestedLocally || !folder.IsStamped) return;
+
+        // Already held back for a deferred verdict — re-running would re-fire OnItemPlaced.
+        if (PendingVerdictFolder == folder) return;
 
         HandOffPoint point = FindAt(folder.transform.position);
         if (point == null) return;
@@ -103,8 +106,9 @@ public class HandOffPoint : PlacementBoard
         if (folderController == null) return;
 
         // Guard against a double hand-off (e.g. the drop fallback and the stamp-complete
-        // fallback both resolving the same folder).
-        if (folderController.IsHandedOff) return;
+        // fallback both resolving the same folder). HandOffRequestedLocally covers the window
+        // before the server-written IsHandedOff replicates back to a non-host client.
+        if (folderController.IsHandedOff || folderController.HandOffRequestedLocally) return;
 
         // Do NOT gate on SuspectController.Instance.CurrentSuspect here. CurrentSuspect is set
         // synchronously on the server but only arrives on non-host clients asynchronously via

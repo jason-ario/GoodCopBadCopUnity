@@ -1045,12 +1045,20 @@ public class PlayerPickupController : NetworkBehaviour
         
         PlacementBoard placementBoard = ObjectPlacer.Instance.PlacementBoard;
 
-        // Fallback: the ghost can visually sit on the window hand-off point while the aim
-        // raycast actually grazed the frame/ledge next to the board's collider, resolving no
-        // board — the hand-off then silently didn't register until the folder was re-placed.
-        // Resolve by the final drop position instead.
-        if (placementBoard == null && dropPoint == null && hasPlacementPose)
-            placementBoard = HandOffPoint.FindAt(placementPosition);
+        // The ghost can visually sit on the window hand-off point while the aim raycast resolved
+        // no board (grazed the frame/ledge) OR a different board — the office desk's full-surface
+        // PlacementBoard ends ~15cm from the window mat, so the ray/snap-sphere often picks it.
+        // Either way the hand-off silently didn't register until the folder was re-placed.
+        // For folders, the final drop position is authoritative: if it rests on a hand-off point,
+        // that wins over whatever the aim resolved (exact PlacementSlot snaps excepted).
+        FolderController droppedFolder = _heldObject.GetComponent<FolderController>();
+        if (dropPoint == null && hasPlacementPose && droppedFolder != null
+            && !(placementBoard is HandOffPoint) && !(placementBoard is PlacementSlot))
+        {
+            HandOffPoint handOffAtDrop = HandOffPoint.FindAt(placementPosition);
+            if (handOffAtDrop != null)
+                placementBoard = handOffAtDrop;
+        }
 
         if (placementBoard != null)
         {
@@ -1127,6 +1135,12 @@ public class PlayerPickupController : NetworkBehaviour
             if (_heldObject is Flashlight flashlight)
                 flashlight.TurnOff();
             _heldObject.OnDropped();
+
+            // Safety net for anything the instant check above misses (folder settling onto the
+            // mat after release, held-state replication lag on non-host clients). Exits at once
+            // if the hand-off already registered.
+            if (dropPoint == null && droppedFolder != null)
+                droppedFolder.BeginRestingHandOffCheck();
 
             // Placement feedback: punch scale + surface poof particle + this item's own
             // placement sound (PickableItemData.PlacementSound — different objects get their own

@@ -89,6 +89,39 @@ public class FolderController : PickableObject
     public bool IsStamped => isStamped.Value;
     public StampContainer.StampType StampType => stampContainer.Stamp;
     public bool IsHandedOff => isHandedOff.Value;
+
+    /// <summary>
+    /// True as soon as this machine has issued the hand-off (DeliverVerdict → OnHandOff), before
+    /// the server-written <see cref="IsHandedOff"/> replicates back. Guards against a second
+    /// hand-off being issued from this client during that round-trip.
+    /// </summary>
+    public bool HandOffRequestedLocally { get; private set; }
+
+    private Coroutine _restingHandOffCheck;
+
+    /// <summary>
+    /// Called on the dropping client after a free placement. Polls briefly so a folder that ends
+    /// up resting on the window hand-off point registers without needing to be re-placed (e.g. it
+    /// settled onto the mat after release, or IsHeld was still replicating on a non-host client).
+    /// </summary>
+    public void BeginRestingHandOffCheck()
+    {
+        if (IsHandedOff || HandOffRequestedLocally) return;
+        if (_restingHandOffCheck != null) StopCoroutine(_restingHandOffCheck);
+        _restingHandOffCheck = StartCoroutine(RestingHandOffCheckRoutine());
+    }
+
+    private IEnumerator RestingHandOffCheckRoutine()
+    {
+        float endTime = Time.time + 2f;
+        WaitForSeconds interval = new WaitForSeconds(0.1f);
+        while (Time.time < endTime && !IsHandedOff && !HandOffRequestedLocally)
+        {
+            yield return interval;
+            HandOffPoint.TryHandOffRestingFolder(this);
+        }
+        _restingHandOffCheck = null;
+    }
     private NetworkVariable<bool> isHandedOff = new NetworkVariable<bool>();
     public List<PickableObject> documents;
 
@@ -429,6 +462,7 @@ public class FolderController : PickableObject
 
     public void OnHandOff()
     {
+        HandOffRequestedLocally = true;
         // isHandedOff is Server-write-only. When this is called on a non-host client
         // (e.g. Player 2 delivering the verdict), writing it directly here would throw a
         // NetworkVariablePermissionException and abort the rest of DeliverVerdict() before it
