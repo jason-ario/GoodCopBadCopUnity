@@ -930,6 +930,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         StartDialogueCameraBlend(endBodyRot, endLocalPos, endLocalCamRot, onComplete: SyncPitch);
     }
 
+    /// <summary>True while <see cref="ResetCameraZoomForDialogue"/> is still blending the camera back.</summary>
+    public bool IsDialogueCameraBlendingOut => _isDialogueCamBlendingOut;
+
     /// <summary>
     /// Smoothly blends body yaw, camera local position and camera local rotation back to the pose
     /// cached by <see cref="ZoomCameraForDialogue"/>. Mouse look is suppressed until the blend

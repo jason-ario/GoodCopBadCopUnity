@@ -49,6 +49,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
     // Cached player arms — hidden while in dialogue mode, restored on exit.
     private GameObject _playerArms;
 
+    // Pending deferred arms restore (waits for the exit camera transition). Cancelled on re-entry.
+    private Coroutine _restoreArmsCoroutine;
+    private const float ArmsRestoreMaxWait = 3f;
+
     // Other connected players' body meshes hidden locally (this client only) while in dialogue
     // mode, so they can't visually block the suspect camera view. Restored in ShowPlayerBody.
     private readonly List<GameObject> _hiddenOtherPlayerBodies = new();
@@ -703,6 +707,15 @@ public class DialogueChoiceSystem : NetworkBehaviour
     private void HidePlayerBody()
     {
         if (PlayerInstance.Instance == null) return;
+
+        // Re-entering before a previous exit's deferred arms restore ran: cancel it so the arms
+        // don't pop back on mid-conversation (they are still hidden and get re-cached below).
+        if (_restoreArmsCoroutine != null)
+        {
+            StopCoroutine(_restoreArmsCoroutine);
+            _restoreArmsCoroutine = null;
+        }
+
         _playerBody = PlayerInstance.Instance.transform.Find("Art")?.gameObject;
         if (_playerBody != null)
             _playerBody.SetActive(false);
@@ -763,11 +776,11 @@ public class DialogueChoiceSystem : NetworkBehaviour
     {
         if (_playerArms != null)
         {
-            _playerArms.SetActive(true);
-            _playerArms = null;
-            // Re-apply the held item's pickup animation after the Animator resets on re-enable,
-            // so the player visually holds the item correctly when the cutscene ends.
-            ReapplyHeldItemAnimatorState();
+            // The arms ride on the player's head camera, so re-enabling them immediately makes them
+            // float in front of the dialogue / suspect camera while the view blends back to first
+            // person. Defer until the camera transition has finished.
+            if (_restoreArmsCoroutine != null) StopCoroutine(_restoreArmsCoroutine);
+            _restoreArmsCoroutine = StartCoroutine(RestoreArmsAfterCameraTransition());
         }
 
         if (_playerBody != null)
@@ -777,6 +790,42 @@ public class DialogueChoiceSystem : NetworkBehaviour
         }
 
         ShowOtherPlayers();
+    }
+
+    /// <summary>
+    /// Re-enables the first-person arms once the exit camera transition is done: both the
+    /// outside-dialogue dolly-back tween (<see cref="PlayerMovementController.IsDialogueCameraBlendingOut"/>)
+    /// and any Cinemachine blend away from the suspect / line camera. Waits one frame first so the
+    /// brain has picked up the vcam deactivation that happens after <see cref="ShowPlayerBody"/>.
+    /// Capped by <see cref="ArmsRestoreMaxWait"/> so an unrelated long blend can't keep them hidden.
+    /// </summary>
+    private IEnumerator RestoreArmsAfterCameraTransition()
+    {
+        yield return null;
+
+        var player = PlayerInstance.Instance;
+        var movement = player != null ? player.GetComponent<PlayerMovementController>() : null;
+        var interaction = player != null ? player.GetComponent<PlayerInteractionController>() : null;
+        Unity.Cinemachine.CinemachineBrain brain = interaction != null && interaction.cam != null
+            ? interaction.cam.GetComponent<Unity.Cinemachine.CinemachineBrain>()
+            : null;
+
+        float startTime = Time.unscaledTime;
+        while (Time.unscaledTime - startTime < ArmsRestoreMaxWait &&
+               ((movement != null && movement.IsDialogueCameraBlendingOut) ||
+                (brain != null && brain.IsBlending)))
+        {
+            yield return null;
+        }
+
+        _restoreArmsCoroutine = null;
+
+        if (_playerArms == null) yield break;
+        _playerArms.SetActive(true);
+        _playerArms = null;
+        // Re-apply the held item's pickup animation after the Animator resets on re-enable,
+        // so the player visually holds the item correctly when the cutscene ends.
+        ReapplyHeldItemAnimatorState();
     }
 
     // ─── Activity interrupt helpers ─────────────────────────────────────────

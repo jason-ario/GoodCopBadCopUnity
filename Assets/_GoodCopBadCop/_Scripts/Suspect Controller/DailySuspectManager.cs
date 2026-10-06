@@ -139,6 +139,18 @@ public class DailySuspectManager : MonoBehaviour
         ShiftManager.Instance.OnShiftStart += PopulateShiftCharacters;
     }
 
+    /// <summary>
+    /// Marks the current lineup as stale. Called by <see cref="ShiftManager"/> the instant a shift
+    /// is clocked in — the call switch is armed immediately, but the new lineup is only built
+    /// ~3s later on <see cref="ShiftManager.OnShiftStart"/>. Without this, a switch press inside
+    /// that window would read the PREVIOUS shift's lineup (or an empty one after a debug/save
+    /// start), and a failed spawn there could call MarkSuspectsComplete and fire Dusk at clock-in.
+    /// </summary>
+    public void InvalidateLineup()
+    {
+        IsLineupPopulated = false;
+    }
+
     private void PopulateShiftCharacters()
     {
         shiftSuspects.Clear();

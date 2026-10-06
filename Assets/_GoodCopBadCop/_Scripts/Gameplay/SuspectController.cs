@@ -368,6 +368,26 @@ public class SuspectController : NetworkBehaviour
             yield break;
         }
 
+        // The switch is armed the instant the shift is clocked in, but today's lineup is only
+        // built ~3s later (DailySuspectManager.PopulateShiftCharacters on OnShiftStart). Wait for
+        // it — otherwise an early press reads a stale/empty lineup, the spawn fails on the
+        // "last" slot, and MarkSuspectsComplete fires Dusk (e.g. Day 2's out-back sequence) at
+        // clock-in.
+        if (!dailySuspectManager.IsLineupPopulated)
+        {
+            Debug.Log("[SuspectController] Next suspect requested before today's lineup was populated — waiting for it.");
+            float timeoutAt = Time.time + 10f;
+            yield return new WaitUntil(() => dailySuspectManager.IsLineupPopulated || Time.time >= timeoutAt);
+
+            if (!dailySuspectManager.IsLineupPopulated)
+            {
+                Debug.LogError("[SuspectController] Lineup still not populated after 10s — re-arming the switch instead of ending the shift.");
+                suspectIndex.Value -= 1;
+                ShiftManager.Instance?.SetNextSuspectReady();
+                yield break;
+            }
+        }
+
         // Cheat: overwrite this slot with a specific character (e.g. "Force Nona Next").
         if (ForceNextSuspectData != null)
         {

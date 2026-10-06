@@ -998,6 +998,10 @@ public class ShiftManager : NetworkBehaviour
         ResetSuspectsProcessed();
         SuspectController.Instance.ResetSuspects();
 
+        // The lineup is rebuilt on OnShiftStart below (3s from now), but the switch is armed
+        // right away — flag the old lineup as stale so an early press waits for the new one.
+        DailySuspectManager.Instance?.InvalidateLineup();
+
         windowLampController.TurnGreen();
 
         // Notify the table bell/switch that the first suspect is ready to be called right away,
