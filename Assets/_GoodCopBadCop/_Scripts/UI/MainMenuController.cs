@@ -666,6 +666,7 @@ public class MainMenuController : MonoBehaviour
         if (resumingPastDay1)
         {
             GameManager.Instance.CancelLobbyTransition();
+            UIController.Instance.SetBlackImmediate();
             GameManager.Instance.SpawnAllPlayersForResumedDay();
             ShiftManager.Instance.ResumeSavedDay();
         }

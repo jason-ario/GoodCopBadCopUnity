@@ -17,9 +17,12 @@ using UnityEngine.InputSystem;
 /// skips the current logo only — it fades out quickly and the next logo begins. The input must be
 /// released before another skip can be charged. An optional prompt/progress bar shows hold progress.
 ///
-/// While the splash is playing, the scene's <see cref="EventSystem"/> is disabled so no UI on
-/// the main menu can be clicked, navigated, or submitted. It is re-enabled only once the main
-/// menu UI has fully faded in. Use <see cref="IsPlaying"/> to guard any non-EventSystem input.
+/// The <see cref="EventSystem"/> stays enabled the whole time (disabling it, or its input module,
+/// either replays stale clicks on re-enable or drops the pointer so hover stops working until the
+/// mouse moves). Instead the full-screen backdrop absorbs pointer input while the splash plays, and
+/// the menu <c>menuGroup</c> is non-interactable with nothing selected, so navigation/submit do nothing.
+/// Input is handed to the menu the moment it starts fading in. Use <see cref="IsPlaying"/> to guard
+/// any non-EventSystem input.
 ///
 /// The splash only plays once per application session — reloading <c>Main.unity</c> skips it.
 /// </summary>
@@ -35,7 +38,7 @@ public class MainMenuSplashScreen : MonoBehaviour
     [Tooltip("Logos shown in order. Each must have its own CanvasGroup.")]
     [SerializeField] private CanvasGroup[] logos;
 
-    [Tooltip("EventSystem disabled while the splash is playing so the main menu cannot be interacted with.")]
+    [Tooltip("Scene EventSystem. Kept enabled; its selection is cleared while the splash plays so navigation/submit can't reach the menu.")]
     [SerializeField] private EventSystem eventSystem;
 
     [Header("Timing (seconds, unscaled)")]
@@ -143,7 +146,14 @@ public class MainMenuSplashScreen : MonoBehaviour
         }
 
         if (backgroundGroup != null)
+        {
             backgroundGroup.alpha = 1f;
+
+            // The backdrop is the splash's input blocker. With cullTransparentMesh on, a fully
+            // transparent backdrop gets culled and stops catching raycasts, so keep it unculled.
+            foreach (CanvasRenderer cr in backgroundGroup.GetComponentsInChildren<CanvasRenderer>(true))
+                cr.cullTransparentMesh = false;
+        }
 
         foreach (CanvasGroup logo in logos)
         {
@@ -170,11 +180,7 @@ public class MainMenuSplashScreen : MonoBehaviour
         if (_instance == this)
             _instance = null;
 
-        if (IsPlaying)
-        {
-            IsPlaying = false;
-            SetMenuInputEnabled(true);
-        }
+        IsPlaying = false;
     }
 
     /// <summary>
@@ -205,7 +211,9 @@ public class MainMenuSplashScreen : MonoBehaviour
             _menuGroup.alpha = 0f;
 
         gameObject.SetActive(true);
-        SetMenuInputEnabled(false);
+        if (rootGroup != null)
+            rootGroup.blocksRaycasts = true;
+        ClearSelection();
 
         _routine = StartCoroutine(PlaySequence());
         return true;
@@ -269,7 +277,9 @@ public class MainMenuSplashScreen : MonoBehaviour
         }
 
         // 3. Main menu UI fades in (and any remaining backdrop clears).
+        // The menu is clickable as soon as it starts appearing.
         _onLogosFinished?.Invoke();
+        ReleaseInputToMenu();
         MenuFadeInStarted?.Invoke(menuFadeInDuration);
 
         if (backgroundGroup.alpha > 0f)
@@ -279,11 +289,6 @@ public class MainMenuSplashScreen : MonoBehaviour
             yield return Fade(_menuGroup, 1f, menuFadeInDuration, interruptible: false);
         else
             yield return Wait(menuFadeInDuration);
-
-        // Don't hand input back while a skip input (click/key/button) is still held, or its
-        // release would land on the freshly enabled menu.
-        while (SkipInputHeld())
-            yield return null;
 
         Finish();
         _onComplete?.Invoke();
@@ -326,42 +331,38 @@ public class MainMenuSplashScreen : MonoBehaviour
 
     private void Finish()
     {
-        IsPlaying = false;
+        ReleaseInputToMenu();
         WillPlayThisLoad = false;
-        _canSkip = false;
-        SetMenuInputEnabled(true);
         gameObject.SetActive(false);
     }
 
     /// <summary>
-    /// Toggles the EventSystem AND its input modules. Disabling only the EventSystem leaves
-    /// InputSystemUIInputModule's action callbacks recording pointer presses/releases that are
-    /// never processed; on re-enable that stale state was replayed as a click on whatever was
-    /// under the cursor (usually Continue). Disabling the module resets its pointer state.
+    /// Stops the splash from absorbing input and makes the menu UI interactable. Called when the
+    /// menu starts fading in (and again by <see cref="Finish"/>; idempotent).
     /// </summary>
-    private void SetMenuInputEnabled(bool enabled)
+    private void ReleaseInputToMenu()
     {
-        if (eventSystem == null)
-            return;
+        IsPlaying = false;
+        _canSkip = false;
 
-        BaseInputModule[] modules = eventSystem.GetComponents<BaseInputModule>();
+        if (rootGroup != null)
+            rootGroup.blocksRaycasts = false;
 
-        if (enabled)
+        if (skipPrompt != null)
+            skipPrompt.alpha = 0f;
+        SetSkipProgress(0f);
+
+        if (_menuGroup != null)
         {
-            foreach (BaseInputModule module in modules)
-                module.enabled = true;
-
-            eventSystem.enabled = true;
-            eventSystem.SetSelectedGameObject(null);
+            _menuGroup.interactable = true;
+            _menuGroup.blocksRaycasts = true;
         }
-        else
-        {
-            eventSystem.SetSelectedGameObject(null);
-            eventSystem.enabled = false;
+    }
 
-            foreach (BaseInputModule module in modules)
-                module.enabled = false;
-        }
+    private void ClearSelection()
+    {
+        if (eventSystem != null && eventSystem.isActiveAndEnabled)
+            eventSystem.SetSelectedGameObject(null);
     }
 
     // ---------------------------------------------------------------------------

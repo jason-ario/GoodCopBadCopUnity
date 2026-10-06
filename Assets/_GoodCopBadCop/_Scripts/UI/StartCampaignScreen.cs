@@ -500,30 +500,53 @@ public class StartCampaignScreen : MonoBehaviour
     /// </summary>
     public void StartGame()
     {
+        if (_isStartingResumedDay) return;
+
         // Commit the slot to disk now that the player has confirmed they want to play.
         SaveDataManager.Instance.InitialiseActiveSlot();
 
         bool resumingPastDay1 = SaveDataManager.Instance.CurrentDay > 1;
 
-        GameManager.Instance.TryStartGame();
-
         if (resumingPastDay1)
         {
-            // Not going through the lobby transition — clear the flag it would otherwise
-            // have cleared itself once players were spawned there.
-            GameManager.Instance.CancelLobbyTransition();
+            // Run on UIController (persistent) so hiding this screen can't kill the coroutine.
+            _isStartingResumedDay = true;
+            UIController.Instance.StartCoroutine(StartResumedDayBehindBlackout());
+            return;
+        }
 
-            // TransitionToLobby (skipped below) is normally what spawns every connected
-            // client — without it, a client whose connection was deferred while still on this
-            // pre-game screen would never get a player object. Spawn them explicitly; ResumeSavedDay
-            // repositions everyone from here straight into the bunker.
-            GameManager.Instance.SpawnAllPlayersForResumedDay();
-            ShiftManager.Instance.ResumeSavedDay();
-        }
-        else
-        {
-            GameManager.Instance.TransitionToLobby();
-        }
+        GameManager.Instance.TryStartGame();
+        GameManager.Instance.TransitionToLobby();
+    }
+
+    private bool _isStartingResumedDay;
+
+    /// <summary>
+    /// Resumed (Day 2+) start: fades every screen to black BEFORE players are spawned at the
+    /// outside lobby point, so neither the spawn nor ResumeSavedDay's teleport into the bunker
+    /// is ever visible. Mirrors <see cref="MainMenuController.ContinueGame"/>'s fade-first order.
+    /// ResumeSavedDay owns the single reveal once everyone is in the bunker.
+    /// </summary>
+    private IEnumerator StartResumedDayBehindBlackout()
+    {
+        GameManager.Instance.PlayTransitionStinger();
+        GameManager.Instance.FadeClientsToBlackForResumedDay();
+        yield return UIController.Instance.StartCoroutine(UIController.Instance.FadeInAndWait());
+
+        GameManager.Instance.TryStartGame();
+
+        // Not going through the lobby transition — clear the flag it would otherwise
+        // have cleared itself once players were spawned there.
+        GameManager.Instance.CancelLobbyTransition();
+
+        // TransitionToLobby (skipped) is normally what spawns every connected client —
+        // without it, a client whose connection was deferred while still on this pre-game
+        // screen would never get a player object. Spawn them explicitly; ResumeSavedDay
+        // repositions everyone from here straight into the bunker.
+        GameManager.Instance.SpawnAllPlayersForResumedDay();
+        ShiftManager.Instance.ResumeSavedDay();
+
+        _isStartingResumedDay = false;
     }
 
     /// <summary>

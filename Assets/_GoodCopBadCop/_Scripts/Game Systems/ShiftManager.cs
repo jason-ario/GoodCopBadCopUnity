@@ -2043,6 +2043,11 @@ public class ShiftManager : NetworkBehaviour
         // Upper bound only — EndResumeCueSuppressionWhenSettled shortens it once restore is done.
         TaskSuccessCue.SuppressCompletionCuesFor(ResumeCueSuppressionMaxSeconds);
 
+        // Players were spawned at the outside lobby point and are only moved into the bunker
+        // below. Hold the screen fully black from here until the reveal so that position is
+        // never seen. Callers normally fade first; this snap is the safety net (no-op if black).
+        UIController.Instance.SetBlackImmediate();
+
         MainMenuController.Instance.TransitionToGameplay();
         MainMenuController.Instance.FadeOutCutsceneMusic();
         MainMenuController.Instance.StopMainMenuMusic();
@@ -2119,8 +2124,11 @@ public class ShiftManager : NetworkBehaviour
 
         UIController.Instance.ShowPlayerUI();
 
-        // ContinueGame fades to black before connecting so the automatic player spawn is hidden.
-        // Unlike the lobby/day-transition paths, this direct resume path has no later reveal step.
+        // Don't reveal until the local player has actually landed in the bunker and the camera
+        // has rendered from there, otherwise the first fade-out frames still show the lobby.
+        yield return WaitForLocalPlayerAt(bunkerSpawn.position);
+
+        // The screen has been held black since the top of this sequence; this is the only reveal.
         UIController.Instance.FadeOut();
 
         EnablePlayerControl();
@@ -2137,6 +2145,33 @@ public class ShiftManager : NetworkBehaviour
         StartCoroutine(EndResumeCueSuppressionWhenSettled());
 
         Debug.Log($"[ShiftManager] ResumeSavedDay — resumed on Day {_currentDay} inside the bunker.");
+    }
+
+    /// <summary>
+    /// Waits (capped, unscaled) until the local player is within a metre of
+    /// <paramref name="target"/>, then a few more frames so the camera, NetworkTransform and
+    /// CharacterController settle before a reveal. Times out rather than hanging the sequence.
+    /// </summary>
+    private static IEnumerator WaitForLocalPlayerAt(Vector3 target)
+    {
+        const float Timeout = 2f;
+        const float ArrivalDistanceSqr = 1f;
+        const int SettleFrames = 3;
+
+        float elapsed = 0f;
+        while (elapsed < Timeout
+               && PlayerInstance.Instance != null
+               && (PlayerInstance.Instance.transform.position - target).sqrMagnitude > ArrivalDistanceSqr)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        if (elapsed >= Timeout)
+            Debug.LogWarning("[ShiftManager] ResumeSavedDay — local player did not reach the bunker spawn in time; revealing anyway.");
+
+        for (int i = 0; i < SettleFrames; i++)
+            yield return null;
     }
 
     /// <summary>Hard cap on the resume chime mute, in case the resume sequence is interrupted.</summary>

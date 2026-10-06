@@ -507,6 +507,26 @@ public class UIController : MonoBehaviour
     }
 
     /// <summary>
+    /// Snaps the screen fully black with no animation, cancelling any fade in progress.
+    /// Used to cover teleports that must never be visible (e.g. resuming a saved day, where
+    /// players spawn at the lobby and are moved into the bunker). No-op visually if already black.
+    /// </summary>
+    public void SetBlackImmediate()
+    {
+        CanvasGroup[] canvasGroups = MainMenuController.Instance.GetComponentsInChildren<CanvasGroup>();
+        foreach (CanvasGroup canvasGroup in canvasGroups)
+        {
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
+
+        if (_tentacleBlackout != null)
+            _tentacleBlackout.SetProgress(1f);
+        else
+            screenFade.SetBool("Black", true);
+    }
+
+    /// <summary>
     /// Starts the fade-to-black and yields until the screen is fully dark.
     /// Safe to call even if a fade is already in progress or complete:
     /// — already black (progress ≥ 0.99): returns immediately.

@@ -150,8 +150,30 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void HideMainMenuForResumedDayClientRpc()
     {
+        // Players are about to be spawned at the lobby and moved into the bunker; go black
+        // before the menu disappears so the outside camera is never shown.
+        UIController.Instance?.SetBlackImmediate();
         MainMenuController.Instance?.TransitionToGameplay();
         MainMenuController.Instance?.StopMainMenuMusic();
+    }
+
+    /// <summary>
+    /// Starts the fade-to-black on every non-host client ahead of a resumed (Day 2+) start, so
+    /// party members' screens are dark before players spawn at the lobby. The host drives its own
+    /// fade via <see cref="UIController.FadeInAndWait"/>. SERVER ONLY.
+    /// </summary>
+    public void FadeClientsToBlackForResumedDay()
+    {
+        if (!IsServer) return;
+        FadeClientsToBlackForResumedDayClientRpc();
+    }
+
+    [ClientRpc]
+    private void FadeClientsToBlackForResumedDayClientRpc()
+    {
+        // The host is already fading itself; restarting here would replay the fade from clear.
+        if (IsServer) return;
+        UIController.Instance?.FadeIn();
     }
 
     /// <summary>
