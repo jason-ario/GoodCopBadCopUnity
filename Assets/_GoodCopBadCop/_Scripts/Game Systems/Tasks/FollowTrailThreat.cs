@@ -1202,7 +1202,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         Vector3 origin = new Vector3(position.x, position.y + castOriginHeight, position.z);
 
-        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, castDistance, _terrainLayerMask))
+        // Ignore triggers: the end splatters carry trigger BoxColliders, so without this each
+        // splatter could snap onto the previous one's box (or a large trigger zone) and float
+        // above the ground, where the projected decal draws nothing.
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, castDistance, _terrainLayerMask,
+                            QueryTriggerInteraction.Ignore))
             return hit.point + Vector3.up * yOffset;
 
         return new Vector3(position.x, position.y + yOffset, position.z);

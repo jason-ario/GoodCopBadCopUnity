@@ -606,6 +606,12 @@ public class SuspectCharacter : Interactable
         // one is alive.
         SuspectRunRecords.Instance?.RegisterActiveFullMutant(suspectData);
 
+        // Awake() disables the NavMeshAgent for booth walk-ins. The booth handoffs
+        // (MutantSuspectBehaviour) re-enable it before InitialiseServer(); this world-spawn path
+        // must do the same, otherwise InitialiseServer() throws on agent.isStopped before
+        // ChaseLoop starts and the mutant stands idle, never chasing or attacking players.
+        EnableAgentForFeralMutant();
+
         if (initialAggroTarget != null)
         {
             _mutantEnemy.SetAggroTarget(initialAggroTarget);
@@ -613,6 +619,28 @@ public class SuspectCharacter : Interactable
         }
         _mutantEnemy.InitialiseServer();
         EnableMutantEnemyClientRpc();
+    }
+
+    /// <summary>
+    /// Server-only. Enables this character's NavMeshAgent and snaps it onto the NavMesh so
+    /// <see cref="MutantEnemy.InitialiseServer"/> can drive it as a normal feral mutant.
+    /// </summary>
+    private void EnableAgentForFeralMutant()
+    {
+        if (_navAgent == null) _navAgent = GetComponent<NavMeshAgent>();
+        if (_navAgent == null) return;
+
+        if (!_navAgent.enabled)
+            _navAgent.enabled = true;
+
+        if (!_navAgent.isOnNavMesh)
+        {
+            var filter = new NavMeshQueryFilter { agentTypeID = _navAgent.agentTypeID, areaMask = NavMesh.AllAreas };
+            if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 3f, filter))
+                _navAgent.Warp(hit.position);
+            else
+                Debug.LogWarning($"[SuspectCharacter] '{name}' legacy mutant spawned off the NavMesh at {transform.position}.", this);
+        }
     }
 
     /// <summary>

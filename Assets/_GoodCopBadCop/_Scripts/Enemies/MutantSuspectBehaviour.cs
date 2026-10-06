@@ -335,7 +335,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     }
 
     /// <summary>
-    /// Pays out when the mutant is removed because players beat it — a permanent kill or a
+    /// Dispenses coupons from the <see cref="ATM"/> when the mutant is removed because players beat it — a permanent kill or a
     /// beaten-and-fled escape (both leave <see cref="MutantEnemy.IsDead"/> true). Removal for any
     /// other reason pays nothing. Fires at most once per lineup appearance.
     /// </summary>
@@ -348,13 +348,23 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             return;
 
         int reward = _data.defeatCouponReward;
-        if (reward <= 0 || GlobalHostVariables.Instance == null)
+        if (reward <= 0)
             return;
 
-        GlobalHostVariables.Instance.AddMoney(reward);
+        if (ATM.Instance == null)
+        {
+            Debug.LogError("[MutantSuspectBehaviour] ATM.Instance is null — defeat reward coupons not dispensed.");
+            return;
+        }
+
+        // Coupons are physically dispensed by the ATM (scaled by Checkpoint Integrity); money is
+        // credited when players pick them up via CouponPickup. Returns 0 if the ATM is unpowered.
+        int dispensed = ATM.Instance.SpawnCoupons(reward);
+        if (dispensed <= 0)
+            return;
 
         bool isFullMutant = TryGetComponent<SuspectCharacter>(out _);
-        ShowDefeatRewardClientRpc(reward, isFullMutant);
+        ShowDefeatRewardClientRpc(dispensed, isFullMutant);
     }
 
     [ClientRpc]

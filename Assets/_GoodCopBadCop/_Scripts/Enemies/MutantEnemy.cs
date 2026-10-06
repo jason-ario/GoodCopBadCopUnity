@@ -878,7 +878,14 @@ public class MutantEnemy : NetworkBehaviour
         _agent.acceleration = data.acceleration;
         _agent.stoppingDistance = data.stoppingDistance;
         _agent.updateRotation = true;
-        _agent.isStopped = false;
+        // isStopped throws on a disabled/off-mesh agent, which would abort before ChaseLoop
+        // starts and leave an "active" mutant that never targets anyone. ChaseLoop recovers
+        // off-mesh agents itself (TryRecoverOntoNavMesh).
+        if (_agent.enabled && _agent.isOnNavMesh)
+            _agent.isStopped = false;
+        else
+            Debug.LogWarning($"[MutantEnemy] {name} initialised with its NavMeshAgent " +
+                             $"{(_agent.enabled ? "off the NavMesh" : "disabled")} — ChaseLoop will try to recover.", this);
 
         _defaultAgentTypeId = _agent.agentTypeID;
 

@@ -262,12 +262,21 @@ public class Day_03 : DayBase, IDailyTask
              "also shows the 'Fix Fuse' tutorial overlay, highlights the spawned fuses, and advances " +
              "the task text to 'find and add the fuses'. The power switch lever " +
              "highlights itself automatically once every fuse slot is filled — see " +
-             "PowerSwitch.OnFuseCountChanged — so no separate wiring is needed for that step.")]
+             "PowerSwitch.OnFuseCountChanged — and gets its own tutorial arrow (see _powerSwitch).")]
     [SerializeField] private FuseBoxPuzzleController _fuseBoxController;
 
     [Tooltip("Gap (m) between the top of the fuse box's rendered bounds and the tutorial arrow's " +
              "pivot. The arrow height is computed from the box's renderer bounds at runtime.")]
     [SerializeField] private float _fuseBoxMarkerClearance = 0.25f;
+
+    [Tooltip("The power station's power switch lever. Pointed at with a pooled TutorialMarker arrow " +
+             "once every fuse slot is filled (the same moment the switch highlights itself), and " +
+             "cleared when power is restored or a fuse is pulled back out. Falls back to the first " +
+             "PowerSwitch in the scene if unassigned.")]
+    [SerializeField] private PowerSwitch _powerSwitch;
+
+    [Tooltip("Gap (m) between the top of the power switch's rendered bounds and the tutorial arrow's pivot.")]
+    [SerializeField] private float _powerSwitchMarkerClearance = 0.25f;
 
     private bool _fuseTutorialShown;
 
@@ -429,30 +438,56 @@ public class Day_03 : DayBase, IDailyTask
         }
 
         _fuseBoxController.SetForceHighlight(true);
-        TutorialMarkerManager.Instance?.Mark(_fuseBoxController.transform, GetFuseBoxMarkerHoverHeight());
+        TutorialMarkerManager.Instance?.Mark(_fuseBoxController.transform,
+            GetMarkerHoverHeight(_fuseBoxController.transform, _fuseBoxMarkerClearance));
 
         _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
         _fuseBoxController.OnBoxInteracted += OnFuseBoxFirstOpened;
     }
 
     /// <summary>
-    /// Hover height (above the fuse box pivot) that places the arrow clearly above the top of the
-    /// box's rendered bounds. The box mesh is large and flipped, so its pivot is not near its top.
+    /// Hover height (above <paramref name="target"/>'s pivot) that places the arrow clearly above
+    /// the top of its rendered bounds. Used for the fuse box (large, flipped mesh whose pivot is not
+    /// near its top) and the power switch lever.
     /// </summary>
-    private float GetFuseBoxMarkerHoverHeight()
+    private static float GetMarkerHoverHeight(Transform target, float clearance)
     {
-        Transform box = _fuseBoxController.transform;
         bool found = false;
-        float top = box.position.y;
+        float top = target.position.y;
 
-        foreach (Renderer r in _fuseBoxController.GetComponentsInChildren<Renderer>())
+        foreach (Renderer r in target.GetComponentsInChildren<Renderer>())
         {
             if (!r.enabled || r is ParticleSystemRenderer) continue;
             top = found ? Mathf.Max(top, r.bounds.max.y) : r.bounds.max.y;
             found = true;
         }
 
-        return Mathf.Max(top - box.position.y, 0f) + _fuseBoxMarkerClearance;
+        return Mathf.Max(top - target.position.y, 0f) + clearance;
+    }
+
+    /// <summary>Resolves <see cref="_powerSwitch"/>, falling back to the first one in the scene.</summary>
+    private PowerSwitch ResolvePowerSwitch()
+    {
+        if (_powerSwitch == null)
+            _powerSwitch = FindFirstObjectByType<PowerSwitch>();
+        return _powerSwitch;
+    }
+
+    /// <summary>
+    /// Step 4: shows the power switch arrow while every fuse slot is filled and hides it again if a
+    /// fuse is pulled back out (mirroring <see cref="PowerSwitch.OnFuseCountChanged"/>'s highlight).
+    /// Stays subscribed until power is restored (see <see cref="ClearFuseBoxTutorialState"/>).
+    /// </summary>
+    private void OnFuseCountChangedForSwitchArrow(int filled, int total)
+    {
+        PowerSwitch powerSwitch = ResolvePowerSwitch();
+        if (powerSwitch == null || TutorialMarkerManager.Instance == null) return;
+
+        if (_fuseBoxController != null && _fuseBoxController.IsReady)
+            TutorialMarkerManager.Instance.Mark(powerSwitch.transform,
+                GetMarkerHoverHeight(powerSwitch.transform, _powerSwitchMarkerClearance));
+        else
+            TutorialMarkerManager.Instance.Unmark(powerSwitch.transform);
     }
 
     /// <summary>
@@ -488,7 +523,7 @@ public class Day_03 : DayBase, IDailyTask
     /// active. Once every slot is filled, clears the fuse highlights plus the fuse-box highlight
     /// and arrow, and advances the guidebook task to "pull the lever". The power switch highlights itself automatically once
     /// <see cref="FuseBoxPuzzleController.IsReady"/> — see <see cref="PowerSwitch.OnFuseCountChanged"/>
-    /// — so no separate lever highlight call is needed here.
+    /// — and this step hands off to <see cref="OnFuseCountChangedForSwitchArrow"/> to point an arrow at it.
     /// </summary>
     private void OnFuseCountChangedDuringOutage(int filled, int total)
     {
@@ -499,6 +534,10 @@ public class Day_03 : DayBase, IDailyTask
         _fuseBoxController.SetForceHighlight(false);
         TutorialMarkerManager.Instance?.Unmark(_fuseBoxController.transform);
         _powerOutageThreat?.SetStep(RepairPowerThreat.Step.PullLever);
+
+        _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedForSwitchArrow;
+        _fuseBoxController.OnFuseCountChanged += OnFuseCountChangedForSwitchArrow;
+        OnFuseCountChangedForSwitchArrow(filled, total);
     }
 
     /// <summary>
@@ -510,10 +549,14 @@ public class Day_03 : DayBase, IDailyTask
     {
         FusePickup.SetFindHighlightActive(false);
 
+        if (_powerSwitch != null)
+            TutorialMarkerManager.Instance?.Unmark(_powerSwitch.transform);
+
         if (_fuseBoxController == null) return;
 
         _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
         _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedDuringOutage;
+        _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedForSwitchArrow;
         _fuseBoxController.SetForceHighlight(false);
         TutorialMarkerManager.Instance?.Unmark(_fuseBoxController.transform);
     }

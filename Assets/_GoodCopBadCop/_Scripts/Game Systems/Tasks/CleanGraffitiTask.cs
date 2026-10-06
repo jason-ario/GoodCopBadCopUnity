@@ -58,6 +58,10 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
              "The pieces are captured by the day-start checkpoint save, so unscrubbed graffiti is " +
              "rebuilt on load. Day 1 is excluded — Day_01 pre-spawns its own via SpawnGraffitiEarly.")]
     [SerializeField] private bool _spawnOnDayStart = true;
+    [Tooltip("Scales the min/max graffiti range for the Day 2+ day-start batch (0.5 = half). " +
+             "Day 1 (SpawnGraffitiEarly / TriggerDailyTask) always uses the full range.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float _dayStartCountMultiplier = 0.5f;
 
     // ── Networked state ──────────────────────────────────────────────────────
 
@@ -231,8 +235,9 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Rolls a graffiti spawn count between <see cref="_minGraffitiCount"/> and
     /// <see cref="_maxGraffitiCount"/>, halved (minimum 1) when only a single player is
     /// connected — the full range is tuned for 2 players and is excessive solo.
+    /// <paramref name="rangeScale"/> further scales the range (min floored, max ceiled, minimum 1).
     /// </summary>
-    private int RollGraffitiCount()
+    private int RollGraffitiCount(float rangeScale = 1f)
     {
         bool isSinglePlayer = NetworkManager.Singleton == null
             || DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) <= 1;
@@ -244,6 +249,12 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         {
             minCount = Mathf.Max(1, minCount / 2);
             maxCount = Mathf.Max(minCount, maxCount / 2);
+        }
+
+        if (rangeScale < 1f)
+        {
+            minCount = Mathf.Max(1, Mathf.FloorToInt(minCount * rangeScale));
+            maxCount = Mathf.Max(minCount, Mathf.CeilToInt(maxCount * rangeScale));
         }
 
         return Random.Range(minCount, maxCount + 1);
@@ -446,7 +457,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         int spawned = 0;
         // Day 1 owns its graffiti via Day_01 → SpawnGraffitiEarly (subscribed after this handler).
         if (_spawnOnDayStart && !CleanupTaskGating.IsMandatoryDay)
-            spawned = SpawnGraffiti(RollGraffitiCount());
+            spawned = SpawnGraffiti(RollGraffitiCount(_dayStartCountMultiplier));
 
         _scrubbed.Value   = 0;
         _totalCount.Value = carriedOver + spawned;

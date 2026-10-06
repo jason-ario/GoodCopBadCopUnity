@@ -1385,6 +1385,10 @@ public class ShiftManager : NetworkBehaviour
         ResetSuspectsProcessed();
         SuspectController.Instance.ResetSuspects();
 
+        // No blood carries into the next day. Runs on every peer while the screen is black and
+        // before OnDayStart, so it can't remove blood that day-start systems spawn for the new day.
+        BloodSplatterCleanup.ClearAllForDayTransition();
+
         // Advance the campaign day — server-only; propagates to all clients via NetworkVariable.
         // Usually this already happened before the report was shown so "Dead Overnight" can
         // include the just-simulated population losses. Keep the fallback for older/debug paths
