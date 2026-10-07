@@ -62,6 +62,7 @@ public class UIController : MonoBehaviour
     [SerializeField] private AudioClip transitionToGameplayStinger;
     [SerializeField] private GameObject pauseMenu;
     private bool pauseMenuOpened = false;
+    private bool backButtonWasActiveBeforePaused;
 
     [Header("Transition Effect")]
     [Tooltip("Tentacle blackout controller for the menu → gameplay transition. " +
@@ -163,6 +164,10 @@ public class UIController : MonoBehaviour
         // Some systems write Cursor directly (PC terminal, movement controller); re-assert it so
         // the report's Continue button is always reachable for both players.
         if (IsEndOfShiftReportOpen && (!Cursor.visible || Cursor.lockState == CursorLockMode.Locked))
+            ShowCursor();
+
+        // Same failsafe for the pause menu: it must always be clickable.
+        if (pauseMenuOpened && (!Cursor.visible || Cursor.lockState == CursorLockMode.Locked))
             ShowCursor();
 
         // Failsafe: the HUD must always be hidden while the local player is in a dialogue
@@ -622,8 +627,17 @@ public class UIController : MonoBehaviour
     {
         backButton.onClick.AddListener(onClickCallback);
         _backButtonCallbacks.Add(onClickCallback);
-        backButtonUI.SetActive(true);
         _backButtonLayoutDirty = true;
+
+        // While paused the gameplay Back button stays hidden so it can't steal Escape/clicks
+        // from the pause menu; ClosePauseMenu reveals it.
+        if (pauseMenuOpened)
+        {
+            backButtonWasActiveBeforePaused = true;
+            return;
+        }
+
+        backButtonUI.SetActive(true);
         UpdateBackButtonHudAvoidance();
     }
 
@@ -634,6 +648,7 @@ public class UIController : MonoBehaviour
         // Whoever owned the button underneath an exclusive owner is done with it too.
         _suspendedBackButtonCallbacks.Clear();
         _backButtonWasVisibleBeforeExclusive = false;
+        backButtonWasActiveBeforePaused = false;
         backButtonUI.SetActive(false);
     }
 
@@ -644,7 +659,7 @@ public class UIController : MonoBehaviour
     /// </summary>
     public void ShowExclusiveBackButton(UnityAction onClickCallback)
     {
-        _backButtonWasVisibleBeforeExclusive = backButtonUI.activeSelf;
+        _backButtonWasVisibleBeforeExclusive = pauseMenuOpened ? backButtonWasActiveBeforePaused : backButtonUI.activeSelf;
         foreach (UnityAction callback in _backButtonCallbacks)
         {
             backButton.onClick.RemoveListener(callback);
@@ -679,7 +694,10 @@ public class UIController : MonoBehaviour
 
         bool visible = _backButtonCallbacks.Count > 0 || _backButtonWasVisibleBeforeExclusive;
         _backButtonWasVisibleBeforeExclusive = false;
-        backButtonUI.SetActive(visible);
+        if (pauseMenuOpened)
+            backButtonWasActiveBeforePaused = visible;
+        else
+            backButtonUI.SetActive(visible);
         _backButtonLayoutDirty = true;
     }
 
@@ -876,6 +894,14 @@ public class UIController : MonoBehaviour
         if (IsEndOfShiftReportOpen)
             return;
 
+        // The pause menu needs the cursor. Gameplay hides requested while paused (e.g. a dialogue
+        // exit landing under the menu) go into the pause snapshot and apply on ClosePauseMenu.
+        if (pauseMenuOpened && !_applyingPauseState)
+        {
+            showedCursorBeforePaused = false;
+            return;
+        }
+
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
@@ -905,6 +931,12 @@ public class UIController : MonoBehaviour
         OnPauseMenuOpened?.Invoke();
 
         playerUI.SetActive(false);
+
+        // The gameplay Back button (dialogue "leave", diegetic views, etc.) lives outside the
+        // HUD and pause menu. Left active, it keeps owning Escape/clicks under the pause menu, so
+        // Escape would trigger the dialogue exit (hiding the cursor) instead of resuming.
+        backButtonWasActiveBeforePaused = backButtonUI.activeSelf;
+        backButtonUI.SetActive(false);
         
         ShowCursor();
 
@@ -968,6 +1000,14 @@ public class UIController : MonoBehaviour
 
         pauseMenuOpened = false;
         pauseMenu.SetActive(false);
+
+        if (backButtonWasActiveBeforePaused)
+        {
+            backButtonUI.SetActive(true);
+            _backButtonLayoutDirty = true;
+            UpdateBackButtonHudAvoidance();
+        }
+        backButtonWasActiveBeforePaused = false;
     }
 
     /// <summary>

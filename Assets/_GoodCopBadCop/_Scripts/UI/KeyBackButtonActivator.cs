@@ -84,7 +84,13 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
     private void OnEnable()
     {
         _instances.Add(this);
+        _enabledFrame = Time.frameCount;
     }
+
+    // Frame this activator was last enabled. A press in that same frame belongs to whatever
+    // revealed the button (e.g. Escape closing the pause menu re-shows the dialogue Back button),
+    // so it must not also trigger this button.
+    private int _enabledFrame = -1;
 
     private void OnDisable()
     {
@@ -97,6 +103,7 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
         // While a text field (e.g. the PC search bar) owns the keyboard, Q/Escape belong to it.
         if (GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard) return;
         if (!(Keyboard.current?[_key].wasPressedThisFrame ?? false)) return;
+        if (Time.frameCount == _enabledFrame) return;
 
         if (_key == Key.Escape && _button != null && _button.isActiveAndEnabled && _button.interactable)
             EscapeBackButtonPressedThisFrame = true;

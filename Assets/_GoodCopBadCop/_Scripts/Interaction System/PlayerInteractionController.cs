@@ -812,7 +812,7 @@ public class PlayerInteractionController : NetworkBehaviour
                     continue;
                 }
 
-                if (!crossedGlass && IsGlassBarrier(collider))
+                if (!crossedGlass && IsGlassBarrier(collider) && IsBoothWindowOpen())
                 {
                     crossedGlass = true;
                     glassHit = hits[i];
@@ -869,13 +869,27 @@ public class PlayerInteractionController : NetworkBehaviour
     /// True when <paramref name="collider"/> belongs to a <see cref="BreakableGlassController"/> pane
     /// (checked on parents, since the glass mesh's collider(s) live on a child of the controller).
     /// Interrogation-room windows are meant to be seen and talked through, so â€” unlike the fence â€”
-    /// this passthrough is unconditional and unrestricted: whatever Interactable is standing behind
+    /// this passthrough is unrestricted while the booth shutter is open (see <see cref="IsBoothWindowOpen"/>):
+    /// whatever Interactable is standing behind
     /// the glass (e.g. the suspect) resolves normally, while the glass itself still blocks movement
     /// and still shows up as the aim/tooltip target when nothing interactable is back there.
     /// </summary>
     private static bool IsGlassBarrier(Collider collider)
     {
         return collider.GetComponentInParent<BreakableGlassController>() != null;
+    }
+
+    /// <summary>
+    /// The glass passthrough is only granted while the booth's rolling shutter is open. The shutter
+    /// has no collider of its own (it is a purely animated visual), so without this gate a closed
+    /// shutter would still let the ray reach — and start dialogue with — the suspect behind it.
+    /// When closed, the glass is treated as the solid wall it visually is. Scenes without a
+    /// shutter keep the unconditional passthrough.
+    /// </summary>
+    private static bool IsBoothWindowOpen()
+    {
+        ShutterController shutter = ShutterController.Instance;
+        return shutter == null || shutter.IsOpen;
     }
 
     /// <summary>
