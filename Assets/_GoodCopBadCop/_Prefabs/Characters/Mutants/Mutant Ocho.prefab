@@ -255,6 +255,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7307716854411765365, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5121497498241078416}
+    - targetCorrespondingSourceObject: {fileID: 7307716854411765365, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6024436598944257110}
   m_SourcePrefab: {fileID: 100100000, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
 --- !u!1 &2621481266503138004 stripped
 GameObject:
@@ -455,6 +458,32 @@ MonoBehaviour:
   DebugRays: 0
   AnimationStyle: 0
   ConstantParentalAxisUpdate: 1
+--- !u!114 &6024436598944257110
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2621481266503138004}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d34478576033614da59ff5c302d8334, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LimbHitReactor
+  _limbSource: 0
+  _rigRoot: {fileID: 849422567984056484}
+  _explicitLimbColliders: []
+  _activateHitboxesOnStart: 1
+  _hitboxInflation: 1.4
+  _kickDegrees: 18
+  _maxAngle: 35
+  _stiffness: 160
+  _damping: 14
+  _parentFalloff: 0.45
+  _parentPropagationDepth: 2
+  _referenceDamage: 25
+  _strengthRange: {x: 0.6, y: 1.75}
+  _maxLimbDistance: 3
 --- !u!4 &7186731734777384254 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2501469216775164319, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}

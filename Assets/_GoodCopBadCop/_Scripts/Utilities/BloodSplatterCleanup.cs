@@ -40,6 +40,11 @@ public static class BloodSplatterCleanup
         {
             if (target == null) continue;
 
+            // Follow-trail UV marks mirror FollowTrailThreat's replicated position list; the server
+            // clears that list itself. Peers transition at different times, so sweeping them here
+            // could delete a trail the server had already republished for the new day.
+            if (FollowTrailThreat.IsLocalTrailParticle(target)) continue;
+
             if (target.TryGetComponent(out NetworkObject netObj) && netObj.IsSpawned)
             {
                 // Spawned copies are owned by the server; clients receive the despawn.

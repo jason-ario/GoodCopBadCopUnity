@@ -2670,7 +2670,52 @@ public class MutantEnemy : NetworkBehaviour
                 TriggerHitAnimationClientRpc();
 
             ApplyKnockback(knockbackDirection.Value);
+
+            PlayLimbReactions(new[] { hitPoint }, knockbackDirection.Value, amount);
         }
+    }
+
+    // ── Limb reactivity ───────────────────────────────────────────────────────
+
+    private LimbHitReactor _limbReactor;
+    private bool _limbReactorSearched;
+
+    /// <summary>Optional <see cref="LimbHitReactor"/> on this mutant's hierarchy (cached).</summary>
+    private LimbHitReactor LimbReactor
+    {
+        get
+        {
+            if (!_limbReactorSearched)
+            {
+                _limbReactor = GetComponentInChildren<LimbHitReactor>(true);
+                _limbReactorSearched = true;
+            }
+            return _limbReactor;
+        }
+    }
+
+    /// <summary>
+    /// Server-side: plays a cosmetic limb reaction at each of <paramref name="hitPoints"/> on every
+    /// client. Used for physical hits only (gunshots, pellets, melee) — not fire/radiation ticks.
+    /// No-op when this mutant has no <see cref="LimbHitReactor"/> or is dead.
+    /// </summary>
+    public void PlayLimbReactions(Vector3[] hitPoints, Vector3 direction, float damagePerHit)
+    {
+        if (!IsServer || _isDead || hitPoints == null || hitPoints.Length == 0 || LimbReactor == null)
+            return;
+
+        PlayLimbReactionsClientRpc(hitPoints, direction, damagePerHit);
+    }
+
+    [ClientRpc]
+    private void PlayLimbReactionsClientRpc(Vector3[] hitPoints, Vector3 direction, float damagePerHit)
+    {
+        LimbHitReactor reactor = LimbReactor;
+        if (reactor == null || hitPoints == null) return;
+
+        float strength = reactor.StrengthFromDamage(damagePerHit);
+        foreach (Vector3 point in hitPoints)
+            reactor.ReactToHit(point, direction, strength);
     }
 
     /// <summary>
@@ -2994,6 +3039,9 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     private void DisableColliders()
     {
+        // Stop limb reactions and restore limb collider sizes before the ragdoll (if any) reuses them.
+        LimbReactor?.Shutdown();
+
         foreach (Collider col in GetComponentsInChildren<Collider>(true))
         {
             // Excluded so a persisting corpse (PlayAnimation death behaviour) can still be

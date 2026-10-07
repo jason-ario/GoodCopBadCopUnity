@@ -171,6 +171,112 @@ public class BreakableGlassController : MonoBehaviour
     /// <summary>Normalised crack progress in 0–1, matching what the overlay shader is showing.</summary>
     public float DamageProgress => _maxHits > 0 ? Mathf.Clamp01((float)CurrentHits / _maxHits) : 0f;
 
+    /// <summary>
+    /// Which side of the pane the rolling shutter sits on, relative to the pane's forward axis:
+    /// +1 / -1, or 0 while not yet resolved. The shutter only rolls vertically, so the side never
+    /// changes and is resolved once from the shutter's renderer bounds.
+    /// </summary>
+    private int _shutterSide;
+
+    /// <summary>
+    /// True when the rolling shutter is closed AND <paramref name="attackerPosition"/> is on the
+    /// shutter's side of the pane, i.e. the closed shutter stands between the attacker and the
+    /// glass. Player weapons must treat the glass as unhittable in that case. The shutter has no
+    /// collider, so this geometric check is what makes it shield the pane.
+    /// </summary>
+    public bool IsShieldedFrom(Vector3 attackerPosition)
+    {
+        if (!TryGetClosedShutterPlane(out Bounds paneBounds, out Vector3 towardShutter)) return false;
+        return Vector3.Dot(attackerPosition - paneBounds.center, towardShutter) > 0f;
+    }
+
+    /// <summary>
+    /// How far (metres) beyond the pane's edges the closed shutter is still treated as covering
+    /// the opening, so a line clipping the frame edge doesn't slip past.
+    /// </summary>
+    private const float ShutterCoverMargin = 0.15f;
+
+    /// <summary>
+    /// True when the rolling shutter is closed and the segment <paramref name="from"/> →
+    /// <paramref name="to"/> passes through the window opening (from either side). Works whether
+    /// the glass is intact or smashed. The shutter has no collider, so line-of-sight checks (e.g.
+    /// melee) must call this to stop reaching through a closed shutter.
+    /// </summary>
+    public bool IsLineBlockedByShutter(Vector3 from, Vector3 to)
+    {
+        if (!TryGetClosedShutterPlane(out Bounds paneBounds, out Vector3 towardShutter)) return false;
+
+        float fromDot = Vector3.Dot(from - paneBounds.center, towardShutter);
+        float toDot   = Vector3.Dot(to   - paneBounds.center, towardShutter);
+        if (fromDot * toDot >= 0f) return false; // Doesn't cross the window plane.
+
+        Vector3 crossing = Vector3.Lerp(from, to, fromDot / (fromDot - toDot));
+        paneBounds.Expand(ShutterCoverMargin * 2f);
+        return paneBounds.Contains(crossing);
+    }
+
+    /// <summary>
+    /// When the shutter exists and is closed, returns the pane's world bounds and the pane normal
+    /// pointing toward the shutter's side. The pane bounds come from the mesh, not the renderer,
+    /// so they stay valid while the intact pane is hidden (smashed).
+    /// </summary>
+    private bool TryGetClosedShutterPlane(out Bounds paneBounds, out Vector3 towardShutter)
+    {
+        paneBounds    = default;
+        towardShutter = Vector3.zero;
+
+        ShutterController shutter = ShutterController.Instance;
+        if (shutter == null || shutter.IsOpen || _normalGlass == null) return false;
+
+        Transform pane = _normalGlass.transform;
+        paneBounds = GetPaneWorldBounds();
+
+        if (_shutterSide == 0)
+        {
+            Vector3 shutterCenter = GetBoundsCenter(shutter.gameObject, shutter.transform.position);
+            float shutterDot = Vector3.Dot(shutterCenter - paneBounds.center, pane.forward);
+            if (Mathf.Abs(shutterDot) < 0.0001f) return false;
+            _shutterSide = shutterDot > 0f ? 1 : -1;
+        }
+
+        towardShutter = pane.forward * _shutterSide;
+        return true;
+    }
+
+    /// <summary>World-space bounds of the intact pane mesh, valid even while the pane is inactive.</summary>
+    private Bounds GetPaneWorldBounds()
+    {
+        Transform pane = _normalGlass.transform;
+        MeshFilter mf = _normalGlass.GetComponent<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null)
+            return new Bounds(pane.position, Vector3.zero);
+
+        Bounds local = mf.sharedMesh.bounds;
+        Vector3 c = local.center;
+        Vector3 e = local.extents;
+        Bounds world = new Bounds(pane.TransformPoint(c), Vector3.zero);
+        for (int x = -1; x <= 1; x += 2)
+        for (int y = -1; y <= 1; y += 2)
+        for (int z = -1; z <= 1; z += 2)
+            world.Encapsulate(pane.TransformPoint(c + Vector3.Scale(e, new Vector3(x, y, z))));
+        return world;
+    }
+
+    private static Vector3 GetBoundsCenter(GameObject root, Vector3 fallback)
+    {
+        // Inactive/disabled renderers report empty bounds at the origin, so only use live ones.
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(false);
+        bool found = false;
+        Bounds bounds = default;
+        foreach (Renderer r in renderers)
+        {
+            if (!r.enabled || r is ParticleSystemRenderer) continue;
+            if (!found) { bounds = r.bounds; found = true; }
+            else        bounds.Encapsulate(r.bounds);
+        }
+        return found ? bounds.center : fallback;
+    }
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()

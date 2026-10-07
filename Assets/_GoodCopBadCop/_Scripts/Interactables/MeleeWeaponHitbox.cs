@@ -72,7 +72,9 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
     // Internal
 
-    private static readonly Collider[] OverlapBuffer = new Collider[16];
+    // Sized for busy scenes: every trigger volume nearby (interaction zones, task areas) plus an
+    // enemy's limb hitboxes all land here. At 16 the target could be cut off and the swing missed.
+    private static readonly Collider[] OverlapBuffer = new Collider[96];
 
     /// <summary>Colliders belonging to this weapon's own hierarchy, populated on Start.</summary>
     private readonly HashSet<Collider> _ownColliders = new HashSet<Collider>();
@@ -188,6 +190,12 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
         ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
 
+        // Line-of-sight origin: the swinging player's eye. Every candidate below must be visible
+        // from here, so the swing sphere can't reach through walls, intact glass or a closed shutter.
+        Camera eyeCamera = Camera.main;
+        bool checkLineOfSight = eyeCamera != null;
+        Vector3 eye = checkLineOfSight ? eyeCamera.transform.position : attackOrigin;
+
         bool anyNonSelfHit = false;
         Vector3 firstNonSelfHitPosition = attackOrigin;
         bool propHit = false;
@@ -217,16 +225,31 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             MutantEnemy enemy = col.GetComponentInParent<MutantEnemy>();
             if (enemy != null && enemy.CanBeDamagedByPlayers)
             {
-                target   = enemy;
-                hitPoint = col.ClosestPoint(attackOrigin);
+                // Prefer the nearest LimbHitbox the swing overlapped over a broad body capsule, so
+                // the hit point sits on the limb that was actually struck (drives LimbHitReactor).
+                Collider limb = CombatHitUtility.FindNearestLimbInOverlap(OverlapBuffer, hitCount, enemy, attackOrigin, out Vector3 limbPoint);
+                Vector3 bodyPoint = col.ClosestPoint(attackOrigin);
+
+                if (limb != null && (!checkLineOfSight || HasLineOfSight(eye, limbPoint, limb, enemy)))
+                    hitPoint = limbPoint;
+                else if (!checkLineOfSight || HasLineOfSight(eye, bodyPoint, col, enemy))
+                    hitPoint = bodyPoint;
+                else
+                    continue; // Behind a wall from the swinger's view; other colliders may still connect.
+
+                target = enemy;
                 return HitKind.Mutant;
             }
 
             SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
             if (suspect != null && !suspect.IsDead)
             {
+                Vector3 suspectPoint = col.ClosestPoint(attackOrigin);
+                if (checkLineOfSight && !HasLineOfSight(eye, suspectPoint, col, suspect))
+                    continue;
+
                 target   = suspect;
-                hitPoint = col.ClosestPoint(attackOrigin);
+                hitPoint = suspectPoint;
                 return HitKind.Suspect;
             }
 
@@ -242,10 +265,21 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 if (playerHealth == null)
                     continue;
 
+                Vector3 playerPoint = col.ClosestPoint(attackOrigin);
+                if (checkLineOfSight && !HasLineOfSight(eye, playerPoint, col, playerHealth))
+                    continue;
+
                 target   = playerHealth;
-                hitPoint = col.ClosestPoint(attackOrigin);
+                hitPoint = playerPoint;
                 return HitKind.Player;
             }
+
+            // Everything below is only worth considering if the swinger can actually see it. The
+            // glass pane is built from several colliders, so its own siblings mustn't block it.
+            Vector3 surfacePoint = SafeClosestPoint(col, attackOrigin);
+            BreakableGlassController glass = col.GetComponentInParent<BreakableGlassController>();
+            if (checkLineOfSight && !HasLineOfSight(eye, surfacePoint, col, glass))
+                continue;
 
             // Track the closest surface point of the first non-self, non-weapon, non-trigger
             // collider so environment hits have a meaningful spawn position. Trigger colliders
@@ -257,7 +291,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             if (!anyNonSelfHit && !col.isTrigger)
             {
                 anyNonSelfHit = true;
-                firstNonSelfHitPosition = col.ClosestPoint(attackOrigin);
+                firstNonSelfHitPosition = surfacePoint;
             }
 
             // Cosmetic hittable props (signs etc.) outrank plain geometry but not live targets,
@@ -265,16 +299,20 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             if (!propHit && !col.isTrigger && col.GetComponentInParent<HittableProp>() != null)
             {
                 propHit = true;
-                propHitPosition = col.ClosestPoint(attackOrigin);
+                propHitPosition = surfacePoint;
             }
 
             // Breakable glass is a plain MonoBehaviour singleton, so there is no NetworkObject to
             // send — the server resolves it through BreakableGlassController.Instance, exactly as
             // the existing visual ClientRpcs below already do.
-            BreakableGlassController glass = col.GetComponentInParent<BreakableGlassController>();
             if (glass != null && !glass.IsSmashed)
             {
-                hitPoint = col.ClosestPoint(attackOrigin);
+                // A closed shutter on the swinger's side shields the pane, so skip it (a solid
+                // pane collider has already been recorded above as plain environment geometry).
+                if (glass.IsShieldedFrom(GetSwingerPosition(attackOrigin)))
+                    continue;
+
+                hitPoint = surfacePoint;
                 return HitKind.Glass;
             }
         }
@@ -294,6 +332,94 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         return HitKind.None;
     }
 
+
+    /// <summary>
+    /// Where the swinging player stands, used to tell which side of the booth pane the swing comes
+    /// from. The weapon tip can poke through the thin pane, so the player's body is the reliable
+    /// reference. Falls back to the weapon position when no local player object exists.
+    /// </summary>
+    private static Vector3 GetSwingerPosition(Vector3 fallback)
+    {
+        NetworkObject player = NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient != null
+            ? NetworkManager.Singleton.LocalClient.PlayerObject
+            : null;
+        return player != null ? player.transform.position : fallback;
+    }
+
+    /// <summary>Stop the line-of-sight ray this far short of the target point so the target's own surface never counts.</summary>
+    private const float LineOfSightSkin = 0.05f;
+
+    /// <summary>
+    /// <see cref="Collider.ClosestPoint"/> only supports primitive and convex mesh colliders; for
+    /// non-convex meshes fall back to the swing origin instead of warning.
+    /// </summary>
+    private static Vector3 SafeClosestPoint(Collider col, Vector3 position)
+    {
+        if (col is MeshCollider mesh && !mesh.convex) return position;
+        return col.ClosestPoint(position);
+    }
+
+    private static readonly RaycastHit[] LineOfSightBuffer = new RaycastHit[32];
+
+    /// <summary>
+    /// True when nothing solid sits between the swinger's <paramref name="eye"/> and
+    /// <paramref name="point"/> on the candidate. Blockers are static/kinematic world geometry,
+    /// intact booth glass, and the closed rolling shutter (which has no collider, so it is tested
+    /// geometrically via <see cref="BreakableGlassController.IsLineBlockedByShutter"/>).
+    /// </summary>
+    private bool HasLineOfSight(Vector3 eye, Vector3 point, Collider targetCollider, Component targetOwner)
+    {
+        BreakableGlassController booth = BreakableGlassController.Instance;
+        if (booth != null && booth.IsLineBlockedByShutter(eye, point))
+            return false;
+
+        Vector3 delta = point - eye;
+        float distance = delta.magnitude - LineOfSightSkin;
+        if (distance <= 0f)
+            return true;
+
+        int count = Physics.RaycastNonAlloc(eye, delta / delta.magnitude, LineOfSightBuffer, distance,
+            Physics.AllLayers, QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < count; i++)
+        {
+            if (BlocksLineOfSight(LineOfSightBuffer[i].collider, targetCollider, targetOwner))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>Whether <paramref name="col"/> counts as a wall for melee line of sight.</summary>
+    private bool BlocksLineOfSight(Collider col, Collider targetCollider, Component targetOwner)
+    {
+        if (col == null || col == targetCollider || _ownColliders.Contains(col))
+            return false;
+
+        if (targetOwner != null && col.transform.IsChildOf(targetOwner.transform))
+            return false;
+
+        // Bodies (players, including the swinger and resurrected corpses, mutants, suspects) aren't walls.
+        if (col.transform.root.CompareTag(PlayerTag)
+            || col.GetComponentInParent<MutantEnemy>() != null
+            || col.GetComponentInParent<SuspectCharacter>() != null)
+            return false;
+
+        // Loose physics objects (dropped items, documents) shouldn't eat a swing.
+        Rigidbody body = col.attachedRigidbody;
+        if (body != null && !body.isKinematic)
+            return false;
+
+        // Open mesh fences and cosmetic props don't block, matching the gun rules.
+        if (col.GetComponentInParent<PerimiterFence>() != null || col.GetComponentInParent<HittableProp>() != null)
+            return false;
+
+        // Shards of a smashed window are debris, not a pane.
+        BreakableGlassController glass = col.GetComponentInParent<BreakableGlassController>();
+        if (glass != null && glass.IsSmashed)
+            return false;
+
+        return true;
+    }
 
     // Server
 
@@ -337,7 +463,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         }
 
         // Sanity bound, NOT a hit test: rejects impossible reports without re-validating the swing.
-        float distance = Vector3.Distance(targetObj.transform.position, hitPoint);
+        // Measured to the target's nearest collider, not its pivot, so big enemies (Ocho) keep limb hits.
+        float distance = CombatHitUtility.DistanceToTarget(targetObj, hitPoint);
         if (distance > MaxReportedHitDistance)
         {
             Debug.LogWarning($"[MeleeWeaponHitbox] Discarding hit report from client {senderClientId} — reported hit point is {distance:F1}m from '{targetObj.name}'.", this);

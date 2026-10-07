@@ -148,7 +148,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             // random spread against already-moved targets — so a blast that clearly connected
             // locally could deal little or nothing. See FireServerRpc.
             ResolveBlast(cam.transform.position, cam.transform.forward,
-                out NetworkObjectReference[] mutantRefs, out int[] mutantPellets,
+                out NetworkObjectReference[] mutantRefs, out int[] mutantPellets, out Vector3[] mutantPelletPoints,
                 out NetworkObjectReference[] playerRefs, out int[] playerPellets,
                 out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
                 out bool hitGlass, out Vector3[] propPoints);
@@ -158,7 +158,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             foreach (Vector3 point in propPoints)
                 HittableProp.TryHitAt(point, cam.transform.forward);
 
-            FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, playerRefs, playerPellets,
+            FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, mutantPelletPoints, playerRefs, playerPellets,
                 suspectRefs, suspectPoints, hitGlass, propPoints);
         }
     }
@@ -166,16 +166,18 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     /// <summary>
     /// Traces the pellet cone locally on the shooter's machine and accumulates how many pellets
     /// landed on each mutant and each fellow player, plus whether the booth glass was struck.
+    /// Mutant pellet impact points are returned flattened in <paramref name="mutantPelletPoints"/>,
+    /// grouped per mutant in the same order as <paramref name="mutantRefs"/> (counts = <paramref name="mutantPellets"/>).
     /// Living subjects / world NPCs are collected once each (first pellet point) — shots only make
     /// them flinch. Runs on the shooter only — the spread the player sees is the spread that is reported.
     /// </summary>
     private void ResolveBlast(Vector3 rayOrigin, Vector3 rayDirection,
-        out NetworkObjectReference[] mutantRefs, out int[] mutantPellets,
+        out NetworkObjectReference[] mutantRefs, out int[] mutantPellets, out Vector3[] mutantPelletPoints,
         out NetworkObjectReference[] playerRefs, out int[] playerPellets,
         out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
         out bool hitGlass, out Vector3[] propPoints)
     {
-        Dictionary<NetworkObject, int> mutantHits = new();
+        Dictionary<NetworkObject, List<Vector3>> mutantHits = new();
         Dictionary<NetworkObject, int> playerHits = new();
         Dictionary<NetworkObject, Vector3> suspectHits = new();
         Dictionary<HittableProp, Vector3> propHits = new();
@@ -200,8 +202,10 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
             System.Array.Sort(pelletHits, (a, b) => a.distance.CompareTo(b.distance));
 
-            foreach (RaycastHit hit in pelletHits)
+            for (int h = 0; h < pelletHits.Length; h++)
             {
+                RaycastHit hit = pelletHits[h];
+
                 // IsActive matters here: every Player prefab carries a dormant MutantEnemy (see
                 // CorpseResurrectionController) so it can later resurrect into a chasing mutant
                 // while still alive/uninfected. Without the IsActive check, a pellet hitting a
@@ -214,8 +218,16 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 {
                     if (enemy.NetworkObject != null)
                     {
-                        mutantHits.TryGetValue(enemy.NetworkObject, out int mCount);
-                        mutantHits[enemy.NetworkObject] = mCount + 1;
+                        if (!mutantHits.TryGetValue(enemy.NetworkObject, out List<Vector3> points))
+                        {
+                            points = new List<Vector3>();
+                            mutantHits[enemy.NetworkObject] = points;
+                        }
+
+                        // Prefer the LimbHitbox behind a broad body capsule so the pellet's point
+                        // lands on the limb it actually struck (drives LimbHitReactor reactions).
+                        int limbIndex = CombatHitUtility.PreferLimbAlongRay(pelletHits, h, enemy);
+                        points.Add(pelletHits[limbIndex].point);
                     }
                     break;
                 }
@@ -256,7 +268,12 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
                 BreakableGlassController glassHit = hit.collider.GetComponentInParent<BreakableGlassController>();
                 if (glassHit != null && !glassHit.IsSmashed)
+                {
+                    // A closed shutter on the shooter's side shields the pane: the pellet stops dead.
+                    if (glassHit.IsShieldedFrom(rayOrigin))
+                        break;
                     hitGlass = true;
+                }
 
                 // Cosmetic props (signs, bottles…) — one reaction per prop per blast.
                 HittableProp prop = hit.collider.GetComponentInParent<HittableProp>();
@@ -268,7 +285,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             }
         }
 
-        ToArrays(mutantHits, out mutantRefs, out mutantPellets);
+        MutantHitsToArrays(mutantHits, out mutantRefs, out mutantPellets, out mutantPelletPoints);
         ToArrays(playerHits, out playerRefs, out playerPellets);
 
         propPoints = new Vector3[propHits.Count];
@@ -283,6 +300,25 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             suspectPoints[s] = kvp.Value;
             s++;
         }
+    }
+
+    private static void MutantHitsToArrays(Dictionary<NetworkObject, List<Vector3>> hits,
+        out NetworkObjectReference[] refs, out int[] counts, out Vector3[] points)
+    {
+        refs   = new NetworkObjectReference[hits.Count];
+        counts = new int[hits.Count];
+
+        List<Vector3> flat = new List<Vector3>();
+        int index = 0;
+        foreach (var kvp in hits)
+        {
+            refs[index]   = new NetworkObjectReference(kvp.Key);
+            counts[index] = kvp.Value.Count;
+            flat.AddRange(kvp.Value);
+            index++;
+        }
+
+        points = flat.ToArray();
     }
 
     private static void ToArrays(Dictionary<NetworkObject, int> hits,
@@ -328,6 +364,12 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     // ── Combat ─────────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Sanity limit (metres) between a reported pellet point and the target's nearest collider.
+    /// Rejects impossible reports only; never re-litigates a legitimate pellet.
+    /// </summary>
+    private const float MaxReportedHitDistance = 6f;
+
+    /// <summary>
     /// Server-side: validates the shooter, spends a round, then applies the per-target pellet counts
     /// the CLIENT resolved in <see cref="ResolveBlast"/>. Damage from multiple pellets hitting the
     /// same mutant/player is accumulated into one call; the glass registers at most one hit per
@@ -339,7 +381,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     private void FireServerRpc(Vector3 rayDirection,
-        NetworkObjectReference[] mutantRefs, int[] mutantPellets,
+        NetworkObjectReference[] mutantRefs, int[] mutantPellets, Vector3[] mutantPelletPoints,
         NetworkObjectReference[] playerRefs, int[] playerPellets,
         NetworkObjectReference[] suspectRefs, Vector3[] suspectPoints,
         bool hitGlass, Vector3[] propPoints, ServerRpcParams rpcParams = default)
@@ -361,17 +403,37 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         if (mutantRefs != null && mutantPellets != null)
         {
             int count = Mathf.Min(mutantRefs.Length, mutantPellets.Length);
+            int pointOffset = 0;
             for (int i = 0; i < count; i++)
             {
+                int reportedPellets = Mathf.Max(0, mutantPellets[i]);
+                int sliceStart = pointOffset;
+                pointOffset += reportedPellets;
+
                 if (!mutantRefs[i].TryGet(out NetworkObject targetObj) || targetObj == null) continue;
 
                 MutantEnemy enemy = targetObj.GetComponent<MutantEnemy>() ?? targetObj.GetComponentInChildren<MutantEnemy>();
                 if (enemy == null) continue;
 
-                int pellets = Mathf.Clamp(mutantPellets[i], 0, _pelletCount);
+                int pellets = Mathf.Clamp(reportedPellets, 0, _pelletCount);
                 if (pellets <= 0) continue;
 
-                enemy.TakeDamage(_mutantPelletDamage * pellets, enemy.transform.position);
+                // Pellet impact points that pass the sanity bound (to the nearest collider, not the pivot).
+                List<Vector3> validPoints = new List<Vector3>(pellets);
+                if (mutantPelletPoints != null)
+                {
+                    for (int p = sliceStart; p < sliceStart + pellets && p < mutantPelletPoints.Length; p++)
+                    {
+                        if (CombatHitUtility.DistanceToTarget(targetObj, mutantPelletPoints[p]) <= MaxReportedHitDistance)
+                            validPoints.Add(mutantPelletPoints[p]);
+                    }
+                }
+
+                Vector3 damagePoint = validPoints.Count > 0 ? validPoints[0] : enemy.transform.position;
+                enemy.TakeDamage(_mutantPelletDamage * pellets, damagePoint);
+
+                if (validPoints.Count > 0)
+                    enemy.PlayLimbReactions(validPoints.ToArray(), rayDirection, _mutantPelletDamage);
             }
         }
 

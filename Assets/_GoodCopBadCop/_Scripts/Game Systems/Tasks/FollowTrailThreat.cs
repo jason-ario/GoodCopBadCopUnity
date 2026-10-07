@@ -354,7 +354,35 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     private void Update()
     {
-        if (IsSpawned) SyncEnemyCompassMarkers();
+        if (!IsSpawned) return;
+        SyncEnemyCompassMarkers();
+        ReconcileTrailParticles();
+    }
+
+    /// <summary>
+    /// True if <paramref name="go"/> is one of this peer's local trail marks. Their lifetime is owned
+    /// by the replicated <see cref="_trailParticlePositions"/> list, so per-peer sweeps (e.g.
+    /// <see cref="BloodSplatterCleanup"/>) must leave them alone — see <see cref="ReconcileTrailParticles"/>.
+    /// </summary>
+    public static bool IsLocalTrailParticle(GameObject go) =>
+        go != null && Instance != null && Instance._spawnedTrailParticles.Contains(go);
+
+    /// <summary>
+    /// Self-heals the local trail VFX against the replicated list. Every peer runs its own day
+    /// transition on its own timeline, so a peer-local sweep could destroy marks the server had
+    /// already republished for the new day; with no further list change that peer never rebuilt
+    /// them and only the other player could see the trail. Rebuilds whenever the local mirror
+    /// has lost instances or drifted in count.
+    /// </summary>
+    private void ReconcileTrailParticles()
+    {
+        if (_trailParticlesPrefab == null) return;
+
+        bool needsRebuild = _spawnedTrailParticles.Count != _trailParticlePositions.Count;
+        for (int i = 0; !needsRebuild && i < _spawnedTrailParticles.Count; i++)
+            needsRebuild = _spawnedTrailParticles[i] == null;
+
+        if (needsRebuild) RebuildTrailParticles();
     }
 
     // ── Enemy compass pips — run on ALL peers ─────────────────────────────────

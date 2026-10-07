@@ -228,8 +228,10 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
 
         ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
 
-        foreach (RaycastHit hit in hits)
+        for (int i = 0; i < hits.Length; i++)
         {
+            RaycastHit hit = hits[i];
+
             // IsActive matters here: every Player prefab carries a dormant MutantEnemy (see
             // CorpseResurrectionController) so it can later resurrect into a chasing mutant while
             // still alive/uninfected. Without the IsActive check, a shot at a perfectly living
@@ -240,7 +242,12 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             if (enemy != null && enemy.CanBeDamagedByPlayers)
             {
                 if (enemy.NetworkObject != null)
-                    return new FireHit(ShotKind.Mutant, new NetworkObjectReference(enemy.NetworkObject), hit.point);
+                {
+                    // If the ray first grazed a broad body capsule, use the LimbHitbox behind it so
+                    // the hit point lands on the actual limb (drives LimbHitReactor reactions).
+                    int limbIndex = CombatHitUtility.PreferLimbAlongRay(hits, i, enemy);
+                    return new FireHit(ShotKind.Mutant, new NetworkObjectReference(enemy.NetworkObject), hits[limbIndex].point);
+                }
                 continue;
             }
 
@@ -274,7 +281,12 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
 
             BreakableGlassController glass = hit.collider.GetComponentInParent<BreakableGlassController>();
             if (glass != null && !glass.IsSmashed)
+            {
+                // A closed shutter on the shooter's side shields the pane: the shot stops dead.
+                if (glass.IsShieldedFrom(rayOrigin))
+                    return new FireHit(ShotKind.None, default, hit.point);
                 return new FireHit(ShotKind.Glass, default, hit.point);
+            }
 
             if (hit.collider.GetComponentInParent<HittableProp>() != null)
                 return new FireHit(ShotKind.Prop, default, hit.point);
@@ -417,7 +429,8 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             return; // Target despawned between the shot and this message.
 
         // Sanity bound, NOT a hit test — rejects a report that could only come from a bug.
-        if (Vector3.Distance(targetObj.transform.position, hitPoint) > MaxReportedHitDistance)
+        // Measured to the target's nearest collider, not its pivot, so big enemies (Ocho) keep limb hits.
+        if (CombatHitUtility.DistanceToTarget(targetObj, hitPoint) > MaxReportedHitDistance)
         {
             Debug.LogWarning($"[Pistol] Discarding shot report from client {shooterClientId} — reported hit point is far from '{targetObj.name}'.");
             return;
