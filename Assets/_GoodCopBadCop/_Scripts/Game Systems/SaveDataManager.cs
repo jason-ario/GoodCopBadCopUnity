@@ -4,10 +4,11 @@ using GoodCopBadCop.Population;
 using UnityEngine;
 
 /// <summary>
-/// Owns the campaign save file. Saves are day-start checkpoints only: during a day every
-/// progression setter mutates the live in-memory slot, and nothing is written to disk until the
-/// next day begins (see <see cref="CommitDayStartCheckpoint"/>). Quitting, returning to the menu,
-/// or losing the day discards every change made since that checkpoint.
+/// Owns the campaign save file. Saves are checkpoints only: during a day every progression
+/// setter mutates the live in-memory slot, and nothing is written to disk until the next
+/// checkpoint — the start of a day (see <see cref="CommitDayStartCheckpoint"/>) or, on Day 2+,
+/// the moment that day turns to Dusk (see <see cref="CommitDuskCheckpoint"/>). Quitting,
+/// returning to the menu, or losing the day discards every change made since the last checkpoint.
 /// </summary>
 public class SaveDataManager : MonoBehaviour
 {
@@ -501,14 +502,21 @@ public class SaveDataManager : MonoBehaviour
     // Day-Start Checkpoint
     // -------------------------------------------------------------------------
 
-    /// <summary>Returns the baseline captured when the requested day began, or null.</summary>
+    /// <summary>
+    /// Returns the checkpoint snapshot for the requested day, or null. This is the day-start
+    /// baseline, or the Dusk snapshot once that day has reached Dusk (see
+    /// <see cref="CommitDuskCheckpoint"/>) — every load and retry resumes from whichever is newer.
+    /// </summary>
     public WorkdaySaveState GetDayStartWorkdayState(int day)
     {
         WorkdaySaveState state = ActiveSlot?.DayStartWorkdayState;
         return state != null && state.IsValid && state.Day == day ? state : null;
     }
 
-    /// <summary>True when the checkpoint on disk for the active slot already belongs to <paramref name="day"/>.</summary>
+    /// <summary>
+    /// True when the checkpoint on disk for the active slot already belongs to <paramref name="day"/>
+    /// (day-start or Dusk). Prevents a load/retry from overwriting the snapshot it restored from.
+    /// </summary>
     public bool HasCommittedDayStart(int day)
     {
         if (ActiveSlotIndex < 0) return false;
@@ -516,26 +524,64 @@ public class SaveDataManager : MonoBehaviour
         return state != null && state.IsValid && state.Day == day;
     }
 
-    /// <summary>
-    /// The only gameplay path that writes to disk. Stores the day-start world baseline (pickables,
-    /// carried inventory, scheduled tasks, cash) in the active slot and commits the whole slot —
-    /// including every progression change made during the previous day — as the new checkpoint.
-    /// Host-only; called by <see cref="ShiftManager"/> right after <see cref="ShiftManager.OnDayStart"/>.
-    /// </summary>
-    public void CommitDayStartCheckpoint(WorkdaySaveState baseline)
+    /// <summary>True when the checkpoint on disk for the active slot is <paramref name="day"/>'s Dusk snapshot.</summary>
+    public bool HasCommittedDuskCheckpoint(int day)
     {
-        if (ActiveSlot == null || baseline == null || !CanSave()) return;
+        if (ActiveSlotIndex < 0) return false;
+        return _committedData.Slots[ActiveSlotIndex]?.IsDuskCheckpointFor(day) ?? false;
+    }
 
-        baseline.IsValid = true;
+    /// <summary>
+    /// True when the live slot will resume <paramref name="day"/> at Dusk. Right after a revert/load
+    /// the live slot mirrors disk, so this is what <see cref="ShiftManager.ResumeSavedDay"/> reads.
+    /// </summary>
+    public bool IsResumingAtDusk(int day) => ActiveSlot?.IsDuskCheckpointFor(day) ?? false;
+
+    /// <summary>
+    /// True when starting the active slot should skip the lobby/Day 1 onboarding and drop players
+    /// straight into the saved day via <see cref="ShiftManager.ResumeSavedDay"/> — any day past
+    /// Day 1, or Day 1 itself once it has a Dusk checkpoint.
+    /// </summary>
+    public bool ShouldResumeDirectlyIntoSavedDay => CurrentDay > 1 || IsResumingAtDusk(CurrentDay);
+
+    /// <summary>
+    /// Writes the day-start world baseline (pickables, carried inventory, scheduled tasks, cash) and
+    /// commits the whole slot — including every progression change made during the previous day —
+    /// as the new checkpoint. Host-only; called by <see cref="ShiftManager"/> right after
+    /// <see cref="ShiftManager.OnDayStart"/>.
+    /// </summary>
+    public void CommitDayStartCheckpoint(WorkdaySaveState baseline) => CommitCheckpoint(baseline, "start");
+
+    /// <summary>
+    /// Writes the Dusk snapshot (the moment the day's last suspect was processed and post-shift
+    /// tasks began) over the day's start baseline and commits the whole slot, including every
+    /// progression change made during the shift. A death after the shift then reloads from Dusk
+    /// instead of replaying suspect processing. Host-only; called by <see cref="ShiftManager"/>.
+    /// </summary>
+    public void CommitDuskCheckpoint(WorkdaySaveState snapshot)
+    {
+        if (snapshot == null || snapshot.Phase != (int)ShiftManager.DayPhase.PostShift)
+        {
+            Debug.LogWarning("[SaveDataManager] CommitDuskCheckpoint ignored — snapshot is not in the PostShift phase.");
+            return;
+        }
+        CommitCheckpoint(snapshot, "Dusk");
+    }
+
+    private void CommitCheckpoint(WorkdaySaveState snapshot, string label)
+    {
+        if (ActiveSlot == null || snapshot == null || !CanSave()) return;
+
+        snapshot.IsValid = true;
         SaveSlot slot = ActiveSlot;
-        slot.DayStartWorkdayState = Clone(baseline);
-        slot.TotalCashEarned = baseline.Cash;
-        slot.PickableObjects = baseline.Pickables ?? Array.Empty<PickableObjectSaveData>();
+        slot.DayStartWorkdayState = Clone(snapshot);
+        slot.TotalCashEarned = snapshot.Cash;
+        slot.PickableObjects = snapshot.Pickables ?? Array.Empty<PickableObjectSaveData>();
         slot.LastSaved = DateTime.UtcNow;
 
         _committedData.Slots[ActiveSlotIndex] = Clone(slot);
         WriteToDisk();
-        Debug.Log($"[SaveDataManager] Day {baseline.Day} start checkpoint saved — cash: {baseline.Cash}, pickables: {slot.PickableObjects.Length}, carried items: {baseline.PlayerInventoryItemIds?.Length ?? 0}, ammo reserves: {baseline.AmmoReserves?.Length ?? 0}.");
+        Debug.Log($"[SaveDataManager] Day {snapshot.Day} {label} checkpoint saved — cash: {snapshot.Cash}, pickables: {slot.PickableObjects.Length}, carried items: {snapshot.PlayerInventoryItemIds?.Length ?? 0}, ammo reserves: {snapshot.AmmoReserves?.Length ?? 0}, pending tasks: {snapshot.PendingDailyTaskIds?.Length ?? 0}.");
     }
 
     /// <summary>
@@ -547,7 +593,7 @@ public class SaveDataManager : MonoBehaviour
         // Playtime is real time spent and must survive checkpoint reverts.
         FlushPlaytime();
         _saveData = Clone(_committedData);
-        Debug.Log("[SaveDataManager] Reverted live save data to the last day-start checkpoint.");
+        Debug.Log("[SaveDataManager] Reverted live save data to the last checkpoint (day start or Dusk).");
     }
 
     /// <summary>Invalidates the live day-start baseline once the campaign advances to a new day.</summary>
@@ -1030,11 +1076,20 @@ public class SaveSlot
     public PickableObjectSaveData[] PickableObjects = new PickableObjectSaveData[0];
 
     /// <summary>
-    /// World baseline captured right after the current day started (pickables, carried inventory,
-    /// scheduled tasks, daily pickups, cash). Every load and every day-loss retry restores this
-    /// snapshot, so a day always replays from its beginning.
+    /// World snapshot for the current day (pickables, carried inventory, scheduled tasks, daily
+    /// pickups, cash). Captured right after the day starts, then overwritten when the day reaches
+    /// Dusk (<see cref="WorkdaySaveState.Phase"/> = PostShift). Every load and every day-loss retry
+    /// restores this snapshot. Field name kept for save-file compatibility.
     /// </summary>
     public WorkdaySaveState DayStartWorkdayState = new WorkdaySaveState();
+
+    /// <summary>True when this slot's checkpoint is <paramref name="day"/>'s Dusk snapshot.</summary>
+    public bool IsDuskCheckpointFor(int day)
+    {
+        WorkdaySaveState state = DayStartWorkdayState;
+        return state != null && state.IsValid && state.Day == day &&
+               state.Phase == (int)ShiftManager.DayPhase.PostShift;
+    }
 
     [NonSerialized]
     private DateTime _lastSaved;

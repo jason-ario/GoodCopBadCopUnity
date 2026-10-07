@@ -15,9 +15,11 @@ using UnityEngine.InputSystem;
 ///  1. Upper-body layer (layer 3) is ramped to weight 1 so the emote
 ///     animation overrides the body. If it was already 1 before the
 ///     emote started it is left at 1 when done.
-///  2. The animator bool for the selected emote is set for
-///     <see cref="EmoteDefinition.Duration"/> seconds, then cleared.
-///  3. Layer 3 is restored to 0 (or left at 1 if it was already there).
+///  2. The animator trigger for the selected emote is fired (networked). The
+///     emote state exits back to Default on exit time in the animator.
+///  3. After <see cref="EmoteDefinition.Duration"/> seconds the trigger is reset
+///     (in case it went unconsumed) and layer 3 is restored to 0 (or left at 1
+///     if it was already there). Interrupting an emote resets its trigger too.
 ///
 /// While the wheel is open, movement, look rotation, and interaction are locked
 /// (mirrors the pause menu / guidebook pattern), and restored when it closes.
@@ -37,6 +39,8 @@ public class EmoteInputController : MonoBehaviour
     private bool      _wheelOpen       = false;
     private bool      _isEmoting       = false;
     private Coroutine _emoteCoroutine;
+    private string    _activeTrigger;
+    private bool      _layer3WasActiveBeforeEmote;
 
     // ─── Unity lifecycle ────────────────────────────────────────────────────
 
@@ -104,6 +108,12 @@ public class EmoteInputController : MonoBehaviour
     private void OpenWheel()
     {
         if (_wheelOpen || _isEmoting) return;
+
+        // Emoting puts the guidebook away. Close it before the wheel takes the control lock:
+        // closing afterwards would hand movement/look back while the wheel is still up, and
+        // leaving it open would let CloseWheel restore control with the book still in hand.
+        GuidebookController.CloseLocalGuidebook();
+
         _wheelOpen = true;
 
         UIController.Instance?.ShowCursor();
@@ -149,10 +159,27 @@ public class EmoteInputController : MonoBehaviour
         EmoteDefinition[] emotes = EmoteWheelUI.Instance.Emotes;
         if (index < 0 || index >= emotes.Length) return;
 
+        // Safety net for any path that plays an emote without opening the wheel first. While the
+        // wheel is open it owns the control lock, so don't hand control back here.
+        GuidebookController.CloseLocalGuidebook(restorePlayerControl: !_wheelOpen);
+
         // Selecting an emote does not close the wheel — closing is 100% driven by releasing
         // the open key/button, so the player can fire off several emotes in a row while holding it.
-        if (_emoteCoroutine != null)
+        bool interrupting = _emoteCoroutine != null;
+        if (interrupting)
+        {
             StopCoroutine(_emoteCoroutine);
+
+            // Clear the interrupted emote's trigger so it can't sit pending and replay
+            // once the upper-body layer returns to Default.
+            if (!string.IsNullOrEmpty(_activeTrigger))
+                _animController.ResetAnimTrigger(_activeTrigger);
+        }
+        else
+        {
+            // Only sample on a fresh emote — mid-emote the target weight is already 1.
+            _layer3WasActiveBeforeEmote = _animController.GetLayer3TargetWeight() >= 0.99f;
+        }
 
         _emoteCoroutine = StartCoroutine(PlayEmoteSequence(emotes[index]));
     }
@@ -160,19 +187,21 @@ public class EmoteInputController : MonoBehaviour
     private IEnumerator PlayEmoteSequence(EmoteDefinition emote)
     {
         _isEmoting = true;
-
-        // Remember whether layer 3 was already active before this emote.
-        bool layer3WasActive = _animController.GetLayer3TargetWeight() >= 0.99f;
+        _activeTrigger = emote.AnimTriggerName;
 
         _animController.SetLayer3Weight(1f);
-        _animController.SetAnimBool(emote.AnimBoolName, true);
+        _animController.SetAnimTrigger(emote.AnimTriggerName);
 
+        // The animator leaves the emote state on exit time; Duration just keeps layer 3
+        // at full weight for the clip and blocks reopening the wheel meanwhile.
         yield return new WaitForSeconds(emote.Duration);
 
-        _animController.SetAnimBool(emote.AnimBoolName, false);
+        // Clear the trigger in case it was never consumed (e.g. layer was mid-transition).
+        _animController.ResetAnimTrigger(emote.AnimTriggerName);
+        _activeTrigger = null;
 
         // Only lower layer 3 back to 0 if it wasn't already active before.
-        if (!layer3WasActive)
+        if (!_layer3WasActiveBeforeEmote)
             _animController.SetLayer3Weight(0f);
 
         yield return new WaitForSeconds(0.15f);

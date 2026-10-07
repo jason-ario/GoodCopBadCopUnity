@@ -177,8 +177,9 @@ public class StartCampaignScreen : MonoBehaviour
         SaveSlot slot = SaveDataManager.Instance?.ActiveSlot;
         int displayDay = Mathf.Max(1, slot?.CurrentDay ?? 0);
         bool isNewGame = slot == null || !slot.IsOccupied;
+        string duskSuffix = !isNewGame && slot.IsDuskCheckpointFor(slot.CurrentDay) ? " (Dusk)" : string.Empty;
 
-        dayNumberText.text = isNewGame ? $"New Game - Day {displayDay}" : $"Continue - Day {displayDay}";
+        dayNumberText.text = isNewGame ? $"New Game - Day {displayDay}" : $"Continue - Day {displayDay}{duskSuffix}";
     }
 
     private void RefreshUI()
@@ -505,7 +506,7 @@ public class StartCampaignScreen : MonoBehaviour
         // Commit the slot to disk now that the player has confirmed they want to play.
         SaveDataManager.Instance.InitialiseActiveSlot();
 
-        bool resumingPastDay1 = SaveDataManager.Instance.CurrentDay > 1;
+        bool resumingPastDay1 = SaveDataManager.Instance.ShouldResumeDirectlyIntoSavedDay;
 
         if (resumingPastDay1)
         {

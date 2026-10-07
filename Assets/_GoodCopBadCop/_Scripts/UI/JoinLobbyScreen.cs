@@ -17,7 +17,9 @@ public class JoinLobbyScreen : MonoBehaviour
     private const string ErrorSteamNotReady = "STEAM NOT CONNECTED";
     private const string ErrorJoinFailed    = "UNABLE TO JOIN LOBBY";
     private const string ErrorInvalidIP     = "INVALID IP ADDRESS";
+    private const string ErrorHostNoResponse = "HOST DID NOT RESPOND";
     private const string StatusLANReady     = "READY — PRESS JOIN TO CONNECT";
+    private const string StatusJoiningInvite = "JOINING FRIEND'S LOBBY...";
 
     private void Awake()
     {
@@ -28,6 +30,7 @@ public class JoinLobbyScreen : MonoBehaviour
     private void OnEnable()
     {
         LobbyManager.Instance.OnJoinFailed += OnJoinFailed;
+        inviteCodeInput.interactable = true;
         SetConnectingAnimationVisible(false);
         RefreshUI();
     }
@@ -36,6 +39,21 @@ public class JoinLobbyScreen : MonoBehaviour
     {
         LobbyManager.Instance.OnJoinFailed -= OnJoinFailed;
         SetConnectingAnimationVisible(false);
+    }
+
+    /// <summary>Cold-launch Steam invite: shows the connecting state with code entry locked.</summary>
+    public void ShowInviteJoining()
+    {
+        inviteCodeInput.interactable = false;
+        SetConnectingAnimationVisible(true);
+        SetStatus(StatusJoiningInvite);
+    }
+
+    /// <summary>Cold-launch Steam invite failed: shows the reason and unlocks code entry.</summary>
+    public void ShowInviteJoinFailed(string reason)
+    {
+        inviteCodeInput.interactable = true;
+        OnJoinFailed(reason);
     }
 
     /// <summary>
@@ -112,6 +130,7 @@ public class JoinLobbyScreen : MonoBehaviour
             "LobbyFull"       => ErrorLobbyFull,
             "Full"            => ErrorLobbyFull,
             "DoesntExist"     => ErrorLobbyNotFound,
+            "TIMEOUT"         => ErrorHostNoResponse,
             _                 => ErrorJoinFailed,
         });
     }

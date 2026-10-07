@@ -794,6 +794,13 @@ public class ExamNotebook : PickableObject
         SnapshotAllPages();
     }
 
+    /// <summary>Server / observers: hide or restore the separate page objects with the notebook.</summary>
+    protected override void OnHiddenForGuidebookNetworked(bool hidden)
+    {
+        SetPagesActive(!hidden);
+        if (!hidden) SnapshotAllPages();
+    }
+
     private void SubscribeToCutsceneState()
     {
         PlayerInstance player = PlayerInstance.Instance;

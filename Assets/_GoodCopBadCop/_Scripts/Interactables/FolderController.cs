@@ -356,6 +356,16 @@ public class FolderController : PickableObject
     }
 
     /// <summary>
+    /// Server / observers: the holder's guidebook hid or re-showed the folder, so hide or restore
+    /// the filed documents with it (they follow slots, they aren't children).
+    /// </summary>
+    protected override void OnHiddenForGuidebookNetworked(bool hidden)
+    {
+        SetDocumentsActive(!hidden);
+        if (!hidden) SyncOpenVisual();
+    }
+
+    /// <summary>
     /// Runs on every machine (including late updates on the owner) whenever the authoritative
     /// stowed state changes, keeping filed documents' visibility in sync with the folder.
     /// </summary>

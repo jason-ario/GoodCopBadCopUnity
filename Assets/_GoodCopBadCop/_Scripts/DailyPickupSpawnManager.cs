@@ -80,6 +80,13 @@ public class DailyPickupSpawnManager : NetworkBehaviour
         return results.ToArray();
     }
 
+    /// <summary>
+    /// Server-only. Restores (or rolls) the current day's pickups without waiting for
+    /// <see cref="ShiftManager.OnDayStart"/>, which a Dusk-checkpoint resume deliberately skips.
+    /// Idempotent per day.
+    /// </summary>
+    public void EnsureInitializedForCurrentDay() => OnDayStart();
+
     private void OnDayStart()
     {
         if (!IsServer)

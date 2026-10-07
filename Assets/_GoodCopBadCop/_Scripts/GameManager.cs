@@ -581,7 +581,7 @@ public class GameManager : NetworkBehaviour
         // saved campaign past Day 1. Running the lobby transition here instead spawned
         // players at the Day 1 tutorial/lobby positions before the resumed-day setup
         // could move them into the bunker.
-        if (SaveDataManager.Instance != null && SaveDataManager.Instance.CurrentDay > 1)
+        if (SaveDataManager.Instance != null && SaveDataManager.Instance.ShouldResumeDirectlyIntoSavedDay)
         {
             // The main menu screen is visible by default after every scene reload (see
             // MainMenuController.Start). The Day 1 lobby-transition path hides it via

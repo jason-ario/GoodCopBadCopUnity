@@ -4,7 +4,8 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Opens and closes the guidebook when the local player presses Tab.
-/// On open: deactivates the held object, locks movement and look, and sets both
+/// On open: hides the held object (locally and, via <see cref="PickableObject.RequestSetHiddenForGuidebookNetworked"/>,
+/// on the server and every observer), releases its arm IK rigs, locks movement and look, and sets both
 /// arm animators to the HoldingGuidebook state via PlayerAnimationController. Also hides the
 /// HUD and takes over the Back button (Escape / click closes the book; the exit prompt next to it
 /// shows the Tab / View key).
@@ -82,12 +83,18 @@ public class GuidebookController : MonoBehaviour
     /// <summary>
     /// Closes the local player's guidebook if it is open. Call from cutscene entry paths that
     /// take over the camera without going through <see cref="PlayerInstance.SetIsInCutscene"/>
-    /// (e.g. the intro cutscene), before they apply their own control lock.
+    /// (e.g. the intro cutscene), before they apply their own control lock. Also used by the
+    /// emote flow — performing an emote puts the book away.
+    /// Pass <paramref name="restorePlayerControl"/> = false when the caller currently owns the
+    /// player control lock (see <see cref="CloseGuidebook"/>).
     /// </summary>
-    public static void CloseLocalGuidebook()
+    public static void CloseLocalGuidebook(bool restorePlayerControl = true)
     {
-        if (Local != null && Local.IsOpen) Local.CloseGuidebook();
+        if (Local != null && Local.IsOpen) Local.CloseGuidebook(restorePlayerControl);
     }
+
+    /// <summary>True while the local player's guidebook is open.</summary>
+    public static bool IsLocalGuidebookOpen => Local != null && Local.IsOpen;
 
     /// <summary>
     /// False while the first-person rig holding the book is hidden — the intro cutscene disables
@@ -275,8 +282,27 @@ public class GuidebookController : MonoBehaviour
             held.ForceClearUseState();
 
             held.OnHiddenForGuidebook();
+
+            // Release the item's arm IK. Two-handed carries (supply box, package) pin both hands
+            // to grip targets on the item; left on, they drag the hands (and the book in them)
+            // back into the carry pose over the HoldingGuidebook animation. Networked, so
+            // observers' body rigs let go too.
+            SetHeldItemRigs(held.ItemData, false);
+
             _deactivatedHeldObject = held.gameObject;
-            _deactivatedHeldObject.SetActive(false);
+            _pickupController.IsHidingHeldItemForGuidebook = true;
+            try
+            {
+                _deactivatedHeldObject.SetActive(false);
+            }
+            finally
+            {
+                _pickupController.IsHidingHeldItemForGuidebook = false;
+            }
+
+            // Hide it on the server and every observer as well, so it never blocks the
+            // body-space guidebook other players see.
+            held.RequestSetHiddenForGuidebookNetworked(true);
         }
 
         // Freeze movement and look, stopping any active movement immediately.
@@ -333,8 +359,17 @@ public class GuidebookController : MonoBehaviour
             _deactivatedHeldObject.SetActive(true);
 
             PickableObject pickable = _deactivatedHeldObject.GetComponent<PickableObject>();
-            if (pickable != null && _pickupController.HeldObject == pickable)
+            bool stillHeld = pickable != null && _pickupController.HeldObject == pickable;
+
+            // Un-hide on the server and observers (always allowed, even if the item left the hand).
+            if (pickable != null)
+                pickable.RequestSetHiddenForGuidebookNetworked(false);
+
+            if (stillHeld)
+            {
                 pickable.OnShownAfterGuidebook();
+                SetHeldItemRigs(pickable.ItemData, true);
+            }
 
             if (pickable != null && pickable.ItemData.usesTwoArms)
                 _animationController.EnableHoldObjectTwoArmsMask();
@@ -355,6 +390,22 @@ public class GuidebookController : MonoBehaviour
         _movementController.SetCanLook(true);
         _movementController.SetCanControl(true);
         _movementController.SetCanMove(true);
+    }
+
+    /// <summary>
+    /// Turns the held item's arm IK / aim rigs off while the book is open, or back on (to the
+    /// same weights <see cref="PlayerPickupController.PickUpObject"/> uses) when it closes.
+    /// The IK targets themselves are left assigned, so restoring only needs the weights.
+    /// </summary>
+    private void SetHeldItemRigs(PickableItemData itemData, bool active)
+    {
+        if (itemData == null) return;
+        float weight = active ? 1f : 0f;
+        const float blendTime = 0.2f;
+
+        if (itemData.useRightIK) _animationController.SetRightArmRigWeightSmooth(weight, blendTime);
+        if (itemData.useLeftIK)  _animationController.SetLeftArmRigWeightSmooth(weight, blendTime);
+        if (itemData.useAimIK)   _animationController.SetAimRigWeightSmooth(weight, blendTime);
     }
 
     /// <summary>

@@ -573,6 +573,11 @@ public class Day_01 : DayBase
     private int _subjectProcessedCount;
     private TutorialObjectiveItem _taskSubjectCount;
 
+    // True on the server while/after Day 1 is rebuilt from its Dusk checkpoint (see
+    // RestoreDuskStateBeforeTasks). The post-shift tutorial then owns the first breach, so the
+    // generic breach-gate restore must not trigger it immediately.
+    private bool _resumedFromDuskCheckpoint;
+
     // -------------------------------------------------------------------------
     // DayBase Lifecycle
     // -------------------------------------------------------------------------
@@ -589,6 +594,7 @@ public class Day_01 : DayBase
 
         _dayStartedFired = false;
         _debugSkipActive = false;
+        _resumedFromDuskCheckpoint = false;
         DocumentationExamTutorialComplete = SaveDataManager.Instance?.DocumentationExamTutorialComplete ?? false;
 
         // Claim the trash/graffiti objectives for the WHOLE day — before TriggerEndOfShiftSetup
@@ -3407,11 +3413,84 @@ public class Day_01 : DayBase
         // The breach manager's spawned wave is scene-lifetime state, so it cannot survive a
         // scene reload by itself. A saved PostShift gate therefore needs a new authoritative
         // breach trigger; otherwise the restored gate has no event left that can ever complete.
-        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentPhase == ShiftManager.DayPhase.PostShift &&
+        // A Dusk-checkpoint resume is the exception: the trash/graffiti tutorial is replayed and
+        // its completion barrier (TryFinishTrashAndGraffitiTutorials) starts the breach as normal.
+        if (!_resumedFromDuskCheckpoint &&
+            ShiftManager.Instance != null && ShiftManager.Instance.CurrentPhase == ShiftManager.DayPhase.PostShift &&
             MutantBreachManager.Instance != null && !MutantBreachManager.Instance.IsBreachRunning)
         {
             MutantBreachManager.Instance.TriggerBreach(_firstBreachData);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Dusk Checkpoint Resume
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only. First half of rebuilding Day 1 from its Dusk checkpoint — the moment Vlad's
+    /// post-Alexei "good work today" megaphone line ended and <see cref="AlexeiController"/>'s
+    /// end-of-shift setup ran. Recreates what that setup left in the world that no snapshot owns:
+    /// the Soldier's ragdolled, collectible body at the booth window and the unlocked, open booth
+    /// door. Called by <see cref="ShiftManager"/> before task state is restored so the trash
+    /// task can re-adopt the body (see <see cref="RestoreDuskStateAfterTasks"/>).
+    /// </summary>
+    public void RestoreDuskStateBeforeTasks()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        _resumedFromDuskCheckpoint = true;
+
+        if (_soldierCharacter != null)
+        {
+            Transform corpseAt = _soldierBoothPos != null ? _soldierBoothPos : _soldierCharacter.transform;
+            _soldierCharacter.RestoreScriptedCorpse(corpseAt.position, corpseAt.rotation);
+        }
+        else
+        {
+            Debug.LogWarning("[Day_01] RestoreDuskStateBeforeTasks: _soldierCharacter is not assigned — no body to rebuild.");
+        }
+
+        if (AlexeiController.Instance != null)
+            AlexeiController.Instance.OpenBoothDoorForEndOfShift();
+        else
+            Debug.LogWarning("[Day_01] RestoreDuskStateBeforeTasks: AlexeiController.Instance not found — booth door not opened.");
+    }
+
+    /// <summary>
+    /// Server-only. Second half of the Dusk restore, after trash/graffiti have been rebuilt: puts
+    /// the Soldier's body back into the trash total and re-registers the breach clock-out gate
+    /// (registered at shift start in live play, which a Dusk resume never replays).
+    /// </summary>
+    public void RestoreDuskStateAfterTasks()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        TakeOutTrashTask.Instance?.AdoptPreExistingJunkAfterRestore();
+        RegisterMutantBreachGate();
+    }
+
+    /// <summary>
+    /// Server-only. Unlocks what Day 1's opening tutorial had unlocked by Dusk (folders, doc exam,
+    /// stamps, lever) while keeping the breach shovels and hammer locked for their own post-shift
+    /// tutorial beats. Used instead of <see cref="ForceUnlockTutorialItems"/> for a Dusk resume.
+    /// </summary>
+    public void UnlockTutorialItemsForDuskResume()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+        UnlockOpeningTutorialItems();
+    }
+
+    /// <summary>
+    /// Server-only. Replays the post-shift tutorial hand-off on every client once a Dusk resume
+    /// has been revealed — trash/graffiti objective rows, the Trash Spawner arrow, the
+    /// Checkpoint Integrity panel and its overlay (timed after the Dusk banner). Its
+    /// trash+graffiti barrier then starts the first breach exactly like live play.
+    /// </summary>
+    public void BeginDuskResumeTutorial()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+        TutorialTaskSync.Instance?.BroadcastTrashTaskReadyServer();
     }
 
     private void RegisterMutantBreachGate()
@@ -3595,21 +3674,7 @@ public class Day_01 : DayBase
     {
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
-        _stackOfFolders?.SetInteractable(true);
-        _documentationExamShopItem?.SetAvailable(true);
-
-        // ShopItem.SetAvailable is a purely local override and this method is server-only, so on
-        // its own the line above never reached remote clients' shops (they'd keep showing '???').
-        // Route through the synced path, which also persists the unlock to the save slot so
-        // ToolShopController.ApplyAvailabilityFromSave re-applies it on every future load.
-        if (MegaphoneDialogueManager.Instance != null && !string.IsNullOrEmpty(_documentationExamItemName))
-            MegaphoneDialogueManager.Instance.SetShopItemAvailableSynced(_documentationExamItemName);
-
-        DocumentationExamTutorialComplete = true;
-        _greenStampSlot?.SetSlotInteractable(true);
-        _yellowStampSlot?.SetSlotInteractable(true);
-        _redStampSlot?.SetSlotInteractable(true);
-        _lever?.SetInteractable(true);
+        UnlockOpeningTutorialItems();
 
         // The breach shovels are locked in DayActivated and only unlocked when Day 1's first
         // breach starts (ArmBreachShovel) or in Day 1's DayDeactivated — neither runs for a save
@@ -3625,6 +3690,26 @@ public class Day_01 : DayBase
         _hammer?.SetInteractableNetworked(true);
 
         Debug.Log("[Day_01] ForceUnlockTutorialItems: tutorial-gated items (incl. lever and hammer) unlocked for a resumed save past Day 1.");
+    }
+
+    /// <summary>Folder stack, documentation exam, stamp slots and lever — everything Day 1's opening tutorial unlocks.</summary>
+    private void UnlockOpeningTutorialItems()
+    {
+        _stackOfFolders?.SetInteractable(true);
+        _documentationExamShopItem?.SetAvailable(true);
+
+        // ShopItem.SetAvailable is a purely local override and this method is server-only, so on
+        // its own the line above never reached remote clients' shops (they'd keep showing '???').
+        // Route through the synced path, which also persists the unlock to the save slot so
+        // ToolShopController.ApplyAvailabilityFromSave re-applies it on every future load.
+        if (MegaphoneDialogueManager.Instance != null && !string.IsNullOrEmpty(_documentationExamItemName))
+            MegaphoneDialogueManager.Instance.SetShopItemAvailableSynced(_documentationExamItemName);
+
+        DocumentationExamTutorialComplete = true;
+        _greenStampSlot?.SetSlotInteractable(true);
+        _yellowStampSlot?.SetSlotInteractable(true);
+        _redStampSlot?.SetSlotInteractable(true);
+        _lever?.SetInteractable(true);
     }
 
     // -------------------------------------------------------------------------

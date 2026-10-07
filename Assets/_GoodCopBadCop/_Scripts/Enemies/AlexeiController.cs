@@ -348,13 +348,7 @@ public class AlexeiController : NetworkBehaviour
             Debug.LogWarning("[AlexeiController] EndOfShiftSetupSequence: _soldierBodySuspect is not assigned.");
 
         // Unlock and open the booth door on all clients — matches "I'm unlocking the door for you".
-        if (_boothDoor != null)
-        {
-            _boothDoor.Unlock();
-            _boothDoor.ForceOpen();
-        }
-        else
-            Debug.LogWarning("[AlexeiController] EndOfShiftSetupSequence: _boothDoor is not assigned.");
+        OpenBoothDoorForEndOfShift();
 
         // Trigger TakeOutTrashTask to spawn all task items immediately. TriggerTask registers
         // itself with ShiftManager as a pending daily task (see TakeOutTrashTask.RegisterPendingDailyTask
@@ -389,6 +383,25 @@ public class AlexeiController : NetworkBehaviour
         // marking suspects complete now cannot prime the timecard machine early — ShiftManager
         // waits for both this flag and an empty pending-task set before enabling clock-out.
         ShiftManager.Instance?.MarkSuspectsComplete();
+    }
+
+    /// <summary>
+    /// Unlocks and force-opens the booth door (both replicated). Used by the live end-of-shift
+    /// setup and by Day 1's Dusk checkpoint resume, which must land with the door already open.
+    /// Server-only.
+    /// </summary>
+    public void OpenBoothDoorForEndOfShift()
+    {
+        if (!IsServer) return;
+
+        if (_boothDoor == null)
+        {
+            Debug.LogWarning("[AlexeiController] OpenBoothDoorForEndOfShift: _boothDoor is not assigned.");
+            return;
+        }
+
+        _boothDoor.Unlock();
+        _boothDoor.ForceOpen();
     }
 
     // ── Mutant Entrance ────────────────────────────────────────────────────────

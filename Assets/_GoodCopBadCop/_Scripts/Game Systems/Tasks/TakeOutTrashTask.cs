@@ -293,6 +293,28 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         }
     }
 
+    /// <summary>
+    /// Server-only. <see cref="RestoreSaveState"/> only recreates this task's own spawned items, so
+    /// pre-existing scene junk counted by the original trigger (e.g. the Day 1 Soldier's body) is
+    /// no longer tracked and could never be credited. Call once that junk has been rebuilt: it is
+    /// re-swept into the counted set and the total is made consistent with what actually remains.
+    /// </summary>
+    public void AdoptPreExistingJunkAfterRestore()
+    {
+        if (!IsServer || !_taskActive) return;
+
+        CollectCountablePreExistingItems(includeSuspects: !_isGoreTask);
+        _countedExistingItems.RemoveAll(netObj => _spawnedItems.Contains(netObj));
+        SetTaskRequired(_countedExistingItems, true);
+
+        int savedTotal = _totalCount.Value;
+        _totalCount.Value = _depositedCount.Value + _spawnedItems.Count + _countedExistingItems.Count;
+        UpdateThreatLevel();
+
+        Debug.Log($"[TakeOutTrashTask] Adopted {_countedExistingItems.Count} pre-existing junk item(s) after restore — " +
+                  $"total {_totalCount.Value} (saved {savedTotal}), deposited {_depositedCount.Value}.");
+    }
+
     private static WorldObjectPlacementSaveData[] CapturePlacements(
         List<NetworkObject> objects,
         Dictionary<NetworkObject, WorldObjectPlacementSaveData> placements)

@@ -1305,8 +1305,42 @@ public class PlayerAnimationController : NetworkBehaviour
     public void SetAnimTrigger(string animString)
     {
         if (!IsOwner) return;
-        
+
+        // Apply locally and immediately so the owner sees no round-trip delay;
+        // the ClientRpc skips the owner so the trigger isn't fired twice.
+        bodyAnimator.SetTrigger(animString);
+        armsAnimator.SetTrigger(animString);
+
         SetAnimTriggerServerRpc(animString);
+    }
+
+    /// <summary>
+    /// Clears a pending animator trigger on all clients (e.g. an emote trigger that was
+    /// interrupted before the state machine consumed it). Owner-only.
+    /// </summary>
+    public void ResetAnimTrigger(string animString)
+    {
+        if (!IsOwner) return;
+
+        bodyAnimator.ResetTrigger(animString);
+        armsAnimator.ResetTrigger(animString);
+
+        ResetAnimTriggerServerRpc(animString);
+    }
+
+    [ServerRpc]
+    private void ResetAnimTriggerServerRpc(string animString)
+    {
+        ResetAnimTriggerClientRpc(animString);
+    }
+
+    [ClientRpc]
+    private void ResetAnimTriggerClientRpc(string animString)
+    {
+        if (IsOwner) return;
+
+        bodyAnimator.ResetTrigger(animString);
+        armsAnimator.ResetTrigger(animString);
     }
 
     /// <summary>
@@ -1339,6 +1373,9 @@ public class PlayerAnimationController : NetworkBehaviour
     [ClientRpc]
     private void SetAnimTriggerClientRpc(string animString)
     {
+        // Owner already applied it locally in SetAnimTrigger.
+        if (IsOwner) return;
+
         bodyAnimator.SetTrigger(animString);
         armsAnimator.SetTrigger(animString);
     }

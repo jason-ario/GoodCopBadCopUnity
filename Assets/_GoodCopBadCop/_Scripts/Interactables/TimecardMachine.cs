@@ -222,6 +222,10 @@ public class TimecardMachine : Interactable
         Debug.Log($"[TimecardMachine] OnShiftReady fired. CurrentDay={ShiftManager.Instance?.CurrentDay ?? -1}.");
 
         if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentDay == 1) return;
+
+        // A Dusk-checkpoint resume re-fires OnShiftReady after the PostShift state is restored;
+        // the shift is already over, so clock-in must stay disarmed (clock-out state was restored).
+        if (ShiftManager.Instance != null && ShiftManager.Instance.CurrentPhase != ShiftManager.DayPhase.PreShift) return;
         EnableClockIn();
     }
 

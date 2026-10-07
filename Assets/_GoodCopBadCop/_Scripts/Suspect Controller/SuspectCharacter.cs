@@ -1917,6 +1917,58 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
+    /// Server-only. Rebuilds a body whose death was purely scripted presentation and therefore
+    /// cannot survive a scene reload — e.g. the Day 1 Soldier, ragdolled by a Timeline signal in
+    /// the Alexei murder cutscene. Reveals the character, places it at <paramref name="position"/>,
+    /// ragdolls it on every peer, and re-enables it as collectible junk. Used by Day 1's Dusk
+    /// checkpoint resume.
+    /// </summary>
+    public void RestoreScriptedCorpse(Vector3 position, Quaternion rotation)
+    {
+        if (!IsServer || !IsSpawned) return;
+
+        ApplyScriptedCorpse(position, rotation);
+        RestoreScriptedCorpseClientRpc(position, rotation);
+
+        if (_junkItem != null)
+            EnableJunkPickup();
+    }
+
+    [ClientRpc]
+    private void RestoreScriptedCorpseClientRpc(Vector3 position, Quaternion rotation)
+    {
+        if (IsServer) return; // already applied above
+        ApplyScriptedCorpse(position, rotation);
+    }
+
+    private void ApplyScriptedCorpse(Vector3 position, Quaternion rotation)
+    {
+        SetVisualsHidden(false);
+
+        if (_navAgent == null) _navAgent = GetComponent<NavMeshAgent>();
+        if (_navAgent != null) _navAgent.enabled = false;
+
+        // Each peer places its own copy (the ragdoll is local physics, exactly like the cutscene's
+        // signal), so stop NetworkTransform from dragging the body back to a stale synced pose.
+        var networkTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
+        if (networkTransform != null) networkTransform.enabled = false;
+
+        transform.SetPositionAndRotation(position, rotation);
+        StartCoroutine(ActivateScriptedCorpseRagdollNextFrame());
+    }
+
+    private IEnumerator ActivateScriptedCorpseRagdollNextFrame()
+    {
+        // One Animator evaluation first so the ragdoll drops from a standing pose, not the bind pose.
+        yield return null;
+        RagdollController ragdoll = GetComponent<RagdollController>();
+        if (ragdoll != null)
+            ragdoll.ActivateRagdoll();
+        else
+            Debug.LogWarning($"[SuspectCharacter] '{name}' has no RagdollController — scripted corpse left standing.", this);
+    }
+
+    /// <summary>
     /// Activates the body as a collectible JunkItem on all clients. Call server-side when
     /// the suspect dies and has a JunkItem component. Re-enables the interaction collider
     /// so the body is raycasted, enables the JunkItem, and updates the interact label.

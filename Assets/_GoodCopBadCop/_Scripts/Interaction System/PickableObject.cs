@@ -168,6 +168,20 @@ public class PickableObject : Interactable
         NetworkVariableWritePermission.Server);
 
     /// <summary>
+    /// True while the holder has this item hidden in hand because their guidebook is open.
+    /// Server-authoritative so the server and every observer hide the item too; the holder
+    /// applies it locally (see <see cref="GuidebookController"/>) and ignores the echo.
+    /// Cleared by the server whenever the holder changes or the item is force-released.
+    /// </summary>
+    private NetworkVariable<bool> _isHiddenForGuidebook = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>True while the holder's guidebook is open and this held item is hidden on every peer.</summary>
+    public bool IsHiddenForGuidebook => _isHiddenForGuidebook.Value;
+
+    /// <summary>
     /// True while this item is physically contained by a supply box. The server writes this
     /// before spawning delivered contents, so every peer makes the item's colliders triggers
     /// and its rigidbodies kinematic before it can push against the box.
@@ -224,6 +238,7 @@ public class PickableObject : Interactable
         _holdingClientId.OnValueChanged             += OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged += OnNetworkInteractableOverrideChanged;
         _isStowed.OnValueChanged                    += OnIsStowedChanged;
+        _isHiddenForGuidebook.OnValueChanged        += OnIsHiddenForGuidebookChanged;
         _isContainedInSupplyBox.OnValueChanged      += OnSupplyBoxContainmentChanged;
 
         // Apply tutorial override first; fall back to holder-based logic if unset.
@@ -233,8 +248,10 @@ public class PickableObject : Interactable
         // Late joiners must not see a held item glowing (task/tutorial holds are hidden while carried).
         ApplyHeldHighlightSuppression(IsHeld);
 
-        // Late-joining clients need to inherit the current stowed visibility too.
-        gameObject.SetActive(!_isStowed.Value);
+        // Late-joining clients need to inherit the current stowed / guidebook-hidden visibility too.
+        gameObject.SetActive(!_isStowed.Value && !_isHiddenForGuidebook.Value);
+        if (_isHiddenForGuidebook.Value)
+            OnHiddenForGuidebookNetworked(true);
 
         // Late-joining clients never received PlaceInSlotClientRpc for supply-box contents,
         // so rebuild the local slot attachment from the replicated box reference/path.
@@ -270,6 +287,7 @@ public class PickableObject : Interactable
         _holdingClientId.OnValueChanged             -= OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged -= OnNetworkInteractableOverrideChanged;
         _isStowed.OnValueChanged                    -= OnIsStowedChanged;
+        _isHiddenForGuidebook.OnValueChanged        -= OnIsHiddenForGuidebookChanged;
         _isContainedInSupplyBox.OnValueChanged      -= OnSupplyBoxContainmentChanged;
 
         PickableObjectRegistry.Instance.Unregister(this);
@@ -448,6 +466,56 @@ public class PickableObject : Interactable
     }
 
     /// <summary>
+    /// Called by the holder's <see cref="GuidebookController"/> after it has hidden / re-shown
+    /// this held item locally. Replicates the hidden state to the server and every observer so
+    /// the item never blocks the body-space guidebook other players see.
+    /// </summary>
+    public void RequestSetHiddenForGuidebookNetworked(bool hidden)
+    {
+        if (!IsSpawned) return;
+        SetHiddenForGuidebookServerRpc(hidden);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SetHiddenForGuidebookServerRpc(bool hidden, ServerRpcParams rpcParams = default)
+    {
+        // Only the current holder may hide the item; a late "hide" arriving after a drop or
+        // hand-off must not make a free/someone else's item vanish. Un-hiding is always allowed.
+        if (hidden && rpcParams.Receive.SenderClientId != _holdingClientId.Value) return;
+        _isHiddenForGuidebook.Value = hidden;
+    }
+
+    /// <summary>Server-only: clears the guidebook-hidden state (release, force-drop, restore).</summary>
+    private void ClearHiddenForGuidebookServer()
+    {
+        if (IsServer && _isHiddenForGuidebook.Value)
+            _isHiddenForGuidebook.Value = false;
+    }
+
+    /// <summary>
+    /// Applies the replicated guidebook-hidden state on the server and observers. The holder
+    /// skips it: its <see cref="GuidebookController"/> already toggled the item locally, in the
+    /// right order relative to its own use/inspect cleanup hooks.
+    /// </summary>
+    private void OnIsHiddenForGuidebookChanged(bool previousValue, bool newValue)
+    {
+        NetworkManager nm = NetworkManager;
+        if (nm != null && _holdingClientId.Value == nm.LocalClientId) return;
+
+        if (newValue) ForceClearUseState();
+        gameObject.SetActive(!newValue && !_isStowed.Value);
+        OnHiddenForGuidebookNetworked(newValue);
+    }
+
+    /// <summary>
+    /// Runs on the server and observers (never the holder) when the holder's guidebook hides or
+    /// re-shows this item. Override to hide extra visuals that are not children of this object
+    /// (filed folder documents, notebook pages, supply-box contents). The holder uses
+    /// <see cref="OnHiddenForGuidebook"/> / <see cref="OnShownAfterGuidebook"/> instead.
+    /// </summary>
+    protected virtual void OnHiddenForGuidebookNetworked(bool hidden) { }
+
+    /// <summary>
     /// Stable identifier used to match this instance to its saved checkpoint data across a
     /// scene reload. Scene-placed objects keep the same GameObject/parent names across a
     /// reload, so the full hierarchy path is a reliable deterministic key (NetworkObject's
@@ -575,6 +643,7 @@ public class PickableObject : Interactable
         _pendingStowIntent = null;
         if (_isStowed.Value)
             _isStowed.Value = false;
+        ClearHiddenForGuidebookServer();
         gameObject.SetActive(true);
         RemoveParent();
 
@@ -630,6 +699,10 @@ public class PickableObject : Interactable
 
     private void OnHoldingClientChanged(ulong previous, ulong current)
     {
+        // A guidebook hide belongs to the hand that applied it; never let it outlive that hold.
+        if (previous != current)
+            ClearHiddenForGuidebookServer();
+
         // An item becomes physically independent as soon as a player claims it. The server
         // clears the replicated containment state, allowing the usual held/drop/throw flow to
         // resume identically on the host and all clients.
@@ -916,6 +989,7 @@ public class PickableObject : Interactable
         // Clear the hidden state first so the object is visible/active again on every client.
         _pendingStowIntent = null;
         if (_isStowed.Value) _isStowed.Value = false;
+        ClearHiddenForGuidebookServer();
         gameObject.SetActive(true);
 
         _holdingClientId.Value = ulong.MaxValue;
@@ -964,6 +1038,7 @@ public class PickableObject : Interactable
 
         _pendingStowIntent = null;
         if (_isStowed.Value) _isStowed.Value = false;
+        ClearHiddenForGuidebookServer();
         gameObject.SetActive(true);
 
         _holdingClientId.Value = ulong.MaxValue;

@@ -31,7 +31,7 @@ public static class HeldItemDiagnostics
 
         PlayerInstance player = PlayerInstance.Instance;
         PlayerPickupController pickup = player != null ? player.PlayerPickupController : null;
-        if (pickup == null || pickup.IsStowingHeldItem) return;
+        if (pickup == null || pickup.IsStowingHeldItem || pickup.IsHidingHeldItemForGuidebook) return;
 
         PlayerInventory inventory = player.GetComponent<PlayerInventory>();
         bool inHand = pickup.HeldObject == item;

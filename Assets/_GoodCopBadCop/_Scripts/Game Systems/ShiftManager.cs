@@ -640,6 +640,15 @@ public class ShiftManager : NetworkBehaviour
         _suspectsComplete = state.SuspectsComplete;
         _clockOutEnabledThisCycle = state.ClockOutEnabled;
         CurrentPhase = (DayPhase)Mathf.Clamp(state.Phase, (int)DayPhase.PreShift, (int)DayPhase.PostShift);
+
+        // Day 1's Dusk is the end of a scripted sequence (Alexei cutscene → Vlad's closing line →
+        // end-of-shift setup) whose world effects no snapshot owns. Rebuild them around the task
+        // restores: the Soldier's body must exist before the trash task can re-adopt it.
+        Day_01 duskDay1 = _currentDay == 1 && CurrentPhase == DayPhase.PostShift && CampaignManager.Instance != null
+            ? CampaignManager.Instance.GetDay<Day_01>()
+            : null;
+        duskDay1?.RestoreDuskStateBeforeTasks();
+
         GlobalHostVariables.Instance?.SetMoney(state.Cash);
         PickableObjectRegistry.Instance?.RestoreAll(state.Pickables);
         PickableObjectRegistry.Instance?.RestoreBackpackContents(state.Pickables);
@@ -653,6 +662,7 @@ public class ShiftManager : NetworkBehaviour
         SortMailTask.Instance?.RestoreSaveState(state.Mail);
         FenceRepairTask.Instance?.RestoreSaveState(state.FenceRepair);
         CleanBoothMessTask.Instance?.RestoreSaveState(state.BoothMess);
+        duskDay1?.RestoreDuskStateAfterTasks();
         RestorePendingDailyTaskFallbacks(state);
         RestoreOutstandingFollowTrailFallback(state);
 
@@ -676,9 +686,9 @@ public class ShiftManager : NetworkBehaviour
         }
         else
         {
+            // PostShift (Dusk checkpoint) players are placed in the booth on every peer by
+            // ResumeSavedDaySequence, so nothing is repositioned from this host-only path.
             shiftStarted.Value = false;
-            if (CurrentPhase == DayPhase.PostShift)
-                StartCoroutine(PositionPlayerForPostShiftRetry());
             if (state.ClockedOut)
                 SignalShiftEndClientRpc();
         }
@@ -692,7 +702,7 @@ public class ShiftManager : NetworkBehaviour
         if (CurrentPhase == DayPhase.PostShift && !state.ClockedOut && !_clockOutEnabledThisCycle && _pendingDailyTasks.Count == 0)
             TryEnableClockOut();
 
-        Debug.Log($"[ShiftManager] Restored Day {_currentDay} ({CurrentPhase}) from its day-start checkpoint.");
+        Debug.Log($"[ShiftManager] Restored Day {_currentDay} ({CurrentPhase}) from its {(CurrentPhase == DayPhase.PostShift ? "Dusk" : "day-start")} checkpoint.");
     }
 
     /// <summary>
@@ -721,6 +731,31 @@ public class ShiftManager : NetworkBehaviour
         if (save.HasCommittedDayStart(_currentDay)) yield break;
 
         save.CommitDayStartCheckpoint(CaptureWorkdaySaveState());
+    }
+
+    /// <summary>
+    /// Server-only. Second save point of the day: once the day reaches Dusk, the PostShift world
+    /// (shift results, cash, pickables, carried inventory, post-shift task state and pending
+    /// clock-out blockers) is committed over the day-start baseline, so dying after the shift
+    /// reloads from Dusk instead of replaying suspect processing. Waits one frame so blockers
+    /// registered by Dusk handlers/post-shift tasks (e.g. Day 2's Vlad sequence) are captured.
+    /// On Day 1 this lands right after Vlad's post-Alexei "good work today" line, once
+    /// AlexeiController's end-of-shift setup has opened the booth and assigned the chores.
+    /// </summary>
+    private IEnumerator CommitDuskCheckpointRoutine()
+    {
+        yield return null;
+        yield return new WaitWhile(() => IsRestoringWorkdayState);
+
+        if (CurrentPhase != DayPhase.PostShift) yield break;
+
+        SaveDataManager save = SaveDataManager.Instance;
+        if (save == null || save.ActiveSlot == null) yield break;
+        if (save.CurrentDay != _currentDay) yield break;
+        if (CampaignManager.Instance != null && CampaignManager.Instance.IsCampaignComplete) yield break;
+        if (save.HasCommittedDuskCheckpoint(_currentDay)) yield break;
+
+        save.CommitDuskCheckpoint(CaptureWorkdaySaveState());
     }
 
     private void Awake()
@@ -853,6 +888,9 @@ public class ShiftManager : NetworkBehaviour
         CampaignManager.Instance?.ActiveDay?.TriggerPostShiftTasks();
 
         TryEnableClockOut();
+
+        if (IsServer)
+            StartCoroutine(CommitDuskCheckpointRoutine());
     }
 
     [ClientRpc]
@@ -868,17 +906,6 @@ public class ShiftManager : NetworkBehaviour
         PlayerInstance.Instance.SetPosition(spawn);
         PlayerInstance.Instance.SetIsOutside(false);
         OnDoorLock?.Invoke();
-    }
-
-    private IEnumerator PositionPlayerForPostShiftRetry()
-    {
-        yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
-
-        Transform spawn = PlayerSpawner.Instance.GetOutsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
-        PlayerInstance.Instance.SetPosition(spawn);
-        PlayerInstance.Instance.SetIsOutside(true);
-
-        OnDoorUnlock?.Invoke();
     }
 
     /// <summary>
@@ -2032,18 +2059,30 @@ public class ShiftManager : NetworkBehaviour
     public void ResumeSavedDay()
     {
         if (IsServer)
-            ResumeSavedDayClientRpc();
+        {
+            // The host's save is authoritative; tell every peer whether this resume lands at
+            // Dusk so they all pick the same spawn point and skip the day-start beats.
+            SaveDataManager save = SaveDataManager.Instance;
+            bool atDusk = save != null && save.IsResumingAtDusk(save.CurrentDay);
+            ResumeSavedDayClientRpc(atDusk);
+        }
         else
-            StartCoroutine(ResumeSavedDaySequence());
+            StartCoroutine(ResumeSavedDaySequence(false));
     }
 
     [ClientRpc]
-    private void ResumeSavedDayClientRpc()
+    private void ResumeSavedDayClientRpc(bool atDusk)
     {
-        StartCoroutine(ResumeSavedDaySequence());
+        StartCoroutine(ResumeSavedDaySequence(atDusk));
     }
 
-    private IEnumerator ResumeSavedDaySequence()
+    /// <param name="atDusk">
+    /// True when resuming from the day's Dusk checkpoint: players land in the booth with the door
+    /// unlocked, and the day-start beats (<see cref="OnShiftReady"/>, <see cref="OnDayStart"/>, the
+    /// day-number fanfare) are skipped. Those would re-arm clock-in, replay scripted day openings
+    /// (e.g. Day 2's Vlad intro) and re-run day-start spawns/restocks. The Dusk banner is shown instead.
+    /// </param>
+    private IEnumerator ResumeSavedDaySequence(bool atDusk)
     {
         // Objective rows are added and torn down by several systems while the day bootstraps
         // (timecard reset/restore, HUDTaskList registry sync, task restores). None of those
@@ -2081,12 +2120,18 @@ public class ShiftManager : NetworkBehaviour
         // Wait for a valid PlayerInstance — same guard as SkipToBoothReadySequence.
         yield return new WaitUntil(() => PlayerInstance.Instance != null && PlayerSpawner.Instance != null);
 
-        Transform bunkerSpawn = PlayerSpawner.Instance.GetInsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
+        Transform bunkerSpawn = atDusk
+            ? PlayerSpawner.Instance.GetBoothSpawnPoint(PlayerInstance.Instance.OwnerClientId)
+            : PlayerSpawner.Instance.GetInsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
         PlayerInstance.Instance.SetPosition(bunkerSpawn);
         PlayerInstance.Instance.SetIsOutside(false);
 
         // Force the bunker door closed, matching the natural start-of-day state.
         _bunkerDoorController?.Reset();
+
+        // At Dusk the shift is over and post-shift work is outside — never leave the booth locked.
+        if (atDusk)
+            OnDoorUnlock?.Invoke();
 
         // Safety net: explicitly flip every Start Shift Gate into post-intro mode rather than
         // relying solely on OnShiftReady's event ordering (mirrors DebugConsole's day-skip commands).
@@ -2105,10 +2150,12 @@ public class ShiftManager : NetworkBehaviour
             CampaignManager campaign = CampaignManager.Instance;
 
             Day_01 day1 = campaign != null ? campaign.GetDay<Day_01>() : null;
-            if (day1 != null)
-                day1.ForceUnlockTutorialItems();
-            else
+            if (day1 == null)
                 Debug.LogWarning("[ShiftManager] ResumeSavedDay — Day_01 component not found; tutorial-gated items could not be force-unlocked.");
+            else if (_currentDay == 1 && atDusk)
+                day1.UnlockTutorialItemsForDuskResume(); // shovels/hammer stay locked for the breach tutorial
+            else
+                day1.ForceUnlockTutorialItems();
 
             // CampaignManager.StartCampaign() already restores the coupon total from the active
             // slot, but that only runs once, right as TryStartGame's RPC fires — before this
@@ -2136,14 +2183,42 @@ public class ShiftManager : NetworkBehaviour
         // has rendered from there, otherwise the first fade-out frames still show the lobby.
         yield return WaitForLocalPlayerAt(bunkerSpawn.position);
 
+        // Dusk resumes fire day events that read CurrentPhase (e.g. the timecard's clock-in
+        // guard), so the host must have finished rebuilding the PostShift state first.
+        if (atDusk && IsServer)
+        {
+            yield return new WaitWhile(() =>
+                IsRestoringWorkdayState ||
+                (CampaignManager.Instance != null && CampaignManager.Instance.HasPendingWorkdayRestore));
+        }
+
         // The screen has been held black since the top of this sequence; this is the only reveal.
         UIController.Instance.FadeOut();
 
         EnablePlayerControl();
         GameManager.Instance.OnGameStart?.Invoke();
+        // OnShiftReady still runs at Dusk (calendar date, fax/newspaper contents, gates); the
+        // timecard ignores it outside PreShift so clock-in isn't re-armed after the shift.
         OnShiftReady?.Invoke();
-        OnDayStart?.Invoke();
-        PlayShiftStartFanfare();
+        if (atDusk)
+        {
+            OnDuskBegin?.Invoke();
+
+            if (IsServer)
+            {
+                // OnDayStart is skipped at Dusk, but the day's unpicked pickups (captured in the
+                // Dusk snapshot) are still restored by their day-start handler — run it directly.
+                DailyPickupSpawnManager.Instance?.EnsureInitializedForCurrentDay();
+
+                if (_currentDay == 1)
+                    CampaignManager.Instance?.GetDay<Day_01>()?.BeginDuskResumeTutorial();
+            }
+        }
+        else
+        {
+            OnDayStart?.Invoke();
+            PlayShiftStartFanfare();
+        }
 
         // Tasks triggered by the resumed day's DayActivated() (e.g. Day 3's trash/blood tasks)
         // fired well before this HUD element was shown — force a fresh sync with TaskRegistry
@@ -2152,7 +2227,7 @@ public class ShiftManager : NetworkBehaviour
 
         StartCoroutine(EndResumeCueSuppressionWhenSettled());
 
-        Debug.Log($"[ShiftManager] ResumeSavedDay — resumed on Day {_currentDay} inside the bunker.");
+        Debug.Log($"[ShiftManager] ResumeSavedDay — resumed on Day {_currentDay} {(atDusk ? "at Dusk inside the booth" : "inside the bunker")}.");
     }
 
     /// <summary>

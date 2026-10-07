@@ -122,6 +122,19 @@ public class MainMenuController : MonoBehaviour
         }
 #endif
 
+        // Cold launch from a Steam invite: skip the home screen and show the join screen in its
+        // connecting state. The host's join routing then opens the ready-up screen or moves us
+        // into gameplay; LobbyManager calls ShowInviteJoinFailed if the join fails.
+        if (LobbyManager.IsLaunchInviteJoinPending)
+        {
+            PlayMainMenuMusic();
+            playableDirector.gameObject.SetActive(true);
+            SetMenuInteractable(true);
+            SwitchToScreen(joinGameScreen);
+            JoinScreen?.ShowInviteJoining();
+            return;
+        }
+
         // Music and the menu cutscene (cameras) start immediately, so the splash fades from black
         // straight into the live menu scene and the logos play over it.
         PlayMainMenuMusic();
@@ -154,6 +167,28 @@ public class MainMenuController : MonoBehaviour
     {
         SwitchToScreen(homeScreen);
         RefreshContinueButton();
+    }
+
+    private JoinLobbyScreen _joinScreen;
+    private JoinLobbyScreen JoinScreen =>
+        _joinScreen != null ? _joinScreen
+        : (_joinScreen = joinGameScreen != null ? joinGameScreen.GetComponentInChildren<JoinLobbyScreen>(true) : null);
+
+    /// <summary>True once the client reached the pre-game ready-up screen or the menu was hidden for gameplay.</summary>
+    public bool IsInLobbyOrGame => _currentScreen == preGameLobbyScreen || mainMenu == null || !mainMenu.activeSelf;
+
+    /// <summary>
+    /// Launch-invite fallback: shows the join screen with the failure reason, unless the player
+    /// already ended up in the lobby or in gameplay.
+    /// </summary>
+    public void ShowInviteJoinFailed(string reason)
+    {
+        if (IsInLobbyOrGame)
+            return;
+
+        if (_currentScreen != joinGameScreen)
+            SwitchToScreen(joinGameScreen);
+        JoinScreen?.ShowInviteJoinFailed(reason);
     }
 
     private void SetMenuInteractable(bool interactable)
@@ -280,9 +315,15 @@ public class MainMenuController : MonoBehaviour
         BackToHomeScreen();
     }
 
-    /// <summary>Returns to the multiplayer hub from the join screen.</summary>
-    public void BackToMultiplayerScreen() =>
+    /// <summary>Returns to the multiplayer hub from the join screen. Backing out while a
+    /// cold-launch Steam invite is still connecting cancels that join.</summary>
+    public void BackToMultiplayerScreen()
+    {
+        if (LobbyManager.IsLaunchInviteJoinPending)
+            LobbyManager.Instance?.CancelLaunchInviteJoin();
+
         SwitchToScreen(multiplayerScreen);
+    }
 
     /// <summary>
     /// Opens the pre-game lobby screen. Called after networking is established,
@@ -432,7 +473,7 @@ public class MainMenuController : MonoBehaviour
                 // Gate's Day 1 onboarding (start-shift screen + intro cutscene), and the main
                 // menu's intro cinematic entirely — the player is dropped straight into the
                 // bunker as if resuming mid-campaign. See ShiftManager.ResumeSavedDay.
-                bool resumingPastDay1 = SaveDataManager.Instance.CurrentDay > 1;
+                bool resumingPastDay1 = SaveDataManager.Instance.ShouldResumeDirectlyIntoSavedDay;
 
                 GameManager.Instance.TryStartGame();
 
@@ -659,7 +700,7 @@ public class MainMenuController : MonoBehaviour
         // Mirror ContinueGame: a save already past Day 1 skips the lobby-outside spawn, the
         // Start Shift Gate's Day 1 onboarding (start-shift screen + intro cutscene), and the
         // main menu's intro cinematic entirely — see ShiftManager.ResumeSavedDay.
-        bool resumingPastDay1 = SaveDataManager.Instance.CurrentDay > 1;
+        bool resumingPastDay1 = SaveDataManager.Instance.ShouldResumeDirectlyIntoSavedDay;
 
         GameManager.Instance.TryStartGame();
 

@@ -81,6 +81,9 @@ public class SupplyBox : PickableObject
 
     public override void OnNetworkDespawn()
     {
+        // Never leave contained items invisible if the box goes away while hidden for the guidebook.
+        SetContentsHiddenForGuidebook(false);
+
         // Unlock any items that are still registered (e.g. box destroyed while carrying items).
         // Must run before base.OnNetworkDespawn() so item NetworkVariables are still active.
         if (IsServer)
@@ -342,11 +345,65 @@ public class SupplyBox : PickableObject
     public override void OnDropped()
     {
         base.OnDropped();
+        // Contents must never stay invisible once the box leaves the hand.
+        SetContentsHiddenForGuidebook(false);
         // Restore item interactability only if the box was open when put down.
         if (!isOpen) return;
         if (IsServer)
             UnlockItemsOnServer();
         else
             UnlockItemsServerRpc();
+    }
+
+    // ── Guidebook ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Renderers on contained items this box hid for the guidebook, so exactly those are restored.
+    /// Contained items follow the box via a ParentConstraint instead of being children, so hiding
+    /// the box GameObject alone leaves them floating in front of the camera / body guidebook.
+    /// </summary>
+    private readonly List<Renderer> _contentsHiddenForGuidebook = new List<Renderer>();
+
+    public override void OnHiddenForGuidebook()
+    {
+        base.OnHiddenForGuidebook();
+        SetContentsHiddenForGuidebook(true);
+    }
+
+    public override void OnShownAfterGuidebook()
+    {
+        base.OnShownAfterGuidebook();
+        SetContentsHiddenForGuidebook(false);
+    }
+
+    protected override void OnHiddenForGuidebookNetworked(bool hidden) =>
+        SetContentsHiddenForGuidebook(hidden);
+
+    private void SetContentsHiddenForGuidebook(bool hidden)
+    {
+        if (!hidden)
+        {
+            foreach (Renderer r in _contentsHiddenForGuidebook)
+                if (r != null) r.enabled = true;
+            _contentsHiddenForGuidebook.Clear();
+            return;
+        }
+
+        NetworkManager nm = NetworkManager;
+        if (nm == null || nm.SpawnManager == null || NetworkObject == null) return;
+
+        foreach (NetworkObject netObj in nm.SpawnManager.SpawnedObjectsList)
+        {
+            if (netObj == null || netObj == NetworkObject) continue;
+            if (!netObj.TryGetComponent(out PickableObject item)) continue;
+            if (item.IsHeld || !item.IsContainedInSupplyBoxOf(NetworkObject)) continue;
+
+            foreach (Renderer r in item.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r == null || !r.enabled) continue;
+                r.enabled = false;
+                _contentsHiddenForGuidebook.Add(r);
+            }
+        }
     }
 }

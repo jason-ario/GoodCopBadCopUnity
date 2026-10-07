@@ -33,6 +33,9 @@ public class LobbyManager : MonoBehaviour
     private static void ResetStaticState()
     {
         Instance = null;
+        _launchArgsConsumed = false;
+        _launchInviteLobbyId = null;
+        _launchInviteResolved = false;
     }
 
     private void Awake()
@@ -45,6 +48,11 @@ public class LobbyManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        // Launched from a Steam invite: skip the studio splash so its logo sequence can't finish
+        // after the join and drop the player back on the home screen.
+        if (IsLaunchInviteJoinPending)
+            MainMenuSplashScreen.Suppress();
 
         InitializeSteam();
     }
@@ -127,6 +135,172 @@ public class LobbyManager : MonoBehaviour
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+
+        if (networkTransport is FacepunchTransport)
+            _ = TryJoinLobbyFromLaunchArgs();
+    }
+
+    private const string ConnectLobbyLaunchArg = "+connect_lobby";
+    private const float LaunchInviteJoinTimeoutSeconds = 20f;
+    private static bool _launchArgsConsumed;
+    private static ulong? _launchInviteLobbyId;
+    private static bool _launchInviteResolved;
+
+    /// <summary>Lobby ID from "+connect_lobby" on the command line, or 0. Parsed once.</summary>
+    private static ulong LaunchInviteLobbyId =>
+        _launchInviteLobbyId ??= ParseConnectLobbyArg(Environment.GetCommandLineArgs());
+
+    /// <summary>
+    /// True from startup until a cold-launch Steam invite join either reaches the lobby/game or
+    /// fails. While true, <see cref="MainMenuController"/> keeps the home screen hidden.
+    /// </summary>
+    public static bool IsLaunchInviteJoinPending => !_launchInviteResolved && LaunchInviteLobbyId != 0;
+
+    private const string LaunchInviteTimeoutReason = "TIMEOUT";
+    private const string LaunchInviteDisconnectedReason = "DISCONNECTED";
+
+    /// <summary>
+    /// Ends a pending launch-invite join as failed: leaves any half-joined Steam lobby / NGO
+    /// session (flagged intentional so ConnectionLossHandler doesn't reload the scene) and shows
+    /// the reason on the join screen.
+    /// </summary>
+    private async Task FailLaunchInvite(string reason)
+    {
+        if (_launchInviteResolved)
+            return;
+        _launchInviteResolved = true;
+
+        Debug.LogWarning($"[LobbyManager] Launch invite join failed: {reason}");
+
+        if (CurrentLobby.Id != 0 || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening))
+            await ExitLobbyAsync();
+
+        if (MainMenuController.Instance != null)
+            MainMenuController.Instance.ShowInviteJoinFailed(reason);
+    }
+
+    /// <summary>Player backed out of the join screen while a launch-invite join was connecting.</summary>
+    public async void CancelLaunchInviteJoin()
+    {
+        if (_launchInviteResolved)
+            return;
+        _launchInviteResolved = true;
+
+        Debug.Log("[LobbyManager] Launch invite join cancelled by player.");
+        await ExitLobbyAsync();
+    }
+
+    /// <summary>
+    /// Cold-launch invite handling. When a player accepts a Steam lobby invite while the game is
+    /// closed, Steam launches the game with "+connect_lobby &lt;lobbyId&gt;" on the command line and
+    /// does NOT raise <see cref="SteamFriends.OnGameLobbyJoinRequested"/> (that callback only fires
+    /// while the game is already running). Parse the argument once at startup and join.
+    /// </summary>
+    private async Task TryJoinLobbyFromLaunchArgs()
+    {
+        if (_launchArgsConsumed)
+            return;
+        _launchArgsConsumed = true;
+
+        ulong lobbyId = LaunchInviteLobbyId;
+        if (lobbyId == 0)
+            return;
+
+        Debug.Log($"[LobbyManager] Launched from Steam invite — {ConnectLobbyLaunchArg} {lobbyId}");
+
+        // Wait for Steam and the main menu UI to be ready so the host's join RPCs land on an
+        // initialized client (same state as accepting an invite while already in the menu).
+        const float ReadyTimeoutSeconds = 10f;
+        float waited = 0f;
+        while ((!SteamClient.IsValid || UIController.Instance == null) && waited < ReadyTimeoutSeconds)
+        {
+            await Task.Delay(100);
+            waited += 0.1f;
+            if (this == null || _launchInviteResolved)
+                return;
+        }
+
+        if (!SteamClient.IsValid)
+        {
+            Debug.LogError("[LobbyManager] Steam not initialized — cannot join lobby from launch invite.");
+            await FailLaunchInvite("STEAM_NOT_READY");
+            return;
+        }
+
+        // Capture the Steam-side failure reason (DoesntExist, Full, LobbyFull, ...) if the join fails.
+        string joinFailReason = null;
+        void CaptureJoinFail(string r) => joinFailReason ??= r;
+        OnJoinFailed += CaptureJoinFail;
+        try
+        {
+            await JoinLobbyFromInvite(lobbyId);
+        }
+        finally
+        {
+            OnJoinFailed -= CaptureJoinFail;
+        }
+
+        if (_launchInviteResolved)
+            return;
+
+        if (joinFailReason != null)
+        {
+            await FailLaunchInvite(joinFailReason);
+            return;
+        }
+
+        // The host routes us (OnClientConnected → ready-up screen or gameplay). Wait for that;
+        // fail if the connection drops (e.g. approval rejected) or the host never responds.
+        waited = 0f;
+        while (waited < LaunchInviteJoinTimeoutSeconds)
+        {
+            if (this == null || _launchInviteResolved)
+                return;
+
+            MainMenuController menu = MainMenuController.Instance;
+            if (menu != null && menu.IsInLobbyOrGame)
+            {
+                _launchInviteResolved = true;
+                Debug.Log("[LobbyManager] Launch invite join succeeded.");
+                return;
+            }
+
+            NetworkManager nm = NetworkManager.Singleton;
+            if (nm == null || !nm.IsClient)
+            {
+                string reason = nm != null && !string.IsNullOrEmpty(nm.DisconnectReason)
+                    ? nm.DisconnectReason
+                    : LaunchInviteDisconnectedReason;
+                await FailLaunchInvite(reason);
+                return;
+            }
+
+            if (CurrentLobby.Id.Value != lobbyId)
+            {
+                await FailLaunchInvite(LaunchInviteDisconnectedReason);
+                return;
+            }
+
+            await Task.Delay(100);
+            waited += 0.1f;
+        }
+
+        await FailLaunchInvite(LaunchInviteTimeoutReason);
+    }
+
+    private static ulong ParseConnectLobbyArg(string[] args)
+    {
+        if (args == null)
+            return 0;
+
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], ConnectLobbyLaunchArg, StringComparison.OrdinalIgnoreCase) &&
+                ulong.TryParse(args[i + 1], out ulong id))
+                return id;
+        }
+
+        return 0;
     }
 
     private void Update()
@@ -605,10 +779,27 @@ public class LobbyManager : MonoBehaviour
         }
     }
 
-    private void OnGameLobbyJoinRequested(Lobby lobby, SteamId friendId)
+    private async void OnGameLobbyJoinRequested(Lobby lobby, SteamId friendId)
     {
         Debug.Log($"Steam invite accepted from {friendId} for lobby {lobby.Id}");
-        JoinLobby(lobby.Id);
+        await JoinLobbyFromInvite(lobby.Id);
+    }
+
+    /// <summary>Shared invite join path for both in-game (callback) and cold-launch (command line) invites.</summary>
+    private async Task JoinLobbyFromInvite(ulong lobbyId)
+    {
+        if (CurrentLobby.Id.Value == lobbyId)
+        {
+            Debug.Log($"[Invite] Already in lobby {lobbyId} — ignoring.");
+            return;
+        }
+
+        // Leave any lobby/session we're still in, otherwise StartClient would be skipped.
+        if (CurrentLobby.Id != 0 || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening))
+            await ExitLobbyAsync();
+
+        DevSpectatorRegistry.IsLocalSpectating = false;
+        await JoinLobbyInternal(lobbyId, "127.0.0.1");
     }
 
     // =========================
@@ -849,7 +1040,43 @@ public class LobbyManager : MonoBehaviour
         else
         {
             Debug.Log($"[Host] IsTransitioningToLobby=true — spawn deferred to LobbyTransitionSequence for clientId={clientId}");
+            _ = RerouteIfDeferredClientMissed(clientId);
         }
+    }
+
+    /// <summary>
+    /// SERVER: the deferred branch above assumes LobbyTransitionSequence will spawn this client.
+    /// That's only true when the transition actually runs. The host/new-game flows clear the flag
+    /// via CancelLobbyTransition without running it, which would leave the joiner stuck on the
+    /// main menu. Once the flag clears, re-run routing if the client still has no player object.
+    /// </summary>
+    private async Task RerouteIfDeferredClientMissed(ulong clientId)
+    {
+        const float TimeoutSeconds = 30f;
+        float waited = 0f;
+
+        while (waited < TimeoutSeconds)
+        {
+            await Task.Delay(250);
+            waited += 0.25f;
+
+            NetworkManager nm = NetworkManager.Singleton;
+            if (this == null || nm == null || !nm.IsServer || GameManager.Instance == null)
+                return;
+            if (!nm.ConnectedClients.TryGetValue(clientId, out NetworkClient client))
+                return; // Disconnected meanwhile.
+            if (GameManager.Instance.IsTransitioningToLobby)
+                continue;
+
+            if (client.PlayerObject != null)
+                return; // LobbyTransitionSequence (or a resumed-day spawn) handled it.
+
+            Debug.Log($"[Host] Lobby transition ended without routing clientId={clientId} — re-routing.");
+            OnClientConnected(clientId);
+            return;
+        }
+
+        Debug.LogWarning($"[Host] clientId={clientId} still deferred after {TimeoutSeconds}s — IsTransitioningToLobby never cleared.");
     }
 
     // =========================

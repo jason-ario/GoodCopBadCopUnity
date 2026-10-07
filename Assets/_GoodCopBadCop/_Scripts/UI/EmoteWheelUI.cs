@@ -20,14 +20,14 @@ public class EmoteWheelUI : MonoBehaviour
              "up by Name via PlayEmote(string).")]
     [SerializeField] private EmoteDefinition[] _emotes = new EmoteDefinition[]
     {
-        new EmoteDefinition { Name = "Wave",          AnimBoolName = "Waving",       Duration = 2.5f },
-        new EmoteDefinition { Name = "Shrug",         AnimBoolName = "Shrug",        Duration = 2.0f },
-        new EmoteDefinition { Name = "Dance",         AnimBoolName = "Dance",        Duration = 4.0f },
-        new EmoteDefinition { Name = "Thumbs Up",     AnimBoolName = "ThumbsUp",     Duration = 2.0f },
-        new EmoteDefinition { Name = "Puke",          AnimBoolName = "Puke",         Duration = 3.0f },
-        new EmoteDefinition { Name = "Cough",         AnimBoolName = "Cough",        Duration = 2.5f },
-        new EmoteDefinition { Name = "Point",         AnimBoolName = "Point",        Duration = 2.0f },
-        new EmoteDefinition { Name = "Middle Finger", AnimBoolName = "MiddleFinger", Duration = 1.5f },
+        new EmoteDefinition { Name = "Wave",          AnimTriggerName = "Waving",        Duration = 2.5f },
+        new EmoteDefinition { Name = "Shrug",         AnimTriggerName = "Shrug",         Duration = 2.0f },
+        new EmoteDefinition { Name = "Dance",         AnimTriggerName = "Dance",         Duration = 4.0f },
+        new EmoteDefinition { Name = "Thumbs Up",     AnimTriggerName = "Thumbs Up",     Duration = 2.0f },
+        new EmoteDefinition { Name = "Puke",          AnimTriggerName = "Puke",          Duration = 3.0f },
+        new EmoteDefinition { Name = "Cough",         AnimTriggerName = "Cough",         Duration = 2.5f },
+        new EmoteDefinition { Name = "Point",         AnimTriggerName = "Point",         Duration = 2.0f },
+        new EmoteDefinition { Name = "Middle Finger", AnimTriggerName = "Middle Finger", Duration = 1.5f },
     };
 
     /// <summary>Fired with the selected emote index when the player clicks an emote button.</summary>

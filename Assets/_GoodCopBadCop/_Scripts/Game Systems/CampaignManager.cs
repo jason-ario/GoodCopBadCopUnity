@@ -229,11 +229,11 @@ public class CampaignManager : NetworkBehaviour
         if (IsServer)
             TryEnsurePopulationInitialized();
 
-        // Saves only ever load from the start of a day. Grab the day-start checkpoint before
-        // activation so the freshly rolled task output can be replaced with the saved baseline.
-        // Day 1 has no prior day to carry state from, so it always starts from the scene's
-        // authored state (which also guarantees Vlad's tutorial runs from the top).
-        _pendingWorkdayRestore = IsServer && _currentDay > 1
+        // Saves load from the start of a day, or from its Dusk checkpoint. Grab the snapshot before
+        // activation so the freshly rolled task output can be replaced with the saved state.
+        // Day 1's day-start always replays from the scene's authored state (which also guarantees
+        // Vlad's tutorial runs from the top); only its Dusk checkpoint is restored.
+        _pendingWorkdayRestore = IsServer && (_currentDay > 1 || SaveDataManager.Instance.IsResumingAtDusk(_currentDay))
             ? SaveDataManager.Instance?.GetDayStartWorkdayState(_currentDay)
             : null;
 

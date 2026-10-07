@@ -1407,6 +1407,12 @@ public class PlayerPickupController : NetworkBehaviour
     /// </summary>
     public bool IsStowingHeldItem { get; private set; }
 
+    /// <summary>
+    /// True only while <see cref="GuidebookController"/> is deactivating the held item for the open
+    /// guidebook, so <see cref="HeldItemDiagnostics"/> doesn't report it as an unexpected deactivation.
+    /// </summary>
+    public bool IsHidingHeldItemForGuidebook { get; set; }
+
     private PickableObject StowCurrentItemToPointInternal(Transform stowPoint)
     {
         PickableObject stowed = _heldObject;

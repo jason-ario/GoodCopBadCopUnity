@@ -70,6 +70,11 @@ public class ConnectionLossHandler : MonoBehaviour
         if (LobbyManager.IsIntentionalDisconnect)
             return;
 
+        // A cold-launch Steam invite that never finished connecting (e.g. rejected as full) is a
+        // failed join, not a lost connection: LobbyManager shows the reason on the join screen.
+        if (LobbyManager.IsLaunchInviteJoinPending)
+            return;
+
         // Only react to the local client losing its own connection, not other players
         // disconnecting from a session we're hosting.
         bool isLocalClient = _networkManager != null && clientId == _networkManager.LocalClientId;
