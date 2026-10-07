@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Graffiti 2 Decal
-  m_Shader: {fileID: 4800000, guid: 39d94f4992ea08f41b12c64c801645ea, type: 3}
+  m_Shader: {fileID: 4800000, guid: 5f86f55cbca6ec242a89717a6f1458a7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -27,16 +27,42 @@ Material:
         m_Texture: {fileID: 2800000, guid: 0ad3bc7a2501fd04e98595084bfe692d, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RevealMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AlphaTest: 0
+    - _BoxEdgeFade: 0
+    - _BoxEdgeFadeY: 0
+    - _Cutoff: 0.5
+    - _Desaturate: 0
     - _EdgeWidth: 0.07
     - _FoamBrightness: 1.6
     - _NoiseScale: 30
     - _NoiseSpeed: 0
+    - _NormalScale: 1
+    - _RevealEdgeSoftness: 0.5
+    - _RevealFalloff: 1
+    - _RevealNoiseScale: 4
+    - _RevealNoiseSoftness: 0.12
     - _ScrubProgress: 0
+    - _Smoothness: 0.5
+    - _UVAlphaThreshold: 0
+    - _UVGlowEdgeSoftness: 0.5
+    - _UVGlowFalloff: 1
+    - _UVGlowIntensity: 0
+    - _UVOnly: 0
     - _WarpStrength: 0.08
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _FoamColor: {r: 0.92, g: 0.96, b: 1, a: 1}
+    - _RevealColor: {r: 1, g: 1, b: 1, a: 1}
+    - _UVGlowColor: {r: 0.35, g: 1, b: 0.1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
