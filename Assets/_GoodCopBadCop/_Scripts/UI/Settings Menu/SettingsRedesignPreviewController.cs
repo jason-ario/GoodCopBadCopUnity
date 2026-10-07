@@ -1188,24 +1188,25 @@ namespace GoodCopBadCop.UI.SettingsMenu
             if (confirmationDialog == null) return;
             confirmationDialog.Show(
                 "Restore Defaults",
-                "Reset all settings to their default values?",
+                $"Reset all {activeTab} settings to their default values?",
                 "Restore",
                 "Cancel",
-                RestoreAllDefaults);
+                RestoreActiveTabDefaults);
         }
 
-        private void RestoreAllDefaults()
+        // Only the tab the player is viewing is reset; other tabs keep their configured values.
+        private void RestoreActiveTabDefaults()
         {
-            Setting[][] allTabs = { Gameplay, Graphics, Audio, Controls };
-            foreach (Setting[] tab in allTabs)
-                foreach (Setting setting in tab)
-                    setting.ResetToDefault();
+            Tab tabToRestore = activeTab;
+            Setting[] tabSettings = GetSettings(tabToRestore);
 
-            foreach (Setting[] tab in allTabs)
-                foreach (Setting setting in tab)
-                    Apply(setting);
+            foreach (Setting setting in tabSettings)
+                setting.ResetToDefault();
 
-            SelectTab(activeTab);
+            foreach (Setting setting in tabSettings)
+                Apply(setting);
+
+            SelectTab(tabToRestore);
         }
 
         private void RequestClose()

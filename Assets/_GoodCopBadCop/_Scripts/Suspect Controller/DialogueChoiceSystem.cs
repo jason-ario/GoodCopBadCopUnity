@@ -57,6 +57,13 @@ public class DialogueChoiceSystem : NetworkBehaviour
     // mode, so they can't visually block the suspect camera view. Restored in ShowPlayerBody.
     private readonly List<GameObject> _hiddenOtherPlayerBodies = new();
 
+    // Renderers disabled outside the Art / Player_Arms roots: the local held world item (driven by
+    // a ParentConstraint, not parented under the arms) and the throw arc. Restored with the arms.
+    private readonly List<Renderer> _hiddenLocalRenderers = new();
+
+    // Other players' held world items, hidden locally alongside their bodies. Restored in ShowOtherPlayers.
+    private readonly List<Renderer> _hiddenOtherPlayerRenderers = new();
+
     // ── Controller choice navigation ─────────────────────────────────────────
 
     /// <summary>Index of the choice currently highlighted by the controller (-1 = none).</summary>
@@ -119,6 +126,16 @@ public class DialogueChoiceSystem : NetworkBehaviour
         UIController.Instance?.HideBackButton();
         UIController.Instance?.HideCursor();
         PlayerInstance.Instance?.SetIsInCutscene(false);
+
+        // Held items may be dropped into the world when the player object is replaced — make
+        // sure they (and other players' bodies/items) aren't left invisible.
+        if (_restoreArmsCoroutine != null)
+        {
+            StopCoroutine(_restoreArmsCoroutine);
+            _restoreArmsCoroutine = null;
+        }
+        RestoreRenderers(_hiddenLocalRenderers);
+        ShowOtherPlayers();
     }
 
     /// <summary>
@@ -728,7 +745,40 @@ public class DialogueChoiceSystem : NetworkBehaviour
         else
             Debug.LogWarning("[DialogueChoiceSystem] HidePlayerBody: could not find 'CinemachineCamera/Arms_Socket/Player_Arms' — arms will remain visible.");
 
+        // Held world items follow the hand via ParentConstraint rather than being parented under
+        // Player_Arms, so deactivating the arms does not hide them. Disable their renderers instead
+        // (never SetActive — the item is a NetworkObject with live state).
+        var pickup = PlayerInstance.Instance.GetComponent<PlayerPickupController>();
+        if (pickup != null && pickup.HeldObject != null)
+            HideRenderers(pickup.HeldObject.gameObject, _hiddenLocalRenderers);
+
+        // Remaining player-root renderers outside Art / Player_Arms (e.g. the throw arc).
+        foreach (var line in PlayerInstance.Instance.GetComponentsInChildren<LineRenderer>())
+            HideRenderer(line, _hiddenLocalRenderers);
+
         HideOtherPlayers();
+    }
+
+    private static void HideRenderers(GameObject root, List<Renderer> hidden)
+    {
+        foreach (var renderer in root.GetComponentsInChildren<Renderer>())
+            HideRenderer(renderer, hidden);
+    }
+
+    private static void HideRenderer(Renderer renderer, List<Renderer> hidden)
+    {
+        if (renderer == null || !renderer.enabled || hidden.Contains(renderer)) return;
+        renderer.enabled = false;
+        hidden.Add(renderer);
+    }
+
+    private static void RestoreRenderers(List<Renderer> hidden)
+    {
+        foreach (var renderer in hidden)
+            if (renderer != null)
+                renderer.enabled = true;
+
+        hidden.Clear();
     }
 
     /// <summary>
@@ -749,6 +799,11 @@ public class DialogueChoiceSystem : NetworkBehaviour
             NetworkObject playerObject = client.PlayerObject;
             if (playerObject == null || playerObject == localPlayerObject) continue;
 
+            // Their held world item is constraint-driven, not under Art — hide it separately.
+            PickableObject otherHeld = playerObject.GetComponent<PlayerPickupController>()?.ProxyHeldObject;
+            if (otherHeld != null)
+                HideRenderers(otherHeld.gameObject, _hiddenOtherPlayerRenderers);
+
             GameObject otherBody = playerObject.transform.Find("Art")?.gameObject;
             if (otherBody == null || !otherBody.activeSelf) continue;
 
@@ -765,6 +820,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
                 body.SetActive(true);
 
         _hiddenOtherPlayerBodies.Clear();
+        RestoreRenderers(_hiddenOtherPlayerRenderers);
     }
 
     /// <summary>
@@ -774,11 +830,12 @@ public class DialogueChoiceSystem : NetworkBehaviour
     /// </summary>
     private void ShowPlayerBody()
     {
-        if (_playerArms != null)
+        if (_playerArms != null || _hiddenLocalRenderers.Count > 0)
         {
-            // The arms ride on the player's head camera, so re-enabling them immediately makes them
-            // float in front of the dialogue / suspect camera while the view blends back to first
-            // person. Defer until the camera transition has finished.
+            // The arms (and the held item, which tracks the arms' hand socket) ride on the player's
+            // head camera, so re-enabling them immediately makes them float in front of the dialogue /
+            // suspect camera while the view blends back to first person. Defer until the camera
+            // transition has finished.
             if (_restoreArmsCoroutine != null) StopCoroutine(_restoreArmsCoroutine);
             _restoreArmsCoroutine = StartCoroutine(RestoreArmsAfterCameraTransition());
         }
@@ -819,6 +876,8 @@ public class DialogueChoiceSystem : NetworkBehaviour
         }
 
         _restoreArmsCoroutine = null;
+
+        RestoreRenderers(_hiddenLocalRenderers);
 
         if (_playerArms == null) yield break;
         _playerArms.SetActive(true);
