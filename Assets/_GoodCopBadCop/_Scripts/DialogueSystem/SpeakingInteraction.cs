@@ -197,11 +197,11 @@ public class SpeakingInteraction : NetworkBehaviour
             // Catch a mid-conversation joiner up with the choice panel that's already open,
             // so they can immediately take part in the vote.
             SplitChoiceTexts(_lastShownWorldChoiceTexts, out string c0, out string c1, out string c2);
-            ShowWorldChoicesClientRpc(c0, c1, c2, targetParams);
+            ShowWorldChoicesClientRpc(c0, c1, c2, _worldGateId, targetParams);
         }
         else if (_awaitingWorldAdvance)
         {
-            SetWorldAwaitingAdvanceClientRpc(true, targetParams);
+            SetWorldAwaitingAdvanceClientRpc(true, _worldGateId, targetParams);
         }
     }
 
@@ -491,8 +491,18 @@ public class SpeakingInteraction : NetworkBehaviour
     private string[] _lastShownWorldChoiceTexts;
     private Action<int> _onWorldChoiceResolved;
 
+    // Server-only: incremented every time an advance gate or choice vote opens. Clients echo the
+    // id they were shown with each vote so a press/pick still in flight from the PREVIOUS line
+    // (the loop opens the next gate one frame after the last one closes, faster than any client
+    // round-trip) can't be counted as that player's vote on the new line. Without this, the
+    // partner's single press made the count 2/2 and opened the gate instantly with no timer.
+    private int _worldGateId;
+
     // Client-only: true while the server is waiting for this client to advance the current line.
     private bool _clientAwaitingWorldAdvance;
+
+    // Client-only: gate id of the advance gate / choice vote most recently shown to this client.
+    private int _clientWorldGateId;
 
     /// <summary>True on this client while the server is waiting for it to advance the current world-dialogue line.</summary>
     public bool IsAwaitingWorldAdvance => _clientAwaitingWorldAdvance;
@@ -537,33 +547,48 @@ public class SpeakingInteraction : NetworkBehaviour
     /// </summary>
     public void ServerBeginWorldAdvanceGate(Action onOpened)
     {
+        _worldGateId++;
         _worldAdvanceSet.Clear();
         _worldAdvanceReady = false;
         _awaitingWorldAdvance = true;
         _onWorldAdvanceOpened = onOpened;
-        SetWorldAwaitingAdvanceClientRpc(true, WorldParticipantRpcParams());
+        SetWorldAwaitingAdvanceClientRpc(true, _worldGateId, WorldParticipantRpcParams());
     }
 
     [ClientRpc]
-    private void SetWorldAwaitingAdvanceClientRpc(bool awaiting, ClientRpcParams rpcParams = default)
+    private void SetWorldAwaitingAdvanceClientRpc(bool awaiting, int gateId, ClientRpcParams rpcParams = default)
     {
         _clientAwaitingWorldAdvance = awaiting;
+        if (awaiting) _clientWorldGateId = gateId;
         OnWorldAdvanceGateChanged?.Invoke(awaiting);
     }
 
     /// <summary>
-    /// Sent by a participant pressing E/click to advance the current greeting/response line.
-    /// After the first submission a countdown begins; the gate opens once every current
-    /// participant has submitted or the countdown expires — mirrors
-    /// <c>ScriptedDialogueRunner.AdvanceScriptedLineServerRpc</c>.
+    /// Called locally by a participant pressing E/click to advance the current greeting/response
+    /// line. Tags the vote with the gate id this client was shown, so the server can reject it if
+    /// it arrives after that line already closed.
+    /// </summary>
+    public void SubmitWorldAdvance()
+    {
+        if (!_clientAwaitingWorldAdvance) return;
+        SubmitWorldAdvanceServerRpc(_clientWorldGateId);
+    }
+
+    /// <summary>
+    /// Server side of <see cref="SubmitWorldAdvance"/>. After the first submission a countdown
+    /// begins; the gate opens once every current participant has submitted or the countdown
+    /// expires — mirrors <c>ScriptedDialogueRunner.AdvanceScriptedLineServerRpc</c>. Votes from a
+    /// previous gate or from clients not engaged in this conversation are ignored.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    public void SubmitWorldAdvanceServerRpc(ServerRpcParams rpcParams = default)
+    private void SubmitWorldAdvanceServerRpc(int gateId, ServerRpcParams rpcParams = default)
     {
         if (!_awaitingWorldAdvance || _worldAdvanceReady) return;
+        if (gateId != _worldGateId) return;
 
         ulong senderId = rpcParams.Receive.SenderClientId;
-        _worldParticipants.Add(senderId);
+        if (!_worldParticipants.Contains(senderId)) return;
+
         _worldAdvanceSet.Add(senderId);
 
         int required = Mathf.Max(1, _worldParticipants.Count);
@@ -607,7 +632,7 @@ public class SpeakingInteraction : NetworkBehaviour
         }
 
         HideWorldAdvanceTimerClientRpc(WorldParticipantRpcParams());
-        SetWorldAwaitingAdvanceClientRpc(false, WorldParticipantRpcParams());
+        SetWorldAwaitingAdvanceClientRpc(false, _worldGateId, WorldParticipantRpcParams());
 
         // Reuse the shared subtitle-advance broadcast so the waiting line is cleared for every
         // participant exactly the same way a normal (non-voted) advance would clear it.
@@ -634,6 +659,7 @@ public class SpeakingInteraction : NetworkBehaviour
     /// </summary>
     public void ServerBeginWorldChoiceVote(string[] choiceTexts, Action<int> onResolved)
     {
+        _worldGateId++;
         _worldChoiceSubmissions.Clear();
         _worldChoicePlayerNames.Clear();
         _worldChoiceResolved = false;
@@ -642,7 +668,7 @@ public class SpeakingInteraction : NetworkBehaviour
         _lastShownWorldChoiceTexts = choiceTexts;
         _onWorldChoiceResolved = onResolved;
         SplitChoiceTexts(choiceTexts, out string c0, out string c1, out string c2);
-        ShowWorldChoicesClientRpc(c0, c1, c2, WorldParticipantRpcParams());
+        ShowWorldChoicesClientRpc(c0, c1, c2, _worldGateId, WorldParticipantRpcParams());
     }
 
     private static void SplitChoiceTexts(string[] texts, out string choice0, out string choice1, out string choice2)
@@ -653,8 +679,9 @@ public class SpeakingInteraction : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void ShowWorldChoicesClientRpc(string choice0, string choice1, string choice2, ClientRpcParams rpcParams = default)
+    private void ShowWorldChoicesClientRpc(string choice0, string choice1, string choice2, int gateId, ClientRpcParams rpcParams = default)
     {
+        _clientWorldGateId = gateId;
         var texts = new List<string> { choice0, choice1 };
         if (!string.IsNullOrEmpty(choice2)) texts.Add(choice2);
         OnWorldChoicesShown?.Invoke(texts.ToArray());
@@ -669,18 +696,19 @@ public class SpeakingInteraction : NetworkBehaviour
     public void SubmitWorldChoicePick(int choiceIndex)
     {
         DialogueChoiceSystem.Instance.HighlightChoice(choiceIndex);
-        SubmitWorldChoiceServerRpc(choiceIndex, GetLocalPlayerName());
+        SubmitWorldChoiceServerRpc(choiceIndex, GetLocalPlayerName(), _clientWorldGateId);
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SubmitWorldChoiceServerRpc(int choiceIndex, string playerName, ServerRpcParams rpcParams = default)
+    private void SubmitWorldChoiceServerRpc(int choiceIndex, string playerName, int gateId, ServerRpcParams rpcParams = default)
     {
-        if (_worldChoiceResolved) return;
+        if (!_awaitingWorldChoice || _worldChoiceResolved) return;
+        if (gateId != _worldGateId) return; // pick from an earlier vote still in flight
 
         ulong senderId = rpcParams.Receive.SenderClientId;
+        if (!_worldParticipants.Contains(senderId)) return;
         if (_worldChoiceSubmissions.ContainsKey(senderId)) return; // ignore re-submissions
 
-        _worldParticipants.Add(senderId);
         _worldChoiceSubmissions[senderId] = choiceIndex;
         _worldChoicePlayerNames[senderId] = playerName;
 

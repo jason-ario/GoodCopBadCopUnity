@@ -512,6 +512,12 @@ public class DialogueChoiceSystem : NetworkBehaviour
             return;
         }
 
+        // This player already voted on the open scripted/world choice and is waiting for the
+        // other participant (or the timeout). Never fall through to the legacy booth path below:
+        // world dialogue doesn't set ScriptedDialogueRunner.IsScriptedModeActive, so a second
+        // click used to hide the panel and fire ChooseDialogueChoiceServerRpc.
+        if (_localChoiceLocked) return;
+
         // If scripted mode is still active but this player already picked, ignore the click.
         if (ScriptedDialogueRunner.IsScriptedModeActive) return;
         dialogueChoiceContainer.SetActive(false);

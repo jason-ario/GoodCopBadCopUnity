@@ -69,6 +69,8 @@ namespace GoodCopBadCop.Settings
         ReadOnlyReactiveProperty<EQualityPreset> QualityPreset { get; }
         ReadOnlyReactiveProperty<float> Brightness { get; }
         ReadOnlyReactiveProperty<bool> FilmGrainEnabled { get; }
+        ReadOnlyReactiveProperty<float> ControllerLookSensitivity { get; }
+        ReadOnlyReactiveProperty<bool> ControllerInvertYAxis { get; }
     }
 
     public sealed class SettingsModel : ISettingsModel, IDisposable
@@ -149,6 +151,12 @@ namespace GoodCopBadCop.Settings
         public readonly PersistentReactiveProperty<bool> FilmGrainEnabledMutable =
             new("settings.graphics.filmGrainEnabled", true);
 
+        public readonly PersistentReactiveProperty<float> ControllerLookSensitivityMutable =
+            new("settings.controls.controllerLookSensitivity", 50f);
+
+        public readonly PersistentReactiveProperty<bool> ControllerInvertYAxisMutable =
+            new("settings.controls.controllerInvertYAxis", false);
+
         public ReadOnlyReactiveProperty<EDisplayMode> DisplayMode => DisplayModeMutable;
         public ReadOnlyReactiveProperty<EScreenResolution> ScreenResolution => ScreenResolutionMutable;
         public ReadOnlyReactiveProperty<bool> VSyncEnabled => VSyncEnabledMutable;
@@ -174,6 +182,8 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<EQualityPreset> QualityPreset => QualityPresetMutable;
         public ReadOnlyReactiveProperty<float> Brightness => BrightnessMutable;
         public ReadOnlyReactiveProperty<bool> FilmGrainEnabled => FilmGrainEnabledMutable;
+        public ReadOnlyReactiveProperty<float> ControllerLookSensitivity => ControllerLookSensitivityMutable;
+        public ReadOnlyReactiveProperty<bool> ControllerInvertYAxis => ControllerInvertYAxisMutable;
 
         public void Flush()
         {
@@ -202,6 +212,8 @@ namespace GoodCopBadCop.Settings
             QualityPresetMutable.Flush();
             BrightnessMutable.Flush();
             FilmGrainEnabledMutable.Flush();
+            ControllerLookSensitivityMutable.Flush();
+            ControllerInvertYAxisMutable.Flush();
         }
 
         public void Dispose()
@@ -231,6 +243,8 @@ namespace GoodCopBadCop.Settings
             QualityPresetMutable.Dispose();
             BrightnessMutable.Dispose();
             FilmGrainEnabledMutable.Dispose();
+            ControllerLookSensitivityMutable.Dispose();
+            ControllerInvertYAxisMutable.Dispose();
         }
     }
 }

@@ -398,6 +398,7 @@ public class LobbyManager : MonoBehaviour
 
         DevSpectatorRegistry.IsLocalSpectating = false;
         DevSpectatorRegistry.ClearServerState();
+        PlayerSessionIdentity.ClearServerState();
         NetworkManager.Singleton.NetworkConfig.ConnectionData = DevSpectatorConfig.BuildConnectionPayload(false);
 
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
@@ -913,13 +914,19 @@ public class LobbyManager : MonoBehaviour
             return;
         }
 
+        // Remember who this is so a player who left while dead can be recognised on rejoin
+        // (see ReviveManager.ShouldSpawnAsDeadServer).
+        PlayerSessionIdentity.RegisterClient(request.ClientNetworkId, request.Payload);
         response.Approved = true;
     }
 
     private void OnClientDisconnected(ulong clientId)
     {
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        {
             DevSpectatorRegistry.UnregisterSpectator(clientId);
+            PlayerSessionIdentity.UnregisterClient(clientId);
+        }
     }
 
     private async void OnClientConnected(ulong clientId)

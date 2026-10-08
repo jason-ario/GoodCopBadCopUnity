@@ -185,6 +185,18 @@ public class PlayerSpawner : NetworkBehaviour
             return null;
         }
 
+        // A player who died today and left (e.g. Back to Menu) must not bypass death by rejoining:
+        // their new player object spawns already dead and they go straight to spectating. Revives
+        // clear the record first (ReviveManager), so replacement/revive spawns are never affected.
+        bool spawnDead = !replaceExistingPlayerObject
+            && ReviveManager.Instance != null
+            && ReviveManager.Instance.ShouldSpawnAsDeadServer(clientId);
+        if (spawnDead && go.TryGetComponent(out PlayerHealth playerHealth))
+        {
+            playerHealth.PrepareToSpawnDeadServer();
+            Debug.Log($"[PlayerSpawner] Client {clientId} died earlier today and rejoined — spawning as dead spectator.");
+        }
+
         networkObject.SpawnAsPlayerObject(clientId);
 
         var playerInstance = go.GetComponent<PlayerInstance>();

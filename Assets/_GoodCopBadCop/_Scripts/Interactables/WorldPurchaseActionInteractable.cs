@@ -88,6 +88,8 @@ public class WorldPurchaseActionInteractable : Interactable
 
     private const string PurchaseSuccessMessage = "Done!";
     private const string NotEnoughMoneyMessage  = "Not enough coupons!";
+    private const string AlreadyPurchasedMessage = "Already purchased!";
+    private const string PurchaseUnavailableMessage = "Not available yet, try again in a moment.";
 
     // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -258,26 +260,42 @@ public class WorldPurchaseActionInteractable : Interactable
         if (_shopItem == null || !_shopItem.IsAvailable) return;
         if (!HasEnoughMoney()) return;
 
-        // Deduct money — SubtractMoneyFromClient routes through ServerRpc if called from a client.
-        GlobalHostVariables.Instance?.SubtractMoneyFromClient(_shopItem.Price);
-        UIController.Instance.ShowPurchaseNotification(PurchaseSuccessMessage);
-
-        // If the NetworkObject is spawned, broadcast the purchase to all clients via RPC.
-        // Fallback to direct invocation when offline or when the NetworkObject isn't yet spawned
-        // (can happen if ApplySmash was called outside a networked context, e.g. via cheat console
-        // before a host session is running).
         if (NetworkObject != null && NetworkObject.IsSpawned)
         {
+            // Server-authoritative: the server re-validates availability and funds, charges once,
+            // then broadcasts the effect. Two players buying at the same moment can no longer both
+            // be charged or both fire the effect.
             ExecutePurchaseServerRpc();
         }
-        else
+        else if (HasLocalAuthority())
         {
+            // Offline, or the host before this stand's NetworkObject has spawned (e.g. a cheat
+            // console smash before a session is running). The effect itself (e.g.
+            // BreakableGlassController.ResetGlass) publishes any replicated state from here.
+            GlobalHostVariables.Instance?.SubtractMoneyFromClient(_shopItem.Price);
             _onPurchaseConfirmed?.Invoke();
             SetAvailable(false);
             PersistUnlock();
         }
+        else
+        {
+            // A connected client whose copy of this stand isn't spawned yet has no route to the
+            // host. Never apply the effect locally — that would only change THIS player's world.
+            Debug.LogWarning($"[WorldPurchaseActionInteractable] '{name}' is not network-spawned on this client yet; purchase not sent.");
+            UIController.Instance.ShowShopNotification(PurchaseUnavailableMessage);
+            ClosePurchaseView();
+            return;
+        }
 
+        UIController.Instance.ShowPurchaseNotification(PurchaseSuccessMessage);
         ClosePurchaseView();
+    }
+
+    /// <summary>True on the host/server, or when there is no live network session.</summary>
+    private static bool HasLocalAuthority()
+    {
+        var nm = NetworkManager.Singleton;
+        return nm == null || !nm.IsListening || nm.IsServer;
     }
 
     private bool HasEnoughMoney()
@@ -294,8 +312,25 @@ public class WorldPurchaseActionInteractable : Interactable
     // ─── Networking ─────────────────────────────────────────────────────────────
 
     [ServerRpc(RequireOwnership = false)]
-    private void ExecutePurchaseServerRpc()
+    private void ExecutePurchaseServerRpc(ServerRpcParams rpcParams = default)
     {
+        ulong buyer = rpcParams.Receive.SenderClientId;
+
+        // Another player may have bought it a moment earlier (e.g. the glass was already repaired).
+        if (!_availableLocal || _shopItem == null || !_shopItem.IsAvailable)
+        {
+            RejectPurchase(buyer, AlreadyPurchasedMessage);
+            return;
+        }
+
+        // Charge on the server so the funds check and the deduction are atomic.
+        var host = GlobalHostVariables.Instance;
+        if (host != null && !host.SubtractMoney(_shopItem.Price))
+        {
+            RejectPurchase(buyer, NotEnoughMoneyMessage);
+            return;
+        }
+
         // Runs only on the server — the correct, authoritative place to persist the unlock.
         PersistUnlock();
 
@@ -306,6 +341,9 @@ public class WorldPurchaseActionInteractable : Interactable
             _persistentUnlockReplayed = true;
             _netPurchased.Value = true;
         }
+
+        // Close the window for any concurrent request immediately, before the ClientRpc lands.
+        _availableLocal = false;
 
         ExecutePurchaseClientRpc();
     }
@@ -322,6 +360,21 @@ public class WorldPurchaseActionInteractable : Interactable
 
         _onPurchaseConfirmed?.Invoke();
         SetAvailable(false);
+    }
+
+    /// <summary>Tells only the requesting client that its purchase was refused by the server.</summary>
+    private void RejectPurchase(ulong clientId, string message)
+    {
+        PurchaseRejectedClientRpc(message, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+        });
+    }
+
+    [ClientRpc]
+    private void PurchaseRejectedClientRpc(string message, ClientRpcParams clientRpcParams = default)
+    {
+        UIController.Instance?.ShowShopNotification(message);
     }
 
     /// <summary>

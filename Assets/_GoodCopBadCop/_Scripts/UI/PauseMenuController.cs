@@ -1,6 +1,7 @@
 using GoodCopBadCop.UI.SettingsMenu;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using R3;
@@ -130,6 +131,24 @@ public class PauseMenuController : MonoBehaviour
         HideTransientPanels();
         mainMenu.SetActive(true);
         SetPauseMenuShellVisible(true);
+        _returnedToMainListFrame = Time.frameCount;
+    }
+
+    // Frame the pause button list was (re)shown. The B press that closed Settings or a dialog in
+    // that frame must not also resume the game.
+    private int _returnedToMainListFrame = -1;
+
+    /// <summary>Gamepad B on the pause button list resumes, mirroring Start. Settings and the
+    /// confirmation dialog handle B themselves while they're open.</summary>
+    private void Update()
+    {
+        if (!(Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)) return;
+        if (Time.frameCount == _returnedToMainListFrame) return;
+        if (isSettingsOpen || mainMenu == null || !mainMenu.activeInHierarchy) return;
+        if (ConfirmationDialogController.IsAnyOpen || ConfirmationDialogController.CancelHandledThisFrame) return;
+        if (UIController.Instance == null || !UIController.Instance.IsPaused) return;
+
+        ResumeGame();
     }
 
     private void CloseSettingsMenu()

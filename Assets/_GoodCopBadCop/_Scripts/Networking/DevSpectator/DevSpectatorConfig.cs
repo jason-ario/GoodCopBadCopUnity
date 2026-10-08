@@ -47,10 +47,16 @@ public static class DevSpectatorConfig
     /// <summary>True when the local Steam user is whitelisted as a developer.</summary>
     public static bool IsLocalDev => SteamClient.IsValid && IsDevSteamId(SteamClient.SteamId.Value);
 
-    /// <summary>Builds the NGO connection payload. Empty for regular players.</summary>
+    /// <summary>
+    /// Builds the NGO connection payload. Regular players send their stable
+    /// <see cref="PlayerSessionIdentity"/> so the host can recognise them when they rejoin.
+    /// </summary>
     public static byte[] BuildConnectionPayload(bool asSpectator)
     {
-        if (!asSpectator || !SteamClient.IsValid)
+        if (!asSpectator)
+            return PlayerSessionIdentity.BuildPayload();
+
+        if (!SteamClient.IsValid)
             return Array.Empty<byte>();
 
         return Encoding.UTF8.GetBytes(SpectatorPayloadPrefix + SteamClient.SteamId.Value);

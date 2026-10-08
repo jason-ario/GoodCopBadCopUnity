@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using GoodCopBadCop.Input;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using Unity.VisualScripting;
@@ -266,10 +267,11 @@ public class PlayerPickupController : NetworkBehaviour
             ApplyBodyConstraint();
     }
 
-    // RT (rightTrigger) = LMB, LT (leftTrigger) = RMB — mirrors PlayerInteractionController.
-    private bool LmbHeld => Input.GetMouseButton(0)   || (Gamepad.current?.rightTrigger.isPressed             ?? false);
-    private bool LmbUp   => Input.GetMouseButtonUp(0) || (Gamepad.current?.rightTrigger.wasReleasedThisFrame  ?? false);
-    private bool RmbUp   => Input.GetMouseButtonUp(1) || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
+    // UseItem (RT by default) = LMB, PlaceObject (LT by default) = RMB — mirrors PlayerInteractionController.
+    // Gamepad controls follow the rebindable bindings in RebindableInput.
+    private bool LmbHeld => Input.GetMouseButton(0)   || RebindableInput.GetGamepadHeld(GameAction.UseItem);
+    private bool LmbUp   => Input.GetMouseButtonUp(0) || RebindableInput.GetGamepadUp(GameAction.UseItem);
+    private bool RmbUp   => Input.GetMouseButtonUp(1) || RebindableInput.GetGamepadUp(GameAction.PlaceObject);
 
     void Update()
     {

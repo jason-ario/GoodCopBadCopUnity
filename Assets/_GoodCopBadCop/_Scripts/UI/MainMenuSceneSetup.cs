@@ -40,6 +40,7 @@ public class MainMenuSceneSetup : MonoBehaviour
         }
 
         DisableBreakableGlass();
+        MainMenuController.GameplayEntered += OnGameplayEntered;
 
         if (GameManager.Instance != null)
         {
@@ -53,6 +54,8 @@ public class MainMenuSceneSetup : MonoBehaviour
 
     private void OnDestroy()
     {
+        MainMenuController.GameplayEntered -= OnGameplayEntered;
+
         if (_waitingForSplash)
             MainMenuSplashScreen.MenuFadeInStarted -= OnSplashMenuFadeInStarted;
 
@@ -141,6 +144,23 @@ public class MainMenuSceneSetup : MonoBehaviour
         GameManager.Instance.OnGameStart -= OnGameStart;
 
         EnableVignette();
+        EnableBreakableGlass();
+    }
+
+    /// <summary>
+    /// Connected clients re-enable the glass as soon as they enter gameplay by ANY path. Late
+    /// joiners and resumed-day clients never receive <see cref="GameManager.OnGameStart"/>, so
+    /// their Breakable Glass used to stay inactive and never subscribe to the replicated glass
+    /// state. The host keeps its original OnGameStart timing because it restores the glass from
+    /// its save file on first enable.
+    /// </summary>
+    private void OnGameplayEntered()
+    {
+        var nm = Unity.Netcode.NetworkManager.Singleton;
+        bool isConnectedClient = nm != null && nm.IsListening && !nm.IsServer;
+        if (!isConnectedClient) return;
+        if (breakableGlass == null || breakableGlass.activeSelf) return;
+
         EnableBreakableGlass();
     }
 

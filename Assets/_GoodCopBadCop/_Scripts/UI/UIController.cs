@@ -121,6 +121,11 @@ public class UIController : MonoBehaviour
 
         bool pauseInput = escapePausePressed
                           || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
+
+        // A Settings rebind owns Start / Escape (cancel) and any pressed key/button while listening.
+        if (GoodCopBadCop.UI.SettingsMenu.SettingsRedesignPreviewController.IsRebindConsumingInput)
+            pauseInput = false;
+
         if (pauseInput)
         {
             if (pauseMenuOpened)

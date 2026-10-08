@@ -640,11 +640,12 @@ public class SuspectWorldDialogue : MonoBehaviour
         // Second input (or first when the typewriter already finished): vote to advance. The
         // gate only opens — clearing the subtitle and moving on to the next line/options — once
         // every current participant has voted, or the timeout fires (see
-        // SpeakingInteraction.SubmitWorldAdvanceServerRpc).
+        // SpeakingInteraction.SubmitWorldAdvance). The vote is tagged with this line's gate id so
+        // it can never be counted against the next line if it arrives late.
         // Close this player's own spoken-choice echo immediately. The shared NPC response still
         // waits for every participant's advance vote (or its timeout) before progressing.
         DialogueManager.Instance.DismissOwnChoiceEchoOnAdvance();
-        speaking.SubmitWorldAdvanceServerRpc();
+        speaking.SubmitWorldAdvance();
     }
 
     private static readonly List<RaycastResult> _uiRaycastResults = new List<RaycastResult>();

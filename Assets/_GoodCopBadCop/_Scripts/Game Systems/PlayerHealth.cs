@@ -76,6 +76,17 @@ public class PlayerHealth : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// True when this player object was spawned already dead because its owner died earlier
+    /// today, left the session and rejoined. Such an object never fires <see cref="OnDeath"/>
+    /// (no ragdoll, corpse, item drop or death analytics) and has no visible body; see
+    /// <see cref="PlayerInstance"/> for the bodiless presentation and the spectate hand-off.
+    /// </summary>
+    private readonly NetworkVariable<bool> _networkSpawnedDead = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
 
     // Local accessors
 
@@ -84,6 +95,9 @@ public class PlayerHealth : NetworkBehaviour
 
     /// <summary>Whether this player is dead, readable on all clients.</summary>
     public bool IsDead => _networkIsDead.Value;
+
+    /// <summary>Whether this player object was spawned dead for a rejoining dead player. Readable on all clients.</summary>
+    public bool SpawnedDead => _networkSpawnedDead.Value;
 
     /// <summary>The gameplay effect key associated with the latest health mutation.</summary>
     public string LastHealthEffectKey => _networkHealth.Value.EffectKey.ToString();
@@ -104,6 +118,15 @@ public class PlayerHealth : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        // Applied before subscribing so no value change is observed: OnDeath never fires, and
+        // the dead state reaches every client as part of the initial spawn sync.
+        if (IsServer && _spawnDeadPending)
+        {
+            _spawnDeadPending = false;
+            _networkIsDead.Value = true;
+            _networkSpawnedDead.Value = true;
+        }
 
         _networkHealth.OnValueChanged += HandleHealthChanged;
         _networkIsDead.OnValueChanged += HandleDeadChanged;
@@ -168,6 +191,24 @@ public class PlayerHealth : NetworkBehaviour
         else
             ResetHealthServerRpc();
     }
+
+    /// <summary>
+    /// SERVER ONLY, and only BEFORE this object is spawned. Marks the player to spawn already dead
+    /// so every peer receives the dead state as its initial value. Because no value change is
+    /// observed, <see cref="OnDeath"/> never fires for this object.
+    /// </summary>
+    public void PrepareToSpawnDeadServer()
+    {
+        if (IsSpawned)
+        {
+            Debug.LogError("[PlayerHealth] PrepareToSpawnDeadServer must be called before the player object is spawned.");
+            return;
+        }
+
+        _spawnDeadPending = true;
+    }
+
+    private bool _spawnDeadPending;
 
 
     // ServerRpcs

@@ -79,7 +79,7 @@ public class PlayerEquipmentController : NetworkBehaviour
     {
         if (!IsOwner) return;
         if (!_isMaskEquipped.Value) return;
-        if (RebindableInput.GetKeyDown(GameAction.ToggleMask))
+        if (RebindableInput.GetKeyDown(GameAction.ToggleMask) || RebindableInput.GetGamepadDown(GameAction.ToggleMask))
             UnequipMask();
     }
 

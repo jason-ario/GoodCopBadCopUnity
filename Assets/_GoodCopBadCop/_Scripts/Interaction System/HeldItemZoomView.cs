@@ -12,9 +12,13 @@ using UnityEngine.Rendering.Universal;
 /// so it shares the mini fridge / tool locker behaviour: Cinemachine blend in, movement +
 /// interaction locked, cursor shown, cursor-driven panning, Q / back button to exit.
 ///
+/// Gamepad: the ZoomHeldItem gamepad binding (D-pad down by default, rebindable) opens and closes zoom,
+/// the right stick pans (replacing the cursor while a gamepad is the active device), and B exits
+/// through the Back button's <see cref="GamepadBackButtonActivator"/>.
+///
 /// Differences from the scene-placed diegetic views:
 ///  • Lives on the Player prefab (one shared camera) and opens itself from
-///    <see cref="GameAction.ZoomHeldItem"/> (F by default, rebindable) or gamepad R3 while the
+///    <see cref="GameAction.ZoomHeldItem"/> (F / D-pad down by default, both rebindable) while the
 ///    held item has a <see cref="HeldItemZoomable"/>.
 ///  • Documents (<see cref="HeldItemZoomable.InspectWhileZoomed"/>): zoom behaves exactly as if
 ///    LMB were held for its whole duration (<see cref="PlayerPickupController.BeginHeldUseFromZoom"/>)
@@ -35,7 +39,7 @@ using UnityEngine.Rendering.Universal;
 public class HeldItemZoomView : DiegeticViewController
 {
     [Header("Held Item Zoom")]
-    [Tooltip("Also toggle with the gamepad right stick press.")]
+    [Tooltip("Also toggle with the ZoomHeldItem gamepad binding (D-pad down by default).")]
     [SerializeField] private bool _allowGamepadToggle = true;
 
     [Tooltip("Near clip plane used for the whole time zoom is open, starting on the first frame of the blend in, so the " +
@@ -236,7 +240,7 @@ public class HeldItemZoomView : DiegeticViewController
     private bool TogglePressed()
     {
         if (RebindableInput.GetKeyDown(GameAction.ZoomHeldItem)) return true;
-        return _allowGamepadToggle && (Gamepad.current?.rightStickButton.wasPressedThisFrame ?? false);
+        return _allowGamepadToggle && RebindableInput.GetGamepadDown(GameAction.ZoomHeldItem);
     }
 
     /// <summary>
@@ -250,6 +254,9 @@ public class HeldItemZoomView : DiegeticViewController
         if (IsAnyViewActive) return false;
         if (UIController.Instance == null || UIController.Instance.IsPaused) return false;
         if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsInCutscene) return false;
+        // The default gamepad toggle (D-pad down) also navigates dialogue choices, popups and other
+        // modal UI, all of which disable player control — never open zoom from those.
+        if (PlayerInstance.Instance != null && !PlayerInstance.Instance.CanControl) return false;
         if (!_pickup.CanPickUpAndPlace || !_interaction.CanInteract) return false;
 
         PickableObject held = _pickup.HeldObject;
@@ -448,11 +455,10 @@ public class HeldItemZoomView : DiegeticViewController
         bool paused = UIController.Instance != null && UIController.Instance.IsPaused;
         if (!paused)
         {
-            float normX = Mathf.Clamp((Input.mousePosition.x / Screen.width) * 2f - 1f, -1f, 1f);
-            float normY = Mathf.Clamp((Input.mousePosition.y / Screen.height) * 2f - 1f, -1f, 1f);
+            Vector2 panInput = ReadPanInput();
             Vector3 targetPan = new Vector3(
-                normX * _target.PanX * _framedHalfSize,
-                normY * _target.PanY * _framedHalfSize,
+                panInput.x * _target.PanX * _framedHalfSize,
+                panInput.y * _target.PanY * _framedHalfSize,
                 0f);
 
             float smoothing = _target.PanSmoothing;
@@ -462,6 +468,22 @@ public class HeldItemZoomView : DiegeticViewController
         }
 
         ApplyCameraPose();
+    }
+
+    /// <summary>
+    /// Normalized pan input in [-1, 1] per axis. Keyboard/mouse: cursor position relative to the
+    /// screen centre. Gamepad (active device): right stick deflection acts as the cursor offset,
+    /// so releasing the stick recentres the view.
+    /// </summary>
+    private static Vector2 ReadPanInput()
+    {
+        Gamepad gamepad = Gamepad.current;
+        if (ActiveInputDeviceTracker.IsGamepad && gamepad != null)
+            return Vector2.ClampMagnitude(gamepad.rightStick.ReadValue(), 1f);
+
+        float normX = Mathf.Clamp((Input.mousePosition.x / Screen.width) * 2f - 1f, -1f, 1f);
+        float normY = Mathf.Clamp((Input.mousePosition.y / Screen.height) * 2f - 1f, -1f, 1f);
+        return new Vector2(normX, normY);
     }
 
     private void ApplyCameraPose()

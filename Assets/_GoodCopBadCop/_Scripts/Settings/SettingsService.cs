@@ -29,6 +29,8 @@ namespace GoodCopBadCop.Settings
         void SetQualityPreset(EQualityPreset qualityPreset);
         void SetBrightness(float value);
         void SetFilmGrainEnabled(bool isEnabled);
+        void SetControllerLookSensitivity(float value);
+        void SetControllerInvertYAxis(bool isInverted);
         void Flush();
     }
 
@@ -182,6 +184,19 @@ namespace GoodCopBadCop.Settings
         public void SetFilmGrainEnabled(bool isEnabled)
         {
             model.FilmGrainEnabledMutable.Value = isEnabled;
+        }
+
+        public void SetControllerLookSensitivity(float value)
+        {
+            model.ControllerLookSensitivityMutable.Value = UnityEngine.Mathf.Clamp(
+                value,
+                MinimumMouseSensitivity,
+                MaximumMouseSensitivity);
+        }
+
+        public void SetControllerInvertYAxis(bool isInverted)
+        {
+            model.ControllerInvertYAxisMutable.Value = isInverted;
         }
 
         public void Flush()

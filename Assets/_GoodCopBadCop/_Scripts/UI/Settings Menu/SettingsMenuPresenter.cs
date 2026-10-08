@@ -40,6 +40,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             view.FpsLimitChanged.Subscribe(OnFpsLimitChanged).AddTo(ref disposables);
             view.MouseSensitivityChanged.Subscribe(OnMouseSensitivityChanged).AddTo(ref disposables);
             view.InvertYAxisChanged.Subscribe(OnInvertYAxisChanged).AddTo(ref disposables);
+            view.ControllerLookSensitivityChanged.Subscribe(OnControllerLookSensitivityChanged).AddTo(ref disposables);
+            view.ControllerInvertYAxisChanged.Subscribe(OnControllerInvertYAxisChanged).AddTo(ref disposables);
             view.CrouchModeChanged.Subscribe(OnCrouchModeChanged).AddTo(ref disposables);
             view.SprintModeChanged.Subscribe(OnSprintModeChanged).AddTo(ref disposables);
             view.RunningEffectsEnabledChanged.Subscribe(OnRunningEffectsEnabledChanged).AddTo(ref disposables);
@@ -87,6 +89,14 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             settingsModel.InvertYAxis
                 .Subscribe(view.SetInvertYAxisValue)
+                .AddTo(ref disposables);
+
+            settingsModel.ControllerLookSensitivity
+                .Subscribe(view.SetControllerLookSensitivityValue)
+                .AddTo(ref disposables);
+
+            settingsModel.ControllerInvertYAxis
+                .Subscribe(view.SetControllerInvertYAxisValue)
                 .AddTo(ref disposables);
 
             settingsModel.CrouchMode
@@ -219,6 +229,16 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private void OnInvertYAxisChanged(bool isInverted)
         {
             settingsService.SetInvertYAxis(isInverted);
+        }
+
+        private void OnControllerLookSensitivityChanged(float value)
+        {
+            settingsService.SetControllerLookSensitivity(value);
+        }
+
+        private void OnControllerInvertYAxisChanged(bool isInverted)
+        {
+            settingsService.SetControllerInvertYAxis(isInverted);
         }
 
         private void OnCrouchModeChanged(int value)

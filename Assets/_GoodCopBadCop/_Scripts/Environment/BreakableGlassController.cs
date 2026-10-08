@@ -19,8 +19,11 @@ using UnityEngine.Rendering;
 /// – Every peer receives the change (and the initial value at spawn / on join) via
 ///   <see cref="GlobalHostVariables.GlassHitsChanged"/> and applies it in
 ///   <see cref="ApplyGlassState"/>, which is idempotent.
-/// – The existing <see cref="OnHitByMutant"/> / <see cref="ApplySmash"/> ClientRpc entry points are
-///   kept purely for one-shot feedback (sound, shake, shards) and still converge on the same state.
+/// – On connected clients the replicated value is the ONLY thing that changes the glass state.
+///   The <see cref="OnHitByMutant"/> / <see cref="ApplySmash"/> / <see cref="ResetGlass"/> ClientRpc
+///   entry points only play feedback there. The shatter and repair effects play when the replicated
+///   value changes live. A dropped, late or duplicated RPC (any player count, late joiners) can
+///   therefore never leave a client showing a different window than the host.
 ///
 /// This replaces the previous ClientRpc-only approach, where crack progress, the smashed state and
 /// the repair interactable's visibility could permanently diverge between clients: RPCs sent while a
@@ -117,13 +120,6 @@ public class BreakableGlassController : MonoBehaviour
     private int _hits;
 
     private bool _saveRestoreComplete;
-
-    /// <summary>
-    /// True once this peer has adopted a replicated value at least once. Used to tell an initial
-    /// state adoption (which must NOT replay the shatter animation — a late joiner would see shards
-    /// fall for a window that broke minutes ago) apart from a genuine live transition.
-    /// </summary>
-    private bool _networkStateAdopted;
 
     /// <summary>Guards the one-shot shatter transition so it can never play twice per break.</summary>
     private bool _smashVisualsApplied;
@@ -316,9 +312,10 @@ public class BreakableGlassController : MonoBehaviour
         GlobalHostVariables.GlassHitsChanged += HandleNetworkGlassHits;
 
         // Pull the current value too: the singleton may already have spawned (and therefore already
-        // fired its initial event) before this object was enabled.
+        // fired its initial event) before this object was enabled. Adopted silently — whatever
+        // happened while this object was inactive is history, not a live transition.
         if (GlobalHostVariables.IsGlassStateNetworked)
-            HandleNetworkGlassHits(GlobalHostVariables.CurrentGlassHits);
+            HandleNetworkGlassHits(GlobalHostVariables.CurrentGlassHits, true);
     }
 
     private void OnDisable()
@@ -408,60 +405,77 @@ public class BreakableGlassController : MonoBehaviour
     /// </summary>
     private void SetHitsAuthoritative(int hits)
     {
+        // A connected client must never write its local mirror: that is exactly how a client could
+        // end up believing a state the host never had. Clients follow the replicated value only.
+        if (!HasStateAuthority()) return;
+
         int clamped = Mathf.Clamp(hits, 0, _maxHits);
         _hits = clamped;
-        _networkStateAdopted = true;
 
         GlobalHostVariables.Instance?.SetGlassHits(clamped);
         PersistGlassState(clamped);
     }
 
+    /// <summary>
+    /// True on a connected (non-host) client while the replicated glass state is live. On such a
+    /// peer, RPC entry points only play feedback; state comes exclusively from
+    /// <see cref="HandleNetworkGlassHits"/>.
+    /// </summary>
+    private static bool IsNetworkFollower => !HasStateAuthority() && GlobalHostVariables.IsGlassStateNetworked;
+
     // ── Public client-side (visual) API ───────────────────────────────────────
 
     /// <summary>
-    /// Updates the crack overlay to the given hit count and plays hit feedback.
-    /// Called on all clients via ClientRpc after each intermediate hit.
+    /// Plays hit feedback and, on the host/offline, updates the crack overlay to the given hit count.
+    /// Called on all clients via ClientRpc after each intermediate hit. Connected clients get the
+    /// crack progress from the replicated value instead, so a late/stale RPC can't override it.
     /// </summary>
     public void OnHitByMutant(int hitCount)
     {
-        // Record the value locally as well so the replicated update that follows is recognised as
-        // already-applied and doesn't re-trigger the shatter transition.
-        _hits = Mathf.Clamp(hitCount, 0, _maxHits);
-        _networkStateAdopted = true;
+        int clamped = Mathf.Clamp(hitCount, 0, _maxHits);
 
-        ApplyGlassState(_hits, animateSmash: false);
-        PlayHitFeedback();
+        if (!IsNetworkFollower)
+        {
+            _hits = clamped;
+            ApplyGlassState(_hits, animateSmash: false);
+        }
+
+        PlayHitFeedback(clamped);
     }
 
     /// <summary>
-    /// Transitions to the fully smashed state on all clients:
-    /// hides the intact glass, activates the broken shards, plays the smash sound,
-    /// shows the repair interactable, and schedules the broken pieces for destruction.
-    /// Called on all clients via ClientRpc on the final blow.
+    /// Transitions to the fully smashed state: hides the intact glass, activates the broken shards,
+    /// plays the smash sound, shows the repair interactable, and schedules the shards for destruction.
+    /// Called on all clients via ClientRpc on the final blow. On connected clients this is a no-op —
+    /// the replicated value crossing the smash threshold plays the exact same transition, once.
     /// </summary>
     public void ApplySmash()
     {
-        _hits = _maxHits;
-        _networkStateAdopted = true;
+        if (IsNetworkFollower) return;
 
+        _hits = _maxHits;
         ApplyGlassState(_maxHits, animateSmash: true);
     }
 
     /// <summary>
-    /// Resets the glass to full health on all clients:
-    /// cancels any pending despawn, destroys leftover broken shards, re-enables the intact pane,
-    /// and pre-instantiates a fresh (inactive) broken glass ready for the next smash.
-    /// Invoked on every peer from WorldPurchaseActionInteractable's purchase ClientRpc; the host
-    /// additionally publishes the reset so late joiners never see a stale broken window.
+    /// Repairs the glass. Invoked on every peer from WorldPurchaseActionInteractable's purchase
+    /// ClientRpc (or directly when offline).
+    ///
+    /// Only the host/offline peer actually repairs: it publishes 0 to the replicated state and plays
+    /// the repair presentation. Every connected client — including ones that never received the
+    /// purchase RPC — sees the replicated 0 arrive and runs the same repair presentation from
+    /// <see cref="HandleNetworkGlassHits"/>, so the pane always reappears for all players.
     /// </summary>
     public void ResetGlass()
     {
-        // Server/offline: publish and persist the repair. On a client this is a no-op, and the
-        // host's replicated 0 arrives independently — both paths end in the same visual state.
+        if (IsNetworkFollower) return;
+
+        bool wasDamaged = _hits > 0;
         SetHitsAuthoritative(0);
 
         ApplyGlassState(0, animateSmash: false);
-        PlayRepairFeedback();
+        if (wasDamaged || !GlobalHostVariables.IsGlassStateNetworked)
+            PlayRepairFeedback();
     }
 
     // ── State application ──────────────────────────────────────────────────────
@@ -470,12 +484,12 @@ public class BreakableGlassController : MonoBehaviour
     /// Receives the authoritative hit count on every peer, from
     /// <see cref="GlobalHostVariables.GlassHitsChanged"/>.
     ///
-    /// The very first value adopted after enabling is applied silently (no shatter animation, no
-    /// audio) because it represents "this is how the window already looks" — a late joiner must not
-    /// watch a break that happened before they connected. Later changes that cross the smash
-    /// threshold do play the transition, which also covers a dropped feedback ClientRpc.
+    /// An initial sync (spawn / late join / re-enable) is applied silently because it represents
+    /// "this is how the window already looks". A live change that crosses the smash threshold plays
+    /// the shatter, and a live change back to 0 plays the repair presentation. On the host both are
+    /// already handled locally before the value is written, so they are never doubled there.
     /// </summary>
-    private void HandleNetworkGlassHits(int hits)
+    private void HandleNetworkGlassHits(int hits, bool isInitialSync)
     {
         int clamped = Mathf.Clamp(hits, 0, _maxHits);
 
@@ -489,12 +503,15 @@ public class BreakableGlassController : MonoBehaviour
             return;
         }
 
-        bool isLiveTransition = _networkStateAdopted && clamped >= _maxHits && _hits < _maxHits;
+        bool liveSmash  = !isInitialSync && clamped >= _maxHits && _hits < _maxHits;
+        bool liveRepair = !isInitialSync && clamped == 0 && _hits > 0;
 
         _hits = clamped;
-        _networkStateAdopted = true;
 
-        ApplyGlassState(clamped, animateSmash: isLiveTransition);
+        ApplyGlassState(clamped, animateSmash: liveSmash);
+
+        if (liveRepair)
+            PlayRepairFeedback();
     }
 
     /// <summary>
@@ -707,12 +724,12 @@ public class BreakableGlassController : MonoBehaviour
         _shakeTween = target.DOShakePosition(_shakeDuration, _shakeStrength, _shakeVibrato);
     }
 
-    private void PlayHitFeedback()
+    private void PlayHitFeedback(int hitCount)
     {
         if (_audioSource != null && _hitClip != null)
             _audioSource.PlayOneShot(_hitClip, _hitVolume);
 
-        if (_audioSource != null && _partialBreakClip != null && _hits > 0 && _hits < _maxHits)
+        if (_audioSource != null && _partialBreakClip != null && hitCount > 0 && hitCount < _maxHits)
             _audioSource.PlayOneShot(_partialBreakClip, _partialBreakVolume);
 
         var target = _shakeTarget != null

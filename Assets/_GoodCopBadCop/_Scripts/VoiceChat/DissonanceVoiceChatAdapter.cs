@@ -208,7 +208,7 @@ namespace GoodCopBadCop.VoiceChat
         /// Push-to-talk is gated here rather than by Dissonance's own PushToTalk mode. That mode polls
         /// legacy <c>Input.GetAxis(InputName)</c>, which can't follow the rebindable
         /// <see cref="GameAction.PushToTalk"/> key. Instead the trigger runs in Open mode and stays
-        /// muted unless the bound key is held.
+        /// muted unless the bound key or the bound gamepad button (unbound by default) is held.
         /// </summary>
         private void UpdatePushToTalkGate()
         {
@@ -227,7 +227,8 @@ namespace GoodCopBadCop.VoiceChat
         private bool IsPushToTalkGateClosed()
         {
             return model.InputMode.CurrentValue == EVoiceChatInputMode.PushToTalk
-                && !RebindableInput.GetKeyHeld(GameAction.PushToTalk);
+                && !RebindableInput.GetKeyHeld(GameAction.PushToTalk)
+                && !RebindableInput.GetGamepadHeld(GameAction.PushToTalk);
         }
 
         private static CommActivationMode ToDissonanceMode(EVoiceChatInputMode mode)

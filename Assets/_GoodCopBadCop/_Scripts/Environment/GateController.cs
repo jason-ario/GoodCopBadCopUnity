@@ -77,7 +77,7 @@ public class GateController : Interactable, IMutantPassable, ILockable
         // In-scene NetworkObjects spawn in no guaranteed order. If the padlock spawned first, its
         // Lock()/Unlock() call on this gate was a no-op (IsServer is false until this behaviour
         // spawns), so adopt the padlock's current state here. A padlock that is still present
-        // reports its own NetworkVariable (defaults to locked); a destroyed one means unlocked.
+        // reports its own NetworkVariable (defaults to locked); a despawned one reports unlocked.
         if (IsServer && _lockController != null)
             _isLocked.Value = _lockController.IsLocked;
 

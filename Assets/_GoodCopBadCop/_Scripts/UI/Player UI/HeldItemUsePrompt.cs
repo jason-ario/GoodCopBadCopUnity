@@ -28,13 +28,17 @@ public class HeldItemUsePrompt : MonoBehaviour
     [Tooltip("Icon for left mouse button.")]
     [SerializeField] private Sprite _mouseSprite;
 
-    [Tooltip("Icon for the gamepad use button (right trigger).")]
+    [Tooltip("Icon for the gamepad use button (right trigger). Fallback when no icon database is assigned.")]
     [SerializeField] private Sprite _gamepadSprite;
+
+    [Tooltip("When assigned, the gamepad icon follows the rebindable Use Item binding.")]
+    [SerializeField] private InputIconDatabase _iconDatabase;
 
     private void OnEnable()
     {
         ActiveInputDeviceTracker.EnsureSubscribed();
         ActiveInputDeviceTracker.DeviceChanged += OnDeviceChanged;
+        RebindableInput.BindingChanged += OnBindingChanged;
         if (_label != null) _label.text = _text;
         RefreshIcon();
         SetVisible(false);
@@ -43,10 +47,16 @@ public class HeldItemUsePrompt : MonoBehaviour
     private void OnDisable()
     {
         ActiveInputDeviceTracker.DeviceChanged -= OnDeviceChanged;
+        RebindableInput.BindingChanged -= OnBindingChanged;
         SetVisible(false);
     }
 
     private void OnDeviceChanged(bool isGamepad) => RefreshIcon();
+
+    private void OnBindingChanged(GameAction action)
+    {
+        if (action == GameAction.UseItem) RefreshIcon();
+    }
 
     private void Update()
     {
@@ -74,7 +84,14 @@ public class HeldItemUsePrompt : MonoBehaviour
     {
         if (_keyImage == null) return;
 
-        Sprite icon = ActiveInputDeviceTracker.IsGamepad ? _gamepadSprite : _mouseSprite;
+        Sprite icon = _mouseSprite;
+        if (ActiveInputDeviceTracker.IsGamepad)
+        {
+            Sprite bound = _iconDatabase != null
+                ? _iconDatabase.GetGamepadControlSprite(RebindableInput.GetGamepadBinding(GameAction.UseItem))
+                : null;
+            icon = bound != null ? bound : _gamepadSprite;
+        }
         if (icon != null) _keyImage.sprite = icon;
     }
 }

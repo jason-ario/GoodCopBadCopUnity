@@ -205,19 +205,14 @@ public class MainMenuController : MonoBehaviour
         if (MainMenuSplashScreen.IsPlaying) return;
         if (!(Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)) return;
 
-        // Quit confirmation dialog open — B = cancel
-        if (quitConfirmationDialog != null && quitConfirmationDialog.gameObject.activeSelf)
-        {
-            quitConfirmationDialog.Cancel();
+        // Any open confirmation dialog (quit, delete save) handles B itself — see ConfirmationDialogController.
+        if (ConfirmationDialogController.IsAnyOpen || ConfirmationDialogController.CancelHandledThisFrame)
             return;
-        }
 
-        // Settings screen open — B = close settings / back to home
+        // The settings view owns B (closes its dropdown first, ignores B while rebinding) and
+        // raises BackRequested -> CloseSettingsScreen itself.
         if (isSettingsOpen)
-        {
-            CloseSettingsScreen();
             return;
-        }
 
         // Route back action based on the current screen
         if (_currentScreen == campaignScreen
@@ -557,6 +552,13 @@ public class MainMenuController : MonoBehaviour
     /// <see cref="StopMainMenuMusic"/>, which callers should invoke once the intro cutscene
     /// (if any) has finished, so the music carries through it instead of cutting off abruptly.
     /// </summary>
+    /// <summary>
+    /// Raised every time the main menu is dismissed for gameplay. Unlike
+    /// <see cref="GameManager.OnGameStart"/>, this fires on EVERY entry path, including late joins
+    /// and resumed (Day 2+) days, so listeners can restore gameplay-only scene objects reliably.
+    /// </summary>
+    public static event System.Action GameplayEntered;
+
     public void TransitionToGameplay()
     {
         mainMenu.SetActive(false);
@@ -567,6 +569,7 @@ public class MainMenuController : MonoBehaviour
         }
 
         HideAllMenus();
+        GameplayEntered?.Invoke();
     }
 
     /// <summary>

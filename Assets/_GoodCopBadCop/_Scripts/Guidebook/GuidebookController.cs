@@ -1,4 +1,5 @@
 using System;
+using GoodCopBadCop.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -219,7 +220,7 @@ public class GuidebookController : MonoBehaviour
         }
 
         bool guidebookInput = Input.GetButtonDown(InputButton)
-                              || (Gamepad.current?.selectButton.wasPressedThisFrame ?? false);
+                              || RebindableInput.GetGamepadDown(GameAction.OpenGuidebook);
 
         if (!IsOpen && guidebookInput && rigVisible)
             OpenGuidebook();

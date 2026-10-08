@@ -37,6 +37,10 @@ public class GamepadBackButtonActivator : MonoBehaviour
     {
         if (!(Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)) return;
 
+        // An open confirmation dialog (outside this button) owns B; one press must only close the dialog.
+        if (ConfirmationDialogController.CancelHandledThisFrame || ConfirmationDialogController.IsAnyOpenOutside(transform))
+            return;
+
         // Checked before invoking, since the Back action usually deactivates this screen.
         if (_partner != null && (IsClickable || _partner.IsClickable))
             _partner.PlayClickSfx(false);

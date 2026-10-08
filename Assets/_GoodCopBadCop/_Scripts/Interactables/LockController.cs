@@ -52,15 +52,27 @@ public class LockController : Interactable
 
     // ── Private state ─────────────────────────────────────────────────────────
 
+    private const float TargetUnlockedGraceSeconds = 0.5f;
+
     private ILockable _lockable;
+    private bool      _unlockVisualsPlayed;
+    private Coroutine _targetUnlockedFallback;
 
     private NetworkVariable<bool> _isLocked = new NetworkVariable<bool>(
         true,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Server-only: set when this padlock was despawned as unlocked. The GameObject now survives
+    /// its despawn (see <see cref="DespawnAsUnlocked"/>), so a silent auto-unlock that leaves
+    /// <see cref="_isLocked"/> untouched must still report unlocked to readers like
+    /// <see cref="GateController"/>.
+    /// </summary>
+    private bool _despawnedAsUnlocked;
+
     /// <summary>Whether this padlock is currently locked.</summary>
-    public bool IsLocked => _isLocked.Value;
+    public bool IsLocked => !_despawnedAsUnlocked && _isLocked.Value;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -97,9 +109,9 @@ public class LockController : Interactable
         base.OnNetworkDespawn();
         _isLocked.OnValueChanged -= OnIsLockedChanged;
 
-        // Late-joining clients never spawn an in-scene padlock the server already despawned
-        // (e.g. restored-as-unlocked from save); NGO only invokes OnNetworkDespawn on it and
-        // leaves the GameObject active. Hide it so it is not visible or interactable.
+        // Late joiners: the server keeps despawned padlocks in the scene (Despawn(false)), so NGO
+        // lists them in the late-join sync and invokes OnNetworkDespawn here without ever spawning
+        // them, leaving the GameObject active. Hide it so it is not visible or interactable.
         if (NetworkManager != null && NetworkManager.ShutdownInProgress) return;
         HideLocally();
     }
@@ -107,6 +119,7 @@ public class LockController : Interactable
     private void HideLocally()
     {
         StopAllCoroutines();
+        _targetUnlockedFallback = null;
         if (gameObject.activeSelf)
             gameObject.SetActive(false);
     }
@@ -147,8 +160,8 @@ public class LockController : Interactable
     /// </summary>
     public void ForceUnlock()
     {
-        if (!IsServer) return;
-        if (!_isLocked.Value) return;
+        if (!IsServer || !IsSpawned) return;
+        if (!IsLocked) return;
 
         if (!string.IsNullOrEmpty(_lockId) && SaveDataManager.Instance != null)
             SaveDataManager.Instance.SaveUnlockedLock(_lockId);
@@ -176,7 +189,7 @@ public class LockController : Interactable
         // Leave _isLocked untouched so OnIsLockedChanged doesn't play the unlock animation on
         // any peer; despawning hides the padlock everywhere (see OnNetworkDespawn).
         _lockable?.Unlock();
-        NetworkObject.Despawn();
+        DespawnAsUnlocked();
         Debug.Log($"[LockController] '{name}' auto-unlocked for Day {day} (threshold Day {_autoUnlockOnDay}).");
         return true;
     }
@@ -262,22 +275,86 @@ public class LockController : Interactable
     private IEnumerator DespawnNextFrameCoroutine()
     {
         yield return null;
-        NetworkObject.Despawn();
+        DespawnAsUnlocked();
+    }
+
+    /// <summary>
+    /// Server-only: despawns this padlock WITHOUT destroying it. A destroyed in-scene NetworkObject
+    /// is missing from NGO's late-join "despawned in-scene objects" list, so a late joiner would
+    /// never be told about it and would keep showing the padlock. Kept (hidden by
+    /// <see cref="OnNetworkDespawn"/>), it is listed and hidden on the late joiner too.
+    /// </summary>
+    private void DespawnAsUnlocked()
+    {
+        if (!IsServer || !IsSpawned) return;
+        _despawnedAsUnlocked = true;
+        NetworkObject.Despawn(false);
     }
 
     private void OnIsLockedChanged(bool oldValue, bool newValue)
     {
         if (!newValue)
-        {
-            lockAnimator?.SetTrigger(UnlockTrigger);
-
-            if (audioSource != null && unlockSound != null)
-                audioSource.PlayOneShot(unlockSound);
-
-            StartCoroutine(UnlockSequenceCoroutine());
-        }
+            PlayUnlockVisuals();
 
         ApplyLockedState(newValue);
+    }
+
+    /// <summary>Plays the unlock trigger + sound and starts the physics/despawn sequence once.</summary>
+    private void PlayUnlockVisuals()
+    {
+        if (_unlockVisualsPlayed) return;
+        _unlockVisualsPlayed = true;
+
+        if (lockAnimator != null)
+            lockAnimator.SetTrigger(UnlockTrigger);
+
+        if (audioSource != null && unlockSound != null)
+            audioSource.PlayOneShot(unlockSound);
+
+        StartCoroutine(UnlockSequenceCoroutine());
+    }
+
+    /// <summary>
+    /// Client-side safety net, called by the <see cref="ILockable"/> owner (e.g. <see cref="ToolsLocker"/>)
+    /// when its own replicated lock state becomes unlocked. The padlock is a separate in-scene
+    /// NetworkObject, so a client can miss its unlock delta and/or despawn (e.g. when the server
+    /// unlocks and despawns it while the client is still loading/synchronizing the scene) and
+    /// would otherwise keep showing a padlock on an unlocked target.
+    /// <para><paramref name="immediate"/> = true (late-join/spawn snapshot) hides at once unless the
+    /// unlock is already playing; false waits briefly for the padlock's own replication, plays the
+    /// unlock visuals locally if they never arrived, then hides.</para>
+    /// No-op on the server, which owns the padlock lifecycle.
+    /// </summary>
+    public void NotifyTargetUnlocked(bool immediate)
+    {
+        if (this == null || !isActiveAndEnabled) return;
+        // Not IsServer: that's per-behaviour and stays false if this padlock never spawned here.
+        var netManager = Unity.Netcode.NetworkManager.Singleton;
+        if (netManager != null && netManager.IsServer) return;
+
+        if (immediate)
+        {
+            if (!_unlockVisualsPlayed)
+                HideLocally();
+            return;
+        }
+
+        if (_targetUnlockedFallback == null)
+            _targetUnlockedFallback = StartCoroutine(TargetUnlockedFallbackCoroutine());
+    }
+
+    private IEnumerator TargetUnlockedFallbackCoroutine()
+    {
+        // Give the padlock's own replicated unlock a moment to arrive (normal path).
+        yield return new WaitForSeconds(TargetUnlockedGraceSeconds);
+
+        if (!_unlockVisualsPlayed)
+            PlayUnlockVisuals();
+
+        // Hide locally in case the server's despawn never reaches this padlock.
+        yield return new WaitForSeconds(_physicsActivationDelay + _despawnDelay + TargetUnlockedGraceSeconds);
+        _targetUnlockedFallback = null;
+        HideLocally();
     }
 
     /// <summary>
@@ -288,7 +365,8 @@ public class LockController : Interactable
     private IEnumerator UnlockSequenceCoroutine()
     {
         yield return new WaitForSeconds(_physicsActivationDelay);
-        lockAnimator.enabled = false;
+        if (lockAnimator != null)
+            lockAnimator.enabled = false;
         
         foreach (var rb in GetComponentsInChildren<Rigidbody>())
             rb.isKinematic = false;
@@ -296,7 +374,7 @@ public class LockController : Interactable
         if (!IsServer) yield break;
 
         yield return new WaitForSeconds(_despawnDelay);
-        NetworkObject.Despawn();
+        DespawnAsUnlocked();
     }
 
     /// <summary>

@@ -127,7 +127,7 @@ public class PowerSwitch : Interactable
 
     // Interact key (E / ButtonWest) starts the grab (see Interact) and must stay held to keep it.
     // LMB / RT is reserved for held-item use, so it plays no part here.
-    private bool GrabHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || (Gamepad.current?.buttonWest.isPressed ?? false);
+    private bool GrabHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || RebindableInput.GetGamepadHeld(GameAction.Interact);
 
     // ── Update ────────────────────────────────────────────────────────────────
 

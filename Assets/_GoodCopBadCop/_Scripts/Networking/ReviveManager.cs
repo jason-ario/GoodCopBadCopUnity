@@ -23,6 +23,13 @@ public class ReviveManager : NetworkBehaviour
     private NetworkList<ulong> _deadPlayerClientIds;
     private float _nextRosterRefreshTime;
 
+    // SERVER ONLY. PlayerSessionIdentity -> campaign day on which that player died and has not been
+    // revived. Survives the player leaving (their PlayerObject is destroyed on disconnect), so a dead
+    // player who goes Back to Menu and rejoins the same day comes back dead and spectating instead of
+    // bypassing death. Cleared per player on revive and entirely when a new day starts.
+    private readonly System.Collections.Generic.Dictionary<string, int> _deadIdentityDays =
+        new System.Collections.Generic.Dictionary<string, int>();
+
     private void Awake()
     {
         _playerClientIds = new NetworkList<ulong>();
@@ -107,6 +114,28 @@ public class ReviveManager : NetworkBehaviour
     }
 
     /// <summary>
+    /// SERVER ONLY. True when <paramref name="clientId"/> belongs to a player who died earlier today
+    /// and left without being revived, so their new player object must spawn already dead
+    /// (spectating) rather than alive. False once the day has passed.
+    /// </summary>
+    public bool ShouldSpawnAsDeadServer(ulong clientId)
+    {
+        if (!IsServer || !PlayerSessionIdentity.TryGetIdentity(clientId, out string identity))
+            return false;
+
+        if (!_deadIdentityDays.TryGetValue(identity, out int deathDay))
+            return false;
+
+        if (deathDay != GetCurrentDay())
+        {
+            _deadIdentityDays.Remove(identity);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Asks the server to revive the first dead teammate of the calling client (mid-game revive),
     /// charging <paramref name="cost"/> from the shared money pool. The server picks the target from
     /// its authoritative client list and only charges when a revive actually happens.
@@ -129,6 +158,9 @@ public class ReviveManager : NetworkBehaviour
     private void ReviveDeadPlayersForNewDay()
     {
         if (!IsServer) return;
+
+        // The day has passed: players who died and left yesterday rejoin alive.
+        _deadIdentityDays.Clear();
 
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
@@ -210,8 +242,11 @@ public class ReviveManager : NetworkBehaviour
             players.Add(client.ClientId);
 
             PlayerHealth health = client.PlayerObject.GetComponent<PlayerHealth>();
-            if (health != null && health.IsDead)
+            bool isDead = health != null && health.IsDead;
+            if (isDead)
                 dead.Add(client.ClientId);
+
+            TrackDeathByIdentityServer(client.ClientId, isDead);
         }
 
         bool playersChanged = SyncList(_playerClientIds, players);
@@ -220,6 +255,31 @@ public class ReviveManager : NetworkBehaviour
         if (playersChanged || deadChanged)
             Debug.Log($"[ReviveManager] Roster updated — players: [{string.Join(", ", players)}], dead: [{string.Join(", ", dead)}].");
     }
+
+    /// <summary>
+    /// SERVER ONLY. Mirrors a connected player's dead state into <see cref="_deadIdentityDays"/> so it
+    /// is still known after they disconnect. Keeps the original death day while they stay dead.
+    /// </summary>
+    private void TrackDeathByIdentityServer(ulong clientId, bool isDead)
+    {
+        if (!PlayerSessionIdentity.TryGetIdentity(clientId, out string identity))
+            return;
+
+        if (!isDead)
+            _deadIdentityDays.Remove(identity);
+        else if (!_deadIdentityDays.ContainsKey(identity))
+            _deadIdentityDays[identity] = GetCurrentDay();
+    }
+
+    /// <summary>SERVER ONLY. Forgets a client's recorded death so their next spawn is alive.</summary>
+    private void ForgetDeathByIdentityServer(ulong clientId)
+    {
+        if (PlayerSessionIdentity.TryGetIdentity(clientId, out string identity))
+            _deadIdentityDays.Remove(identity);
+    }
+
+    private static int GetCurrentDay() =>
+        CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : -1;
 
     /// <summary>Copies <paramref name="source"/> into <paramref name="target"/>. Returns true when it changed.</summary>
     private static bool SyncList(NetworkList<ulong> target, System.Collections.Generic.List<ulong> source)
@@ -266,6 +326,10 @@ public class ReviveManager : NetworkBehaviour
             Debug.LogWarning($"[ReviveManager] Ignoring revive request for client {clientId} — their player is not dead.");
             return false;
         }
+
+        // Must happen before spawning the replacement, otherwise PlayerSpawner would see the
+        // recorded death and spawn the revived player dead again.
+        ForgetDeathByIdentityServer(clientId);
 
         CorpseResurrectionController corpse = deadPlayerObject.GetComponent<CorpseResurrectionController>();
         bool hasActiveCorpse = corpse != null && corpse.HasActiveCorpse;

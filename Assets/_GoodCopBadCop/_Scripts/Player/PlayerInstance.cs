@@ -188,7 +188,13 @@ public class PlayerInstance : NetworkBehaviour
             s_retiredLocalPlayer = null;
 
             UIController.Instance?.HideDeathScreen();
-            RestoreLocalGameplayStateAfterSpawn();
+
+            // A player who died earlier today and rejoined spawns already dead: skip the normal
+            // gameplay restore and hand them straight to spectating.
+            if (PlayerHealth != null && PlayerHealth.SpawnedDead && PlayerHealth.IsDead)
+                StartCoroutine(EnterSpectateAfterDeadRejoinRoutine());
+            else
+                RestoreLocalGameplayStateAfterSpawn();
 
             OnLocalPlayerSpawned?.Invoke();
 
@@ -197,6 +203,120 @@ public class PlayerInstance : NetworkBehaviour
             if (_audioListenerEnforcementRoutine != null)
                 StopCoroutine(_audioListenerEnforcementRoutine);
             _audioListenerEnforcementRoutine = StartCoroutine(EnforceAudioListenerInvariantRoutine());
+        }
+    }
+
+    protected override void OnNetworkPostSpawn()
+    {
+        base.OnNetworkPostSpawn();
+
+        // Every peer: a dead-rejoin player object has no body in the world (its real corpse was
+        // removed when the owner left). Post-spawn so the server-side PlayerHealth has applied the
+        // flag regardless of component order, and after the local branch re-enabled the CharacterController.
+        if (PlayerHealth != null && PlayerHealth.SpawnedDead && PlayerHealth.IsDead)
+            HideBodyForDeadRejoin();
+    }
+
+    // ── Dead rejoin ────────────────────────────────────────────────────────────
+
+    [Tooltip("Delay after a dead-rejoin spawn before entering spectate, so the late-join bootstrap " +
+             "(InitializeLateJoinClientRpc, which re-shows gameplay UI) has already run.")]
+    [SerializeField] private float deadRejoinSpectateDelay = 0.5f;
+
+    /// <summary>Components this object disabled to hide a dead-rejoin body, restored on an in-place revive.</summary>
+    private readonly System.Collections.Generic.List<Behaviour> _hiddenBodyBehaviours = new System.Collections.Generic.List<Behaviour>();
+    private readonly System.Collections.Generic.List<Renderer> _hiddenBodyRenderers = new System.Collections.Generic.List<Renderer>();
+    private readonly System.Collections.Generic.List<Collider> _hiddenBodyColliders = new System.Collections.Generic.List<Collider>();
+    private bool _isBodyHiddenForDeadRejoin;
+
+    /// <summary>
+    /// Hides every renderer and disables every collider (including the CharacterController) of a
+    /// player object spawned dead for a rejoining player, plus its name tag and light.
+    /// </summary>
+    private void HideBodyForDeadRejoin()
+    {
+        if (_isBodyHiddenForDeadRejoin) return;
+        _isBodyHiddenForDeadRejoin = true;
+
+        foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
+        {
+            if (!r.enabled) continue;
+            r.enabled = false;
+            _hiddenBodyRenderers.Add(r);
+        }
+
+        foreach (Collider c in GetComponentsInChildren<Collider>(true))
+        {
+            if (!c.enabled) continue;
+            c.enabled = false;
+            _hiddenBodyColliders.Add(c);
+        }
+
+        foreach (Light l in GetComponentsInChildren<Light>(true))
+        {
+            if (!l.enabled) continue;
+            l.enabled = false;
+            _hiddenBodyBehaviours.Add(l);
+        }
+
+        if (nameTag != null) nameTag.SetActive(false);
+    }
+
+    /// <summary>Undoes <see cref="HideBodyForDeadRejoin"/> when the player is revived in place (ResetHealth).</summary>
+    private void RestoreBodyAfterDeadRejoin()
+    {
+        if (!_isBodyHiddenForDeadRejoin) return;
+        _isBodyHiddenForDeadRejoin = false;
+
+        foreach (Renderer r in _hiddenBodyRenderers)
+            if (r != null) r.enabled = true;
+        foreach (Collider c in _hiddenBodyColliders)
+            if (c != null) c.enabled = true;
+        foreach (Behaviour b in _hiddenBodyBehaviours)
+            if (b != null) b.enabled = true;
+
+        _hiddenBodyRenderers.Clear();
+        _hiddenBodyColliders.Clear();
+        _hiddenBodyBehaviours.Clear();
+    }
+
+    /// <summary>
+    /// Local owner of a dead-rejoin player object: locks control like <see cref="Die"/> (without the
+    /// stinger or item drop — nothing is held) and enters spectate mode. Falls back to the death
+    /// screen when no living teammate is available to watch.
+    /// </summary>
+    private IEnumerator EnterSpectateAfterDeadRejoinRoutine()
+    {
+        CanControl = false;
+        SetCanInteract(false);
+        SetCanMove(false);
+
+        const float readyTimeout = 5f;
+        float waited = 0f;
+        while ((UIController.Instance == null || SpectateManager.Instance == null) && waited < readyTimeout)
+        {
+            waited += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        yield return new WaitForSecondsRealtime(deadRejoinSpectateDelay);
+
+        // Revived (or replaced) while waiting — nothing to do.
+        if (Instance != this || PlayerHealth == null || !PlayerHealth.IsDead)
+            yield break;
+
+        DisableReticle();
+        UIController.Instance?.ClosePlayerUI();
+
+        if (SpectateManager.Instance != null && SpectateManager.Instance.SpectatableCount > 0)
+        {
+            Debug.Log("[PlayerInstance] Rejoined while dead — entering spectate mode.");
+            StartSpectating();
+        }
+        else
+        {
+            Debug.Log("[PlayerInstance] Rejoined while dead with no living teammates — showing death screen.");
+            ReturnToDeathScreen();
         }
     }
 
@@ -373,6 +493,7 @@ public class PlayerInstance : NetworkBehaviour
 
     private void OnAnyPlayerRespawn()
     {
+        RestoreBodyAfterDeadRejoin();
         if (nameTag != null) nameTag.SetActive(true);
     }
 
@@ -380,7 +501,8 @@ public class PlayerInstance : NetworkBehaviour
     {
         _isOutside.Value = value;
         _isOutsideLocal = value;
-        playerLight.SetActive(value);
+        // A hidden dead-rejoin body must not light up its spawn point.
+        playerLight.SetActive(value && !_isBodyHiddenForDeadRejoin);
     }
 
     /// <summary>
@@ -867,7 +989,14 @@ public class PlayerInstance : NetworkBehaviour
 
     public void DisableReticle()
     {
-        _playerInteractionController.reticle.gameObject.SetActive(false);
+        // Same lookup as EnableReticle: a freshly spawned player (e.g. a dead rejoin) has no
+        // cached reference yet.
+        if (_playerInteractionController.reticle == null)
+            _playerInteractionController.reticle =
+                FindFirstObjectByType<ReticleController>(FindObjectsInactive.Include);
+
+        if (_playerInteractionController.reticle != null)
+            _playerInteractionController.reticle.gameObject.SetActive(false);
     }
 
     public void EnableReticle()

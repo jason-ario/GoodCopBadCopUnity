@@ -9,6 +9,7 @@ using R3;
 
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace GoodCopBadCop.UI.SettingsMenu
@@ -16,8 +17,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
     /// <summary>
     /// Runtime-only interaction harness for Settings Menu Redesign Preview.
     /// The production menu remains untouched until this layout is approved.
+    /// Gamepad / keyboard-arrow navigation and gamepad rebinding live in
+    /// SettingsRedesignPreviewController.Gamepad.cs.
     /// </summary>
-    public sealed class SettingsRedesignPreviewController : MonoBehaviour, ISettingsMenuView
+    public sealed partial class SettingsRedesignPreviewController : MonoBehaviour, ISettingsMenuView
     {
         private const string PreferencePrefix = "settings_preview.";
         private const float FirstRowY = 355f;
@@ -36,6 +39,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             public readonly GameAction RebindAction;
             public int Index;
             public float Value;
+            public float MinValue;
+            public float MaxValue = 100f;
             private int defaultIndex;
             private readonly float defaultValue;
 
@@ -70,6 +75,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
             {
                 defaultIndex = index;
                 Index = index;
+                return this;
+            }
+
+            public Setting WithRange(float min, float max)
+            {
+                MinValue = min;
+                MaxValue = max;
                 return this;
             }
 
@@ -112,6 +124,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
             public RectTransform Handle;
             public Button Button;
             public RectTransform SliderHitArea;
+            // Runtime-created gamepad binding cell for rebind rows (see EnsureGamepadCell).
+            public TMP_Text GamepadValue;
+            public Button GamepadButton;
+            public RectTransform GamepadDivider;
         }
 
         private static readonly Setting[] Gameplay =
@@ -149,20 +165,29 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static readonly Setting[] Controls =
         {
-            new Setting("Mouse Sensitivity", "mouse_sensitivity", 50f),
+            new Setting("Mouse Sensitivity", "mouse_sensitivity", 50f).WithRange(1f, 100f),
             new Setting("Invert Y Axis", "invert_y", "Off", "On"),
+            new Setting("Controller Sensitivity", "controller_sensitivity", 50f).WithRange(1f, 100f),
+            new Setting("Invert Y (Controller)", "controller_invert_y", "Off", "On"),
             new Setting("Crouch Mode", "crouch_mode", "Hold", "Toggle"),
             new Setting("Sprint Mode", "sprint_mode", "Hold", "Toggle"),
+            new Setting("Use Item", "use_item", GameAction.UseItem),
             new Setting("Interact", "interact", GameAction.Interact),
+            new Setting("Jump", "jump", GameAction.Jump),
+            new Setting("Sprint", "sprint", GameAction.Sprint),
             new Setting("Crouch", "crouch_key", GameAction.Crouch),
             new Setting("Place Object", "place_object", GameAction.PlaceObject),
             new Setting("Throw Object", "throw_object", GameAction.ThrowObject),
+            new Setting("Reload", "reload_key", GameAction.Reload),
+            new Setting("Zoom Item", "zoom_item", GameAction.ZoomHeldItem),
+            new Setting("Next Slot", "next_slot", GameAction.NextSlot),
+            new Setting("Previous Slot", "previous_slot", GameAction.PreviousSlot),
             new Setting("Toggle Mask", "toggle_mask", GameAction.ToggleMask),
             new Setting("Open Emotes", "open_emotes", GameAction.OpenEmotes),
-            new Setting("Zoom Item", "zoom_item", GameAction.ZoomHeldItem),
-            new Setting("Reload", "reload_key", GameAction.Reload),
             new Setting("Push To Talk", "push_to_talk", GameAction.PushToTalk)
         };
+
+        private static Setting FindSetting(Setting[] settings, string key) => Array.Find(settings, s => s.Key == key);
 
         private static Setting MicrophoneSetting => Array.Find(Audio, s => s.Key == "microphone");
 
@@ -196,6 +221,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<int> fpsLimitChanged = new Subject<int>();
         private readonly Subject<float> mouseSensitivityChanged = new Subject<float>();
         private readonly Subject<bool> invertYAxisChanged = new Subject<bool>();
+        private readonly Subject<float> controllerLookSensitivityChanged = new Subject<float>();
+        private readonly Subject<bool> controllerInvertYAxisChanged = new Subject<bool>();
         private readonly Subject<int> crouchModeChanged = new Subject<int>();
         private readonly Subject<int> sprintModeChanged = new Subject<int>();
         private readonly Subject<bool> runningEffectsEnabledChanged = new Subject<bool>();
@@ -227,6 +254,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<int> FpsLimitChanged { get { return fpsLimitChanged; } }
         public Observable<float> MouseSensitivityChanged { get { return mouseSensitivityChanged; } }
         public Observable<bool> InvertYAxisChanged { get { return invertYAxisChanged; } }
+        public Observable<float> ControllerLookSensitivityChanged { get { return controllerLookSensitivityChanged; } }
+        public Observable<bool> ControllerInvertYAxisChanged { get { return controllerInvertYAxisChanged; } }
         public Observable<int> CrouchModeChanged { get { return crouchModeChanged; } }
         public Observable<int> SprintModeChanged { get { return sprintModeChanged; } }
         public Observable<bool> RunningEffectsEnabledChanged { get { return runningEffectsEnabledChanged; } }
@@ -278,6 +307,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private void OnEnable()
         {
             isCloseRequested = false;
+            OnGamepadNavigationEnabled();
 
             if (isInitialized)
             {
@@ -287,11 +317,43 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
         }
 
+        private void OnDestroy()
+        {
+            RebindableInput.BindingChanged -= OnBindingChanged;
+        }
+
+        private static int lastRebindListeningFrame = -1;
+        private static SettingsRedesignPreviewController listeningInstance;
+
+        /// <summary>
+        /// True while a Settings rebind is listening for input, and for the frame it ended. Global
+        /// handlers (e.g. <c>UIController</c>'s Pause toggle on Start / Escape) must ignore input
+        /// then, because the press belongs to the rebind (cancel or the new binding).
+        /// </summary>
+        public static bool IsRebindConsumingInput =>
+            (listeningInstance != null && listeningInstance.isActiveAndEnabled && listeningInstance.IsListeningForRebind)
+            || lastRebindListeningFrame >= Time.frameCount - 1;
+
+        private bool IsListeningForRebind => _awaitingRebindIndex >= 0 || _awaitingGamepadRebindIndex >= 0;
+
         private void Update()
         {
+            if (IsListeningForRebind)
+            {
+                listeningInstance = this;
+                lastRebindListeningFrame = Time.frameCount;
+            }
+
             if (_awaitingRebindIndex >= 0)
             {
                 CaptureRebindInput();
+                return;
+            }
+
+            // Listening for a gamepad button: keyboard is ignored except Escape (cancel), and B must not close the menu.
+            if (_awaitingGamepadRebindIndex >= 0)
+            {
+                CaptureGamepadRebindInput();
                 return;
             }
 
@@ -301,15 +363,20 @@ namespace GoodCopBadCop.UI.SettingsMenu
             if (closePressed || UnityEngine.Input.GetKeyDown(KeyCode.Escape))
             {
                 RequestClose();
+                return;
             }
+
+            UpdateGamepadNavigation();
         }
 
         private void BeginRebind(int index)
         {
-            if (index >= activeSettings.Length || activeSettings[index].Control != Control.Rebind) return;
+            if (activeSettings == null || index < 0 || index >= activeSettings.Length || activeSettings[index].Control != Control.Rebind) return;
+            if (!RebindableInput.IsKeyboardRebindable(activeSettings[index].RebindAction)) return;
+            CancelGamepadRebind();
             CloseDropdown();
             _awaitingRebindIndex = index;
-            rows[index].Value.text = "Press any key/button…";
+            rows[index].Value.text = KeyRebindPrompt;
         }
 
         private void CaptureRebindInput()
@@ -337,6 +404,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 if (keyCode == KeyCode.Escape) continue;
                 // LMB/RMB/MMB go through CompleteMouseRebind above; Mouse3+ (side buttons) bind as keys.
                 if ((int)keyCode >= (int)KeyCode.Mouse0 && (int)keyCode <= (int)KeyCode.Mouse2) continue;
+                // While listening for a keyboard/mouse key, gamepad buttons (legacy JoystickButton codes) are ignored.
+                if ((int)keyCode >= (int)KeyCode.JoystickButton0) continue;
                 if (UnityEngine.Input.GetKeyDown(keyCode))
                 {
                     CompleteKeyRebind(setting, keyCode);
@@ -369,18 +438,24 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             int index = _awaitingRebindIndex;
             _awaitingRebindIndex = -1;
-            if (index >= 0 && index < rows.Count) BindRow(index);
+            if (IsValidRowIndex(index)) BindRow(index);
         }
 
         private void FinishRebind()
         {
             int index = _awaitingRebindIndex;
             _awaitingRebindIndex = -1;
-            if (index >= 0 && index < rows.Count) BindRow(index);
+            if (IsValidRowIndex(index)) BindRow(index);
         }
+
+        private bool IsValidRowIndex(int index) =>
+            activeSettings != null && index >= 0 && index < rows.Count && index < activeSettings.Length;
 
         private void OnDisable()
         {
+            CancelRebind();
+            CancelGamepadRebind();
+            OnGamepadNavigationDisabled();
             closed.OnNext(Unit.Default);
         }
 
@@ -389,12 +464,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
             if (isInitialized) return;
             isInitialized = true;
             EnsureEventSystem();
+            ActiveInputDeviceTracker.EnsureSubscribed();
             CacheHierarchy();
             PopulateMicrophoneOptions();
             BindTabs();
             BindFooter();
             SelectTab(Tab.Gameplay);
             SelectRow(-1);
+            RebindableInput.BindingChanged -= OnBindingChanged;
+            RebindableInput.BindingChanged += OnBindingChanged;
         }
 
         private static void PopulateMicrophoneOptions()
@@ -580,10 +658,29 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetScreenResolutionValue(int value) { Graphics[1].Index = value; RefreshActiveSetting("resolution"); }
         public void SetVSyncValue(bool value) { Graphics[2].Index = value ? 1 : 0; RefreshActiveSetting("vsync"); }
         public void SetFpsLimitValue(int value) { Graphics[3].Index = value; RefreshActiveSetting("fps_limit"); }
-        public void SetMouseSensitivityValue(float value) { Controls[0].Value = value; RefreshActiveSetting("mouse_sensitivity"); }
-        public void SetInvertYAxisValue(bool value) { Controls[1].Index = value ? 1 : 0; RefreshActiveSetting("invert_y"); }
-        public void SetCrouchModeValue(int value) { Controls[2].Index = value; RefreshActiveSetting("crouch_mode"); }
-        public void SetSprintModeValue(int value) { Controls[3].Index = value; RefreshActiveSetting("sprint_mode"); }
+        public void SetMouseSensitivityValue(float value) { SetControlsValue("mouse_sensitivity", value); }
+        public void SetInvertYAxisValue(bool value) { SetControlsIndex("invert_y", value ? 1 : 0); }
+        public void SetControllerLookSensitivityValue(float value) { SetControlsValue("controller_sensitivity", value); }
+        public void SetControllerInvertYAxisValue(bool value) { SetControlsIndex("controller_invert_y", value ? 1 : 0); }
+        public void SetCrouchModeValue(int value) { SetControlsIndex("crouch_mode", value); }
+        public void SetSprintModeValue(int value) { SetControlsIndex("sprint_mode", value); }
+
+        private void SetControlsValue(string key, float value)
+        {
+            Setting setting = FindSetting(Controls, key);
+            if (setting == null) return;
+            setting.Value = value;
+            RefreshActiveSetting(key);
+        }
+
+        private void SetControlsIndex(string key, int index)
+        {
+            Setting setting = FindSetting(Controls, key);
+            if (setting == null) return;
+            setting.Index = index;
+            RefreshActiveSetting(key);
+        }
+
         public void SetRunningEffectsEnabledValue(bool value)
         {
             int index = Array.IndexOf(Gameplay, Array.Find(Gameplay, s => s.Key == "running_effects"));
@@ -685,6 +782,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
         }
         private void SelectTab(Tab tab)
         {
+            Tab previousTab = activeTab;
+            bool tabChanged = activeSettings == null || tab != previousTab;
+            // Pending rebinds belong to rows of the previous tab; drop them before the rows are re-bound.
+            if (tabChanged)
+            {
+                _awaitingRebindIndex = -1;
+                _awaitingGamepadRebindIndex = -1;
+            }
+
             CloseDropdown();
             activeTab = tab;
             activeSettings = GetSettings(tab);
@@ -736,6 +842,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
 
             UpdateTabButtonStates((int)tab);
+            RefocusAfterTabChange(tabChanged);
         }
 
         private void BindRow(int index)
@@ -745,10 +852,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
             bool supported = IsSupported(setting);
             bool slider = setting.Control == Control.Slider;
             bool rebind = setting.Control == Control.Rebind;
+            bool keyboardRebindable = rebind && RebindableInput.IsKeyboardRebindable(setting.RebindAction);
 
             row.Label.text = setting.Label;
-            row.Value.text = index == _awaitingRebindIndex ? "Press any key/button…" : setting.DisplayValue;
+            row.Value.text = index == _awaitingRebindIndex ? KeyRebindPrompt : setting.DisplayValue;
             EnsureRowVisuals(row, slider);
+            BindGamepadCell(row, index, setting);
 
             if (row.Button != null)
             {
@@ -759,7 +868,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 {
                     row.Button.onClick.AddListener(() => ToggleDropdown(index));
                 }
-                else if (supported && rebind)
+                else if (supported && keyboardRebindable)
                 {
                     row.Button.onClick.AddListener(() => BeginRebind(index));
                 }
@@ -778,7 +887,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 UpdateSliderVisual(row, setting.Value);
             }
 
-            ApplyRowAppearance(row, supported);
+            ApplyRowStyle(index);
         }
 
         private static void ApplyRowAppearance(Row row, bool supported)
@@ -835,6 +944,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "voice_volume":
                 case "mouse_sensitivity":
                 case "invert_y":
+                case "controller_sensitivity":
+                case "controller_invert_y":
                 case "crouch_mode":
                 case "sprint_mode":
                 case "running_effects":
@@ -951,10 +1062,19 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
 
             float normalized = Mathf.Clamp01(local.x / row.Track.rect.width);
-            activeSettings[index].Value = Mathf.Round(normalized * 100f);
-            row.Value.text = activeSettings[index].DisplayValue;
-            UpdateSliderVisual(row, activeSettings[index].Value);
-            Apply(activeSettings[index]);
+            Setting setting = activeSettings[index];
+            SetSliderValue(index, Mathf.Clamp(Mathf.Round(normalized * 100f), setting.MinValue, setting.MaxValue));
+        }
+
+        // Shared by pointer and gamepad/keyboard input so both update visuals and apply identically.
+        private void SetSliderValue(int index, float value)
+        {
+            Setting setting = activeSettings[index];
+            Row row = rows[index];
+            setting.Value = value;
+            row.Value.text = setting.DisplayValue;
+            UpdateSliderVisual(row, setting.Value);
+            Apply(setting);
         }
 
         private void UpdateSliderVisual(Row row, float value)
@@ -1045,6 +1165,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
                 Button optionButton = optionObject.GetComponent<Button>();
                 optionButton.targetGraphic = optionImage;
+                optionButton.navigation = new Navigation { mode = Navigation.Mode.None };
                 optionButton.onClick.AddListener(() => SelectDropdownOption(index, optionIndex));
 
                 GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -1063,7 +1184,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 label.color = i == setting.Index ? Color.white : new Color(.75f, .77f, .75f, 1f);
                 label.raycastTarget = false;
                 label.text = setting.Options[i];
+
+                dropdownOptionImages.Add(optionImage);
+                dropdownOptionLabels.Add(label);
             }
+
+            // Gamepad highlight starts on the current value, which matches the pointer styling above.
+            dropdownHighlightIndex = Mathf.Clamp(setting.Index, 0, setting.Options.Length - 1);
         }
 
         private void SelectDropdownOption(int settingIndex, int optionIndex)
@@ -1087,6 +1214,9 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 Destroy(dropdownPanel.GetChild(i).gameObject);
             }
 
+            dropdownOptionImages.Clear();
+            dropdownOptionLabels.Clear();
+            dropdownHighlightIndex = -1;
 
             SetScrollingLocked(false);
             dropdownPanel.gameObject.SetActive(false);
@@ -1138,7 +1268,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
                 row.Background.sprite = normalBackgroundSprite;
                 row.Background.rectTransform.sizeDelta = new Vector2(1110.5f, 56f);
-                ApplyRowAppearance(row, IsSupported(activeSettings[i]));
+                ApplyRowStyle(i);
             }
         }
 
@@ -1161,6 +1291,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "voice_volume": voiceVolumeChanged.OnNext(setting.Value); break;
                 case "mouse_sensitivity": mouseSensitivityChanged.OnNext(setting.Value); break;
                 case "invert_y": invertYAxisChanged.OnNext(setting.Index == 1); break;
+                case "controller_sensitivity": controllerLookSensitivityChanged.OnNext(setting.Value); break;
+                case "controller_invert_y": controllerInvertYAxisChanged.OnNext(setting.Index == 1); break;
                 case "crouch_mode": crouchModeChanged.OnNext(setting.Index); break;
                 case "sprint_mode": sprintModeChanged.OnNext(setting.Index); break;
                 case "running_effects": runningEffectsEnabledChanged.OnNext(setting.Index == 1); break;
@@ -1248,14 +1380,19 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static Button GetOrAddButton(GameObject target)
         {
-            return target == null ? null : target.GetComponent<Button>() ?? target.AddComponent<Button>();
+            if (target == null) return null;
+            Button button = target.GetComponent<Button>();
+            if (button == null) button = target.AddComponent<Button>();
+            // Gamepad/keyboard navigation is driven by this controller, not by EventSystem selection.
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            return button;
         }
 
         private static void EnsureEventSystem()
         {
             if (FindFirstObjectByType<EventSystem>() == null)
             {
-                new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+                new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
             }
         }
     }

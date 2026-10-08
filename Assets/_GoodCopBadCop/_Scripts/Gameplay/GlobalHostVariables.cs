@@ -35,8 +35,10 @@ public class GlobalHostVariables : NetworkBehaviour
     /// Raised on every peer with the authoritative glass hit count: once when this object spawns
     /// (delivering the replicated value to late joiners) and again on every subsequent change.
     /// Static so <see cref="BreakableGlassController"/> can subscribe before this singleton spawns.
+    /// The bool is <c>true</c> for the initial value delivered at spawn ("this is how the window
+    /// already looks" — must be adopted silently) and <c>false</c> for a live change.
     /// </summary>
-    public static event Action<int> GlassHitsChanged;
+    public static event Action<int, bool> GlassHitsChanged;
 
     /// <summary>True while the networked glass state is live and authoritative (session running).</summary>
     public static bool IsGlassStateNetworked => Instance != null && Instance.IsSpawned;
@@ -57,7 +59,7 @@ public class GlobalHostVariables : NetworkBehaviour
 
         // Push the current value immediately so a late-joining client's BreakableGlassController
         // adopts the host's state instead of its own local default.
-        GlassHitsChanged?.Invoke(glassHits.Value);
+        GlassHitsChanged?.Invoke(glassHits.Value, true);
     }
 
     public override void OnNetworkDespawn()
@@ -65,7 +67,7 @@ public class GlobalHostVariables : NetworkBehaviour
         glassHits.OnValueChanged -= HandleGlassHitsChanged;
     }
 
-    private void HandleGlassHitsChanged(int previous, int current) => GlassHitsChanged?.Invoke(current);
+    private void HandleGlassHitsChanged(int previous, int current) => GlassHitsChanged?.Invoke(current, false);
 
     /// <summary>
     /// Server-only. Sets the authoritative glass hit count, replicating it to every client.

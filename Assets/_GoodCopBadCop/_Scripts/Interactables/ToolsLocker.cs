@@ -96,9 +96,14 @@ public class ToolsLocker : Interactable, ILockable
     public override void OnNetworkSpawn()
     {
         isOpen.OnValueChanged += OnIsOpenChanged;
+        _isLocked.OnValueChanged += OnIsLockedChanged;
 
         // Snap decor to the current replicated state for late-joining clients.
         ApplyDecorImmediate(isOpen.Value);
+
+        // Already unlocked when this peer spawned the locker: make sure no stale padlock lingers.
+        if (!_isLocked.Value && _lockController != null)
+            _lockController.NotifyTargetUnlocked(immediate: true);
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart += OnDayStart;
@@ -107,9 +112,21 @@ public class ToolsLocker : Interactable, ILockable
     public override void OnNetworkDespawn()
     {
         isOpen.OnValueChanged -= OnIsOpenChanged;
+        _isLocked.OnValueChanged -= OnIsLockedChanged;
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStart;
+    }
+
+    /// <summary>
+    /// The locker's lock state is the authoritative one players interact with. The padlock is a
+    /// separate in-scene NetworkObject whose own unlock/despawn can be missed by a client, so
+    /// drive its visuals from this state too (client-side only; no-op on the server).
+    /// </summary>
+    private void OnIsLockedChanged(bool oldValue, bool newValue)
+    {
+        if (!newValue && _lockController != null)
+            _lockController.NotifyTargetUnlocked(immediate: false);
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────

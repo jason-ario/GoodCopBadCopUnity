@@ -64,14 +64,15 @@ public class PlayerInteractionController : NetworkBehaviour
     // X / Square (buttonWest) = Interact key (E) â€” ALL world interaction; see IInteractable.cs
     // InputSystem's default press-point (0.5) converts the analog axes to the
     // wasPressedThisFrame / isPressed / wasReleasedThisFrame digital events we need.
-    private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
-    private bool LmbHeld => Input.GetMouseButton(0)     || (Gamepad.current?.rightTrigger.isPressed             ?? false);
-    private bool RmbHeld => RebindableInput.GetMouseButtonHeld(GameAction.PlaceObject) || (Gamepad.current?.leftTrigger.isPressed              ?? false);
-    private bool RmbUp   => RebindableInput.GetMouseButtonUp(GameAction.PlaceObject)   || (Gamepad.current?.leftTrigger.wasReleasedThisFrame   ?? false);
-    private bool MmbDown => RebindableInput.GetMouseButtonDown(GameAction.ThrowObject) || (Gamepad.current?.rightShoulder.wasPressedThisFrame  ?? false);
-    private bool MmbUp   => RebindableInput.GetMouseButtonUp(GameAction.ThrowObject)   || (Gamepad.current?.rightShoulder.wasReleasedThisFrame ?? false);
-    private bool InteractDown => RebindableInput.GetKeyDown(GameAction.Interact) || (Gamepad.current?.buttonWest.wasPressedThisFrame ?? false);
-    private bool InteractHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || (Gamepad.current?.buttonWest.isPressed          ?? false);
+    // Gamepad controls are the current (rebindable) bindings from RebindableInput; the defaults are listed above.
+    private bool LmbDown => Input.GetMouseButtonDown(0) || RebindableInput.GetGamepadDown(GameAction.UseItem);
+    private bool LmbHeld => Input.GetMouseButton(0)     || RebindableInput.GetGamepadHeld(GameAction.UseItem);
+    private bool RmbHeld => RebindableInput.GetMouseButtonHeld(GameAction.PlaceObject) || RebindableInput.GetGamepadHeld(GameAction.PlaceObject);
+    private bool RmbUp   => RebindableInput.GetMouseButtonUp(GameAction.PlaceObject)   || RebindableInput.GetGamepadUp(GameAction.PlaceObject);
+    private bool MmbDown => RebindableInput.GetMouseButtonDown(GameAction.ThrowObject) || RebindableInput.GetGamepadDown(GameAction.ThrowObject);
+    private bool MmbUp   => RebindableInput.GetMouseButtonUp(GameAction.ThrowObject)   || RebindableInput.GetGamepadUp(GameAction.ThrowObject);
+    private bool InteractDown => RebindableInput.GetKeyDown(GameAction.Interact) || RebindableInput.GetGamepadDown(GameAction.Interact);
+    private bool InteractHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || RebindableInput.GetGamepadHeld(GameAction.Interact);
 
     [Header("Hold Interact")]
     [Tooltip("Seconds the Interact key must be held to trigger an object's secondary hold action (Interactable.InteractHold). Releasing earlier counts as a tap (Interactable.Interact).")]

@@ -15,6 +15,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<int> FpsLimitChanged { get; }
         Observable<float> MouseSensitivityChanged { get; }
         Observable<bool> InvertYAxisChanged { get; }
+        Observable<float> ControllerLookSensitivityChanged { get; }
+        Observable<bool> ControllerInvertYAxisChanged { get; }
         Observable<int> CrouchModeChanged { get; }
         Observable<int> SprintModeChanged { get; }
         Observable<bool> RunningEffectsEnabledChanged { get; }
@@ -46,6 +48,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void SetFpsLimitValue(int value);
         void SetMouseSensitivityValue(float value);
         void SetInvertYAxisValue(bool value);
+        void SetControllerLookSensitivityValue(float value);
+        void SetControllerInvertYAxisValue(bool value);
         void SetCrouchModeValue(int value);
         void SetSprintModeValue(int value);
         void SetRunningEffectsEnabledValue(bool value);
@@ -323,6 +327,9 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<int> fpsLimitChanged = new();
         private readonly Subject<float> mouseSensitivityChanged = new();
         private readonly Subject<bool> invertYAxisChanged = new();
+        // Legacy view has no controller rows; these never emit.
+        private readonly Subject<float> controllerLookSensitivityChanged = new();
+        private readonly Subject<bool> controllerInvertYAxisChanged = new();
         private readonly Subject<int> crouchModeChanged = new();
         private readonly Subject<int> sprintModeChanged = new();
         private readonly Subject<bool> runningEffectsEnabledChanged = new();
@@ -354,6 +361,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<int> FpsLimitChanged => fpsLimitChanged;
         public Observable<float> MouseSensitivityChanged => mouseSensitivityChanged;
         public Observable<bool> InvertYAxisChanged => invertYAxisChanged;
+        public Observable<float> ControllerLookSensitivityChanged => controllerLookSensitivityChanged;
+        public Observable<bool> ControllerInvertYAxisChanged => controllerInvertYAxisChanged;
         public Observable<int> CrouchModeChanged => crouchModeChanged;
         public Observable<int> SprintModeChanged => sprintModeChanged;
         public Observable<bool> RunningEffectsEnabledChanged => runningEffectsEnabledChanged;
@@ -481,6 +490,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             SetDropdownValue(sprintModeDropdown, value);
         }
+
+        // Legacy view has no UI for the controller settings.
+        public void SetControllerLookSensitivityValue(float value) { }
+
+        public void SetControllerInvertYAxisValue(bool value) { }
 
         public void SetRunningEffectsEnabledValue(bool value)
         {

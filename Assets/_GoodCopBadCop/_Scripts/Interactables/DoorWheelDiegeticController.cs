@@ -1,4 +1,5 @@
 using System.Collections;
+using GoodCopBadCop.Input;
 using HighlightPlus;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -106,8 +107,8 @@ public class DoorWheelDiegeticController : DiegeticViewController
     /// and while waiting for the post-unlock close delay to elapse.</summary>
     protected override bool SuppressCameraMovement => _isDragging || _closing;
 
-    private bool LmbDown => Input.GetMouseButtonDown(0) || (Gamepad.current?.rightTrigger.wasPressedThisFrame  ?? false);
-    private bool LmbHeld => Input.GetMouseButton(0)     || (Gamepad.current?.rightTrigger.isPressed             ?? false);
+    private bool LmbDown => Input.GetMouseButtonDown(0) || RebindableInput.GetGamepadDown(GameAction.UseItem);
+    private bool LmbHeld => Input.GetMouseButton(0)     || RebindableInput.GetGamepadHeld(GameAction.UseItem);
 
     // Cursor-driven diegetic view: the Interact key opens the view (BunkerDoorInteractable), and
     // clicking/dragging inside it stays on LMB / RT, like every other cursor view.

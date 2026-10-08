@@ -76,6 +76,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     private float _baseMouseSensitivity;
     private float _settingsMouseSensitivity = 50f;
     private bool _invertYAxis;
+    // Right-stick look settings (1-100 scale, 50 = controllerLookSensitivity as authored). Independent of the mouse.
+    private float _settingsControllerLookSensitivity = 50f;
+    private bool _controllerInvertYAxis;
     private EInputActivationMode _crouchMode = EInputActivationMode.Hold;
     private EInputActivationMode _sprintMode = EInputActivationMode.Hold;
     private bool _sprintToggleActive;
@@ -128,9 +131,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     // Input helpers — combine legacy Input Manager with gamepad polling so both
     // keyboard/mouse and controller work simultaneously without migrating to
-    // the new Input System's action map callbacks.
-    private bool IsJumpHeld => Input.GetButton("Jump") || (Gamepad.current?.buttonSouth.isPressed ?? false);
-    private bool IsJumpDown => Input.GetButtonDown("Jump") || (Gamepad.current?.buttonSouth.wasPressedThisFrame ?? false);
+    // the new Input System's action map callbacks. Gamepad buttons follow RebindableInput bindings.
+    private bool IsJumpHeld => Input.GetButton("Jump") || RebindableInput.GetGamepadHeld(GameAction.Jump);
+    private bool IsJumpDown => Input.GetButtonDown("Jump") || RebindableInput.GetGamepadDown(GameAction.Jump);
 
     [Header("Ground Check")]
     [Tooltip("Extra distance below the capsule base to scan for ground. Lower = stricter.")]
@@ -684,9 +687,12 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         // Gamepad right stick — already a continuous axis value; scale by deltaTime for
         // frame-rate-independent rotation. No extra smoothing layer to avoid added latency.
+        // Uses the controller-specific sensitivity / invert settings, not the mouse ones.
         Vector2 rightStick = Gamepad.current?.rightStick.ReadValue() ?? Vector2.zero;
-        float controllerX =  rightStick.x * controllerLookSensitivity * Time.deltaTime;
-        float controllerY =  rightStick.y * controllerLookSensitivity * Time.deltaTime * verticalDirection;
+        float appliedControllerSensitivity = controllerLookSensitivity * (_settingsControllerLookSensitivity / 50f);
+        float controllerVerticalDirection = _controllerInvertYAxis ? -1f : 1f;
+        float controllerX =  rightStick.x * appliedControllerSensitivity * Time.deltaTime;
+        float controllerY =  rightStick.y * appliedControllerSensitivity * Time.deltaTime * controllerVerticalDirection;
 
         float totalX = _smoothedMouseX + controllerX;
         float totalY = _smoothedMouseY + controllerY;
@@ -741,6 +747,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             SettingsService.MinimumMouseSensitivity,
             SettingsService.MaximumMouseSensitivity);
         _invertYAxis = settings.InvertYAxis;
+        _settingsControllerLookSensitivity = Mathf.Clamp(settings.ControllerLookSensitivity, 1f, 100f);
+        _controllerInvertYAxis = settings.ControllerInvertYAxis;
         _crouchMode = settings.CrouchMode;
         _sprintMode = settings.SprintMode;
 
@@ -1111,8 +1119,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     private void UpdateCrouchInput()
     {
-        bool gamepadCrouchDown = Gamepad.current?.buttonEast.wasPressedThisFrame ?? false;
-        bool gamepadCrouchHeld = Gamepad.current?.buttonEast.isPressed ?? false;
+        bool gamepadCrouchDown = RebindableInput.GetGamepadDown(GameAction.Crouch);
+        bool gamepadCrouchHeld = RebindableInput.GetGamepadHeld(GameAction.Crouch);
 
         if (_crouchMode == EInputActivationMode.Toggle)
         {
@@ -1134,9 +1142,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     private bool IsSprintInputActive()
     {
         bool sprintHeld    = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)
-                             || (Gamepad.current?.leftStickButton.isPressed ?? false);
+                             || RebindableInput.GetGamepadHeld(GameAction.Sprint);
         bool sprintPressed = Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift)
-                             || (Gamepad.current?.leftStickButton.wasPressedThisFrame ?? false);
+                             || RebindableInput.GetGamepadDown(GameAction.Sprint);
 
         if (_sprintMode == EInputActivationMode.Hold)
         {

@@ -10,6 +10,12 @@ namespace GoodCopBadCop.Settings
         public readonly bool HeadBobEnabled;
         public readonly bool CameraShakeEnabled;
 
+        /// <summary>Gamepad right-stick look sensitivity on the settings 1-100 scale (50 = the prefab's base speed).</summary>
+        public readonly float ControllerLookSensitivity;
+
+        /// <summary>Inverts the gamepad right-stick vertical look independently of the mouse.</summary>
+        public readonly bool ControllerInvertYAxis;
+
         public PlayerControlSettings(
             float mouseSensitivity,
             bool invertYAxis,
@@ -17,7 +23,9 @@ namespace GoodCopBadCop.Settings
             EInputActivationMode sprintMode,
             bool runningEffectsEnabled,
             bool headBobEnabled,
-            bool cameraShakeEnabled)
+            bool cameraShakeEnabled,
+            float controllerLookSensitivity,
+            bool controllerInvertYAxis)
         {
             MouseSensitivity = mouseSensitivity;
             InvertYAxis = invertYAxis;
@@ -26,6 +34,8 @@ namespace GoodCopBadCop.Settings
             RunningEffectsEnabled = runningEffectsEnabled;
             HeadBobEnabled = headBobEnabled;
             CameraShakeEnabled = cameraShakeEnabled;
+            ControllerLookSensitivity = controllerLookSensitivity;
+            ControllerInvertYAxis = controllerInvertYAxis;
         }
     }
 }

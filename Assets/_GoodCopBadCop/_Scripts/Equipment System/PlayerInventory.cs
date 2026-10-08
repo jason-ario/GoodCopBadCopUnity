@@ -6,9 +6,11 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Two-slot hotbar inventory for the local player.
-/// Press 1/2 to equip the item in that slot, or scroll the mouse wheel to cycle through
-/// held/carried items. Picking up an item brings it straight to hand; placing/dropping empties
-/// the hand.
+/// Press 1/2 to equip the item in that slot, scroll the mouse wheel, or press the gamepad
+/// <see cref="GameAction.NextSlot"/> / <see cref="GameAction.PreviousSlot"/> bindings (D-pad
+/// Right / Left by default) to cycle through held/carried items. Hotbar input is ignored while
+/// the guidebook or a diegetic view is open. Picking up an item brings it straight to hand;
+/// placing/dropping empties the hand.
 ///
 /// Exactly one slot is always SELECTED (<see cref="ActiveSlot"/> is 0 or 1, never -1). The hand
 /// always shows the selected slot's contents: its item when occupied, or empty hands when that
@@ -227,6 +229,10 @@ public class PlayerInventory : NetworkBehaviour
         float scroll = Input.mouseScrollDelta.y;
         if (scroll > 0f) CycleActiveItem(1);
         else if (scroll < 0f) CycleActiveItem(-1);
+
+        // Gamepad slot cycling (D-pad Right / Left by default, rebindable).
+        if (RebindableInput.GetGamepadDown(GameAction.NextSlot)) CycleActiveItem(1);
+        else if (RebindableInput.GetGamepadDown(GameAction.PreviousSlot)) CycleActiveItem(-1);
     }
 
     /// <summary>
@@ -248,6 +254,9 @@ public class PlayerInventory : NetworkBehaviour
         }
 
         if (UIController.Instance != null && UIController.Instance.IsPaused) return "game is paused";
+        // The guidebook turns pages with the D-pad, and diegetic views own their own input.
+        if (GuidebookController.IsLocalGuidebookOpen) return "guidebook is open";
+        if (DiegeticViewController.Current != null) return "a diegetic view is open";
         return null;
     }
 
@@ -272,15 +281,15 @@ public class PlayerInventory : NetworkBehaviour
     // ── Reloading ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// <see cref="GameAction.Reload"/> (R by default, rebindable in Settings -> Controls) or the fixed
-    /// gamepad button from <see cref="RebindableInput.GamepadButtonName"/> (Y / buttonNorth).
+    /// <see cref="GameAction.Reload"/> (R by default, rebindable in Settings -> Controls) or its
+    /// rebindable gamepad binding (Y / buttonNorth by default).
     /// Ignored while paused so the gamepad button can't fire through the pause menu.
     /// </summary>
     private static bool ReloadPressed()
     {
         if (UIController.Instance != null && UIController.Instance.IsPaused) return false;
         if (RebindableInput.GetKeyDown(GameAction.Reload)) return true;
-        return Gamepad.current?.buttonNorth.wasPressedThisFrame ?? false;
+        return RebindableInput.GetGamepadDown(GameAction.Reload);
     }
 
     /// <summary>
