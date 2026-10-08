@@ -18,6 +18,19 @@ public class TMPTextReveal : MonoBehaviour
     [SerializeField] AudioClip[] revealSounds;
     [SerializeField] private float minSoundInterval = 0.1f;
 
+    [Tooltip("Extra pause (seconds) after a line break is revealed, like a teleprinter carriage return. 0 = none.")]
+    [SerializeField] private float lineBreakDelay = 0f;
+
+    /// <summary>
+    /// Raised once per revealed character with that character and whether a line break ('\n')
+    /// was crossed to reach it. Lets other components (e.g. <see cref="TeleprinterRevealAudio"/>)
+    /// drive custom per-character feedback; leave <see cref="revealSounds"/> empty in that case.
+    /// </summary>
+    public event Action<char, bool> CharacterRevealed;
+
+    /// <summary>Raised when a reveal is interrupted (skip/complete, clear, new text, or disable).</summary>
+    public event Action RevealInterrupted;
+
     private string _fullText;
     private float _lastSoundPlayTime = float.NegativeInfinity;
 
@@ -111,11 +124,35 @@ public class TMPTextReveal : MonoBehaviour
         // and any ContentSizeFitter in the hierarchy reflect the actual visible width.
         tmp.maxVisibleCharacters = 99999;
 
+        int previousStringIndex = -1;
         for (int i = 0; i < totalChars; i++)
         {
-            tmp.text = fullText.Substring(0, charStringIndices[i] + 1);
+            int stringIndex = charStringIndices[i];
+            tmp.text = fullText.Substring(0, stringIndex + 1);
 
-            if (revealSounds.Length != 0 && Time.time - _lastSoundPlayTime >= minSoundInterval)
+            // Detect a crossed line break whether or not TMP lists '\n' as its own character.
+            bool crossedLineBreak = false;
+            for (int s = previousStringIndex + 1; s <= stringIndex && s < fullText.Length; s++)
+            {
+                if (fullText[s] == '\n') { crossedLineBreak = true; break; }
+            }
+            previousStringIndex = stringIndex;
+
+            char revealed = stringIndex < fullText.Length ? fullText[stringIndex] : ' ';
+
+            if (crossedLineBreak && lineBreakDelay > 0f && i > 0)
+            {
+                CharacterRevealed?.Invoke('\n', true);
+                yield return new WaitForSeconds(lineBreakDelay);
+                if (revealed == '\n') continue;
+                CharacterRevealed?.Invoke(revealed, false);
+            }
+            else
+            {
+                CharacterRevealed?.Invoke(revealed, crossedLineBreak);
+            }
+
+            if (revealSounds != null && revealSounds.Length != 0 && Time.time - _lastSoundPlayTime >= minSoundInterval)
             {
                 _lastSoundPlayTime = Time.time;
                 SFXController.Instance.Play(revealSounds[UnityEngine.Random.Range(0, revealSounds.Length)]);
@@ -189,6 +226,7 @@ public class TMPTextReveal : MonoBehaviour
         {
             StopCoroutine(revealRoutine);
             revealRoutine = null;
+            RevealInterrupted?.Invoke();
         }
     }
 }

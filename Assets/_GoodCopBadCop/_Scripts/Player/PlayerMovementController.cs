@@ -216,6 +216,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
                 return;
 
+            // Players spawn behind the intro story cinematic; the spawn restore (and any other
+            // late writer) must not hand control back until the cinematic releases it.
+            if (value && IntroCinematicController.Instance != null && IntroCinematicController.Instance.IsPlaying)
+                return;
+
             // Same for the end-of-shift report: late UI teardown (e.g. the non-confirming player's
             // bed view closing after the report already appeared) must not re-lock the cursor or
             // hand movement back underneath it. HideEndOfShiftReport clears this before
@@ -791,6 +796,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         // (dumpster deposit, coin-slot insertion, etc.) call SetCanLook(true) after yielding;
         // if a cutscene started during that yield, look must stay disabled.
         if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
+            return;
+        if (value && IntroCinematicController.Instance != null && IntroCinematicController.Instance.IsPlaying)
             return;
         if (UIController.Instance != null && UIController.Instance.TryCaptureLookWhilePaused(this, value))
             return;

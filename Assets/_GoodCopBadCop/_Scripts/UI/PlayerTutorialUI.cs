@@ -11,6 +11,9 @@ public class PlayerTutorialUI : MonoBehaviour
     [SerializeField] private TMPTextReveal textReveal;
     [SerializeField] private float defaultHoldDuration = 3f;
 
+    [Tooltip("Seconds after the intro cinematic ends and the screen fades in before 'Go to the booth' appears.")]
+    [SerializeField] private float boothMessageDelay = 4f;
+
     private Animator _animator;
     private Coroutine _sequenceCoroutine;
     private Action _onCloseCallback;
@@ -64,11 +67,17 @@ public class PlayerTutorialUI : MonoBehaviour
         }
 
         gameObject.SetActive(true);
-        StartCoroutine(DelayedShowBoothMessage(3f));
+        StartCoroutine(DelayedShowBoothMessage(boothMessageDelay));
     }
 
     private IEnumerator DelayedShowBoothMessage(float delay)
     {
+        // Players spawn before the intro story cinematic, so wait until this player has finished
+        // it and the screen has faded back in — then give them a few seconds to look around.
+        while ((IntroCinematicController.Instance != null && IntroCinematicController.Instance.IsPlaying)
+               || (GameManager.Instance != null && GameManager.Instance.IsLocalLobbyRevealPending))
+            yield return null;
+
         yield return new WaitForSeconds(delay);
 
         ShowBoothMessage();

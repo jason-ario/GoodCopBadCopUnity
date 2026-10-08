@@ -107,6 +107,24 @@ public class BusCutsceneController : NetworkBehaviour
         // Defensive: never replay the intro because a player arrived late.
         if (_cutsceneFinished.Value) return;
 
+        StartCoroutine(StartWhenIntroCinematicsDone());
+    }
+
+    /// <summary>
+    /// SERVER: players now spawn at the lobby before the intro story cinematic, so hold the bus
+    /// (visual, idle audio, and drive-off) until every player has finished reading it — otherwise
+    /// they'd hear it behind the black screen and miss it driving away.
+    /// </summary>
+    private IEnumerator StartWhenIntroCinematicsDone()
+    {
+        // The spawn fires inside GameManager's lobby setup; give it a frame to settle.
+        yield return null;
+
+        while (GameManager.Instance != null && GameManager.Instance.IsWaitingForIntroCinematics)
+            yield return null;
+
+        if (_cutsceneFinished.Value) yield break;
+
         RevealBusClientRpc();
         StartCoroutine(ServerSequence());
     }

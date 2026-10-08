@@ -33,18 +33,19 @@ public class IntroCinematicController : MonoBehaviour
     [SerializeField] private float promptFadeInDuration = 0.6f;
     [SerializeField] private float promptFadeOutDuration = 0.2f;
 
-    [Tooltip("Story lines shown in order, one at a time, over the black screen.")]
-    [TextArea(2, 4)]
+    [Tooltip("Story pages shown in order, one at a time, over the black screen. Put each sentence on its own line.")]
+    [TextArea(2, 6)]
     [SerializeField]
     private string[] storyLines =
     {
+        "20 October 1989 - Saplavi Checkpoint, Soviet Georgia",
         "The disaster began beyond the northern mountains.",
-        "No one knows exactly what happened. The government called it an industrial accident. Then the radiation reached the villages, and people stopped acting like themselves.",
+        "No one knows exactly what happened.\nThe government called it an industrial accident.\nThen the radiation reached the villages, and people stopped acting like themselves.",
         "Saplavi is one of the last towns still standing.",
-        "Its checkpoint is the only barrier between the valley and the outside world. The healthy may pass. The infected must be quarantined.",
+        "Its checkpoint is the only barrier between the valley and the outside world.\nThe healthy may pass.\nThe infected must be quarantined.",
         "Anything no longer human must be eliminated.",
         "You have been assigned to the checkpoint.",
-        "Inspect everyone. Follow protocol. Protect the town.",
+        "Inspect everyone.\nFollow protocol.\nProtect the town.",
         "And remember, decisions have consequences..."
     };
 
@@ -75,9 +76,13 @@ public class IntroCinematicController : MonoBehaviour
 
     private void Update()
     {
-        if (IsPlaying && _lockedPlayer == null && PlayerInstance.Instance != null)
+        // Re-assert every frame, not once: the host's player spawns (and its spawn restore grants
+        // control) just before the cinematic starts, and a respawned player object replaces the
+        // locked one. The CanControl/SetCanLook guards block re-enables while IsPlaying.
+        PlayerInstance local = PlayerInstance.Instance;
+        if (IsPlaying && local != null && (local != _lockedPlayer || local.CanControl))
         {
-            _lockedPlayer = PlayerInstance.Instance;
+            _lockedPlayer = local;
             _lockedPlayer.OpenedUIPanel();
         }
 
@@ -124,6 +129,13 @@ public class IntroCinematicController : MonoBehaviour
 
         panelRoot.SetActive(true);
         IsPlaying = true;
+
+        // Lock immediately (same frame) rather than waiting for Update.
+        if (PlayerInstance.Instance != null)
+        {
+            _lockedPlayer = PlayerInstance.Instance;
+            _lockedPlayer.OpenedUIPanel();
+        }
 
         foreach (string line in storyLines)
             yield return StartCoroutine(ShowLineAndWait(line));

@@ -97,6 +97,51 @@ public class GameManager : NetworkBehaviour
     /// </summary>
     public bool IsTransitioningToLobby { get; private set; }
 
+    /// <summary>
+    /// LOCAL: true from the start of this client's <see cref="LobbyTransitionSequence"/> until its
+    /// screen has faded back in after the intro story cinematic. Gameplay prompts that fire on
+    /// spawn (e.g. <see cref="PlayerTutorialUI"/>'s "Go to the booth") wait on this, because players
+    /// now spawn before the cinematic starts.
+    /// </summary>
+    public bool IsLocalLobbyRevealPending { get; private set; }
+
+    [Tooltip("SERVER: safety cap (seconds) on how long lobby events (the bus) wait for every player to finish the intro story cinematic.")]
+    [SerializeField] private float maxIntroCinematicWait = 180f;
+
+    /// <summary>SERVER: clients that were spawned at the lobby but haven't finished their intro cinematic yet.</summary>
+    private readonly System.Collections.Generic.HashSet<ulong> _introCinematicPendingClients = new();
+    private float _introCinematicWaitDeadline;
+
+    /// <summary>
+    /// SERVER: true while at least one connected player is still watching the intro story
+    /// cinematic (capped by <see cref="maxIntroCinematicWait"/>). Lobby-world events such as the
+    /// bus wait on this so nobody hears or misses them behind the black screen.
+    /// </summary>
+    public bool IsWaitingForIntroCinematics
+    {
+        get
+        {
+            if (!IsServer || _introCinematicPendingClients.Count == 0) return false;
+            if (Time.unscaledTime >= _introCinematicWaitDeadline)
+            {
+                _introCinematicPendingClients.Clear();
+                return false;
+            }
+
+            var connected = NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClients : null;
+            if (connected != null)
+                _introCinematicPendingClients.RemoveWhere(id => !connected.ContainsKey(id));
+
+            return _introCinematicPendingClients.Count > 0;
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void NotifyIntroCinematicFinishedServerRpc(ServerRpcParams rpcParams = default)
+    {
+        _introCinematicPendingClients.Remove(rpcParams.Receive.SenderClientId);
+    }
+
     private void Awake()
     {
         Instance = this;
@@ -185,6 +230,8 @@ public class GameManager : NetworkBehaviour
 
     private IEnumerator LobbyTransitionSequence()
     {
+        IsLocalLobbyRevealPending = true;
+
         AudioManager.Instance.FadeOutAmbientAudio();
         SFXController.Instance.Play(transitionToGameplayStinger);
 
@@ -203,6 +250,13 @@ public class GameManager : NetworkBehaviour
         // IntroCinematicController while its own cinematic is still showing.
         if (IsServer)
         {
+            // Register everyone who is about to watch the cinematic BEFORE spawning, so the bus
+            // (triggered by the first lobby spawn) already sees them as pending.
+            _introCinematicPendingClients.Clear();
+            foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+                _introCinematicPendingClients.Add(clientId);
+            _introCinematicWaitDeadline = Time.unscaledTime + maxIntroCinematicWait;
+
             SpawnAllPlayersAtLobby();
             IsTransitioningToLobby = false;
             // Signal all clients (including self) that all players are spawned
@@ -215,6 +269,10 @@ public class GameManager : NetworkBehaviour
         // application session — see IntroCinematicController.PlayIfNeeded.
         if (IntroCinematicController.Instance != null)
             yield return StartCoroutine(IntroCinematicController.Instance.PlayIfNeeded());
+
+        // Tell the server this player is done (also sent when the cinematic was a no-op) so
+        // lobby-world events like the bus can start once nobody is behind the black screen.
+        NotifyIntroCinematicFinishedServerRpc();
 
         // The main menu's background music has been playing underneath the black screen and
         // the intro cutscene above — stop it now that the intro cutscene has finished.
@@ -242,6 +300,7 @@ public class GameManager : NetworkBehaviour
         yield return new WaitForSeconds(FadeOutDuration);
 
         UIController.Instance.ShowPlayerUI();
+        IsLocalLobbyRevealPending = false;
         OnGameStart?.Invoke();
     }
 

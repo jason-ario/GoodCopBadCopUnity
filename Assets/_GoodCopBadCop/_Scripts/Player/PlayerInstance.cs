@@ -387,6 +387,12 @@ public class PlayerInstance : NetworkBehaviour
         const int maxAttempts = 60; // Covers detach/spawn and scene UI initialization races at low frame rates.
         int attempts = 0;
 
+        // Players spawn behind the intro story cinematic (see GameManager.LobbyTransitionSequence).
+        // Hold the whole restore (control, interaction, reticle, HUD) until it finishes, however
+        // long the player takes to read it — not capped by maxAttempts.
+        while (IntroCinematicController.Instance != null && IntroCinematicController.Instance.IsPlaying)
+            yield return null;
+
         // Only wait on cheap static flags. The reticle is not a readiness signal: Die() leaves it
         // inactive, so an active-only lookup never succeeded and stalled the HUD for every attempt.
         // EnableReticle() below finds it even while inactive.
