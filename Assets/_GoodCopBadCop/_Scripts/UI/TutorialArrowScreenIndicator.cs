@@ -6,9 +6,12 @@ using UnityEngine;
 /// currently enabled in the scene (see <see cref="TutorialMarker.ActiveInstances"/> — covers both markers
 /// shown via <see cref="TutorialMarkerManager"/>'s pool and pre-placed scene arrows toggled directly by
 /// Day scripts), pools a 2D UI arrow that:
-///  - Hides itself while the marker's arrow is inside the camera's view.
-///  - Otherwise clamps itself to the edge of the screen and rotates to point toward the marker's
-///    on-screen direction, so the player always knows which way to look/travel to find it.
+///  - Hides itself only while the marker's world arrow is actually visible (inside the camera's view
+///    AND within <see cref="TutorialMarker.IsWithinVisibleRange"/>).
+///  - In view but out of range (world arrow faded out): sits over the target's projected position,
+///    pointing down at it.
+///  - Off screen at any distance: clamps itself to the edge of the screen and rotates to point toward
+///    the marker, so the player always knows which way to look/travel to find it.
 /// Tracks each marker's <see cref="TutorialMarker.StableAnchorPosition"/> (bottom of its bob range)
 /// rather than its live, bobbing transform position, so the indicator doesn't jitter every frame.
 /// Lives on the Player HUD canvas, sibling to <see cref="CompassController"/>. Purely additive —
@@ -87,8 +90,11 @@ public class TutorialArrowScreenIndicator : MonoBehaviour
             && viewportPoint.x >= 0f && viewportPoint.x <= 1f
             && viewportPoint.y >= 0f && viewportPoint.y <= 1f;
 
-        // Hide while the marker is on screen, or while it's out of range (its world arrow is faded out too).
-        if (onScreen || !marker.IsWithinVisibleRange(cam.transform.position))
+        // Only hide while the world arrow itself is visible: on screen AND within its visible range.
+        // Out of range (e.g. Day 3's far-away fuse box) the world arrow is faded out, so the screen
+        // marker must keep showing no matter how far the target is.
+        bool worldArrowVisible = marker.IsWithinVisibleRange(cam.transform.position);
+        if (onScreen && worldArrowVisible)
         {
             ReleaseArrow(marker);
             return;
@@ -98,6 +104,18 @@ public class TutorialArrowScreenIndicator : MonoBehaviour
         {
             arrow = GetFromPool();
             _activeArrows[marker] = arrow;
+        }
+
+        if (onScreen)
+        {
+            // Target is in view but too far for its world arrow: sit over the target's projected
+            // position (kept inside the edge margin) and point straight down at it.
+            Vector2 local = new Vector2(viewportPoint.x - 0.5f, viewportPoint.y - 0.5f) * indicatorContainer.rect.size;
+            local.x = Mathf.Clamp(local.x, -halfSize.x, halfSize.x);
+            local.y = Mathf.Clamp(local.y, -halfSize.y, halfSize.y);
+            arrow.anchoredPosition = local;
+            arrow.localRotation = Quaternion.identity; // authored sprite already points down (-Y)
+            return;
         }
 
         // Mirror the projection for points behind the camera so the arrow points the short way
