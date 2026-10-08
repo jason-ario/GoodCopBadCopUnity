@@ -144,6 +144,14 @@ public class Telephone : Interactable
     private bool _isScriptedCall = false;
     private Action _scriptedCallAnsweredCallback;
 
+    // Server-only: a scripted call requested while the phone couldn't ring (handset held, e.g. the
+    // HQ Order Screen, or BlockAllCalls). Rings automatically once the phone is free again —
+    // see TickQueuedScriptedCallServer. Scripted calls are story-critical and must never be dropped.
+    private bool _hasQueuedScriptedCall = false;
+    private Action _queuedScriptedCallback;
+    private float _queuedScriptedCallEarliestTime;
+    private const float QueuedScriptedCallDelayAfterPutDown = 1f;
+
     // Client-only: drives the ring cycle (animation + one-shot audio).
     private Coroutine _ringCycleCoroutine;
 
@@ -178,6 +186,7 @@ public class Telephone : Interactable
     private void Update()
     {
         ReleaseHandsetIfHolderInactiveServer();
+        TickQueuedScriptedCallServer();
 
         if (_observedHolder == null || !handSet.enabled) return;
 
@@ -341,13 +350,66 @@ public class Telephone : Interactable
     /// fires on the server as soon as the player picks up the handset.
     /// Callers should wait ~1.5 s inside <paramref name="onAnswered"/> before starting any
     /// <see cref="ScriptedDialogueRunner"/> sequence so the grab animation can finish first.
-    /// Does nothing if the phone is already ringing or currently grabbed.
+    /// <para>
+    /// Scripted calls are never dropped: if the handset is currently held (e.g. a player has the
+    /// HQ Order Screen open) or <see cref="BlockAllCalls"/> is set, the call is queued and rings
+    /// as soon as the phone is free. A ringing regular call is pre-empted. Scripted calls do not
+    /// time out — they ring until answered or <see cref="CancelScriptedCall"/> is called.
+    /// </para>
     /// </summary>
     public void TriggerScriptedCall(Action onAnswered)
     {
         if (!IsServer) return;
-        if (BlockAllCalls) return;
-        if (_isRinging.Value || _isGrabbed.Value) return;
+
+        if (_isRinging.Value && _isScriptedCall)
+        {
+            Debug.LogWarning("[Telephone] TriggerScriptedCall: a scripted call is already ringing -- ignoring duplicate.");
+            return;
+        }
+
+        if (CanStartScriptedRingServer())
+        {
+            StartScriptedRingServer(onAnswered);
+            return;
+        }
+
+        _hasQueuedScriptedCall = true;
+        _queuedScriptedCallback = onAnswered;
+        _queuedScriptedCallEarliestTime = Time.time + QueuedScriptedCallDelayAfterPutDown;
+        Debug.Log("[Telephone] TriggerScriptedCall: phone busy -- scripted call queued, will ring once the handset is free.");
+    }
+
+    /// <summary>
+    /// Server-only. Cancels a queued or currently ringing scripted call (e.g. when the day that
+    /// requested it is deactivated). Does not affect a scripted call that was already answered.
+    /// </summary>
+    public void CancelScriptedCall()
+    {
+        if (!IsServer) return;
+
+        _hasQueuedScriptedCall = false;
+        _queuedScriptedCallback = null;
+
+        if (_isRinging.Value && _isScriptedCall)
+        {
+            StopRingTimeout();
+            _isRinging.Value = false;
+            _pendingTaskIndex = -1;
+            _isScriptedCall = false;
+            _scriptedCallAnsweredCallback = null;
+            StopRingingClientRpc();
+        }
+    }
+
+    private bool CanStartScriptedRingServer()
+    {
+        return !BlockAllCalls && !_isGrabbed.Value && !(_isRinging.Value && _isScriptedCall);
+    }
+
+    private void StartScriptedRingServer(Action onAnswered)
+    {
+        // Pre-empt a ringing regular call — its task is simply never delivered.
+        StopRingTimeout();
 
         _isScriptedCall = true;
         _scriptedCallAnsweredCallback = onAnswered;
@@ -355,7 +417,28 @@ public class Telephone : Interactable
         _isRinging.Value = true;
 
         StartRingingClientRpc();
-        _ringTimeoutCoroutine = StartCoroutine(RingTimeoutRoutine());
+    }
+
+    /// <summary>
+    /// Server-only, every frame. Rings a queued scripted call once the handset has been free for
+    /// <see cref="QueuedScriptedCallDelayAfterPutDown"/> seconds (lets the put-down sequence finish).
+    /// </summary>
+    private void TickQueuedScriptedCallServer()
+    {
+        if (!_hasQueuedScriptedCall || !IsServer || !IsSpawned) return;
+
+        if (!CanStartScriptedRingServer())
+        {
+            _queuedScriptedCallEarliestTime = Time.time + QueuedScriptedCallDelayAfterPutDown;
+            return;
+        }
+
+        if (Time.time < _queuedScriptedCallEarliestTime) return;
+
+        Action callback = _queuedScriptedCallback;
+        _hasQueuedScriptedCall = false;
+        _queuedScriptedCallback = null;
+        StartScriptedRingServer(callback);
     }
 
     /// <summary>

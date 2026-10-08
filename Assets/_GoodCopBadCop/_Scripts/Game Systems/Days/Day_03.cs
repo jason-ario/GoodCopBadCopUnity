@@ -404,6 +404,10 @@ public class Day_03 : DayBase, IDailyTask
     {
         base.DayDeactivated();
 
+        // Scripted calls never time out, so drop any queued/ringing HQ call from this day.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            Telephone.Instance?.CancelScriptedCall();
+
         UnsubscribeAll();
         StopAllCoroutines();
     }
