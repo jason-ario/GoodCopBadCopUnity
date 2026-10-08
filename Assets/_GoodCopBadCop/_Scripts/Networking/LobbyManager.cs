@@ -411,6 +411,16 @@ public class LobbyManager : MonoBehaviour
                 Debug.LogError("[CreateLobby] Steam is not initialized — cannot create lobby.");
                 return false;
             }
+            // Steam can be initialized while the client is disconnected from Steam's servers.
+            // CreateLobbyAsync then times out (~10s per attempt) and the retry loop below would
+            // leave the player on a black fade for close to a minute. Fail fast instead.
+            if (!SteamClient.IsLoggedOn)
+            {
+                Debug.LogError("[CreateLobby] Steam client is not connected to Steam servers (offline or reconnecting) — cannot create lobby.");
+                return false;
+            }
+
+
 
             Debug.Log("[CreateLobby] FacepunchTransport detected — creating Steam lobby...");
 

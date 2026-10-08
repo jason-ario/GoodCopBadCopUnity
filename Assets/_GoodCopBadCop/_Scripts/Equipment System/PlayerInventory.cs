@@ -617,6 +617,11 @@ public class PlayerInventory : NetworkBehaviour
                 continue;
             }
 
+            // The open guidebook deliberately hides the in-hand item (local SetActive(false)).
+            // It owns that visibility until it closes or notices the item left the hand, so
+            // don't mistake it for a late stowed echo and re-show the item under the book.
+            if (item.IsLocallyHiddenForGuidebook) continue;
+
             if (held == item)
             {
                 // In hand but hidden: a late stowed=true replication deactivated it after it was

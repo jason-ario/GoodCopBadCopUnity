@@ -182,6 +182,15 @@ public class PickableObject : Interactable
     public bool IsHiddenForGuidebook => _isHiddenForGuidebook.Value;
 
     /// <summary>
+    /// Holder-side, local-only: true from the moment the local <see cref="GuidebookController"/>
+    /// hides this held item until it re-shows it. Unlike <see cref="IsHiddenForGuidebook"/> this
+    /// doesn't wait for a server round-trip, so self-healing / echo paths that re-activate an
+    /// "unexpectedly hidden" held item (<see cref="PlayerInventory"/> reconcile, stowed=false
+    /// echoes) can tell the guidebook hide apart and leave the item hidden.
+    /// </summary>
+    public bool IsLocallyHiddenForGuidebook { get; set; }
+
+    /// <summary>
     /// True while this item is physically contained by a supply box. The server writes this
     /// before spawning delivered contents, so every peer makes the item's colliders triggers
     /// and its rigidbodies kinematic before it can push against the box.
@@ -321,7 +330,9 @@ public class PickableObject : Interactable
         // here as well as in the owner's stow path — otherwise the item comes back "busy".
         if (newValue) ForceClearUseState();
 
-        gameObject.SetActive(!newValue);
+        // An unstow echo arriving after the holder opened the guidebook must not re-show the item
+        // under the book; the guidebook re-activates it on close.
+        gameObject.SetActive(!newValue && !IsLocallyHiddenForGuidebook);
         OnStowedNetworked?.Invoke(newValue);
     }
 

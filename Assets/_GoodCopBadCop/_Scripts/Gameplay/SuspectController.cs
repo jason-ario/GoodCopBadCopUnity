@@ -798,6 +798,8 @@ public class SuspectController : NetworkBehaviour
 
         // Not shootable/woundable yet — only becomes true once ArrivedAtPosition fires below.
         suspectCharacter.SetIsAtBooth(false);
+        // Not interactable (talk/item use/reticle) until they reach the booth.
+        suspectCharacter.SetWalkingToBoothServer(true);
 
         suspectCharacter.SetLocomotionState(true);
         // Walk straight to the booth stand position via DOTween rather than NavMeshAgent
@@ -874,6 +876,7 @@ public class SuspectController : NetworkBehaviour
 
         // Now standing at the window — shootable/woundable from here on.
         suspectCharacter.SetIsAtBooth(true);
+        suspectCharacter.SetWalkingToBoothServer(false);
 
         // Leg animators (procedural IK) stay disabled here — they are only ever re-enabled for
         // a full-mutant's window climb-through (see MutantSuspectBehaviour), never for a normal
@@ -1949,6 +1952,7 @@ public class SuspectController : NetworkBehaviour
 
         // No longer at the booth once it's leaving — blocks any in-flight damage/shot RPCs.
         suspectToDespawn.SetIsAtBooth(false);
+        suspectToDespawn.SetWalkingToBoothServer(false);
 
         NetworkObject netObj = suspectToDespawn.GetComponent<NetworkObject>();
         if (netObj != null && netObj.IsSpawned)

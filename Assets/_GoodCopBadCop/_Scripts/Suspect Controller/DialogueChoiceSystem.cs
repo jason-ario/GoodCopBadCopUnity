@@ -767,7 +767,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
     private static void HideRenderers(GameObject root, List<Renderer> hidden)
     {
-        foreach (var renderer in root.GetComponentsInChildren<Renderer>())
+        // Include inactive: a held item can still be deactivated by the guidebook at this point
+        // (if a path hid the rig before the book closed) and is re-activated right after.
+        foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
             HideRenderer(renderer, hidden);
     }
 

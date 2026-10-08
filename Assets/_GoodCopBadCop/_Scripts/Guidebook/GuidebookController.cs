@@ -213,6 +213,8 @@ public class GuidebookController : MonoBehaviour
             return;
         }
 
+        if (IsOpen) ReleaseHiddenItemIfNoLongerHeld();
+
         if (!GameSettings.Instance.GuidebookEnabled)
         {
             if (IsOpen) CloseGuidebook();
@@ -255,6 +257,9 @@ public class GuidebookController : MonoBehaviour
     public void OpenGuidebook()
     {
         if (IsOpen || !IsLocalPlayersController || !IsFirstPersonRigVisible || IsBlockedByView) return;
+        // A forced dialogue / cutscene owns the player; opening now would hide the held item
+        // only for the book to be torn down again next frame.
+        if (IsInCutsceneOrDialogue()) return;
         IsOpen = true;
         Local = this;
 
@@ -291,6 +296,9 @@ public class GuidebookController : MonoBehaviour
             SetHeldItemRigs(held.ItemData, false);
 
             _deactivatedHeldObject = held.gameObject;
+            // Set before deactivating so self-healing paths (PlayerInventory reconcile, stowed
+            // echoes) never treat this hide as a desync and re-show the item under the book.
+            held.IsLocallyHiddenForGuidebook = true;
             _pickupController.IsHidingHeldItemForGuidebook = true;
             try
             {
@@ -355,16 +363,11 @@ public class GuidebookController : MonoBehaviour
         // Notify all clients to hide the body-space guidebook mesh.
         _animationController.SetGuidebookOpen(false);
 
-        if (_deactivatedHeldObject != null)
+        // ReferenceEquals: also clears a reference to an item destroyed while the book was open.
+        if (!ReferenceEquals(_deactivatedHeldObject, null))
         {
-            _deactivatedHeldObject.SetActive(true);
-
-            PickableObject pickable = _deactivatedHeldObject.GetComponent<PickableObject>();
+            PickableObject pickable = RestoreHiddenHeldItem();
             bool stillHeld = pickable != null && _pickupController.HeldObject == pickable;
-
-            // Un-hide on the server and observers (always allowed, even if the item left the hand).
-            if (pickable != null)
-                pickable.RequestSetHiddenForGuidebookNetworked(false);
 
             if (stillHeld)
             {
@@ -372,12 +375,12 @@ public class GuidebookController : MonoBehaviour
                 SetHeldItemRigs(pickable.ItemData, true);
             }
 
-            if (pickable != null && pickable.ItemData.usesTwoArms)
+            if (stillHeld && pickable.ItemData.usesTwoArms)
                 _animationController.EnableHoldObjectTwoArmsMask();
-            else
+            else if (stillHeld)
                 _animationController.EnableRightArmMask();
-
-            _deactivatedHeldObject = null;
+            else
+                _animationController.DisableRightArmMask();
         }
         else
         {
@@ -391,6 +394,46 @@ public class GuidebookController : MonoBehaviour
         _movementController.SetCanLook(true);
         _movementController.SetCanControl(true);
         _movementController.SetCanMove(true);
+    }
+
+    /// <summary>
+    /// Re-activates the item hidden when the book opened, clears its local hidden flag and
+    /// un-hides it on the server and observers (always allowed, even if it left the hand).
+    /// Returns the item's <see cref="PickableObject"/> (null if it was destroyed or has none).
+    /// </summary>
+    private PickableObject RestoreHiddenHeldItem()
+    {
+        GameObject hidden = _deactivatedHeldObject;
+        _deactivatedHeldObject = null;
+        if (hidden == null) return null;
+
+        PickableObject pickable = hidden.GetComponent<PickableObject>();
+        if (pickable != null)
+            pickable.IsLocallyHiddenForGuidebook = false;
+
+        hidden.SetActive(true);
+
+        if (pickable != null)
+            pickable.RequestSetHiddenForGuidebookNetworked(false);
+
+        return pickable;
+    }
+
+    /// <summary>
+    /// The hidden item left the hand while the book stayed open (death drop, forced release,
+    /// despawn). Show it again right away instead of leaving it invisible until the book closes,
+    /// and release its arm IK so a carry pose doesn't come back on close.
+    /// </summary>
+    private void ReleaseHiddenItemIfNoLongerHeld()
+    {
+        if (ReferenceEquals(_deactivatedHeldObject, null)) return;
+
+        PickableObject pickable = _deactivatedHeldObject != null
+            ? _deactivatedHeldObject.GetComponent<PickableObject>()
+            : null;
+        if (pickable != null && _pickupController.HeldObject == pickable) return;
+
+        RestoreHiddenHeldItem();
     }
 
     /// <summary>

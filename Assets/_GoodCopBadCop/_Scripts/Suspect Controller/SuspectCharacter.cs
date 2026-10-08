@@ -181,10 +181,29 @@ public class SuspectCharacter : Interactable
         GetComponent<InWorldSubtitleAnchor>()?.Subtitle?.Hide();
     }
 
+    /// <summary>
+    /// Server-written, networked. True while <see cref="SuspectController"/> is walking this
+    /// suspect in to the booth window (set in InitiateSuspect, cleared in ArrivedAtPosition).
+    /// While true the suspect can't be targeted, talked to, or used with items — interaction
+    /// only opens once they've reached the booth. Suspects never walked in by the controller
+    /// (scripted/world NPCs) keep this false and are unaffected.
+    /// </summary>
+    private readonly NetworkVariable<bool> _walkingToBooth = new NetworkVariable<bool>(false);
+
+    /// <summary>True while this suspect is still walking in to the booth window.</summary>
+    public bool IsWalkingToBooth => _walkingToBooth.Value;
+
+    /// <summary>Server-only. Marks whether this suspect is currently walking in to the booth.</summary>
+    public void SetWalkingToBoothServer(bool walking)
+    {
+        if (!IsServer) return;
+        _walkingToBooth.Value = walking;
+    }
+
     private bool IsJunkCollectible => _junkItem != null && _junkItem.IsCollectible.Value;
 
     public override bool IsInteractable => base.IsInteractable
-        && ((!_interactionLocked.Value && !_verdictClosed.Value && !_mutantInteractionClosed.Value) || IsJunkCollectible);
+        && ((!_interactionLocked.Value && !_verdictClosed.Value && !_mutantInteractionClosed.Value && !_walkingToBooth.Value) || IsJunkCollectible);
 
     [SerializeField] private GameObject bloodExplosion;
     public Transform lookPos;
@@ -1745,6 +1764,10 @@ public class SuspectCharacter : Interactable
 
         // An active full mutant (window attack, post-hit hostile AI, legacy spawn) is never talkable.
         if (_mutantInteractionClosed.Value)
+            return;
+
+        // Still walking in to the booth — interaction only opens once they've arrived.
+        if (_walkingToBooth.Value)
             return;
 
         // The input that ends a dialogue can also reach world interaction on the same frame.
