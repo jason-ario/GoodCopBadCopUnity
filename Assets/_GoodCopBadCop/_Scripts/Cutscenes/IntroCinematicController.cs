@@ -137,6 +137,11 @@ public class IntroCinematicController : MonoBehaviour
             _lockedPlayer.OpenedUIPanel();
         }
 
+        // Pausing is blocked while IsPlaying (UIController.IsPauseBlocked); also dismiss a pause
+        // menu that was opened during the black-screen spawn window right before this started.
+        if (UIController.Instance != null && UIController.Instance.IsPaused)
+            UIController.Instance.ClosePauseMenu();
+
         foreach (string line in storyLines)
             yield return StartCoroutine(ShowLineAndWait(line));
 

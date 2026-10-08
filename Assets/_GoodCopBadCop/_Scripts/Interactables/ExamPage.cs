@@ -15,6 +15,13 @@ public class ExamPage : FolderItem
     public bool isRippedOut;
     [SerializeField] private GameObject container;
 
+    /// <summary>
+    /// Pages are runtime children of an <see cref="ExamNotebook"/>, which saves their used/remaining
+    /// state itself. Every page also shares the same "Name(Clone)" save id, so persisting them made
+    /// a filed page's despawn write a tombstone that despawned a random fresh page on load.
+    /// </summary>
+    public override bool IsPersistedInSave => false;
+
     [Header("Dynamic Checklist Item Spawning")]
     /// <summary>The base "Checklist Item" prefab instantiated per anomaly at runtime.</summary>
     [SerializeField] private ChecklistItem checklistItemPrefab;

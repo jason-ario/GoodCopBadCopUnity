@@ -235,15 +235,26 @@ public class DeliveryTruckController : NetworkBehaviour
 
     /// <summary>
     /// Server-only. Hides the delivery crate that was dropped off during a previous delivery.
-    /// Called by <see cref="SortMailTask.OnDayChanged"/> at the start of the day following a
-    /// delivery day, so the crate doesn't sit visible/active on the ground indefinitely — it is
+    /// Called by <see cref="SortMailTask.OnDayChanged"/> at the start of every day, so the crate doesn't sit visible/active on the ground indefinitely — it is
     /// simply reactivated and repositioned on the truck's roof (see <see cref="MountCrateOnRoof"/>)
-    /// the next time a delivery sequence begins. No-op if the crate is already hidden.
+    /// the next time a delivery sequence begins. No-op if the crate is already hidden, and never
+    /// touches a crate that is currently mounted on the roof for an in-progress delivery.
     /// </summary>
     public void DeactivateCrate()
     {
         if (!IsServer) return;
+
+        // Crate is riding on the roof for a delivery that hasn't landed yet — leave it alone.
+        if (_sequenceRunning && !_crateDropped.Value) return;
+
         _crateDropped.Value = false;
+
+        // Hide the server's own copy directly rather than relying solely on OnValueChanged
+        // (which only fires on an actual true -> false transition).
+        if (deliveryCrate != null)
+            deliveryCrate.gameObject.SetActive(false);
+        if (crateParentConstraint != null)
+            crateParentConstraint.constraintActive = false;
     }
 
     /// <summary>

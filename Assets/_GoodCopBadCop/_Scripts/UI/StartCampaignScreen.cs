@@ -502,6 +502,11 @@ public class StartCampaignScreen : MonoBehaviour
     public void StartGame()
     {
         if (_isStartingResumedDay) return;
+        if (MainMenuController.Instance != null && MainMenuController.Instance.IsGameStartLocked) return;
+
+        // The fade starts now — block all menu input so Escape/Back can't exit the lobby
+        // mid-transition (that left players on a black screen with no player spawned).
+        MainMenuController.Instance?.LockForGameStart();
 
         // Commit the slot to disk now that the player has confirmed they want to play.
         SaveDataManager.Instance.InitialiseActiveSlot();
@@ -573,6 +578,13 @@ public class StartCampaignScreen : MonoBehaviour
 
     public void ExitLobby()
     {
+        // Back is ignored once the game start has been committed.
+        if (MainMenuController.Instance != null && MainMenuController.Instance.IsGameStartLocked) return;
+        LeaveLobby();
+    }
+
+    private void LeaveLobby()
+    {
         LobbyManager.Instance.ExitLobby();
         MainMenuController.Instance.BackFromPreGameLobbyScreen();
     }
@@ -583,6 +595,6 @@ public class StartCampaignScreen : MonoBehaviour
 
     private void OnKicked()
     {
-        ExitLobby();
+        LeaveLobby();
     }
 }

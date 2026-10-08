@@ -124,6 +124,13 @@ namespace GoodCopBadCop.Input
             return fallbackSprite;
         }
 
+        /// <summary>Icon for a fixed (non-rebindable) keyboard key, or null if none is configured.</summary>
+        public Sprite GetKeySprite(KeyCode key)
+        {
+            EnsureLookups();
+            return _keyLookup.TryGetValue(key, out Sprite sprite) ? sprite : null;
+        }
+
         /// <summary>Icon for a gamepad control path, or null if none is configured.</summary>
         public Sprite GetGamepadControlSprite(string controlPath)
         {

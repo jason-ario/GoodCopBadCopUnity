@@ -56,9 +56,9 @@ public class TrashBagPicker : Interactable
     /// <summary>Interact (empty-handed) grabs a bag.</summary>
     public override void Interact(PlayerInteractionController player) => GiveBag(player);
 
-    /// <summary>A bag can only be grabbed into a free hand.</summary>
+    /// <summary>A bag can only be grabbed into a free hand (or a free hotbar slot to swap to).</summary>
     public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
-        player.pickupController == null || player.pickupController.HeldObject == null;
+        player.pickupController == null || player.pickupController.CanPickUpIntoHand;
 
     /// <summary>
     /// Spawns one trash bag and routes it directly into the requesting player's hands.
@@ -66,7 +66,7 @@ public class TrashBagPicker : Interactable
     /// </summary>
     private void GiveBag(PlayerInteractionController player)
     {
-        if (player.pickupController.HeldObject != null) return;
+        if (!player.pickupController.CanPickUpIntoHand) return;
 
         if (_dispensedItemData == null || _dispensedItemData.PickUpPrefab == null)
         {

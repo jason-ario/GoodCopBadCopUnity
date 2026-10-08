@@ -277,7 +277,8 @@ public class MainMenuSplashScreen : MonoBehaviour
         }
 
         // 3. Main menu UI fades in (and any remaining backdrop clears).
-        // The menu is clickable as soon as it starts appearing.
+        // Input is handed to the menu as soon as it starts appearing. Menu screens with a
+        // CanvasGroupFadeInputGate still stay non-interactable until they're visible enough.
         _onLogosFinished?.Invoke();
         ReleaseInputToMenu();
         MenuFadeInStarted?.Invoke(menuFadeInDuration);

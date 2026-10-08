@@ -1736,11 +1736,12 @@ public class PickableObject : Interactable
     }
     
     /// <summary>
-    /// Picking up needs a free hand, so only offer the Interact prompt when empty-handed
-    /// (pressing it with full hands still reaches <see cref="Interact"/> and shows "Inventory full").
+    /// Picking up needs a free hand (or a free hotbar slot to swap to), so only offer the Interact
+    /// prompt when that's possible (pressing it with both slots full still reaches
+    /// <see cref="Interact"/> and shows "Inventory full").
     /// </summary>
     public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
-        player.pickupController == null || player.pickupController.HeldObject == null;
+        player.pickupController == null || player.pickupController.CanPickUpIntoHand;
 
     protected override string DefaultInteractVerb => "Pick up";
 

@@ -7,7 +7,8 @@ using UnityEngine.UI;
 /// <summary>
 /// Singleton controller for the top-of-screen tutorial overlay.
 /// Slides in from the top, displays a named tutorial screen, and dismisses
-/// when the player holds R until the fill bar is full.
+/// when the player holds R (keyboard) or Gamepad North until the fill bar is full.
+/// The inline close-prompt icon swaps with the active input device.
 ///
 /// Usage: TutorialOverlay.Instance.ShowMovementTutorial();
 /// </summary>
@@ -21,6 +22,10 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private Animator topTutorialAnimator;
     [SerializeField] private Transform screensContainer;
     [SerializeField] private Image holdToCloseFill;
+    [Tooltip("Inline prompt icon in the 'Hold [icon] To Close' label. Shows R on keyboard/mouse, " +
+             "Gamepad North (Y / Triangle) on gamepad.")]
+    [SerializeField] private Image closeKeyIcon;
+    [SerializeField] private GoodCopBadCop.Input.InputIconDatabase iconDatabase;
 
     [Header("Tutorial Screens")]
     [SerializeField] private GameObject movementTutorialScreen;
@@ -43,7 +48,7 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject radiationTutorialScreen;
 
     [Header("Settings")]
-    [Tooltip("Seconds the player must hold R to close the overlay.")]
+    [Tooltip("Seconds the player must hold R / Gamepad North to close the overlay.")]
     [SerializeField] private float holdDuration = 1f;
     [Tooltip("Multiplier for how fast the fill drains when R is released.")]
     [SerializeField] private float fillDrainMultiplier = 2f;
@@ -78,12 +83,26 @@ public class TutorialOverlay : MonoBehaviour
         topTutorialAnimator.gameObject.SetActive(false);
     }
 
+    private void OnEnable()
+    {
+        GoodCopBadCop.Input.ActiveInputDeviceTracker.EnsureSubscribed();
+        GoodCopBadCop.Input.ActiveInputDeviceTracker.DeviceChanged += OnInputDeviceChanged;
+        RefreshCloseKeyIcon();
+    }
+
+    private void OnDisable()
+    {
+        GoodCopBadCop.Input.ActiveInputDeviceTracker.DeviceChanged -= OnInputDeviceChanged;
+    }
+
     private void Update()
     {
         if (!_isShowing) return;
 
-        bool holdingR = Input.GetKey(KeyCode.R) && !GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard;
-        if (holdingR || GoodCopBadCop.Input.RebindableInput.GetGamepadHeld(GoodCopBadCop.Input.GameAction.Interact))
+        bool holdingR = Input.GetKey(CloseKey) && !GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard;
+        Gamepad pad = Gamepad.current;
+        bool holdingPad = pad != null && pad.buttonNorth.isPressed;
+        if (holdingR || holdingPad)
         {
             _holdProgress = Mathf.Min(_holdProgress + Time.deltaTime, holdDuration);
         }
@@ -214,6 +233,23 @@ public class TutorialOverlay : MonoBehaviour
 
     // ── Private ─────────────────────────────────────────────────────────
 
+    // Fixed UI-context close bindings (not rebindable), mirrored by the inline prompt icon.
+    private const KeyCode CloseKey = KeyCode.R;
+    private const string ClosePadControl = "buttonNorth";
+
+    private void OnInputDeviceChanged(bool isGamepad) => RefreshCloseKeyIcon();
+
+    private void RefreshCloseKeyIcon()
+    {
+        if (closeKeyIcon == null || iconDatabase == null) return;
+
+        Sprite sprite = GoodCopBadCop.Input.ActiveInputDeviceTracker.IsGamepad
+            ? iconDatabase.GetGamepadControlSprite(ClosePadControl)
+            : iconDatabase.GetKeySprite(CloseKey);
+
+        if (sprite != null) closeKeyIcon.sprite = sprite;
+    }
+
     private void ShowScreen(GameObject screen, Action onComplete = null)
     {
         if (screen == null)
@@ -240,6 +276,7 @@ public class TutorialOverlay : MonoBehaviour
         _holdProgress = 0f;
         holdToCloseFill.fillAmount = 0f;
         _isShowing = true;
+        RefreshCloseKeyIcon();
         topTutorialAnimator.gameObject.SetActive(true);
         topTutorialAnimator.SetBool(IsShowingHash, true);
     }

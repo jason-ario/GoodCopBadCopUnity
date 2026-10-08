@@ -513,19 +513,36 @@ public class PlayerPickupController : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// True if a new item can be picked up right now: the hand is empty, or the other hotbar
+    /// slot is empty so the held item can be stowed to make room (see <see cref="TryFreeHandForPickup"/>).
+    /// </summary>
+    public bool CanPickUpIntoHand =>
+        HeldObject == null || (_playerInventory != null && _playerInventory.CanFreeHandBySwitchingSlot());
+
+    /// <summary>
+    /// Ensures the hand is empty for a pickup. If the hand is full but the other hotbar slot is
+    /// empty, switches to that slot (stowing the held item). Shows "Inventory full" and returns
+    /// false only when both slots are occupied (or the held item can't be stowed).
+    /// </summary>
+    private bool TryFreeHandForPickup()
+    {
+        if (HeldObject == null) return true;
+        if (_playerInventory != null && _playerInventory.TryFreeHandForPickup()) return true;
+
+        UIController.Instance?.ShowErrorNotification("Inventory full");
+        return false;
+    }
+
     public void SpawnAndPickUp(PickableItemData itemData, Transform spawnPos)
     {
         if (!IsOwner) return;
-        if (HeldObject != null)
-        {
-            // Guard BEFORE spawning: if we let the server spawn the item and only rejected the
-            // pickup afterwards (in PickUpObject), the freshly spawned object would just fall to
-            // the ground instead of never existing. See PickUpObject for the matching guard.
-            UIController.Instance?.ShowErrorNotification("Inventory full");
-            return;
-        }
         if (itemData == null || itemData.PickUpPrefab == null) return;
 
+        // Guard BEFORE spawning: if we let the server spawn the item and only rejected the
+        // pickup afterwards (in PickUpObject), the freshly spawned object would just fall to
+        // the ground instead of never existing. See PickUpObject for the matching guard.
+        if (!TryFreeHandForPickup()) return;
         int itemIndex = ItemDatabase.Instance.GetItemIndex(itemData);
         if (itemIndex < 0)
         {
@@ -593,8 +610,8 @@ public class PlayerPickupController : NetworkBehaviour
     public void PurchaseAndPickUp(PickableItemData itemData, int price, Transform spawnPos)
     {
         if (!IsOwner) return;
-        if (HeldObject != null) return;
         if (itemData == null || itemData.PickUpPrefab == null) return;
+        if (!TryFreeHandForPickup()) return;
 
         int itemIndex = ItemDatabase.Instance.GetItemIndex(itemData);
         if (itemIndex < 0)
@@ -700,14 +717,7 @@ public class PlayerPickupController : NetworkBehaviour
 
     public void PickUpObject(PickableObject pickableObject)
     {
-        if (HeldObject != null)
-        {
-            // Hands are already full — this is the only real inventory limit: a hotbar slot only
-            // ever holds a STOWED item, so an empty hand can always pick something up even if
-            // both slots are already stowed (see PlayerInventory.HandleHeldObjectChanged).
-            UIController.Instance?.ShowErrorNotification("Inventory full");
-            return;
-        }
+        if (pickableObject == null) return;
 
         // Extra guard on top of the collider-based optimistic lock below: if the network state
         // has already caught up and shows this object held by SOMEONE ELSE, don't even attempt
@@ -722,6 +732,13 @@ public class PlayerPickupController : NetworkBehaviour
         {
             return;
         }
+
+        // Hand full: if the other hotbar slot is empty, switch to it (stowing the held item) and
+        // take the pickup there. "Inventory full" only when both slots are occupied. An empty
+        // hand can always pick something up, even with both slots stowed (it's carried
+        // unslotted — see PlayerInventory.HandleHeldObjectChanged). Checked after the
+        // held-by-other guard so we never swap slots for an item we can't actually take.
+        if (!TryFreeHandForPickup()) return;
 
         // Disable colliders immediately as an optimistic lock so no other player's raycast
         // can pick up the same object during the network round-trip for ClaimHolderServerRpc.

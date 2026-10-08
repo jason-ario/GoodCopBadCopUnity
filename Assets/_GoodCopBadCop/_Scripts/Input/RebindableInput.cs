@@ -91,14 +91,16 @@ namespace GoodCopBadCop.Input
             { GameAction.ToggleMask, "" },
             { GameAction.OpenEmotes, "dpad/up" },
             { GameAction.ZoomHeldItem, "dpad/down" },
-            { GameAction.Reload, "buttonNorth" },
+            // B is otherwise only read by on-screen Back buttons / dialogue, which gate gameplay input.
+            { GameAction.Reload, "buttonEast" },
             { GameAction.OpenGuidebook, "select" },
             { GameAction.PushToTalk, "" },
             { GameAction.UseItem, "rightTrigger" },
             { GameAction.Jump, "buttonSouth" },
             { GameAction.Sprint, "leftStickPress" },
-            { GameAction.NextSlot, "dpad/right" },
-            { GameAction.PreviousSlot, "dpad/left" },
+            // Two slots, so a single button toggles between them; PreviousSlot is unbound by default.
+            { GameAction.NextSlot, "buttonNorth" },
+            { GameAction.PreviousSlot, "" },
         };
 
         /// <summary>

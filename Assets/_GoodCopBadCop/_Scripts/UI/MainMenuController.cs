@@ -191,6 +191,41 @@ public class MainMenuController : MonoBehaviour
         JoinScreen?.ShowInviteJoinFailed(reason);
     }
 
+    /// <summary>
+    /// True once a game start has been committed from the menu (the tentacle fade has begun).
+    /// From then on every menu input — Escape/Q, gamepad East, mouse, navigate/submit — is
+    /// ignored, so the player can't back out of the lobby mid-transition (which would exit the
+    /// session and leave them on a black screen with no player). Instance-scoped, so a
+    /// Main.unity reload (return to menu, death, disconnect) starts unlocked.
+    /// </summary>
+    public bool IsGameStartLocked { get; private set; }
+
+    /// <summary>
+    /// Locks the whole main menu for the transition into gameplay. Idempotent. Called on every
+    /// client the moment the fade to black starts (see <see cref="StartCampaignScreen.StartGame"/>
+    /// and <see cref="GameManager"/>'s lobby / resumed-day transitions).
+    /// </summary>
+    public void LockForGameStart()
+    {
+        if (IsGameStartLocked)
+            return;
+
+        IsGameStartLocked = true;
+        SetMenuInteractable(false);
+
+        // Back buttons poll Escape / gamepad East themselves and only check Button.interactable,
+        // which a CanvasGroup doesn't change — disable the activators outright.
+        if (mainMenu != null)
+        {
+            foreach (var activator in mainMenu.GetComponentsInChildren<KeyBackButtonActivator>(true))
+                activator.enabled = false;
+            foreach (var activator in mainMenu.GetComponentsInChildren<GamepadBackButtonActivator>(true))
+                activator.enabled = false;
+        }
+
+        UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(null);
+    }
+
     private void SetMenuInteractable(bool interactable)
     {
         if (canvasGroup == null)
@@ -203,6 +238,7 @@ public class MainMenuController : MonoBehaviour
     private void Update()
     {
         if (MainMenuSplashScreen.IsPlaying) return;
+        if (IsGameStartLocked) return;
         if (!(Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)) return;
 
         // Any open confirmation dialog (quit, delete save) handles B itself — see ConfirmationDialogController.
@@ -344,6 +380,7 @@ public class MainMenuController : MonoBehaviour
     /// </summary>
     public void BackFromPreGameLobbyScreen()
     {
+        if (IsGameStartLocked) return;
         SwitchToScreen(_screenBeforePreGameLobby != null ? _screenBeforePreGameLobby : homeScreen);
         RefreshContinueButton();
     }

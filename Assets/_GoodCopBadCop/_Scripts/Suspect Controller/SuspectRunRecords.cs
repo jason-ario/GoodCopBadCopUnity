@@ -16,13 +16,15 @@ public class SuspectRunRecords : MonoBehaviour
 
     [Tooltip("Daily infection growth applies to every living suspect, seen or not. Suspects the player has " +
              "never seen are capped at this score so they can't appear fully mutated (>= 80) before the " +
-             "player has had a chance to process them.")]
+             "player has had a chance to process them. Keep at 74 or below to hold first sightings in the " +
+             "Quarantine band (mutation score 7); 75+ rounds to 8 (Kill).")]
     [Range(0, 100)] public int neverSeenInfectionCap = 70;
 
     [Tooltip("Multiplier on daily infection growth for suspects the player has already seen (not killed). " +
              "Doesn't apply on the night of a quarantine verdict, when the score resets instead. Makes passing a suspect " +
-             "visibly worse than catching them: with SuspectData.dailyInfectionProgression 8–18 and a 2.5x " +
-             "multiplier, a passed suspect gains roughly 2–4 anomaly-budget points per night.")]
+             "visibly worse than catching them: with SuspectData.dailyInfectionProgression 8–18, the AnomalyManager " +
+             "day roll (1.6–2.4x in Main) and a 1.5x multiplier, a passed suspect gains roughly 2–6 anomaly-budget " +
+             "points per night, so passing a borderline (3–4) suspect tends to put them in the Kill band next visit.")]
     [Min(0f)] public float passedInfectionGrowthMultiplier = 2.5f;
 
     [Header("Replacement System")]

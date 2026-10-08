@@ -484,6 +484,15 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer) return;
 
+        // Any crate dropped by a previous delivery has been sitting on the ground ever since
+        // (only the truck deactivates after driving off, not the crate). Retire it on EVERY day
+        // change — unconditionally and before the restore early-out — since the delivery may have
+        // come from a deferred/manual trigger, a debug skip, or a restored-workday replay, none of
+        // which reliably update _lastTriggeredDay. DeactivateCrate is a no-op when nothing is
+        // dropped and never touches a crate riding on the roof. A new delivery re-mounts it.
+        if (_deliveryTruck != null)
+            _deliveryTruck.DeactivateCrate();
+
         // The saved workday owns its active delivery. Avoid clearing it or rolling a new package
         // set while CampaignManager is preparing the host-side restore; ShiftManager will replay
         // this task only when the persisted blocker journal says it was still incomplete.
@@ -492,13 +501,6 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         // Clear out any packages left sitting in mailboxes/bins from the previous day's delivery.
         DespawnResolvedPackages();
-
-        // If yesterday had a delivery, its crate has been sitting active on the ground ever
-        // since (see DeliveryTruckController — only the truck itself deactivates after driving
-        // off, not the crate it dropped). Hide it now that a new day has started; it gets
-        // reactivated and repositioned on the truck's roof next time a delivery sequence begins.
-        if (_deliveryTruck != null && _lastTriggeredDay == day - 1)
-            _deliveryTruck.DeactivateCrate();
 
         if (day != _lastGoodsRollDay)
         {

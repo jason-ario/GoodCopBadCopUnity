@@ -218,6 +218,7 @@ public class GameManager : NetworkBehaviour
     {
         // The host is already fading itself; restarting here would replay the fade from clear.
         if (IsServer) return;
+        MainMenuController.Instance?.LockForGameStart();
         UIController.Instance?.FadeIn();
     }
 
@@ -231,6 +232,10 @@ public class GameManager : NetworkBehaviour
     private IEnumerator LobbyTransitionSequence()
     {
         IsLocalLobbyRevealPending = true;
+
+        // The menu (incl. the pre-game lobby screen) stays up until the screen is black —
+        // lock its input now so nobody can back out of the lobby mid-fade.
+        MainMenuController.Instance?.LockForGameStart();
 
         AudioManager.Instance.FadeOutAmbientAudio();
         SFXController.Instance.Play(transitionToGameplayStinger);

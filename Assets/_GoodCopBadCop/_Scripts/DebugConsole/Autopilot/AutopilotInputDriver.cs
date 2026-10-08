@@ -15,7 +15,7 @@ namespace GoodCopBadCop.Autopilot
     ///
     /// Mapping (see RebindableInput.GamepadButtonName and PlayerInteractionController):
     /// left stick = move, right stick = look, West = Interact (E), RightTrigger = LMB (primary
-    /// interact / use held item), LeftTrigger = RMB (hold to place), RightShoulder = throw,
+    /// interact / use held item), LeftTrigger = RMB (hold to place), RightShoulder = throw, North (Y) = toggle slot,
     /// South = jump / UI submit.
     /// </summary>
     public class AutopilotInputDriver : IDisposable

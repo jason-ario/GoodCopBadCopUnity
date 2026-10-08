@@ -74,6 +74,14 @@ public class ReticleController : MonoBehaviour
     [Tooltip("Radial-filled Image around the reticle that fills while the Interact key is held on an object with a hold action. Forced to Filled / Radial 360 from the top at runtime.")]
     [SerializeField] private Image _holdRing;
 
+    [Tooltip("Gap (in the reticle's local UI units) between the hold ring and the left edge of the \"Hold to …\" row it sits beside.")]
+    [SerializeField] private float _holdRingTextGap = 10f;
+
+    // True when the hold prompt lives on the tap row ("[E] Hold to {verb}", hold is the only action);
+    // false when it is the separate "Hold to {verb}" row beneath the tap row.
+    private bool _holdOnTapRow;
+    private readonly Vector3[] _cornerBuffer = new Vector3[4];
+
     private bool canInteract = false;
     private bool isTooFar = false;
     private bool isEnemyTarget = false;
@@ -198,6 +206,7 @@ public class ReticleController : MonoBehaviour
     public void SetInteractState(bool state, string text = "", bool showKeyIcon = false, bool showButtonTooltip = true, bool showHint = false, string holdVerb = null, bool useItemIcon = false, string actionVerb = null)
     {
         canInteract = state;
+        _holdOnTapRow = false;
         if (state)
         {
             isTooFar = false;
@@ -224,6 +233,7 @@ public class ReticleController : MonoBehaviour
         if (!keyVisible)
         {
             // Hold is the only action: one "[E] Hold to {verb}" row, so the key icon is still shown.
+            _holdOnTapRow = hasHold;
             SetPrompt(hasHold, hasHold ? $"Hold to {holdVerb}" : null);
             return;
         }
@@ -253,7 +263,42 @@ public class ReticleController : MonoBehaviour
         if (_holdRing.gameObject.activeSelf != visible)
             _holdRing.gameObject.SetActive(visible);
         if (visible)
+        {
             _holdRing.fillAmount = Mathf.Clamp01(progress);
+            AlignHoldRingToPrompt();
+        }
+    }
+
+    /// <summary>
+    /// Places the hold ring like an icon beside the active "Hold to …" line: vertically centred on
+    /// that row and <see cref="_holdRingTextGap"/> to the left of its leftmost visible element (the
+    /// key icon for "[E] Hold to …", the label for the separate hold row). Recomputed every frame while
+    /// filling so it tracks the reticle's interact scale lerp and layout changes.
+    /// </summary>
+    private void AlignHoldRingToPrompt()
+    {
+        GameObject rowObject = _holdOnTapRow ? _tapRow : _holdRow;
+        if (rowObject == null || !rowObject.activeInHierarchy) return;
+
+        RectTransform ringRect = _holdRing.rectTransform;
+        Transform space = ringRect.parent;
+        if (space == null) return;
+
+        float left = float.MaxValue;
+        foreach (Transform child in rowObject.transform)
+        {
+            if (!child.gameObject.activeSelf || child is not RectTransform childRect) continue;
+            childRect.GetWorldCorners(_cornerBuffer);
+            for (int i = 0; i < 4; i++)
+                left = Mathf.Min(left, space.InverseTransformPoint(_cornerBuffer[i]).x);
+        }
+        if (left == float.MaxValue) return;
+
+        ((RectTransform)rowObject.transform).GetWorldCorners(_cornerBuffer);
+        float centreY = (space.InverseTransformPoint(_cornerBuffer[0]).y + space.InverseTransformPoint(_cornerBuffer[1]).y) * 0.5f;
+
+        float halfWidth = ringRect.rect.width * ringRect.localScale.x * 0.5f;
+        ringRect.localPosition = new Vector3(left - _holdRingTextGap - halfWidth, centreY, 0f);
     }
 
     /// <summary>

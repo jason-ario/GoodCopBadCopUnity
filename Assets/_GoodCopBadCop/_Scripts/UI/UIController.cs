@@ -916,8 +916,17 @@ public class UIController : MonoBehaviour
         return cameraImage;
     }
 
+    /// <summary>
+    /// True while pausing is not allowed. The text intro cinematic locks the local player and
+    /// owns E / click / gamepad Start for advancing, so pausing on top of it breaks its control lock.
+    /// </summary>
+    public static bool IsPauseBlocked =>
+        IntroCinematicController.Instance != null && IntroCinematicController.Instance.IsPlaying;
+
     public void OpenPauseMenu()
     {
+        if (pauseMenuOpened || IsPauseBlocked) return;
+
         pauseMenuOpened = true;
         couldControlBeforePaused = PlayerInstance.Instance.CanControl;
         couldLookBeforePaused = PlayerInstance.Instance.GetComponent<PlayerMovementController>().CanLook;

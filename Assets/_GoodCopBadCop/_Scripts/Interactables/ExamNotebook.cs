@@ -129,7 +129,6 @@ public class ExamNotebook : PickableObject
     private NetworkVariable<int> _rippedPageMask = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private NetworkVariable<int>[] _pageBitmasks;
-    private bool[] _pendingRippedPages;
     [SerializeField] private AudioClip ripOutSound;
 
     // ── Controller checklist navigation ─────────────────────────────────────────
@@ -220,40 +219,112 @@ public class ExamNotebook : PickableObject
             _pageBitmask4.Value
         };
 
-        data.BooleanState = new bool[Mathf.Min(pages?.Length ?? 0, 5)];
+        // BooleanState = "page slot already used up". A filed page is usually despawned with its
+        // folder before the save is captured, so pages[i] alone can't be trusted (it reads null →
+        // "unused"). Pages are consumed strictly in order, so combine the replicated ripped mask,
+        // the live flags, and every slot before the current page.
+        int consumedMask = GetConsumedPageMask();
+        data.BooleanState = new bool[PageSlotCount];
         for (int i = 0; i < data.BooleanState.Length; i++)
-            data.BooleanState[i] = pages[i] != null && pages[i].isRippedOut;
+            data.BooleanState[i] = (consumedMask & (1 << i)) != 0;
     }
 
     protected override void RestoreMutableSaveData(PickableObjectSaveData data)
     {
-        if (data.IntegerState != null && data.IntegerState.Length >= 6)
+        int consumedMask = 0;
+
+        // Older saves only recorded the current page reliably — every slot before it is used up.
+        int savedCurrentPage = data.IntegerState != null && data.IntegerState.Length > 0 ? data.IntegerState[0] : 0;
+        for (int i = 0; i < savedCurrentPage && i < PageSlotCount; i++)
+            consumedMask |= 1 << i;
+
+        if (data.BooleanState != null)
         {
-            // Restored ticks aren't player actions — OnValueChanged fires synchronously on the
-            // host for each write below, so mute the pen sound for exactly this block.
-            _isRestoringSaveState = true;
-            try
+            for (int i = 0; i < data.BooleanState.Length && i < PageSlotCount; i++)
+                if (data.BooleanState[i]) consumedMask |= 1 << i;
+        }
+
+        ApplyConsumedPagesServer(consumedMask);
+    }
+
+    /// <summary>Number of page slots this notebook supports (one per bitmask NetworkVariable).</summary>
+    private int PageSlotCount => Mathf.Clamp(pageCount, 0, 5);
+
+    /// <summary>Slots whose page has already been torn out / filed (bit i = slot i used).</summary>
+    private int GetConsumedPageMask()
+    {
+        int mask = _rippedPageMask.Value;
+        for (int i = 0; i < PageSlotCount; i++)
+        {
+            if (i < _currentPage.Value) mask |= 1 << i;
+            if (pages != null && i < pages.Length && pages[i] != null && pages[i].isRippedOut) mask |= 1 << i;
+        }
+        return mask;
+    }
+
+    /// <summary>Consumed-slot mask from a save restored before this notebook's pages were spawned.</summary>
+    private int _pendingConsumedMask;
+
+    /// <summary>
+    /// Server: puts the notebook into its "only the remaining pages" state after a load.
+    /// Freshly spawned pages that stand in for already-used slots are despawned (the real
+    /// filed pages are gone), every checkbox is cleared, and the current page moves to the
+    /// first remaining page.
+    /// </summary>
+    private void ApplyConsumedPagesServer(int consumedMask)
+    {
+        if (pages == null || pages.Length == 0)
+        {
+            // Pages not spawned yet — SpawnAndWirePages will skip these slots.
+            _pendingConsumedMask = consumedMask;
+        }
+        else
+        {
+            for (int i = 0; i < pages.Length && i < PageSlotCount; i++)
             {
-                _currentPage.Value = Mathf.Clamp(data.IntegerState[0], 0, 4);
-                _pageBitmask0.Value = data.IntegerState[1];
-                _pageBitmask1.Value = data.IntegerState[2];
-                _pageBitmask2.Value = data.IntegerState[3];
-                _pageBitmask3.Value = data.IntegerState[4];
-                _pageBitmask4.Value = data.IntegerState[5];
-            }
-            finally
-            {
-                _isRestoringSaveState = false;
+                if ((consumedMask & (1 << i)) == 0) continue;
+
+                ExamPage page = pages[i];
+                // A page already ripped out / in a folder this session is the real filed page — keep it.
+                if (page == null || page.isRippedOut || page.insideThisFolder != null) continue;
+
+                NetworkHelper.Despawn(page.NetworkObject);
+                pages[i] = null;
             }
         }
 
-        _pendingRippedPages = data.BooleanState ?? System.Array.Empty<bool>();
-        int mask = 0;
-        for (int i = 0; i < _pendingRippedPages.Length && i < 5; i++)
-            if (_pendingRippedPages[i]) mask |= 1 << i;
-        _rippedPageMask.Value = mask;
+        int firstRemaining = -1;
+        for (int i = 0; i < PageSlotCount; i++)
+        {
+            bool used = (consumedMask & (1 << i)) != 0 ||
+                        (pages != null && i < pages.Length && pages[i] != null && pages[i].isRippedOut);
+            if (!used) { firstRemaining = i; break; }
+        }
+
+        // Restore writes aren't player actions — mute the pen sound for the synchronous host callbacks.
+        _isRestoringSaveState = true;
+        try
+        {
+            _pageBitmask0.Value = 0;
+            _pageBitmask1.Value = 0;
+            _pageBitmask2.Value = 0;
+            _pageBitmask3.Value = 0;
+            _pageBitmask4.Value = 0;
+            _currentPage.Value = firstRemaining >= 0 ? firstRemaining : Mathf.Max(0, PageSlotCount - 1);
+        }
+        finally
+        {
+            _isRestoringSaveState = false;
+        }
+
+        _rippedPageMask.Value = consumedMask;
         ApplyRippedPages();
     }
+
+    /// <summary>True while the notebook still has an unused page to tear out.</summary>
+    public bool HasRemainingPages =>
+        pages != null && currentPage >= 0 && currentPage < pages.Length &&
+        pages[currentPage] != null && !pages[currentPage].isRippedOut;
 
     public override void OnNetworkSpawn()
     {
@@ -429,8 +500,12 @@ public class ExamNotebook : PickableObject
         var pageRefs = new NetworkObjectReference[pages.Length];
         for (int i = 0; i < pages.Length; i++)
         {
-            if (pages[i] != null)
-                pageRefs[i] = new NetworkObjectReference(pages[i].NetworkObject);
+            // Used-up slots (despawned on load) reference the notebook itself as a sentinel:
+            // it always resolves, and ApplyPageReferences leaves the slot empty because the
+            // notebook has no ExamPage component. A default reference would never resolve.
+            pageRefs[i] = pages[i] != null
+                ? new NetworkObjectReference(pages[i].NetworkObject)
+                : new NetworkObjectReference(NetworkObject);
         }
 
         var targetParams = new ClientRpcParams
@@ -465,6 +540,15 @@ public class ExamNotebook : PickableObject
 
         for (int i = 0; i < pageCount; i++)
         {
+            // Slot already used up in a restored save: don't spawn a page for it. The notebook
+            // itself is returned as a placeholder so callers' index-aligned page refs stay valid
+            // (see RequestPageReferencesServerRpc).
+            if (i < 5 && (_pendingConsumedMask & (1 << i)) != 0)
+            {
+                spawned.Add(NetworkObject);
+                continue;
+            }
+
             NetworkObject pageNetObj = Instantiate(pagePrefab);
 
             // AutoObjectParentSync must be off before Spawn so NGO never replicates
@@ -515,9 +599,12 @@ public class ExamNotebook : PickableObject
         _pagesInitialized = true;
 
         // Wait until every referenced NetworkObject is registered locally before touching pages[].
+        // Bounded: a page despawned on load (used-up slot) before this ran would never resolve.
+        const float PageResolveTimeout = 5f;
+        float resolveDeadline = Time.realtimeSinceStartup + PageResolveTimeout;
         for (int i = 0; i < pageRefs.Length; i++)
         {
-            while (!pageRefs[i].TryGet(out _))
+            while (!pageRefs[i].TryGet(out _) && Time.realtimeSinceStartup < resolveDeadline)
                 yield return null;
         }
 
@@ -567,6 +654,9 @@ public class ExamNotebook : PickableObject
 
         for (int p = 0; p < pages.Length && p < _pageBitmasks.Length; p++)
         {
+            // Used-up slot whose page was never spawned / was despawned on load.
+            if (pages[p] == null) continue;
+
             int capturedPage = p;
             pages[p].SetPageIndex(p);
             pages[p].BuildChecklistFromCategory(categoryName);
@@ -577,6 +667,8 @@ public class ExamNotebook : PickableObject
 
             _pageBitmasks[p].OnValueChanged += (_, newValue) =>
             {
+                if (pages[capturedPage] == null) return;
+
                 // Silent for save-restore writes: the host flag covers the synchronous callback,
                 // and the saved-day resume window covers remote clients receiving it later.
                 bool playSound = !_isRestoringSaveState && !TaskSuccessCue.IsCompletionSuppressed;
@@ -627,14 +719,17 @@ public class ExamNotebook : PickableObject
 
         for (int i = 0; i < pages.Length && i < 5; i++)
         {
-            bool ripped = ((_rippedPageMask.Value & (1 << i)) != 0) ||
-                          (_pendingRippedPages != null && i < _pendingRippedPages.Length && _pendingRippedPages[i]);
-            if (!ripped || pages[i] == null) continue;
+            bool ripped = (_rippedPageMask.Value & (1 << i)) != 0;
+            if (!ripped) continue;
 
-            pages[i].isRippedOut = true;
-            pages[i].CanPickUpManually = true;
+            // The stand-in for a used slot must never show again, even when the page itself
+            // was despawned on load (pages[i] == null).
             if (pagePositions != null && i < pagePositions.Length && pagePositions[i] != null)
                 pagePositions[i].gameObject.SetActive(false);
+
+            if (pages[i] == null) continue;
+            pages[i].isRippedOut = true;
+            pages[i].CanPickUpManually = true;
         }
     }
 
@@ -1063,6 +1158,12 @@ public class ExamNotebook : PickableObject
     public void AddToFolder(FolderController folder)
     {
         Debug.Log($"[ExamNotebook] AddToFolder called on client {NetworkManager.Singleton.LocalClientId} | playerPickupController={(playerPickupController != null ? playerPickupController.name : "NULL")} | currentPage={currentPage} | addingToFolder={addingToFolder}");
+        if (!HasRemainingPages)
+        {
+            Debug.Log($"[ExamNotebook] AddToFolder: {name} has no pages left — ignoring.");
+            return;
+        }
+
         addingToFolder = true;
         pages[currentPage].SetChecklistInteractable(false);
 
@@ -1136,6 +1237,11 @@ public class ExamNotebook : PickableObject
         // On the server, pages[pageIndex] is the real spawned NetworkObject — safe to call RPCs on.
         // playerPickupController is not needed here because dropObject=false bypasses DropObject.
         ExamPage serverPage = pages[pageIndex];
+        if (serverPage == null)
+        {
+            Debug.LogError($"[ExamNotebook] RequestAddToFolderServerRpc: page slot {pageIndex} is already used up");
+            return;
+        }
         Debug.Log($"[ExamNotebook] RequestAddToFolderServerRpc: pageIndex={pageIndex} page={serverPage?.name ?? "NULL"} IsSpawned={serverPage?.NetworkObject?.IsSpawned} NetworkObjectId={serverPage?.NetworkObject?.NetworkObjectId}");
         folder.AddDocument(serverPage, playerPickupController, false);
 
@@ -1302,7 +1408,7 @@ public class ExamNotebook : PickableObject
     [ClientRpc]
     private void RipOutPageClientRpc(int pageIndex)
     {
-        if (pageIndex < 0 || pageIndex >= pages.Length) return;
+        if (pageIndex < 0 || pageIndex >= pages.Length || pages[pageIndex] == null) return;
         ExamPage page = pages[pageIndex];
         page.isRippedOut = true;
         page.CanPickUpManually = true;
@@ -1317,7 +1423,7 @@ public class ExamNotebook : PickableObject
     [ClientRpc]
     private void ResetPageClientRpc(int pageIndex)
     {
-        if (pageIndex < 0 || pageIndex >= pages.Length) return;
+        if (pageIndex < 0 || pageIndex >= pages.Length || pages[pageIndex] == null) return;
         pages[pageIndex].pageAnimator.SetTrigger("Reset");
 
         // Rebuild the cache excluding all page colliders (ripped or not) so SetInteractable

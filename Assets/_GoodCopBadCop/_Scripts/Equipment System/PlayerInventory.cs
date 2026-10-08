@@ -7,8 +7,8 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Two-slot hotbar inventory for the local player.
 /// Press 1/2 to equip the item in that slot, scroll the mouse wheel, or press the gamepad
-/// <see cref="GameAction.NextSlot"/> / <see cref="GameAction.PreviousSlot"/> bindings (D-pad
-/// Right / Left by default) to cycle through held/carried items. Hotbar input is ignored while
+/// <see cref="GameAction.NextSlot"/> / <see cref="GameAction.PreviousSlot"/> bindings (Y toggles
+/// by default; PreviousSlot unbound) to cycle through held/carried items. Hotbar input is ignored while
 /// the guidebook or a diegetic view is open. Picking up an item brings it straight to hand;
 /// placing/dropping empties the hand.
 ///
@@ -230,7 +230,7 @@ public class PlayerInventory : NetworkBehaviour
         if (scroll > 0f) CycleActiveItem(1);
         else if (scroll < 0f) CycleActiveItem(-1);
 
-        // Gamepad slot cycling (D-pad Right / Left by default, rebindable).
+        // Gamepad slot cycling (Y toggles by default, rebindable).
         if (RebindableInput.GetGamepadDown(GameAction.NextSlot)) CycleActiveItem(1);
         else if (RebindableInput.GetGamepadDown(GameAction.PreviousSlot)) CycleActiveItem(-1);
     }
@@ -282,7 +282,7 @@ public class PlayerInventory : NetworkBehaviour
 
     /// <summary>
     /// <see cref="GameAction.Reload"/> (R by default, rebindable in Settings -> Controls) or its
-    /// rebindable gamepad binding (Y / buttonNorth by default).
+    /// rebindable gamepad binding (B / buttonEast by default).
     /// Ignored while paused so the gamepad button can't fire through the pause menu.
     /// </summary>
     private static bool ReloadPressed()
@@ -362,6 +362,39 @@ public class PlayerInventory : NetworkBehaviour
             if (_slots[_activeSlot] != null && !_stowed[_activeSlot])
                 ClearSlot(_activeSlot);
         }
+    }
+
+    // ── Auto-swap for pickups ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// True when the hand is full but a new pickup could still be taken by switching to the
+    /// other (empty) hotbar slot: the held item is the selected slot's stowable item, the other
+    /// slot is empty, and stowing is possible. Owner-only; false on observers.
+    /// </summary>
+    public bool CanFreeHandBySwitchingSlot()
+    {
+        if (!IsOwner || _pickup == null || stowPoint == null) return false;
+        if (IsHandLocked) return false;
+
+        PickableObject held = _pickup.HeldObject;
+        if (held == null || !IsStowable(held)) return false;
+        if (_slots[_activeSlot] != held) return false;
+
+        return _slots[1 - _activeSlot] == null;
+    }
+
+    /// <summary>
+    /// Called before a pickup when the hand is full. If the other hotbar slot is empty, selects
+    /// it (stowing the held item) so the pickup lands there. Returns true if the hand is now empty.
+    /// </summary>
+    public bool TryFreeHandForPickup()
+    {
+        if (_pickup == null) return false;
+        if (_pickup.HeldObject == null) return true;
+        if (!CanFreeHandBySwitchingSlot()) return false;
+
+        EquipSlot(1 - _activeSlot);
+        return _pickup.HeldObject == null;
     }
 
     // ── Slot equipping ────────────────────────────────────────────────────────
