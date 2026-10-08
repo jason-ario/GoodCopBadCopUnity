@@ -40,6 +40,7 @@ public class BearTrap : PickableObject
 
     private const string UnarmedInteractText = "Arm Trap";
     private const string ArmedInteractText = "Pick Up";
+    private const string PlayerLayerName = "Player";
 
 
     // Inspector
@@ -125,8 +126,25 @@ public class BearTrap : PickableObject
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        ExcludePlayersFromBodyCollider();
         _isArmed.OnValueChanged += OnArmedStateChanged;
         ApplyArmedVisuals(_isArmed.Value);
+    }
+
+    /// <summary>
+    /// The root body collider is forced solid by <see cref="PickableColliderController"/> so the
+    /// trap lands on the ground when dropped/placed. Left as-is it is wider than the player
+    /// trigger zone and taller than the CharacterController step offset, so players are pushed
+    /// back at its edge and can never reach the zone. Excluding the Player layer lets players
+    /// walk into the trap while it still collides with world geometry and stays raycastable.
+    /// </summary>
+    private void ExcludePlayersFromBodyCollider()
+    {
+        int playerLayer = LayerMask.NameToLayer(PlayerLayerName);
+        if (playerLayer < 0) return;
+
+        foreach (Collider col in GetComponents<Collider>())
+            col.excludeLayers |= 1 << playerLayer;
     }
 
     public override void OnNetworkDespawn()

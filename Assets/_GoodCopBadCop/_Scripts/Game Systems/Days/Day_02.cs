@@ -559,6 +559,8 @@ public class Day_02 : DayBase, IDailyTask
     /// otherwise stay padlocked forever. Called by <see cref="ShiftManager.ResumeSavedDay"/>
     /// whenever the resumed day is 2 or later. Server-only; the lock's own setter propagates
     /// its state to clients via NetworkVariable.
+    /// The padlock (Main.unity /---ENV_Booth/Tools Locker/Lock) also has _autoUnlockOnDay = 3,
+    /// so debug skips / JumpToDay to Day 3+ unlock it via DayBase.EnsureDay1TutorialGatesUnlocked.
     /// </summary>
     public void ForceUnlockToolLocker()
     {
