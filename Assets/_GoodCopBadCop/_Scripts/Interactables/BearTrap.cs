@@ -190,6 +190,36 @@ public class BearTrap : PickableObject
     }
 
 
+    // Victim Classification
+
+    /// <summary>
+    /// Every player prefab carries a dormant <see cref="MutantEnemy"/> (used by
+    /// <see cref="CorpseResurrectionController"/>), so a plain GetComponentInParent&lt;MutantEnemy&gt;
+    /// check also matches living players. Because the enemy zone is larger than the player zone,
+    /// a walking player used to hit it first and snap the trap on their own inactive mutant -
+    /// no player damage, no hold. A player is a player victim unless their corpse is resurrected;
+    /// a MutantEnemy on a player only counts as an enemy victim once resurrected.
+    /// </summary>
+    public static bool IsPlayerVictim(Component c, out PlayerMovementController player)
+    {
+        player = c != null ? c.GetComponentInParent<PlayerMovementController>() : null;
+        if (player == null) return false;
+        CorpseResurrectionController corpse = player.GetComponent<CorpseResurrectionController>();
+        return corpse == null || !corpse.IsResurrected;
+    }
+
+    /// <inheritdoc cref="IsPlayerVictim"/>
+    public static bool IsEnemyVictim(Component c, out MutantEnemy mutant)
+    {
+        mutant = c != null ? c.GetComponentInParent<MutantEnemy>() : null;
+        if (mutant == null) return false;
+        PlayerMovementController player = mutant.GetComponentInParent<PlayerMovementController>();
+        if (player == null) return true;
+        CorpseResurrectionController corpse = player.GetComponent<CorpseResurrectionController>();
+        return corpse != null && corpse.IsResurrected;
+    }
+
+
     // Trigger Zone Callbacks (called by BearTrapTrigger children)
 
     /// <summary>
@@ -203,15 +233,13 @@ public class BearTrap : PickableObject
 
         if (isPlayer)
         {
-            PlayerMovementController pm = other.GetComponentInParent<PlayerMovementController>();
-            if (pm == null) return;
+            if (!IsPlayerVictim(other, out PlayerMovementController pm)) return;
             NetworkObject netObj = pm.GetComponent<NetworkObject>();
             if (netObj != null) ReportVictimServerRpc(netObj, isPlayer: true);
         }
         else
         {
-            MutantEnemy mutant = other.GetComponentInParent<MutantEnemy>();
-            if (mutant == null || mutant.IsDead) return;
+            if (!IsEnemyVictim(other, out MutantEnemy mutant) || mutant.IsDead) return;
             NetworkObject netObj = mutant.GetComponent<NetworkObject>();
             if (netObj != null) ReportVictimServerRpc(netObj, isPlayer: false);
         }
@@ -244,8 +272,7 @@ public class BearTrap : PickableObject
 
         if (isPlayer)
         {
-            PlayerMovementController pm = victimObj.GetComponent<PlayerMovementController>();
-            if (pm == null) return;
+            if (!IsPlayerVictim(victimObj, out _)) return;
 
             SnapShut();
 
@@ -255,8 +282,7 @@ public class BearTrap : PickableObject
         }
         else
         {
-            MutantEnemy mutant = victimObj.GetComponent<MutantEnemy>();
-            if (mutant == null || mutant.IsDead) return;
+            if (!IsEnemyVictim(victimObj, out MutantEnemy mutant) || mutant.IsDead) return;
 
             SnapShut();
 
@@ -404,8 +430,8 @@ public class BearTrap : PickableObject
         foreach (Collider c in hits)
         {
             bool relevant = isPlayer
-                ? c.GetComponentInParent<PlayerMovementController>() != null
-                : c.GetComponentInParent<MutantEnemy>() != null;
+                ? IsPlayerVictim(c, out _)
+                : IsEnemyVictim(c, out _);
             if (relevant) _ignoredOnArm.Add(c);
         }
     }

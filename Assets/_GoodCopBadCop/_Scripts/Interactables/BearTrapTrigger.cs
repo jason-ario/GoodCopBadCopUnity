@@ -37,6 +37,6 @@ public class BearTrapTrigger : MonoBehaviour, ISelfManagedCollider
     /// configured to catch (player or enemy).
     /// </summary>
     private bool IsRelevant(Collider other) => _isPlayerTrigger
-        ? other.GetComponentInParent<PlayerMovementController>() != null
-        : other.GetComponentInParent<MutantEnemy>() != null;
+        ? BearTrap.IsPlayerVictim(other, out _)
+        : BearTrap.IsEnemyVictim(other, out _);
 }
