@@ -263,8 +263,8 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             if (hit.collider.isTrigger)
                 continue;
 
-            // Perimeter fences are open mesh — shots pass through them, matching melee weapons.
-            if (hit.collider.GetComponentInParent<PerimiterFence>() != null)
+            // Fences and gates are open mesh — shots pass through them, matching melee weapons.
+            if (CombatHitUtility.IsBulletPassthrough(hit.collider))
                 continue;
 
             if (hit.collider.transform.root.CompareTag("Player"))

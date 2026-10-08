@@ -410,7 +410,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             return false;
 
         // Open mesh fences and cosmetic props don't block, matching the gun rules.
-        if (col.GetComponentInParent<PerimiterFence>() != null || col.GetComponentInParent<HittableProp>() != null)
+        if (CombatHitUtility.IsBulletPassthrough(col) || col.GetComponentInParent<HittableProp>() != null)
             return false;
 
         // Shards of a smashed window are debris, not a pane.

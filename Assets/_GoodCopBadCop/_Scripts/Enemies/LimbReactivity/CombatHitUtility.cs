@@ -9,6 +9,19 @@ public static class CombatHitUtility
     private static readonly List<Collider> ColliderBuffer = new List<Collider>(64);
 
     /// <summary>
+    /// True when weapons should pass through <paramref name="collider"/>: open-mesh perimeter
+    /// fences (<see cref="PerimiterFence"/>), fence gates (<see cref="GateController"/>), and
+    /// anything tagged with a <see cref="BulletPassthrough"/> marker (decorative chain-link segments).
+    /// </summary>
+    public static bool IsBulletPassthrough(Collider collider)
+    {
+        if (collider == null) return false;
+        return collider.GetComponentInParent<PerimiterFence>() != null
+            || collider.GetComponentInParent<GateController>() != null
+            || collider.GetComponentInParent<BulletPassthrough>() != null;
+    }
+
+    /// <summary>
     /// Server sanity distance from a reported hit point to the target: the distance to the nearest
     /// enabled collider's bounds, falling back to the root pivot. Measuring from the pivot alone
     /// threw away legitimate hits on big enemies (Ocho's arms and head are several metres from it).
@@ -59,7 +72,7 @@ public static class CombatHitUtility
                 return j;
 
             // Solid world geometry between the capsule surface and the body blocks the lookahead.
-            if (!ownedByTarget && !c.isTrigger)
+            if (!ownedByTarget && !c.isTrigger && !IsBulletPassthrough(c))
                 break;
         }
 

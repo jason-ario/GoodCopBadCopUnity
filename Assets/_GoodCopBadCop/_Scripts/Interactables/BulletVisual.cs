@@ -77,7 +77,7 @@ public class BulletVisual : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             RaycastHit h = _stepHits[i];
-            if (h.collider.GetComponentInParent<PerimiterFence>() != null)
+            if (CombatHitUtility.IsBulletPassthrough(h.collider))
                 continue;
 
             if (!found || h.distance < nearest.distance)

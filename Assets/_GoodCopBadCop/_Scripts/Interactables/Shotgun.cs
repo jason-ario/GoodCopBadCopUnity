@@ -247,8 +247,8 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 if (hit.collider.isTrigger)
                     continue;
 
-                // Perimeter fences are open mesh — pellets pass through them, matching melee weapons.
-                if (hit.collider.GetComponentInParent<PerimiterFence>() != null)
+                // Fences and gates are open mesh — pellets pass through them, matching melee weapons.
+                if (CombatHitUtility.IsBulletPassthrough(hit.collider))
                     continue;
 
                 Transform root = hit.collider.transform.root;
