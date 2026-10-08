@@ -12,6 +12,21 @@ public class ElectricityController : NetworkBehaviour
     [SerializeField] private AudioSource sfxSource;
     [SerializeField] private Vector2 powerOutageRandomTime = new Vector2(60, 120);
 
+    [Header("Grid Outage (Fuse-Box Restore)")]
+    [Tooltip("Played instead of powerOffSound when the outage needs the power station's fuse box " +
+             "(PowerOffFuseRequired). Should sound bigger and further away than a local trip, " +
+             "e.g. 'Power-Outage Sound - NrMaxi Sky.wav'. Falls back to powerOffSound if empty.")]
+    [SerializeField] private AudioClip gridPowerOffSound;
+
+    [Tooltip("Start point of the grid-outage blackout wave. Electric objects switch off in order of " +
+             "distance from here, so the dark rolls in from the power station toward the booth. " +
+             "Falls back to the PowerStationPowerVisuals in the scene, then to this transform.")]
+    [SerializeField] private Transform gridOutageWaveOrigin;
+
+    [Tooltip("Seconds between the nearest and the furthest electric object switching off during a " +
+             "grid outage. 0 = everything off at once, like a local trip.")]
+    [SerializeField, Min(0f)] private float gridOutageWaveDuration = 2.5f;
+
     /// <summary>When false, the automatic power outage countdown never starts.</summary>
     [SerializeField] private bool enablePowerOutage = false;
 
@@ -149,7 +164,7 @@ public class ElectricityController : NetworkBehaviour
         if (!IsServer) return;
 
         _isPowerOn.Value = false;
-        PowerOffClientRpc();
+        PowerOffClientRpc(_requiresFuseBoxRestore.Value);
     }
 
     /// <summary>
@@ -201,12 +216,12 @@ public class ElectricityController : NetworkBehaviour
     // ------------------------------------------------------------------
 
     [ClientRpc]
-    private void PowerOffClientRpc()
+    private void PowerOffClientRpc(bool gridOutage)
     {
         if (_powerOffCoroutine != null)
             StopCoroutine(_powerOffCoroutine);
 
-        _powerOffCoroutine = StartCoroutine(PowerOffCoroutine());
+        _powerOffCoroutine = StartCoroutine(PowerOffCoroutine(gridOutage));
     }
 
     [ClientRpc]
@@ -220,11 +235,13 @@ public class ElectricityController : NetworkBehaviour
             _powerOffCoroutine = null;
         }
 
+        StopPendingPowerOff();
         _electricOffApplied = false;
 
         foreach (var electricObject in electricObjects)
         {
-            electricObject.OnElectricityTurnOn?.Invoke();
+            if (electricObject != null)
+                electricObject.OnElectricityTurnOn?.Invoke();
         }
 
         AudioClip onClip = wasFuseOutage && fuseBoxPowerOnSound != null ? fuseBoxPowerOnSound : powerOnSound;
@@ -245,29 +262,134 @@ public class ElectricityController : NetworkBehaviour
         OnPowerRestoredAllClients?.Invoke();
     }
 
-    private IEnumerator PowerOffCoroutine()
+    private IEnumerator PowerOffCoroutine(bool gridOutage)
     {
-        sfxSource.PlayOneShot(powerOffSound);
+        AudioClip offClip = gridOutage && gridPowerOffSound != null ? gridPowerOffSound : powerOffSound;
+        if (offClip != null) sfxSource.PlayOneShot(offClip);
 
         yield return new WaitForSeconds(2f);
 
-        // The _isPowerOn OnValueChanged callback usually already switched everything off during
-        // this delay. Firing OnElectricityTurnOff a second time would re-reset the electrical
-        // panel (switches off + view closed) under a player who already started repairing it.
-        if (!_electricOffApplied)
-        {
-            foreach (var electricObject in electricObjects)
-            {
-                electricObject.OnElectricityTurnOff?.Invoke();
-            }
-            _electricOffApplied = true;
-        }
+        // The _isPowerOn OnValueChanged callback usually already switched everything off (or
+        // started the grid blackout wave) during this delay. ApplyPowerOffLocal is guarded so it
+        // never re-resets the electrical panel under a player who already started repairing it.
+        ApplyPowerOffLocal(gridOutage);
 
         _powerOffCoroutine = null;
     }
 
-    /// <summary>Local, per peer: true once OnElectricityTurnOff has run for the current outage.</summary>
+    /// <summary>Local, per peer: true once OnElectricityTurnOff has run (or its wave has started) for the current outage.</summary>
     private bool _electricOffApplied;
+
+    /// <summary>Local, per peer: the running grid blackout wave, if any.</summary>
+    private Coroutine _powerOffWaveCoroutine;
+
+    /// <summary>Local, per peer: the one-frame deferral started by <see cref="OnPowerStateChanged"/>.</summary>
+    private Coroutine _deferredPowerOffCoroutine;
+
+    /// <summary>
+    /// Local, per peer. Switches every electric object off once per outage, either all at once
+    /// (local trip) or as a blackout wave rolling out from the power station (grid outage).
+    /// </summary>
+    private void ApplyPowerOffLocal(bool gridOutage)
+    {
+        if (_electricOffApplied || _isPowerOn.Value) return;
+        _electricOffApplied = true;
+
+        if (gridOutage && gridOutageWaveDuration > 0f && isActiveAndEnabled)
+        {
+            _powerOffWaveCoroutine = StartCoroutine(PowerOffWave());
+            return;
+        }
+
+        foreach (var electricObject in electricObjects)
+        {
+            if (electricObject != null)
+                electricObject.OnElectricityTurnOff?.Invoke();
+        }
+    }
+
+    /// <summary>Stops any pending deferral or blackout wave (power came back on).</summary>
+    private void StopPendingPowerOff()
+    {
+        if (_deferredPowerOffCoroutine != null)
+        {
+            StopCoroutine(_deferredPowerOffCoroutine);
+            _deferredPowerOffCoroutine = null;
+        }
+
+        if (_powerOffWaveCoroutine != null)
+        {
+            StopCoroutine(_powerOffWaveCoroutine);
+            _powerOffWaveCoroutine = null;
+        }
+    }
+
+    /// <summary>
+    /// Grid outage only: switches electric objects off in order of distance from the wave origin
+    /// (the power station by default), spread over <see cref="gridOutageWaveDuration"/>, so players
+    /// see the dark arrive from the station instead of only their booth tripping.
+    /// </summary>
+    private IEnumerator PowerOffWave()
+    {
+        Vector3 origin = ResolveGridOutageWaveOrigin();
+
+        var ordered = new System.Collections.Generic.List<(ElectricObject obj, float dist)>();
+        float minDist = float.MaxValue;
+        float maxDist = 0f;
+        foreach (var electricObject in electricObjects)
+        {
+            if (electricObject == null) continue;
+            float d = Vector3.Distance(origin, electricObject.transform.position);
+            ordered.Add((electricObject, d));
+            minDist = Mathf.Min(minDist, d);
+            maxDist = Mathf.Max(maxDist, d);
+        }
+        ordered.Sort((a, b) => a.dist.CompareTo(b.dist));
+
+        float range = Mathf.Max(maxDist - minDist, 0.001f);
+        float elapsed = 0f;
+        int next = 0;
+
+        while (next < ordered.Count)
+        {
+            while (next < ordered.Count
+                   && (ordered[next].dist - minDist) / range * gridOutageWaveDuration <= elapsed)
+            {
+                if (ordered[next].obj != null)
+                    ordered[next].obj.OnElectricityTurnOff?.Invoke();
+                next++;
+            }
+
+            if (next >= ordered.Count) break;
+            yield return null;
+            elapsed += Time.deltaTime;
+        }
+
+        _powerOffWaveCoroutine = null;
+    }
+
+    private Vector3 ResolveGridOutageWaveOrigin()
+    {
+        if (gridOutageWaveOrigin == null)
+        {
+            PowerStationPowerVisuals station = FindFirstObjectByType<PowerStationPowerVisuals>();
+            if (station != null) gridOutageWaveOrigin = station.transform;
+        }
+
+        return gridOutageWaveOrigin != null ? gridOutageWaveOrigin.position : transform.position;
+    }
+
+    /// <summary>
+    /// Waits one frame before applying a power-off seen through the NetworkVariable, so the
+    /// <c>_requiresFuseBoxRestore</c> delta from the same server tick has arrived and the right
+    /// style (wave vs. instant) is used. NGO applies <c>_isPowerOn</c> first (field order).
+    /// </summary>
+    private IEnumerator DeferredPowerOff()
+    {
+        yield return null;
+        _deferredPowerOffCoroutine = null;
+        ApplyPowerOffLocal(_requiresFuseBoxRestore.Value);
+    }
 
     // ------------------------------------------------------------------
     // NetworkVariable change callbacks (handle late-joining clients)
@@ -283,11 +405,13 @@ public class ElectricityController : NetworkBehaviour
         // Snap late-joining clients to the correct visual state without SFX.
         if (current)
         {
+            StopPendingPowerOff();
             _electricOffApplied = false;
 
             foreach (var electricObject in electricObjects)
             {
-                electricObject.OnElectricityTurnOn?.Invoke();
+                if (electricObject != null)
+                    electricObject.OnElectricityTurnOn?.Invoke();
             }
 
             // Fires locally on every client (this callback runs wherever the NetworkVariable
@@ -297,11 +421,12 @@ public class ElectricityController : NetworkBehaviour
         }
         else
         {
-            foreach (var electricObject in electricObjects)
-            {
-                electricObject.OnElectricityTurnOff?.Invoke();
-            }
-            _electricOffApplied = true;
+            if (_electricOffApplied || _deferredPowerOffCoroutine != null) return;
+
+            if (isActiveAndEnabled)
+                _deferredPowerOffCoroutine = StartCoroutine(DeferredPowerOff());
+            else
+                ApplyPowerOffLocal(_requiresFuseBoxRestore.Value);
         }
     }
 }

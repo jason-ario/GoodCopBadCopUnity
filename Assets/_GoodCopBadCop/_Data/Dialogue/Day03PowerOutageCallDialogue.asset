@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 0
   nodes:
   - type: 0
-    npcLine: Hello? This is Central Power Authority. We've registered a fault on your sector's grid. Your circuit box at the power station has tripped. You need to go reset it manually.
+    npcLine: Hello? This is Central Power Authority. This is not a local trip. Your whole sector's grid is down, so your booth panel won't fix it.
     animationTrigger: 
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 11400000, guid: 0ae68bc6a03601b448bb9bc0c8f8bb57, type: 2}
@@ -23,7 +23,15 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 0
-    npcLine: Head to the power station and find the [[circuit box]]. Flip the breakers back on. Until then your whole block stays dark. Move quickly.
+    npcLine: Go to the [[power station]] and open the [[fuse box]]. The fuses have blown. Find replacements, put them in, then pull the main lever.
+    animationTrigger: 
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 11400000, guid: 0ae68bc6a03601b448bb9bc0c8f8bb57, type: 2}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []
+  - type: 0
+    npcLine: Until then your whole block stays dark. Move quickly.
     animationTrigger: 
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 11400000, guid: 0ae68bc6a03601b448bb9bc0c8f8bb57, type: 2}

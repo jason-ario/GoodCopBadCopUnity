@@ -34,9 +34,26 @@ public class Polaroid : PickableObject
 
     private Material _instanceMaterial;
     private Texture2D _ownedTexture;
+    private CameraPickup _dockedCamera;
 
     /// <summary>Returns the photo texture currently displayed, or null if none has been set.</summary>
     public Texture2D Photo => _ownedTexture;
+
+    /// <summary>True while this polaroid sits in a <see cref="CameraPickup"/>'s eject slot.</summary>
+    public bool IsDockedInCamera => _dockedCamera != null;
+
+    /// <summary>
+    /// Marks this polaroid as docked in (or released from) a camera. While docked it is never a
+    /// target itself: the interaction ray passes through to the camera, which offers
+    /// "Hold E to grab photo" and routes the polaroid to the player's hands.
+    /// </summary>
+    public void SetDockedCamera(CameraPickup camera) => _dockedCamera = camera;
+
+    public override bool IsInteractable => base.IsInteractable && !IsDockedInCamera;
+
+    public override bool PassesInteractionRayThrough => IsDockedInCamera;
+
+    public override void Highlight(bool highlight) => base.Highlight(highlight && !IsDockedInCamera);
 
     /// <summary>
     /// Applies <paramref name="photo"/> to the photo mesh's <c>_BaseMap</c> material slot.

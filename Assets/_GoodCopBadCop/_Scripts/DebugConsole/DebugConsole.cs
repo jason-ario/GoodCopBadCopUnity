@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using GoodCopBadCop.Effects;
 using Unity.Netcode;
 using UnityEngine;
@@ -1164,14 +1165,59 @@ public class DebugConsole : MonoBehaviour
             return;
         }
 
+        ForceSuspectNext(_nonaSuspectData);
+    }
+
+    /// <summary>
+    /// Arms <see cref="SuspectController.ForceNextSuspectData"/> with any suspect, so the next
+    /// lineup slot to spawn is overwritten with them (see <see cref="DailySuspectManager.ForceSuspectIntoSlot"/>).
+    /// Scripted intercepts (Vlad, the Soldier, Ocho) still take priority. Pass null to disarm. Host-only.
+    /// </summary>
+    public void ForceSuspectNext(SuspectData suspect)
+    {
         if (ShiftManager.Instance == null || !ShiftManager.Instance.IsServer)
         {
-            Debug.LogWarning("[DebugConsole] ForceNonaNext: run this cheat on the host.");
+            Debug.LogWarning("[DebugConsole] ForceSuspectNext: run this cheat on the host.");
             return;
         }
 
-        SuspectController.ForceNextSuspectData = _nonaSuspectData;
-        Debug.Log("[DebugConsole] Nona will overwrite the next lineup slot.");
+        SuspectController.ForceNextSuspectData = suspect;
+        Debug.Log(suspect != null
+            ? $"[DebugConsole] '{GetSuspectLabel(suspect)}' will overwrite the next lineup slot."
+            : "[DebugConsole] Forced next suspect cleared.");
+    }
+
+    /// <summary>
+    /// Every suspect the "Force Next Suspect" picker can choose: the current lineup pool, every
+    /// day's guaranteed suspects, plus the Inspector-assigned Nona/Butcher. De-duplicated, sorted by name.
+    /// </summary>
+    public List<SuspectData> GetForceableSuspects()
+    {
+        var set = new HashSet<SuspectData>();
+
+        var pool = DailySuspectManager.Instance != null ? DailySuspectManager.Instance.AllSuspects : null;
+        if (pool != null && pool.suspects != null)
+            foreach (var s in pool.suspects)
+                if (s != null) set.Add(s);
+
+        foreach (var day in FindObjectsByType<DayBase>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (day.GuaranteedSuspects != null)
+                foreach (var s in day.GuaranteedSuspects)
+                    if (s != null) set.Add(s);
+
+        if (_nonaSuspectData != null) set.Add(_nonaSuspectData);
+        if (_butcherSuspectData != null) set.Add(_butcherSuspectData);
+
+        var list = new List<SuspectData>(set);
+        list.Sort((a, b) => string.Compare(GetSuspectLabel(a), GetSuspectLabel(b), StringComparison.OrdinalIgnoreCase));
+        return list;
+    }
+
+    public static string GetSuspectLabel(SuspectData suspect)
+    {
+        if (suspect == null) return "(none)";
+        string full = $"{suspect.FirstName} {suspect.LastName}".Trim();
+        return string.IsNullOrEmpty(full) ? suspect.name : full;
     }
 
     /// <summary>

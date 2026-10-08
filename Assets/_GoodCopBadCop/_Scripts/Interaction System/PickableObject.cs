@@ -909,6 +909,22 @@ public class PickableObject : Interactable
         transform.localScale = _restScale;
     }
 
+    /// <summary>
+    /// Overrides the rest scale for objects whose gameplay scale differs from their prefab's
+    /// authored localScale (e.g. exam pages, authored at ~129 to sit inside a 0.1-scaled
+    /// notebook but living unparented in the world). Without this, StopScalePunch (every grab)
+    /// and PlayScalePunch (every placement) snap the object to its authored prefab scale.
+    /// Applies the scale immediately unless a placement punch is in flight (its OnKill lands on
+    /// the new rest scale).
+    /// </summary>
+    public void SetRestScale(Vector3 scale)
+    {
+        if (scale.sqrMagnitude < 1e-10f) return;
+        _restScale = scale;
+        if (_scalePunchTween == null || !_scalePunchTween.IsActive())
+            transform.localScale = scale;
+    }
+
     private void EnsureRestScaleCaptured()
     {
         // Safety net for subclasses that override Awake without calling base.Awake().

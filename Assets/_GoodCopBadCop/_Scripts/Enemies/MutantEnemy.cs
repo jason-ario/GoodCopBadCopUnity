@@ -2823,6 +2823,12 @@ public class MutantEnemy : NetworkBehaviour
         junk.enabled = true;
         netObj.Spawn(destroyWithScene: true);
 
+        // Gore pops out of the body right as the ragdoll activates; without this the pieces shove
+        // the corpse (enough to push it through thin booth walls). Clients mirror it via RPC.
+        if (ragdollController != null)
+            ragdollController.IgnoreCollisionsWith(piece);
+        IgnoreGoreRagdollCollisionClientRpc(netObj);
+
         TakeOutTrashTask.Instance?.RegisterExternalJunkItem(netObj);
 
         // This piece was registered based on the position it was launched from, before physics
@@ -3110,6 +3116,21 @@ public class MutantEnemy : NetworkBehaviour
         EnableRagdoll();
     }
 
+    /// <summary>
+    /// Client mirror of the server's gore/ragdoll collision ignore for a networked gore piece
+    /// (see <see cref="SpawnGoreJunkItem"/>). Physics.IgnoreCollision is local-only, so every peer
+    /// that simulates this corpse's ragdoll needs it.
+    /// </summary>
+    [ClientRpc]
+    private void IgnoreGoreRagdollCollisionClientRpc(NetworkObjectReference goreRef)
+    {
+        if (IsServer || ragdollController == null)
+            return;
+
+        if (goreRef.TryGet(out NetworkObject goreObj) && goreObj != null)
+            ragdollController.IgnoreCollisionsWith(goreObj.gameObject);
+    }
+
     [ClientRpc]
     private void SpawnGoreBurstClientRpc(Vector3[] positions, int[] prefabIndices, Vector3[] velocities)
     {
@@ -3129,6 +3150,8 @@ public class MutantEnemy : NetworkBehaviour
             return;
 
         GameObject piece = Instantiate(prefab, position, UnityEngine.Random.rotation);
+        if (ragdollController != null)
+            ragdollController.IgnoreCollisionsWith(piece);
 
         Rigidbody rb = piece.GetComponent<Rigidbody>();
         if (rb == null)

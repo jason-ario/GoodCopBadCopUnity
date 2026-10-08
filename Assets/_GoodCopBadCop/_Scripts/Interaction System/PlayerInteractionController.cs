@@ -751,6 +751,7 @@ public class PlayerInteractionController : NetworkBehaviour
         Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
         bool junkPassthroughAllowed = AllowsJunkPassthrough();
+        PickableObject heldObject = _playerPickupController != null ? _playerPickupController.HeldObject : null;
 
         // Set once the ray has been let through the fence. From that point on it may only resolve to
         // collectible junk; anything else means the fence is the real answer, so we fall back to the
@@ -766,9 +767,23 @@ public class PlayerInteractionController : NetworkBehaviour
         bool crossedGlass = false;
         RaycastHit glassHit = default;
 
+        // First hit that isn't the local player's own held item (see the skip in the loop).
+        int firstEligibleHit = -1;
+
         for (int i = 0; i < hits.Length; i++)
         {
             Collider collider = hits[i].collider;
+
+            // The local player's own held item is never a target and never blocks the ray. Its
+            // colliders can still be live for a moment (server round-trip after pickup, held-state
+            // replication); resolving to it fed its midair hit point into free placement, so the
+            // ghost and the dropped item floated in front of the player instead of reaching the
+            // surface being aimed at.
+            if (heldObject != null && collider.GetComponentInParent<PickableObject>() == heldObject)
+                continue;
+
+            if (firstEligibleHit < 0) firstEligibleHit = i;
+
             Interactable candidate = ResolveInteractable(collider);
 
             // Objects that opt out of targeting entirely (e.g. ink stamp pickups in their holder)
@@ -828,7 +843,17 @@ public class PlayerInteractionController : NetworkBehaviour
             // passes through to check what's behind it.
         }
 
-        bestHit = crossedFence ? fenceHit : (crossedGlass ? glassHit : hits[0]);
+        if (crossedFence) { bestHit = fenceHit; return true; }
+        if (crossedGlass) { bestHit = glassHit; return true; }
+        if (firstEligibleHit < 0)
+        {
+            // Only the held item was hit: report nothing so free placement falls back to its own
+            // placement-layer surface raycast.
+            bestHit = default;
+            return false;
+        }
+
+        bestHit = hits[firstEligibleHit];
         return true;
     }
 

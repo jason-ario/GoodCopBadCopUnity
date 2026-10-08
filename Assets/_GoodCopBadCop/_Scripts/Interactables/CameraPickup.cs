@@ -475,6 +475,11 @@ public class CameraPickup : PickableObject
         // follow point animates or the camera moves, the polaroid moves with it.
         polaroid.SetSocketFollowWithLocalOffset(_photoFollowPoint, Vector3.zero, Quaternion.identity);
 
+        // While docked, the polaroid is transparent to the interaction ray so aiming at it
+        // targets this camera and shows "Hold E to grab photo".
+        if (polaroid is Polaroid dockedPolaroid)
+            dockedPolaroid.SetDockedCamera(this);
+
         // Decode and paint the photo on every client — the JPG bytes travelled through the
         // server RPC round-trip so all clients (not just the photographer) see the same image.
         if (photoData != null && photoData.Length > 0)
@@ -525,7 +530,7 @@ public class CameraPickup : PickableObject
     {
         if (_netPolaroidId.Value == 0UL) return null;
         if (player.pickupController.HeldObject != null) return null;
-        return "take photo";
+        return "grab photo";
     }
 
     /// <summary>
@@ -577,7 +582,12 @@ public class CameraPickup : PickableObject
         if (!polaroidRef.TryGet(out NetworkObject polaroidNO)) return;
 
         PickableObject polaroid = polaroidNO.GetComponent<PickableObject>();
-        polaroid?.ClearSocketFollow();
+        if (polaroid != null)
+        {
+            polaroid.ClearSocketFollow();
+            if (polaroid is Polaroid dockedPolaroid)
+                dockedPolaroid.SetDockedCamera(null);
+        }
 
         Rigidbody rb = polaroidNO.GetComponent<Rigidbody>();
         if (rb != null) rb.isKinematic = false;

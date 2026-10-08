@@ -81,6 +81,7 @@ public class Day_03 : DayBase, IDailyTask
 
         _answerPhoneThreat = new AnswerPhoneThreat();
         TaskRegistry.Instance?.AddThreat(_answerPhoneThreat);
+        MarkRingingPhoneLocal();
 
         Telephone.OnScriptedCallAnsweredAllClients += OnPowerOutageCallAnsweredAllClients;
 
@@ -107,6 +108,7 @@ public class Day_03 : DayBase, IDailyTask
     private void OnPowerOutageCallAnsweredAllClients()
     {
         Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
+        UnmarkRingingPhoneLocal();
 
         if (_answerPhoneThreat != null)
         {
@@ -278,6 +280,29 @@ public class Day_03 : DayBase, IDailyTask
     [Tooltip("Gap (m) between the top of the power switch's rendered bounds and the tutorial arrow's pivot.")]
     [SerializeField] private float _powerSwitchMarkerClearance = 0.25f;
 
+    [Tooltip("Gap (m) between the top of the telephone's rendered bounds and the tutorial arrow shown " +
+             "(with its compass pip) while HQ's power-outage call is ringing.")]
+    [SerializeField] private float _phoneMarkerClearance = 0.2f;
+
+    [Header("Day 3 — Wrong Panel Reminder")]
+    [Tooltip("Optional. Played once (HQ over the phone speaker, player stays free) the first time a " +
+             "player tries the dead booth electrical panel after the Restore Power task was given. " +
+             "Leave empty to use the lines below.")]
+    [SerializeField] private ScriptedDialogue _wrongPanelReminderDialogue;
+
+    [Tooltip("Fallback lines for the wrong-panel reminder when no dialogue asset is assigned. " +
+             "Supports [[keyword]] markup.")]
+    [SerializeField, TextArea(2, 4)] private string[] _wrongPanelReminderLines =
+    {
+        "Central Power Authority again. Your booth panel can't fix a grid fault!",
+        "Get to the [[power station]] and replace the fuses in the [[fuse box]].",
+    };
+
+    private bool _wrongPanelReminderPlayed;
+    private bool _wrongPanelReminderRunning;
+    private ScriptedDialogue _runtimeWrongPanelReminder;
+    private Transform _markedPhone;
+
     private bool _fuseTutorialShown;
 
     /// <summary>Runtime "Restore Power" guidebook task, created only while the outage is active.</summary>
@@ -368,6 +393,11 @@ public class Day_03 : DayBase, IDailyTask
 
         // Every client grants "Restore Power" when the server broadcasts the HQ call's end.
         Telephone.OnScriptedCallCompletedAllClients += OnPowerOutageCallCompletedAllClients;
+
+        // Server: one-shot HQ reminder when someone tries the dead booth panel during the outage.
+        _wrongPanelReminderPlayed = false;
+        _wrongPanelReminderRunning = false;
+        ElectricPanelController.OnDeadPanelUsedServer += OnDeadPanelUsedServer_Day3;
     }
 
     public override void DayDeactivated()
@@ -412,11 +442,93 @@ public class Day_03 : DayBase, IDailyTask
         ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
         Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
         Telephone.OnScriptedCallCompletedAllClients -= OnPowerOutageCallCompletedAllClients;
+        ElectricPanelController.OnDeadPanelUsedServer -= OnDeadPanelUsedServer_Day3;
 
         if (ElectricityController.Instance != null)
             ElectricityController.Instance.OnPowerRestoredAllClients -= OnPowerOutageResolved;
 
+        UnmarkRingingPhoneLocal();
         ClearFuseBoxTutorialState();
+    }
+
+    // -------------------------------------------------------------------------
+    // Ringing phone marker + wrong-panel reminder
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Local, every client. Points a tutorial arrow (which also gives a compass pip) at the phone
+    /// while HQ's power-outage call is ringing, so players answer it instead of heading for the
+    /// booth panel. Cleared when the call is answered.
+    /// </summary>
+    private void MarkRingingPhoneLocal()
+    {
+        if (Telephone.Instance == null || TutorialMarkerManager.Instance == null) return;
+
+        _markedPhone = Telephone.Instance.transform;
+        TutorialMarkerManager.Instance.Mark(_markedPhone, GetMarkerHoverHeight(_markedPhone, _phoneMarkerClearance));
+    }
+
+    private void UnmarkRingingPhoneLocal()
+    {
+        if (_markedPhone == null) return;
+        TutorialMarkerManager.Instance?.Unmark(_markedPhone);
+        _markedPhone = null;
+    }
+
+    /// <summary>
+    /// Server-only (<see cref="ElectricPanelController.OnDeadPanelUsedServer"/>). The first time a
+    /// player tries the dead booth panel after the Restore Power task was given, HQ repeats where to
+    /// go. Before that, the panel's own error notification and the ringing phone are enough. Skipped
+    /// without using up the one-shot if another scripted sequence is running.
+    /// </summary>
+    private void OnDeadPanelUsedServer_Day3()
+    {
+        if (_wrongPanelReminderPlayed || _wrongPanelReminderRunning) return;
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+        if (_powerOutageThreat == null) return;
+
+        ScriptedDialogueRunner runner = ScriptedDialogueRunner.Instance;
+        if (runner == null || runner.IsServerSequenceActive) return;
+
+        ScriptedDialogue dialogue = ResolveWrongPanelReminderDialogue();
+        if (dialogue == null) return;
+
+        _wrongPanelReminderPlayed = true;
+        _wrongPanelReminderRunning = true;
+
+        runner.PlayMegaphoneDialogue(
+            dialogue,
+            onComplete: () => _wrongPanelReminderRunning = false,
+            unlocked: true,
+            speakerNameOverride: "HQ",
+            speakerColorOverride: Color.white,
+            useAlternateVoice: false,
+            useTelephoneAudioSource: true);
+    }
+
+    private ScriptedDialogue ResolveWrongPanelReminderDialogue()
+    {
+        if (_wrongPanelReminderDialogue != null) return _wrongPanelReminderDialogue;
+        if (_runtimeWrongPanelReminder != null) return _runtimeWrongPanelReminder;
+        if (_wrongPanelReminderLines == null || _wrongPanelReminderLines.Length == 0) return null;
+
+        var nodes = new System.Collections.Generic.List<ScriptedDialogueNode>();
+        foreach (string line in _wrongPanelReminderLines)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            nodes.Add(new ScriptedDialogueNode
+            {
+                type = ScriptedDialogueNodeType.Monologue,
+                npcLine = line,
+                choices = Array.Empty<ScriptedDialogueChoice>(),
+            });
+        }
+        if (nodes.Count == 0) return null;
+
+        _runtimeWrongPanelReminder = ScriptableObject.CreateInstance<ScriptedDialogue>();
+        _runtimeWrongPanelReminder.name = "Day03WrongPanelReminder (Runtime)";
+        _runtimeWrongPanelReminder.nodes = nodes.ToArray();
+        return _runtimeWrongPanelReminder;
     }
 
     // -------------------------------------------------------------------------

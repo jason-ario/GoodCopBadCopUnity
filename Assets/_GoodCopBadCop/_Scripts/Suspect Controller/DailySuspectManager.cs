@@ -5,6 +5,8 @@ using UnityEngine;
 public class DailySuspectManager : MonoBehaviour
 {
     [SerializeField] private SuspectSet allSuspects;
+    /// <summary>The current random-lineup pool (may be swapped per day via <see cref="SetSuspectSet"/>).</summary>
+    public SuspectSet AllSuspects => allSuspects;
     public List<SuspectData> shiftSuspects;
     [SerializeField] private Vector2 suspectsPerShift;
 

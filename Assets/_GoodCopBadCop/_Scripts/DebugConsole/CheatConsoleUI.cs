@@ -88,9 +88,7 @@ public class CheatConsoleUI : MonoBehaviour
             _canvasRoot.SetActive(true);
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible   = true;
-            RebuildLayout();
-            foreach (var tmp in _canvasRoot.GetComponentsInChildren<TextMeshProUGUI>())
-                tmp.ForceMeshUpdate();
+            ShowMainPage();
         }
         else if (_canvasRoot != null)
         {
@@ -229,10 +227,74 @@ public class CheatConsoleUI : MonoBehaviour
         csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
         sv.content = _scrollContent;
+    }
 
-        // ── Cheat buttons ─────────────────────────────────────────────────────
+    private void ClearScrollContent()
+    {
+        for (int i = _scrollContent.childCount - 1; i >= 0; i--)
+        {
+            var child = _scrollContent.GetChild(i).gameObject;
+            child.SetActive(false);
+            Destroy(child);
+        }
+    }
+
+    private void ShowMainPage()
+    {
+        ClearScrollContent();
+
+        AddButton(_scrollContent, "Force Next Suspect…  (pick anyone)", ShowSuspectPickerPage);
+
         foreach (var (label, callback) in _cheats)
             AddButton(_scrollContent, label, callback);
+
+        RefreshPage();
+    }
+
+    /// <summary>
+    /// Lists every forceable suspect (<see cref="DebugConsole.GetForceableSuspects"/>). Picking one
+    /// arms <see cref="SuspectController.ForceNextSuspectData"/> so they take the next lineup slot.
+    /// </summary>
+    private void ShowSuspectPickerPage()
+    {
+        ClearScrollContent();
+
+        var console = DebugConsole.Instance;
+        AddButton(_scrollContent, "<  Back", ShowMainPage);
+
+        string armed = DebugConsole.GetSuspectLabel(SuspectController.ForceNextSuspectData);
+        AddLabel(_scrollContent, $"Currently armed: {armed}", SubtitleHeight, SubtitleFontSize,
+            TitleColor, FontStyles.Normal, TextAlignmentOptions.Center);
+
+        AddButton(_scrollContent, "Clear Forced Suspect", () =>
+        {
+            SuspectController.ForceNextSuspectData = null;
+            ShowSuspectPickerPage();
+        });
+
+        var suspects = console != null ? console.GetForceableSuspects() : new List<SuspectData>();
+        if (suspects.Count == 0)
+            AddLabel(_scrollContent, "No suspects found (start a shift first).", SubtitleHeight, SubtitleFontSize,
+                SubtitleColor, FontStyles.Normal, TextAlignmentOptions.Center);
+
+        foreach (var suspect in suspects)
+        {
+            var s = suspect;
+            AddButton(_scrollContent, DebugConsole.GetSuspectLabel(s), () =>
+            {
+                DebugConsole.Instance.EnsureGameStartedThen(() => DebugConsole.Instance.ForceSuspectNext(s));
+                SetVisible(false);
+            });
+        }
+
+        RefreshPage();
+    }
+
+    private void RefreshPage()
+    {
+        RebuildLayout();
+        foreach (var tmp in _canvasRoot.GetComponentsInChildren<TextMeshProUGUI>())
+            tmp.ForceMeshUpdate();
     }
 
     private static void AddLabel(Transform parent, string text, float height, int fontSize,

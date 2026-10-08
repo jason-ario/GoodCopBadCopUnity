@@ -2,6 +2,13 @@ using System.Linq;
 using UnityEngine;
 
 /// <summary>
+/// Implemented by a component that owns the enabled/trigger state of the collider on its own
+/// GameObject (e.g. <see cref="BearTrapTrigger"/> zones toggled by the trap's armed state).
+/// <see cref="PickableColliderController"/> never touches such colliders.
+/// </summary>
+public interface ISelfManagedCollider { }
+
+/// <summary>
 /// Manages the trigger state of physics colliders on a <see cref="PickableObject"/>.
 ///
 /// While held   → colliders are disabled: the carried item passes through world geometry
@@ -45,9 +52,11 @@ public class PickableColliderController : MonoBehaviour
         // held/released — clobbering the open/closed/held state FolderController manages
         // directly. A document's own controller must still manage its own root collider when
         // picked up standalone, so this exclusion only ever applies to the folder's controller.
+        // Colliders owned by an ISelfManagedCollider (e.g. bear trap trigger zones) are skipped too.
         _physicsColliders = GetComponentsInChildren<Collider>(true)
             .Where(c => c.GetComponent<InteractableCollider>() == null
                      && c.GetComponent<IClickable>() == null
+                     && c.GetComponent<ISelfManagedCollider>() == null
                      && (_ownFolderItem != null || c.GetComponentInParent<FolderItem>() == null))
             .ToArray();
 
@@ -84,6 +93,10 @@ public class PickableColliderController : MonoBehaviour
             if (col == null) continue;
             if (col.GetComponent<InteractableCollider>() != null) continue;
             if (col.GetComponent<IClickable>() != null) continue;
+            // Owned elsewhere (e.g. bear trap trigger zones): forcing them solid and enabled
+            // turned an unarmed trap's zones into an invisible ~1m-tall block that the
+            // placement raycast landed on, so later placements floated in midair.
+            if (col.GetComponent<ISelfManagedCollider>() != null) continue;
             // Skip filed documents' colliders when this is the folder's own controller —
             // see the exclusion note in Awake above.
             if (_ownFolderItem == null && col.GetComponentInParent<FolderItem>() != null) continue;

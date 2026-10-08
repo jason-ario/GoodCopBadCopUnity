@@ -152,6 +152,7 @@ GameObject:
   - component: {fileID: 5432109876543210987}
   - component: {fileID: 5100234627180584390}
   - component: {fileID: 1431098223367122393}
+  - component: {fileID: 2348607921863441057}
   m_Layer: 0
   m_Name: Bear Trap
   m_TagString: Untagged
@@ -191,10 +192,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 2579481648
   InScenePlacedSourceGlobalObjectIdHash: 2579481648
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -217,8 +220,15 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Bear Trap
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   itemData: {fileID: 11400000, guid: 49e6dc696fcca5c4aa42a85528909023, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
   _trapAnimator: {fileID: 1289374056679327237}
   _playerTrigger: {fileID: 636664728075258528}
   _enemyTrigger: {fileID: 7375457273462155693}
@@ -663,10 +673,10 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 0
+  m_UseGravity: 1
   m_IsKinematic: 1
   m_Interpolate: 0
-  m_Constraints: 126
+  m_Constraints: 0
   m_CollisionDetection: 0
 --- !u!114 &5100234627180584390
 MonoBehaviour:
@@ -731,6 +741,18 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 0
   AutoSetKinematicOnDespawn: 1
+--- !u!114 &2348607921863441057
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8736677625868329070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
 --- !u!1001 &6130436948931263816
 PrefabInstance:
   m_ObjectHideFlags: 0

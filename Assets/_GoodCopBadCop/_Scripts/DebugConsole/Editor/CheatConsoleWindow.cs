@@ -56,6 +56,9 @@ public class CheatConsoleWindow : EditorWindow
         {
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
+            DrawForceSuspectSection();
+            EditorGUILayout.Space(6f);
+
             foreach (var (label, callback) in _cheats)
             {
                 if (GUILayout.Button(label, GUILayout.Height(28f)))
@@ -72,6 +75,47 @@ public class CheatConsoleWindow : EditorWindow
             }
 
             EditorGUILayout.EndScrollView();
+        }
+    }
+
+    private bool _forceSuspectFoldout = true;
+    private string _suspectFilter = "";
+
+    /// <summary>Pick any suspect to take the next lineup slot (DebugConsole.ForceSuspectNext).</summary>
+    private void DrawForceSuspectSection()
+    {
+        _forceSuspectFoldout = EditorGUILayout.Foldout(_forceSuspectFoldout, "Force Next Suspect", true, EditorStyles.foldoutHeader);
+        if (!_forceSuspectFoldout) return;
+
+        var console = DebugConsole.Instance;
+        if (!EditorApplication.isPlaying || console == null)
+        {
+            EditorGUILayout.HelpBox("Available in Play Mode once the DebugConsole exists.", MessageType.None);
+            return;
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("Armed:", DebugConsole.GetSuspectLabel(SuspectController.ForceNextSuspectData), EditorStyles.boldLabel);
+            if (GUILayout.Button("Clear", GUILayout.Width(60f)))
+                SuspectController.ForceNextSuspectData = null;
+        }
+
+        _suspectFilter = EditorGUILayout.TextField("Search", _suspectFilter);
+
+        foreach (var suspect in console.GetForceableSuspects())
+        {
+            string label = DebugConsole.GetSuspectLabel(suspect);
+            if (!string.IsNullOrEmpty(_suspectFilter) &&
+                label.IndexOf(_suspectFilter, StringComparison.OrdinalIgnoreCase) < 0 &&
+                suspect.name.IndexOf(_suspectFilter, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            if (GUILayout.Button(label, GUILayout.Height(22f)))
+            {
+                var s = suspect;
+                console.EnsureGameStartedThen(() => console.ForceSuspectNext(s));
+            }
         }
     }
 }

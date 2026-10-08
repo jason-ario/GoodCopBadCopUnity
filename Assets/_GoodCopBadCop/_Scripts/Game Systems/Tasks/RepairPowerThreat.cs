@@ -37,10 +37,10 @@ public class RepairPowerThreat : ISystemicThreat
 
             return _step switch
             {
-                Step.InvestigateFuseBox => "Investigate the fuse box in the power station.",
+                Step.InvestigateFuseBox => "Go to the power station and open the fuse box. The booth panel can't fix this outage.",
                 Step.InsertFuses        => "Find and add the fuses to the fuse box.",
                 Step.PullLever          => "Pull the lever to reactivate the power.",
-                _                       => "The circuit box at the power station has tripped. Go reset it to restore power.",
+                _                       => "The grid is down. Replace the blown fuses at the power station's fuse box to restore power.",
             };
         }
     }

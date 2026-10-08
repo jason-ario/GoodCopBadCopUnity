@@ -22,6 +22,11 @@ using UnityEngine;
 /// Tripping the breaker:
 ///   While the power is already on, touching any circuit switch trips the breaker and cuts
 ///   power entirely (see <see cref="TripPower"/>), same as a real panel.
+///
+/// Grid outage (fuse-box restore, e.g. Day 3):
+///   While <see cref="IsGridOutage"/> is true the panel is dead: interacting does not open the
+///   puzzle, the reticle verb changes, and the player gets an error notification pointing at the
+///   power station (see <see cref="ShowDeadPanelFeedbackLocal"/>).
 /// </summary>
 public class ElectricPanelController : Interactable
 {
@@ -60,6 +65,25 @@ public class ElectricPanelController : Interactable
              "the TOP of the panel box — NOT this component's own root/pivot, which sits low and would " +
              "make the arrow render too close to the ground. Falls back to this transform if unassigned.")]
     [SerializeField] private Transform _arrowTarget;
+
+    [Header("Grid Outage (Fuse-Box Restore)")]
+    [Tooltip("Optional one-shot played when a player tries the panel during a grid outage " +
+             "(ElectricityController.RequiresFuseBoxRestore). The error notification already " +
+             "plays its own negative cue, so this is just an extra dead-panel 'thunk'.")]
+    [SerializeField] private AudioClip _deadPanelSound;
+
+    [Tooltip("Error notification shown when a player tries the panel during a grid outage. The panel " +
+             "does not open, so players never solve a puzzle that can't restore power.")]
+    [SerializeField] private string _deadPanelMessage = "No current reaching the panel. The fault is at the power station.";
+
+    [Tooltip("Reticle verb shown on the panel during a grid outage (instead of 'Open').")]
+    [SerializeField] private string _deadPanelInteractVerb = "Inspect";
+
+    /// <summary>
+    /// Fired on the server whenever any player tries the panel during a grid outage. Day
+    /// controllers (e.g. <see cref="Day_03"/>) use it for a one-shot "wrong panel" reminder.
+    /// </summary>
+    public static event System.Action OnDeadPanelUsedServer;
 
     // ─── Network state ────────────────────────────────────────────────────────
 
@@ -115,11 +139,24 @@ public class ElectricPanelController : Interactable
 
     protected override string DefaultInteractVerb => "Open";
 
+    public override string GetInteractVerb(PlayerInteractionController player)
+        => IsGridOutage && !string.IsNullOrEmpty(_deadPanelInteractVerb)
+            ? _deadPanelInteractVerb
+            : base.GetInteractVerb(player);
+
     public override void Interact(PlayerInteractionController player)
     {
         base.Interact(player);
 
         if (DiegeticViewController.IsAnyViewActive) return;
+
+        // Grid outage: the panel is dead. Don't open the puzzle (the server would silently
+        // reject the restore anyway); tell the player where the real fault is instead.
+        if (IsGridOutage)
+        {
+            ShowDeadPanelFeedbackLocal();
+            return;
+        }
 
         if (_occupancy != null && !_occupancy.TryClaim(player)) return;
 
@@ -134,6 +171,32 @@ public class ElectricPanelController : Interactable
 
     /// <summary>True when the panel's electricity controller currently has power on.</summary>
     public bool IsPowerOn => _electricityController != null && _electricityController.IsPowerOn;
+
+    /// <summary>
+    /// True while power is out AND the outage can only be fixed at the power station's fuse box
+    /// (e.g. Day 3's post-call outage). The panel is dead during this time.
+    /// </summary>
+    public bool IsGridOutage =>
+        _electricityController != null
+        && !_electricityController.IsPowerOn
+        && _electricityController.RequiresFuseBoxRestore;
+
+    /// <summary>
+    /// Local feedback for trying the panel during a grid outage: dead-panel sound + error
+    /// notification pointing at the power station. Also tells the server (see
+    /// <see cref="OnDeadPanelUsedServer"/>). Called by <see cref="Interact"/> and by
+    /// <see cref="ElectricPanelDiegeticController"/> when a grid outage hits while the view is open.
+    /// </summary>
+    public void ShowDeadPanelFeedbackLocal()
+    {
+        if (_audioSource != null && _deadPanelSound != null)
+            _audioSource.PlayOneShot(_deadPanelSound);
+
+        if (!string.IsNullOrEmpty(_deadPanelMessage))
+            UIController.Instance?.ShowErrorNotification(_deadPanelMessage);
+
+        NotifyDeadPanelUsedServerRpc();
+    }
 
     /// <summary>World-space anchor tutorial arrows should point at — the top of the box.</summary>
     public Transform ArrowTarget => _arrowTarget != null ? _arrowTarget : transform;
@@ -264,6 +327,13 @@ public class ElectricPanelController : Interactable
         }
 
         _electricityController.PowerOn();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void NotifyDeadPanelUsedServerRpc()
+    {
+        if (!IsGridOutage) return;
+        OnDeadPanelUsedServer?.Invoke();
     }
 
     [ServerRpc(RequireOwnership = false)]

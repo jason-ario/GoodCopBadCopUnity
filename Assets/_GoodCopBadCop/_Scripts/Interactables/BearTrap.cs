@@ -401,8 +401,8 @@ public class BearTrap : PickableObject
         if (_trapAnimator != null)
             _trapAnimator.SetBool(_bearTrapSetBool, armed);
 
-        if (PlayerCollider != null) PlayerCollider.enabled = armed;
-        if (EnemyCollider != null) EnemyCollider.enabled = armed;
+        if (PlayerCollider != null) { PlayerCollider.isTrigger = true; PlayerCollider.enabled = armed; }
+        if (EnemyCollider != null) { EnemyCollider.isTrigger = true; EnemyCollider.enabled = armed; }
 
         interactText = armed ? ArmedInteractText : UnarmedInteractText;
     }

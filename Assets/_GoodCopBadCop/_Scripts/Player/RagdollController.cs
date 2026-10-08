@@ -12,6 +12,15 @@ public class RagdollController : MonoBehaviour
     [SerializeField] private Vector3 forceToApplyOnActivate;
     [SerializeField] private bool activateOnAwake = false;
 
+    [Header("Activation Stability")]
+    [Tooltip("Max speed (m/s) PhysX may use to push a ragdoll body out of geometry it overlaps when the ragdoll " +
+             "activates. Unity's default (10) violently launches limbs posed inside walls/desks (e.g. a mutant killed " +
+             "inside the booth) and can tunnel them through thin walls. Low values resolve overlaps gently.")]
+    [SerializeField, Min(0.01f)] private float maxDepenetrationVelocity = 1f;
+    [Tooltip("Switch ragdoll bodies to ContinuousSpeculative collision detection on activation so fast-moving limbs " +
+             "can't tunnel through thin walls.")]
+    [SerializeField] private bool continuousCollisionOnActivate = true;
+
     [Header("Death Visuals")]
     [SerializeField] private Transform headTransform;
     [SerializeField] private GameObject bodyArmsMesh;
@@ -158,6 +167,7 @@ public class RagdollController : MonoBehaviour
         if (_playerAnimationController != null)
             _playerAnimationController.SetActiveForRagdoll(false);
 
+        ApplyActivationStability();
         SetRagdollActive(true);
 
         // Zero inherited velocity from the CharacterController's positional delta,
@@ -172,6 +182,43 @@ public class RagdollController : MonoBehaviour
         // If already inside an underwater zone, apply buoyancy damping immediately
         if (_isUnderwater)
             ApplyUnderwaterPhysics(true);
+    }
+
+    /// <summary>
+    /// Caps depenetration speed and enables continuous collision on every ragdoll body, so limbs that
+    /// start overlapping world geometry (e.g. a corpse posed against booth walls) are eased out instead
+    /// of being launched through the wall.
+    /// </summary>
+    private void ApplyActivationStability()
+    {
+        foreach (var rb in ragdollRigidbodies)
+        {
+            if (rb == null) continue;
+            rb.maxDepenetrationVelocity = maxDepenetrationVelocity;
+            if (continuousCollisionOnActivate)
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        }
+    }
+
+    /// <summary>
+    /// Makes every collider on <paramref name="other"/> ignore this ragdoll's colliders (e.g. death gore
+    /// pieces spawned inside/around the body, which would otherwise shove the freshly activated ragdoll).
+    /// Must be called while the ragdoll colliders are enabled; the ignore resets if either side deactivates.
+    /// </summary>
+    public void IgnoreCollisionsWith(GameObject other)
+    {
+        if (other == null || ragdollColliders == null) return;
+
+        Collider[] otherColliders = other.GetComponentsInChildren<Collider>();
+        foreach (var ragdollCol in ragdollColliders)
+        {
+            if (ragdollCol == null || !ragdollCol.enabled || !ragdollCol.gameObject.activeInHierarchy) continue;
+            foreach (var otherCol in otherColliders)
+            {
+                if (otherCol == null || !otherCol.enabled) continue;
+                Physics.IgnoreCollision(ragdollCol, otherCol, true);
+            }
+        }
     }
 
     /// <summary>Enables or disables ragdoll physics, toggling the animator and rigidbody/collider states.</summary>

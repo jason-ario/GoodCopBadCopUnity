@@ -548,6 +548,7 @@ public class ExamNotebook : PickableObject
             pages[i] = page;
         }
 
+        ApplyPageRestScales();
         ExcludePageCollidersFromCache();
         InitializePageBehavior();
 
@@ -1339,12 +1340,42 @@ public class ExamNotebook : PickableObject
     {
         if (pageScaleReference == null) return;
 
-        Vector3 targetScale = pageScaleReference.lossyScale;
+        Vector3 targetScale = GetPageWorldScale();
         for (int i = 0; i < pages.Length; i++)
         {
             if (pages[i] == null || pages[i].isRippedOut) continue;
-            pages[i].transform.localScale = targetScale;
+            pages[i].SetRestScale(targetScale);
         }
+    }
+
+    /// <summary>
+    /// World scale a live (unparented) page must have to match the notebook. Corrected for an
+    /// in-flight placement punch on the notebook so a mid-punch value never becomes a page's
+    /// rest scale.
+    /// </summary>
+    private Vector3 GetPageWorldScale()
+    {
+        Vector3 scale = pageScaleReference.lossyScale;
+        Vector3 local = transform.localScale;
+        Vector3 rest = RestScale;
+        if (local.x > 1e-5f && local.y > 1e-5f && local.z > 1e-5f && rest != Vector3.zero)
+            scale = Vector3.Scale(scale, new Vector3(rest.x / local.x, rest.y / local.y, rest.z / local.z));
+        return scale;
+    }
+
+    /// <summary>
+    /// Gives every page — including ones already ripped out (late join, save restore) that
+    /// LateUpdate skips — the correct world scale as its rest scale. Page prefabs are authored
+    /// at notebook-child scale (~129), so without this a grab or placement punch snaps a
+    /// ripped page to that authored scale and it becomes giant.
+    /// </summary>
+    private void ApplyPageRestScales()
+    {
+        if (pageScaleReference == null || pages == null) return;
+
+        Vector3 targetScale = GetPageWorldScale();
+        foreach (ExamPage page in pages)
+            if (page != null) page.SetRestScale(targetScale);
     }
 
     /// <summary>

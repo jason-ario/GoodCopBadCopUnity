@@ -74,6 +74,15 @@ public class ElectricPanelDiegeticController : DiegeticViewController
 
     protected override void OnUpdate()
     {
+        // A grid outage started while the view was open (its OnPowerOff may still be waiting on
+        // the blackout wave). The panel can't restore this outage, so leave and say why.
+        if (_panelController != null && _panelController.IsGridOutage)
+        {
+            Close();
+            _panelController.ShowDeadPanelFeedbackLocal();
+            return;
+        }
+
         Camera cam = RaycastCamera;
         if (cam == null) return;
 
