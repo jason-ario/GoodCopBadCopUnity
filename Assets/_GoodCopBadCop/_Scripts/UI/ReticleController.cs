@@ -53,22 +53,24 @@ public class ReticleController : MonoBehaviour
     [SerializeField] private Sprite _gamepadHintSprite;
 
     [Header("Prompt Rows")]
-    [Tooltip("Row holding the key icon and label (the tap action). Cloned at runtime into a text-only \"Hold to …\" row stacked beneath it by the parent's VerticalLayoutGroup.")]
+    [Tooltip("Row holding the Interact key icon and label (the tap action). Cloned at runtime into a \"[LMB] {verb}\" use row and a text-only \"Hold to …\" row, stacked beneath it by the parent's VerticalLayoutGroup.")]
     [SerializeField] private GameObject _tapRow;
+
+    // Runtime-built "[LMB / RT] {verb}" row (clone of _tapRow): the held item's tool action on the target.
+    private GameObject _useRow;
+    private TextMeshProUGUI _useLabel;
+    private Image _useKeyImage;
 
     // Runtime-built text-only "Hold to {verb}" row (clone of _tapRow without the icon).
     private GameObject _holdRow;
     private TextMeshProUGUI _holdLabel;
 
     [Header("Use Held Item Icon")]
-    [Tooltip("Shown instead of the Interact icon when the held item can be used on the target (LMB). E.g. a trash bag over junk.")]
+    [Tooltip("Icon on the use row while keyboard/mouse is active (LMB): the held item's tool action on the target, e.g. a stamp over a folder.")]
     [SerializeField] private Sprite _useMouseSprite;
 
-    [Tooltip("Controller equivalent of the use icon (right trigger).")]
+    [Tooltip("Fallback controller icon on the use row (right trigger) when the icon database has no sprite for the current Use Item binding.")]
     [SerializeField] private Sprite _useGamepadSprite;
-
-    /// <summary>True while the key icon shows the use-held-item (LMB / RT) sprite instead of Interact.</summary>
-    private bool _showingUseIcon;
 
     [Header("Hold Ring")]
     [Tooltip("Radial-filled Image around the reticle that fills while the Interact key is held on an object with a hold action. Forced to Filled / Radial 360 from the top at runtime.")]
@@ -100,8 +102,53 @@ public class ReticleController : MonoBehaviour
             _holdRing.gameObject.SetActive(false);
         }
 
+        BuildUseRow();
         BuildHoldRow();
         SetPrompt(false, null);
+    }
+
+    /// <summary>
+    /// Clones <see cref="_tapRow"/> (icon kept) into a sibling "[LMB / RT] {verb}" row directly beneath
+    /// it, shown when the held item has a tool action on the target. Built before the hold row so the
+    /// stack order is: tap row, use row, hold row.
+    /// </summary>
+    private void BuildUseRow()
+    {
+        if (_tapRow == null || _hintLabel == null || _hintKeyImage == null) return;
+        if (_hintLabel.transform.parent != _tapRow.transform || !_hintKeyImage.transform.IsChildOf(_tapRow.transform))
+        {
+            Debug.LogWarning("[ReticleController] Hint label and key image must be inside the tap row.", this);
+            return;
+        }
+
+        string labelPath = GetRelativePath(_tapRow.transform, _hintLabel.transform);
+        string imagePath = GetRelativePath(_tapRow.transform, _hintKeyImage.transform);
+
+        _useRow = Instantiate(_tapRow, _tapRow.transform.parent);
+        _useRow.name = "Use Row";
+        _useRow.transform.SetSiblingIndex(_tapRow.transform.GetSiblingIndex() + 1);
+
+        Transform label = _useRow.transform.Find(labelPath);
+        Transform image = _useRow.transform.Find(imagePath);
+        _useLabel = label != null ? label.GetComponent<TextMeshProUGUI>() : null;
+        _useKeyImage = image != null ? image.GetComponent<Image>() : null;
+
+        if (label != null) label.gameObject.SetActive(true);
+        if (_hintKeyIcon != null)
+        {
+            Transform icon = _useRow.transform.Find(GetRelativePath(_tapRow.transform, _hintKeyIcon.transform));
+            if (icon != null) icon.gameObject.SetActive(true);
+        }
+
+        _useRow.SetActive(false);
+    }
+
+    private static string GetRelativePath(Transform root, Transform target)
+    {
+        string path = target.name;
+        for (Transform t = target.parent; t != null && t != root; t = t.parent)
+            path = t.name + "/" + path;
+        return path;
     }
 
     /// <summary>
@@ -123,7 +170,7 @@ public class ReticleController : MonoBehaviour
 
         _holdRow = Instantiate(_tapRow, _tapRow.transform.parent);
         _holdRow.name = "Hold Row";
-        _holdRow.transform.SetSiblingIndex(_tapRow.transform.GetSiblingIndex() + 1);
+        _holdRow.transform.SetSiblingIndex(_tapRow.transform.GetSiblingIndex() + (_useRow != null ? 2 : 1));
 
         Transform row = _holdRow.transform;
         Transform label = row.GetChild(labelIndex);
@@ -160,7 +207,7 @@ public class ReticleController : MonoBehaviour
 
     private void OnBindingChanged(GameAction action)
     {
-        if (action == GameAction.Interact) RefreshHintIcon();
+        if (action == GameAction.Interact || action == GameAction.UseItem) RefreshHintIcon();
     }
 
     void Update()
@@ -201,9 +248,9 @@ public class ReticleController : MonoBehaviour
     /// <param name="showButtonTooltip">Extra gate for the key icon; false hides it regardless of <paramref name="showKeyIcon"/>.</param>
     /// <param name="showHint">Also show <paramref name="text"/> next to the key icon.</param>
     /// <param name="holdVerb">Secondary hold action: a text-only "Hold to {holdVerb}" row beneath the tap row, or the tap row's label ("[E] Hold to {holdVerb}") when tapping does nothing.</param>
-    /// <param name="useItemIcon">Swap the key icon for the use-held-item icon (LMB / RT): the held item can be used on this target.</param>
-    /// <param name="actionVerb">Action name shown next to the icon ("Pick up", "Open", "Insert fuse"…).</param>
-    public void SetInteractState(bool state, string text = "", bool showKeyIcon = false, bool showButtonTooltip = true, bool showHint = false, string holdVerb = null, bool useItemIcon = false, string actionVerb = null)
+    /// <param name="useItemVerb">The held item's tool action on this target (LMB / RT), shown as its own "[LMB] {verb}" row beneath the tap row. Null hides the row.</param>
+    /// <param name="actionVerb">Action name shown next to the Interact key ("Pick up", "Open", "Insert fuse"…).</param>
+    public void SetInteractState(bool state, string text = "", bool showKeyIcon = false, bool showButtonTooltip = true, bool showHint = false, string holdVerb = null, string useItemVerb = null, string actionVerb = null)
     {
         canInteract = state;
         _holdOnTapRow = false;
@@ -219,36 +266,21 @@ public class ReticleController : MonoBehaviour
             return;
         }
 
-        if (useItemIcon)
-        {
-            SetUseIcon(true);
-            SetPrompt(true, actionVerb);
-            return;
-        }
-
-        SetUseIcon(false);
         bool keyVisible = showKeyIcon && showButtonTooltip;
         bool hasHold = !string.IsNullOrEmpty(holdVerb);
 
         if (!keyVisible)
         {
-            // Hold is the only action: one "[E] Hold to {verb}" row, so the key icon is still shown.
+            // Hold is the only Interact action: one "[E] Hold to {verb}" row, so the key icon is still shown.
             _holdOnTapRow = hasHold;
-            SetPrompt(hasHold, hasHold ? $"Hold to {holdVerb}" : null);
+            SetPrompt(hasHold, hasHold ? $"Hold to {holdVerb}" : null, useVerb: useItemVerb);
             return;
         }
 
         string tapLabel = showHint && !string.IsNullOrEmpty(text) ? text : actionVerb;
 
-        // "[E] {verb}" stacked above a text-only "Hold to {holdVerb}" row.
-        SetPrompt(true, tapLabel, holdVerb);
-    }
-
-    private void SetUseIcon(bool useIcon)
-    {
-        if (_showingUseIcon == useIcon) return;
-        _showingUseIcon = useIcon;
-        RefreshHintIcon();
+        // "[E] {verb}" above "[LMB] {useItemVerb}" above a text-only "Hold to {holdVerb}" row.
+        SetPrompt(true, tapLabel, holdVerb, useItemVerb);
     }
 
     /// <summary>
@@ -352,12 +384,25 @@ public class ReticleController : MonoBehaviour
     private void SetHintVisible(bool visible, string text = "") => SetPrompt(visible, visible ? text : null);
 
     /// <summary>
-    /// Shows/hides the tap row (key icon + label; null/empty label hides the label) and the
-    /// "Hold to {holdVerb}" row (null/empty holdVerb hides it).
+    /// Shows/hides the tap row (key icon + label; null/empty label hides the label), the
+    /// "[LMB] {useVerb}" row (null/empty useVerb hides it) and the "Hold to {holdVerb}" row
+    /// (null/empty holdVerb hides it).
     /// </summary>
-    private void SetPrompt(bool keyIconVisible, string label, string holdVerb = null)
+    private void SetPrompt(bool keyIconVisible, string label, string holdVerb = null, string useVerb = null)
     {
         bool labelVisible = !string.IsNullOrEmpty(label);
+
+        if (_useRow != null)
+        {
+            bool useVisible = !string.IsNullOrEmpty(useVerb);
+            if (useVisible && _useLabel != null && _useLabel.text != useVerb)
+                _useLabel.text = useVerb;
+            if (_useRow.activeSelf != useVisible)
+            {
+                _useRow.SetActive(useVisible);
+                if (useVisible) RefreshHintIcon();
+            }
+        }
 
         if (_hintLabel != null)
         {
@@ -407,13 +452,20 @@ public class ReticleController : MonoBehaviour
         if (interactIcon == null)
             interactIcon = ActiveInputDeviceTracker.IsGamepad ? _gamepadHintSprite : _keyboardHintSprite;
 
-        if (_hintKeyImage == null) return;
+        if (_hintKeyImage != null && interactIcon != null)
+            _hintKeyImage.sprite = interactIcon;
 
-        Sprite icon = _showingUseIcon
-            ? (ActiveInputDeviceTracker.IsGamepad ? _useGamepadSprite : _useMouseSprite)
-            : interactIcon;
-
-        if (icon != null)
-            _hintKeyImage.sprite = icon;
+        if (_useKeyImage != null)
+        {
+            Sprite useIcon = _useMouseSprite;
+            if (ActiveInputDeviceTracker.IsGamepad)
+            {
+                Sprite bound = _iconDatabase != null
+                    ? _iconDatabase.GetGamepadControlSprite(RebindableInput.GetGamepadBinding(GameAction.UseItem))
+                    : null;
+                useIcon = bound != null ? bound : _useGamepadSprite;
+            }
+            if (useIcon != null) _useKeyImage.sprite = useIcon;
+        }
     }
 }

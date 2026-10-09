@@ -66,7 +66,19 @@ public class SupplyBox : PickableObject
     {
         base.Awake();
 
-        
+        // The guidebook (and stow/hidden sync) hides the held box with SetActive(false). By
+        // default that resets the Animator to its entry state and default params, so the lid
+        // snapped shut while isOpen stayed true. Keep the animator state across disable.
+        if (_animator != null)
+            _animator.keepAnimatorStateOnDisable = true;
+    }
+
+    private void OnEnable()
+    {
+        // Safety net: re-apply the logical open state after any deactivate/reactivate so the
+        // visual lid can never drift from isOpen (no sound — this is a resync, not a toggle).
+        if (_animator != null && _animator.isActiveAndEnabled)
+            _animator.SetBool(BoxOpenHash, isOpen);
     }
 
     // ── Network Lifecycle ─────────────────────────────────────────────────────

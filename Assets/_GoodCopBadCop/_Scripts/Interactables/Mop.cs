@@ -247,6 +247,9 @@ public class Mop : PickableObject
     /// Activates the UsingTool animation and starts the overlap-sphere scrub loop.
     /// Only runs on the owning client.
     /// </summary>
+    /// <summary>LMB scrubs with the mop.</summary>
+    public override string GetHeldUseVerb() => "Mop";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

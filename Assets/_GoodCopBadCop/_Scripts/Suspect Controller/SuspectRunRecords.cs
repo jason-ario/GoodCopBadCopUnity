@@ -33,10 +33,30 @@ public class SuspectRunRecords : MonoBehaviour
 
     public static SuspectRunRecords Instance;
 
+    /// <summary>
+    /// Fired on a client after <see cref="ApplyQuarantineSnapshotFromServer"/> overwrites its local
+    /// quarantine state with the host's (late-join catch-up). <see cref="QuarantineBoardController"/>
+    /// listens to refresh its polaroids.
+    /// </summary>
+    public static event System.Action OnQuarantineSnapshotApplied;
+
+    // Late-join snapshot that arrived before this component's Start() built the records list.
+    private static string _pendingSnapshotNames;
+    private static int[]  _pendingSnapshotDays;
+
     private void Start()
     {
         Instance = this;
         InitializeRecordsForRun();
+
+        if (_pendingSnapshotDays != null)
+        {
+            string names = _pendingSnapshotNames;
+            int[]  days  = _pendingSnapshotDays;
+            _pendingSnapshotNames = null;
+            _pendingSnapshotDays  = null;
+            ApplyQuarantineSnapshot(names, days);
+        }
     }
 
     private void InitializeRecordsForRun()
@@ -130,6 +150,79 @@ public class SuspectRunRecords : MonoBehaviour
         record.hasEnteredCity = false;
         record.populationKillPending = false;
         record.quarantinedOnDay = quarantinedOnDay;
+    }
+
+    private const char SnapshotNameSeparator = '\n';
+
+    /// <summary>
+    /// SERVER: packs every currently-active quarantine as (asset name, quarantinedOnDay) so it can be
+    /// sent to a late-joining client. SuspectController.SyncQuarantineRecordClientRpc
+    /// is a one-shot broadcast, so a client that connects after the verdict never received it, and
+    /// its own records are built from its local save, which knows nothing about the host's run.
+    /// Names are newline-joined because NGO RPCs can't take string[] directly.
+    /// </summary>
+    public void BuildQuarantineSnapshot(int currentDay, out string names, out int[] quarantinedOnDays)
+    {
+        List<SuspectRecord> active = GetActiveQuarantineRecords(currentDay);
+        var nameList = new List<string>(active.Count);
+        var dayList  = new List<int>(active.Count);
+        foreach (SuspectRecord record in active)
+        {
+            if (record.SuspectData == null) continue;
+            nameList.Add(record.SuspectData.name);
+            dayList.Add(record.quarantinedOnDay);
+        }
+        names = string.Join(SnapshotNameSeparator.ToString(), nameList);
+        quarantinedOnDays = dayList.ToArray();
+    }
+
+    /// <summary>
+    /// CLIENT: replaces local quarantine state with the host's snapshot (see
+    /// <see cref="BuildQuarantineSnapshot"/>). Not persisted. Safe to call before this component's
+    /// Start(); the snapshot is queued and applied once the records list exists.
+    /// </summary>
+    public static void ApplyQuarantineSnapshotFromServer(string names, int[] quarantinedOnDays)
+    {
+        quarantinedOnDays ??= System.Array.Empty<int>();
+
+        if (Instance == null)
+        {
+            _pendingSnapshotNames = names;
+            _pendingSnapshotDays  = quarantinedOnDays;
+            return;
+        }
+
+        Instance.ApplyQuarantineSnapshot(names, quarantinedOnDays);
+    }
+
+    private void ApplyQuarantineSnapshot(string names, int[] quarantinedOnDays)
+    {
+        // The host is authoritative: drop anything the client's own save claimed was quarantined.
+        foreach (SuspectRecord record in records)
+        {
+            if (record != null) record.quarantinedOnDay = -1;
+        }
+
+        string[] nameArray = string.IsNullOrEmpty(names)
+            ? System.Array.Empty<string>()
+            : names.Split(SnapshotNameSeparator);
+
+        int applied = 0;
+        int count = Mathf.Min(nameArray.Length, quarantinedOnDays.Length);
+        for (int i = 0; i < count; i++)
+        {
+            SuspectRecord record = GetRecordByName(nameArray[i]);
+            if (record == null) continue;
+
+            record.quarantinedOnDay      = quarantinedOnDays[i];
+            record.isKilled              = false; // host only sends living quarantined suspects
+            record.hasEnteredCity        = false;
+            record.populationKillPending = false;
+            applied++;
+        }
+
+        Debug.Log($"[SuspectRunRecords] Applied host quarantine snapshot: {applied}/{count} record(s).");
+        OnQuarantineSnapshotApplied?.Invoke();
     }
 
     public int GetActiveQuarantineCount(int currentDay)

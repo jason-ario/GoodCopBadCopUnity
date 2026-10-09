@@ -29,6 +29,9 @@ public class Thermometer : PickableObject
         internalBattery = GetComponent<InternalBattery>();
     }
 
+    /// <summary>LMB (held) takes a temperature reading.</summary>
+    public override string GetHeldUseVerb() => "Take temperature";
+
     public override void OnStartUse()
     {
         isUsing = true;

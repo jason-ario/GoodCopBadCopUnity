@@ -109,6 +109,9 @@ public class HeartRateScanner : PickableObject
             Destroy(waveformTexture);
     }
 
+    /// <summary>LMB (held) scans a heart rate. Inherited by Scanner.</summary>
+    public override string GetHeldUseVerb() => "Scan";
+
     public override void OnStartUse()
     {
         isUsing = true;

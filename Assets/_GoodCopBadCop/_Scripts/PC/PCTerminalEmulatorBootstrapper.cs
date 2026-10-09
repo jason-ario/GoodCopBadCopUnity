@@ -44,7 +44,7 @@ public class PCTerminalEmulatorBootstrapper : MonoBehaviour
         if (pc == null || GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard)
             return;
 
-        if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
+        if (GoodCopBadCop.Input.RebindableInput.GetKeyDown(GoodCopBadCop.Input.GameAction.Interact) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
             OpenTerminal();
 
         if (Input.GetKeyDown(KeyCode.Alpha1)) pc.OpenResidents();

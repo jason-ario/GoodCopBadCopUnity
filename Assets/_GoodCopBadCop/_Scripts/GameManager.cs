@@ -356,7 +356,17 @@ public class GameManager : NetworkBehaviour
         bool nightPhaseActive = BetweenShiftTaskManager.Instance != null
             && BetweenShiftTaskManager.Instance.IsNightPhaseActive;
 
-        InitializeLateJoinClientRpc(nightPhaseActive, rpcParams);
+        // Quarantine verdicts reach clients only via a one-shot ClientRpc at verdict time, so a
+        // late joiner's Quarantine Board would stay empty. Send the host's active quarantines.
+        string quarantineNames = string.Empty;
+        int[] quarantineDays = System.Array.Empty<int>();
+        if (SuspectRunRecords.Instance != null && CampaignManager.Instance != null)
+        {
+            SuspectRunRecords.Instance.BuildQuarantineSnapshot(
+                CampaignManager.Instance.CurrentDay, out quarantineNames, out quarantineDays);
+        }
+
+        InitializeLateJoinClientRpc(nightPhaseActive, quarantineNames, quarantineDays, rpcParams);
     }
 
     /// <summary>
@@ -436,8 +446,13 @@ public class GameManager : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void InitializeLateJoinClientRpc(bool nightPhaseActive, ClientRpcParams clientRpcParams = default)
+    private void InitializeLateJoinClientRpc(bool nightPhaseActive, string quarantineNames, int[] quarantineDays,
+        ClientRpcParams clientRpcParams = default)
     {
+        // Apply before StartCampaign so the OnDayChanged board refresh already sees the host's state.
+        if (!IsServer)
+            SuspectRunRecords.ApplyQuarantineSnapshotFromServer(quarantineNames, quarantineDays);
+
         ShiftManager.Instance.StopIntroCutscene();
         UIController.Instance.ShowPlayerUI();
         MainMenuController.Instance.TransitionToGameplay();

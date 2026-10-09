@@ -109,6 +109,9 @@ public class HammerPickable : PickableObject
     /// input if pressed within the buffer window before the cooldown ends.
     /// Only runs on the owning client.
     /// </summary>
+    /// <summary>LMB swings the hammer.</summary>
+    public override string GetHeldUseVerb() => "Swing";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

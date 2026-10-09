@@ -16,6 +16,9 @@ public class TaskPageDiegeticController : DiegeticViewController
 
     private bool _viewedOnce;
 
+    // Look-only view: LMB does nothing here, so no LMB prompt.
+    protected override string ActionPromptText => null;
+
     protected override void OnOpened()
     {
         if (_viewedOnce) return;

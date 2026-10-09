@@ -528,9 +528,18 @@ public class FolderController : PickableObject
 
     public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item)
     {
-        string itemName = item != null && item.ItemData != null ? item.ItemData.name : null;
-        if (itemName != null && itemName.StartsWith("Stamp_")) return "Stamp";
+        if (IsStampItem(item)) return "Stamp";
         return "Add to folder";
+    }
+
+    /// <summary>Stamping is the stamp's tool function (LMB / RT); adding a document is a world interaction (E).</summary>
+    public override HeldItemTargetKey GetItemTargetKey(PlayerInteractionController player, PickableObject item)
+        => IsStampItem(item) ? HeldItemTargetKey.UseItem : HeldItemTargetKey.Interact;
+
+    private static bool IsStampItem(PickableObject item)
+    {
+        string itemName = item != null && item.ItemData != null ? item.ItemData.name : null;
+        return itemName != null && itemName.StartsWith("Stamp_");
     }
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject heldItem)
@@ -1106,6 +1115,9 @@ public class FolderController : PickableObject
             HandOffPoint.TryHandOffRestingFolder(this);
         }
     }
+
+    /// <summary>LMB toggles the folder open or closed.</summary>
+    public override string GetHeldUseVerb() => isOpen.Value ? "Close" : "Open";
 
     public override void OnStartUse()
     {

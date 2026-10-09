@@ -89,6 +89,9 @@ public class Shovel : PickableObject
     // ── PickableObject overrides ───────────────────────────────────────────────
 
     /// <summary>Starts the attack sequence when the player uses the shovel.</summary>
+    /// <summary>LMB swings the shovel.</summary>
+    public override string GetHeldUseVerb() => "Swing";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

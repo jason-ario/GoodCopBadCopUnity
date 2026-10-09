@@ -149,6 +149,27 @@ public class SuspectWorldDialogue : MonoBehaviour
 
     public bool InConversation => _inConversation;
 
+    /// <summary>
+    /// Local-only. True while the local player is in (or waiting to join) any world-dialogue
+    /// conversation. While true, this conversation owns the player's dialogue lock, cursor and
+    /// Interact/Back input — other systems (e.g. an unlocked megaphone sequence in
+    /// <see cref="ScriptedDialogueRunner"/>) must not consume that input or restore gameplay
+    /// control underneath it.
+    /// </summary>
+    public static bool IsLocalPlayerInConversation
+    {
+        get
+        {
+            for (int i = 0; i < _instances.Count; i++)
+            {
+                SuspectWorldDialogue dialogue = _instances[i];
+                if (dialogue != null && (dialogue._inConversation || dialogue._awaitingEngagementResponse))
+                    return true;
+            }
+            return false;
+        }
+    }
+
     private void Awake()
     {
         if (startSitting && animator != null)
@@ -292,13 +313,17 @@ public class SuspectWorldDialogue : MonoBehaviour
     /// the authoritative sequence on the server (greeting, then options/response looping until
     /// every participant leaves), later joiners are folded into the existing one (see
     /// <see cref="SpeakingInteraction.RequestBeginEngagement"/>). Safe to call repeatedly —
-    /// ignored while already in conversation or while the NPC is mid-line.
+    /// ignored while already in conversation or while a join request is in flight.
     /// </summary>
     public void BeginConversation()
     {
         if (_inConversation || _awaitingEngagementResponse) return;
         if (IsVerdictClosed()) return;
-        if (DialogueManager.Instance != null && DialogueManager.Instance.IsSpeaking) return;
+        // Intentionally NOT gated on DialogueManager.IsSpeaking: that flag is global and stays
+        // true for any voice audio (ambient barks, entry lines, a line still finishing after the
+        // player backed out), which silently swallowed the Interact press and made players press
+        // twice. The greeting's PlayDialogueAudio already stops any in-flight voice audio, and
+        // immediate re-entry after exiting is covered by SuspectCharacter's dialogue block window.
         if (speaking == null) return;
 
         // Local pre-check only, so a misconfigured NPC (no options authored) never locks the
@@ -625,7 +650,7 @@ public class SuspectWorldDialogue : MonoBehaviour
         if (_state != ConversationState.WaitingForAdvance) return;
         if (DialogueManager.Instance == null) return;
 
-        bool pressedAdvance = Input.GetKeyDown(KeyCode.E)
+        bool pressedAdvance = GoodCopBadCop.Input.RebindableInput.GetKeyDown(GoodCopBadCop.Input.GameAction.Interact)
                                || (Input.GetMouseButtonDown(0) && !IsPointerOverInteractableUI())
                                || AnyGamepadAdvanceButtonThisFrame();
         if (!pressedAdvance) return;

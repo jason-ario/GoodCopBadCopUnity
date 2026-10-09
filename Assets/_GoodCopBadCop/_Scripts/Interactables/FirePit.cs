@@ -148,6 +148,10 @@ public class FirePit : Interactable, IIgnitable
 
     public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Light";
 
+    /// <summary>Striking a match is the item's tool function, so lighting stays on LMB / RT.</summary>
+    public override HeldItemTargetKey GetItemTargetKey(PlayerInteractionController player, PickableObject item)
+        => HeldItemTargetKey.UseItem;
+
     /// <summary>Interact does nothing on the fire pit — it's lit with a held match (LMB / RT).</summary>
     public override bool ShowsInteractPrompt(PlayerInteractionController player) => false;
 

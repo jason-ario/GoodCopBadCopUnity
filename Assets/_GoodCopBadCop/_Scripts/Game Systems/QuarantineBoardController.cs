@@ -10,6 +10,7 @@ using UnityEngine;
 ///   - Start (covers initial load / save restore)
 ///   - CampaignManager.OnDayChanged  (day advance reduces remaining time; removes expired entries)
 ///   - SuspectController.OnSuspectQuarantined  (new entry right after the verdict is committed)
+///   - SuspectRunRecords.OnQuarantineSnapshotApplied  (late-joining client received host state)
 /// </summary>
 public class QuarantineBoardController : MonoBehaviour
 {
@@ -47,12 +48,14 @@ public class QuarantineBoardController : MonoBehaviour
     {
         CampaignManager.OnDayChanged              += OnDayChanged;
         SuspectController.OnSuspectQuarantined    += RefreshBoard;
+        SuspectRunRecords.OnQuarantineSnapshotApplied += RefreshBoard;
     }
 
     private void OnDisable()
     {
         CampaignManager.OnDayChanged              -= OnDayChanged;
         SuspectController.OnSuspectQuarantined    -= RefreshBoard;
+        SuspectRunRecords.OnQuarantineSnapshotApplied -= RefreshBoard;
     }
 
     private void Start()

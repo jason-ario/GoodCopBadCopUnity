@@ -203,6 +203,9 @@ public class BackpackPickable : PickableObject
     }
 
     /// <summary>LMB while held → equip backpack to player's back.</summary>
+    /// <summary>LMB puts the backpack on.</summary>
+    public override string GetHeldUseVerb() => "Put on";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

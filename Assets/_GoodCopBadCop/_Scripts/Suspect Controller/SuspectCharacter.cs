@@ -1733,9 +1733,16 @@ public class SuspectCharacter : Interactable
         base.Highlight(highlight);
     }
 
-    /// <summary>A collectible body is junk: no Interact-key prompt (collected with LMB / RT + trash bag).</summary>
+    /// <summary>A collectible body is junk: Interact-key prompt only while holding a trash bag (E bags it).</summary>
     public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
-        _junkItem == null || !_junkItem.IsCollectible.Value;
+        IsJunkCollectible ? _junkItem.ShowsInteractPrompt(player) : true;
+
+    /// <summary>
+    /// Bagging a body is a world interaction (E, like any junk). Vaccinating / shooting a living
+    /// suspect is the item's tool function (LMB / RT).
+    /// </summary>
+    public override HeldItemTargetKey GetItemTargetKey(PlayerInteractionController player, PickableObject item) =>
+        IsJunkCollectible ? HeldItemTargetKey.Interact : HeldItemTargetKey.UseItem;
 
     protected override string DefaultInteractVerb => "Talk";
 
@@ -1749,10 +1756,13 @@ public class SuspectCharacter : Interactable
 
     public override void Interact(PlayerInteractionController player)
     {
-        // A collectible body is junk — collecting it is item-on-target use (LMB / RT with a trash
-        // bag, routed through InteractWithItem). The Interact key does nothing here.
+        // A collectible body is junk — the Interact key bags it when holding a trash bag (the
+        // controller normally routes that press to InteractWithItem); otherwise it does nothing.
         if (_junkItem != null && _junkItem.IsCollectible.Value)
+        {
+            _junkItem.Interact(player);
             return;
+        }
 
         // Hard-locked suspects (e.g. Day 1 tutorial Vlad) ignore every direct interaction path.
         if (_interactionLocked.Value)

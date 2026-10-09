@@ -48,6 +48,16 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// </summary>
     public static DiegeticViewController Current { get; private set; }
 
+    // Domain reload is disabled for Play Mode, so statics survive between sessions. Without this,
+    // exiting Play while a view was open would leave IsAnyViewActive stuck true next session and
+    // block every interactable that checks it.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        IsAnyViewActive = false;
+        Current = null;
+    }
+
     /// <summary>The interaction controller of the player who opened this view.</summary>
     protected PlayerInteractionController Player { get; private set; }
 
@@ -149,6 +159,11 @@ public abstract class DiegeticViewController : MonoBehaviour
         }
 
         OnOpened();
+
+        // "[LMB / RT] {text}" prompt (lives outside the Player HUD, which is hidden above).
+        string prompt = ActionPromptText;
+        if (!string.IsNullOrEmpty(prompt))
+            DiegeticActionPrompt.Show(prompt);
     }
 
     /// <summary>
@@ -165,6 +180,8 @@ public abstract class DiegeticViewController : MonoBehaviour
 
         // Give subclass a chance to clean up while Player is still valid.
         OnClosed();
+
+        DiegeticActionPrompt.Hide();
 
         if (_viewCamera != null)
         {
@@ -317,6 +334,13 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// and restored on close. Views that must not affect scene lighting (held item zoom) return false.
     /// </summary>
     protected virtual bool ForcePlayerLightOn => true;
+
+    /// <summary>
+    /// Text shown next to the LMB / RT icon (<see cref="DiegeticActionPrompt"/>) while this view is open,
+    /// e.g. "to interact". Return null for look-only views where LMB does nothing.
+    /// Read once inside <see cref="Open"/>; the prompt is hidden on <see cref="Close"/>.
+    /// </summary>
+    protected virtual string ActionPromptText => "to interact";
 
     /// <summary>
     /// Called when the player presses the exit key. Defaults to <see cref="Close"/>.

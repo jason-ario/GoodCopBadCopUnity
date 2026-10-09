@@ -1,11 +1,13 @@
 using System;
-using System.Collections;
 using DG.Tweening;
-using GoodCopBadCop.Input;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
+/// <summary>
+/// Booth drawer. Tap Interact (E / gamepad West) to open, tap again to close.
+/// The local client predicts the slide immediately; the server owns the authoritative open state
+/// and every other client tweens to it when it changes.
+/// </summary>
 public class Drawer : Interactable
 {
     [SerializeField] private AudioSource audioSource;
@@ -32,28 +34,12 @@ public class Drawer : Interactable
     [Tooltip("Local position of the drawer mesh when fully open.")]
     [SerializeField] private Vector3 _openPos = new Vector3(0.001f, 0f, 0.357f);
 
-    [Header("IK")]
-    [Tooltip("Child Transform the right-arm IK anchors to while the player holds the drawer.")]
-    [SerializeField] private Transform _rightIkTarget;
+    [Header("Slide")]
+    [Tooltip("Seconds the drawer takes to slide fully open or closed after a tap.")]
+    [SerializeField] private float _slideDuration = 0.35f;
 
-    [Tooltip("Child Transform the left-arm IK anchors to while the player holds the drawer.")]
-    [SerializeField] private Transform _leftIkTarget;
-
-    [Header("Drag")]
-    [Tooltip("Drag speed magnitude. The drag direction is computed automatically from the camera angle relative to the drawer's slide axis — sign is ignored.")]
-    [SerializeField] private float _dragSensitivity = 0.01f;
-
-    [Tooltip("Units per second the drawer travels at full right-stick deflection (controller only).")]
-    [SerializeField] private float _controllerDragSpeed = 1.5f;
-
-    [Tooltip("Duration of the smooth lerp when remote clients receive a state change.")]
-    [SerializeField] private float _snapDuration = 0.2f;
-
-    private const string RightGripBool = "RightGrip";
-    private const string LeftGripBool  = "LeftGrip";
-
-    /// <summary>How often (in seconds) the dragging client pushes its position to the server.</summary>
-    private const float DragSyncInterval = 0.05f; // ~20 Hz
+    [Tooltip("Easing applied to the open/close slide.")]
+    [SerializeField] private Ease _slideEase = Ease.OutCubic;
 
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(
         false,
@@ -67,39 +53,22 @@ public class Drawer : Interactable
         NetworkVariableWritePermission.Server
     );
 
-    /// <summary>Continuous drawer position shared across the network (0 = closed, 1 = open).</summary>
-    private NetworkVariable<float> _networkDragT = new NetworkVariable<float>(
-        0f,
-        NetworkVariableReadPermission.Everyone,
-        NetworkVariableWritePermission.Server
-    );
+    /// <summary>State the mesh is currently heading to on this client (may lead the network value while a local tap is in flight).</summary>
+    private bool _targetOpen;
 
-    /// <summary>Normalised drawer travel: 0 = closed, 1 = fully open.</summary>
-    private float _dragT = 0f;
+    /// <summary>True while the slide tween is moving the mesh.</summary>
+    private bool _isSnapping;
 
-    private float _lastDragSyncTime = -1f;
-    private bool _inControl = false;
-    private bool _usingRightArm = false;
-    private PlayerInteractionController _currentPlayer;
-    private Coroutine _exitCoroutine;
+    private Tween _slideTween;
 
     /// <summary>Normalised drawer position sampled on the previous frame, used to derive travel speed for movement audio. Negative = uninitialised.</summary>
     private float _previousMeshDragT = -1f;
 
-    /// <summary>Edge-trigger guards so the open/close sound plays once per arrival at an end, not every frame it's held there.</summary>
-    private bool _hasPlayedOpenEndSound = false;
-    private bool _hasPlayedClosedEndSound = false;
+    /// <summary>Edge-trigger guards so the open/close sound plays once per arrival at an end.</summary>
+    private bool _hasPlayedOpenEndSound;
+    private bool _hasPlayedClosedEndSound;
 
-    /// <summary>True while a non-local client is actively receiving live drag updates from the network (i.e. someone else is dragging it right now).</summary>
-    private float _lastRemoteDragSyncTime = -1f;
-    private const float RemoteDragSyncActiveWindow = 0.15f; // Slightly wider than DragSyncInterval so brief gaps between syncs don't cut the loop.
-
-    /// <summary>True while the commit snap-tween (DOTween) is actively moving the mesh to its final open/closed position.</summary>
-    private bool _isSnapping = false;
-
-    /// <summary>
-    /// Fired locally whenever this drawer transitions to open.
-    /// </summary>
+    /// <summary>Fired locally whenever this drawer transitions to open.</summary>
     public event Action OnOpened;
 
     // ── Locking ──────────────────────────────────────────────────────────────
@@ -125,10 +94,8 @@ public class Drawer : Interactable
         if (animator != null)
             animator.enabled = false;
 
-        // Drawer audio plays on every client (it's driven by the synced mesh motion), so the
-        // sources must be fully 3D — a 2D source (spatialBlend 0) ignores distance and was
-        // audible map-wide when a teammate used a drawer. Enforced here so prefab/scene
-        // overrides can't regress it.
+        // Drawer audio plays on every client (driven by the synced mesh motion), so the
+        // sources must be fully 3D — a 2D source would be audible map-wide.
         ForceSpatial(audioSource);
         ForceSpatial(_movementAudioSource);
     }
@@ -142,62 +109,37 @@ public class Drawer : Interactable
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        isOpen.OnValueChanged      += OnDrawerStateChanged;
-        _isLocked.OnValueChanged   += OnLockedChanged;
-        _networkDragT.OnValueChanged += OnNetworkDragTChanged;
+        isOpen.OnValueChanged += OnDrawerStateChanged;
 
-        // Use the continuous position if available, otherwise fall back to binary state.
+        // Late-join / initial state: place instantly, no audio.
+        _targetOpen = isOpen.Value;
         if (_drawerMesh != null)
-            _drawerMesh.localPosition = Vector3.Lerp(_closedPos, _openPos, _networkDragT.Value);
-        else
-            SnapDrawerMeshToState(isOpen.Value);
+            _drawerMesh.localPosition = _targetOpen ? _openPos : _closedPos;
     }
 
     public override void OnNetworkDespawn()
     {
-        isOpen.OnValueChanged      -= OnDrawerStateChanged;
-        _isLocked.OnValueChanged   -= OnLockedChanged;
-        _networkDragT.OnValueChanged -= OnNetworkDragTChanged;
+        isOpen.OnValueChanged -= OnDrawerStateChanged;
+        _slideTween?.Kill();
+        _isSnapping = false;
 
         if (_movementAudioSource != null)
             _movementAudioSource.Stop();
+
+        base.OnNetworkDespawn();
     }
-
-    // Interact key (E / ButtonWest) starts the grab (see Interact) and must stay held to keep it.
-    // LMB / RT is reserved for held-item use, so it plays no part here.
-    private bool GrabHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || RebindableInput.GetGamepadHeld(GameAction.Interact);
-
-    // ── Input loop ────────────────────────────────────────────────────────────
 
     private void Update()
     {
-        // Only evaluate movement audio while the drawer is actually being manipulated —
-        // local drag, a remote player's live drag sync, or the post-commit snap tween.
-        // This avoids false triggers from one-off repositioning (e.g. initial network spawn sync).
-        if (_inControl || _isSnapping || IsRemoteDragActive())
-            UpdateMovementAudio();
-        else
-            StopMovementLoop();
-
-        if (!_inControl) return;
-        if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
-
-        // Do not let a drag interaction restore state while the pause menu still owns it.
-        // Once unpaused, the current held-state check below also recovers a release that was
-        // consumed while paused or while the application was unfocused.
-        if (UIController.Instance != null && UIController.Instance.IsPaused) return;
-
-        if (!GrabHeld)
+        if (_isSnapping)
         {
-            CommitDrawer();
-            _exitCoroutine = StartCoroutine(ExitDrawerInteraction());
-            return;
+            UpdateMovementAudio();
         }
-
-        // Held → scrub drawer position.
-        _dragT = Mathf.Clamp01(_dragT + ComputeDragDelta());
-        ApplyDragPosition();
-        SyncDragTIfNeeded();
+        else
+        {
+            StopMovementLoop();
+            _previousMeshDragT = -1f;
+        }
     }
 
     // ── Interaction ───────────────────────────────────────────────────────────
@@ -205,224 +147,83 @@ public class Drawer : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return isOpen.Value ? "Close" : "Open";
+        return _targetOpen ? "Close" : "Open";
     }
 
-    /// <summary>
-    /// Interact key press grabs the drawer; the drag loop in Update releases it when the key is let go.
-    /// </summary>
+    /// <summary>Tap Interact toggles the drawer open/closed.</summary>
     public override void Interact(PlayerInteractionController player)
     {
         if (_isLocked.Value) return;
         base.Interact(player);
-        if (_inControl) return;
 
-        // Kill any in-progress exit coroutine before it can clean up our new interaction.
-        if (_exitCoroutine != null)
-        {
-            StopCoroutine(_exitCoroutine);
-            _exitCoroutine = null;
-        }
+        bool newOpen = !_targetOpen;
 
-        PlayerAnimationController anim     = player.playerAnimationController;
-        PlayerPickupController    pickup   = player.GetComponent<PlayerPickupController>();
-
-        // Right arm is busy if it's IK-active OR if the hand is physically holding an item
-        // (some items occupy the hand without driving the IK rig).
-        bool rightArmBusy = anim.RightArmRig.weight > 0.5f || (pickup != null && pickup.HeldObject != null);
-        bool leftArmBusy  = anim.LeftArmRig.weight  > 0.5f;
-
-        if (rightArmBusy && leftArmBusy) return; // both arms in active use
-
-        _usingRightArm = leftArmBusy; // prefer left, fall back to right
-
-        // Seed _dragT from the actual current mesh position so the next grab
-        // starts from wherever the drawer was left, not from a binary open/closed state.
-        _dragT = _drawerMesh != null
-            ? Mathf.InverseLerp(_closedPos.z, _openPos.z, _drawerMesh.localPosition.z)
-            : (isOpen.Value ? 1f : 0f);
-        _currentPlayer = player;
-        _inControl = true;
-
-        player.playerMovementController.SetMovementLocked(true);
-
-        if (_usingRightArm)
-        {
-            if (_rightIkTarget != null)
-            {
-                anim.RightArmIKTarget       = _rightIkTarget;
-                anim.CamRightArmRigIKTarget = _rightIkTarget;
-            }
-            anim.SetAnimBool(RightGripBool, true);
-            anim.EnableRightArmMask();
-            anim.SetRightArmRigWeightSmooth(1f, 0.2f);
-        }
-        else
-        {
-            if (_leftIkTarget != null)
-            {
-                anim.LeftArmIKTarget        = _leftIkTarget;
-                anim.CamLeftArmRigIKTarget  = _leftIkTarget;
-            }
-            anim.SetAnimBool(LeftGripBool, true);
-            anim.EnableLeftArmMask();
-            anim.SetLeftArmRigWeightSmooth(1f, 0.2f);
-        }
+        // Predict locally so the slide starts on the press frame, then let the server confirm.
+        SlideTo(newOpen);
+        SetDrawerServerRpc(newOpen);
     }
 
-    private IEnumerator ExitDrawerInteraction()
+    [ServerRpc(RequireOwnership = false)]
+    private void SetDrawerServerRpc(bool open)
     {
-        // Capture and clear state synchronously before any yield so the Update
-        // guard (_inControl) disables input on the very next frame.
-        PlayerInteractionController player = _currentPlayer;
-        _currentPlayer = null;
-        _inControl = false;
+        if (_isLocked.Value) return;
+        isOpen.Value = open;
+    }
 
-        if (player == null) yield break;
-
-        PlayerMovementController movement = player.playerMovementController;
-        PlayerAnimationController anim    = player.playerAnimationController;
-
-        if (_usingRightArm)
-            anim.SetRightArmRigWeightSmooth(0f, 0.2f);
-        else
-            anim.SetLeftArmRigWeightSmooth(0f, 0.2f);
-
-        // Wait for the IK weight to finish ramping down before releasing the mask.
-        yield return new WaitForSeconds(0.25f);
-
-        if (_usingRightArm)
-        {
-            anim.RightArmIKTarget       = null;
-            anim.CamRightArmRigIKTarget = null;
-            anim.SetAnimBool(RightGripBool, false);
-            anim.SetRightArmRigWeightSmooth(0f, 0.2f);
-            anim.DisableRightArmMask();
-        }
-        else
-        {
-            anim.LeftArmIKTarget       = null;
-            anim.CamLeftArmRigIKTarget = null;
-            anim.SetAnimBool(LeftGripBool, false);
-            anim.SetLeftArmRigWeightSmooth(0f, 0.2f);
-            anim.DisableLeftArmMask();
-        }
-
-        movement.SetMovementLocked(false);
-        _exitCoroutine = null;
+    private void OnDrawerStateChanged(bool oldValue, bool newValue)
+    {
+        SlideTo(newValue);
+        if (newValue) OnOpened?.Invoke();
     }
 
     // ── Drawer position ───────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Commits the open/closed network state based on which side of the midpoint
-    /// the drawer was released on. The mesh is NOT snapped — it stays at the
-    /// current drag position.
-    /// </summary>
-    private void CommitDrawer()
+    private void SlideTo(bool open)
     {
-        bool newIsOpen = _dragT >= 0.5f;
-
-        if (newIsOpen != isOpen.Value)
+        if (_drawerMesh == null)
         {
-            if (newIsOpen) OnOpened?.Invoke();
-            SetDrawerServerRpc(newIsOpen, NetworkManager.Singleton.LocalClientId);
-        }
-    }
-
-    /// <summary>
-    /// Returns the _dragT delta for this frame based on mouse input and the camera's
-    /// current angle relative to the drawer's slide axis.
-    /// - Facing front (slide axis into screen): Mouse Y drives the drag — dragging down opens.
-    /// - Facing from the side (slide axis horizontal on screen): mouse is projected onto
-    ///   the drawer's screen-space direction.
-    /// - Intermediate angles blend smoothly between both.
-    /// </summary>
-    private float ComputeDragDelta()
-    {
-        if (_currentPlayer == null || _drawerMesh == null) return 0f;
-
-        Transform cam = _currentPlayer.playerMovementController.CameraTransform;
-
-        // World-space direction the drawer travels when opening.
-        Transform parent = _drawerMesh.parent;
-        Vector3 slideDir = parent != null
-            ? parent.TransformDirection((_openPos - _closedPos).normalized)
-            : (_openPos - _closedPos).normalized;
-
-        // Project the slide direction onto the camera's screen plane.
-        float screenX  = Vector3.Dot(slideDir, cam.right);
-        float screenY  = Vector3.Dot(slideDir, cam.up);
-        var   screen2D = new Vector2(screenX, screenY);
-        float screenLen = screen2D.magnitude;
-
-        float mouseX = Input.GetAxis("Mouse X");
-        float mouseY = Input.GetAxis("Mouse Y");
-
-        // Controller fallback: inject right stick into the projection math.
-        // Scale so that full deflection produces _controllerDragSpeed units/sec of _dragT travel.
-        if (Mathf.Abs(mouseX) < 0.001f && Mathf.Abs(mouseY) < 0.001f && Gamepad.current != null)
-        {
-            Vector2 stick = Gamepad.current.rightStick.ReadValue();
-            if (stick.sqrMagnitude > 0.001f)
-            {
-                // Divide out _dragSensitivity so the scale cancels when it's applied below.
-                float scale = _controllerDragSpeed * Time.deltaTime / Mathf.Max(Mathf.Abs(_dragSensitivity), 0.0001f);
-                mouseX = stick.x * scale;
-                mouseY = stick.y * scale;
-            }
+            _targetOpen = open;
+            return;
         }
 
-        // Planar delta: how much mouse movement aligns with the drawer's screen-space direction.
-        float planarDelta = screenLen > 0.01f
-            ? Vector2.Dot(screen2D.normalized, new Vector2(mouseX, mouseY))
-            : 0f;
+        // Already heading there (e.g. our own predicted tap being confirmed by the server).
+        if (_targetOpen == open && (_isSnapping || _drawerMesh.localPosition == (open ? _openPos : _closedPos)))
+            return;
 
-        // Depth fallback: when the drawer slides into/out of screen (front-facing), drag down = open.
-        float depthDelta = -mouseY;
-
-        // Blend: depth dominates when facing front (screenLen ≈ 0),
-        //        planar dominates when facing from the side (screenLen ≈ 1).
-        return Mathf.Lerp(depthDelta, planarDelta, screenLen) * Mathf.Abs(_dragSensitivity);
-    }
-
-    private void ApplyDragPosition()
-    {
-        if (_drawerMesh == null) return;
-        _drawerMesh.localPosition = Vector3.Lerp(_closedPos, _openPos, _dragT);
-    }
-
-    private void SnapDrawerMeshToState(bool open, float duration = 0f)
-    {
-        if (_drawerMesh == null) return;
+        _targetOpen = open;
         Vector3 target = open ? _openPos : _closedPos;
-        if (duration <= 0f)
+
+        // Scale duration by remaining distance so a mid-slide reversal doesn't feel sluggish.
+        float total = Vector3.Distance(_closedPos, _openPos);
+        float remaining = Vector3.Distance(_drawerMesh.localPosition, target);
+        float duration = total > 0.0001f ? _slideDuration * (remaining / total) : 0f;
+
+        _slideTween?.Kill();
+
+        if (duration <= 0.001f)
         {
-            // Instant reposition (e.g. initial network spawn / late-join catch-up) — not player-driven, no movement audio.
             _drawerMesh.localPosition = target;
+            _isSnapping = false;
+            return;
         }
-        else
-        {
-            _isSnapping = true;
-            _drawerMesh.DOLocalMove(target, duration)
-                .SetEase(Ease.OutCubic)
-                .OnComplete(() => _isSnapping = false);
-        }
+
+        _isSnapping = true;
+        _slideTween = _drawerMesh.DOLocalMove(target, duration)
+            .SetEase(_slideEase)
+            .OnComplete(() =>
+            {
+                // Evaluate audio once at the end so the open/close stinger fires on arrival.
+                UpdateMovementAudio();
+                _isSnapping = false;
+                _slideTween = null;
+            });
     }
 
     // ── Movement audio ────────────────────────────────────────────────────────
 
-    /// <summary>Whether a remote drag sync was received recently enough to be considered "live" right now.</summary>
-    private bool IsRemoteDragActive()
-    {
-        return _lastRemoteDragSyncTime >= 0f
-            && (Time.unscaledTime - _lastRemoteDragSyncTime) < RemoteDragSyncActiveWindow;
-    }
-
     /// <summary>
     /// Drives the looping slide sound and the end-of-track open/close stingers from the
-    /// drawer mesh's actual position each frame. Only called while the drawer is confirmed
-    /// to be under active player control (see the guard in Update()).
+    /// drawer mesh's actual position. Only evaluated while the slide tween is running.
     /// </summary>
     private void UpdateMovementAudio()
     {
@@ -431,7 +232,6 @@ public class Drawer : Interactable
         float currentDragT = Mathf.InverseLerp(_closedPos.z, _openPos.z, _drawerMesh.localPosition.z);
         float deltaTime = Time.deltaTime;
 
-        // First frame after enabling — just seed the reference position, don't evaluate speed yet.
         if (_previousMeshDragT < 0f)
         {
             _previousMeshDragT = currentDragT;
@@ -441,11 +241,8 @@ public class Drawer : Interactable
         if (deltaTime > 0f)
         {
             float speed = Mathf.Abs(currentDragT - _previousMeshDragT) / deltaTime;
-
-            if (speed >= _moveVelocityThreshold)
-                PlayMovementLoop();
-            else
-                StopMovementLoop();
+            if (speed >= _moveVelocityThreshold) PlayMovementLoop();
+            else                                 StopMovementLoop();
         }
 
         const float endOfTrackEpsilon = 0.001f;
@@ -455,6 +252,7 @@ public class Drawer : Interactable
             {
                 _hasPlayedOpenEndSound = true;
                 _hasPlayedClosedEndSound = false;
+                StopMovementLoop();
                 PlayEndOfTrackSound(open: true);
             }
         }
@@ -464,12 +262,12 @@ public class Drawer : Interactable
             {
                 _hasPlayedClosedEndSound = true;
                 _hasPlayedOpenEndSound = false;
+                StopMovementLoop();
                 PlayEndOfTrackSound(open: false);
             }
         }
         else
         {
-            // Left both ends — re-arm so the stinger can fire again next time either end is reached.
             _hasPlayedOpenEndSound = false;
             _hasPlayedClosedEndSound = false;
         }
@@ -499,58 +297,4 @@ public class Drawer : Interactable
         AudioClip clip = open ? drawerOpenSound : drawerCloseSound;
         if (clip != null) audioSource.PlayOneShot(clip);
     }
-
-    // ── Networking ────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Pushes the live drag position to the server at most once per DragSyncInterval.
-    /// </summary>
-    private void SyncDragTIfNeeded()
-    {
-        if (Time.unscaledTime - _lastDragSyncTime < DragSyncInterval) return;
-        _lastDragSyncTime = Time.unscaledTime;
-        UpdateDragTServerRpc(_dragT);
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void UpdateDragTServerRpc(float dragT)
-    {
-        _networkDragT.Value = dragT;
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void SetDrawerServerRpc(bool open, ulong senderClientId)
-    {
-        isOpen.Value = open;
-        _networkDragT.Value = open ? 1f : 0f;
-        BroadcastDrawerStateClientRpc(open, senderClientId);
-    }
-
-    [ClientRpc]
-    private void BroadcastDrawerStateClientRpc(bool open, ulong excludeClientId)
-    {
-        if (NetworkManager.Singleton.LocalClientId == excludeClientId) return;
-        SnapDrawerMeshToState(open, _snapDuration);
-        if (open) OnOpened?.Invoke();
-    }
-
-    private void OnDrawerStateChanged(bool oldValue, bool newValue)
-    {
-        // Catch-up for late-joining clients that missed the ClientRpc.
-        SnapDrawerMeshToState(newValue, _snapDuration);
-        if (newValue) OnOpened?.Invoke();
-    }
-
-    /// <summary>
-    /// Applied on all non-controlling clients every time the server updates the live drag position.
-    /// </summary>
-    private void OnNetworkDragTChanged(float oldVal, float newVal)
-    {
-        if (_inControl) return; // local player is driving — don't fight the input
-        _lastRemoteDragSyncTime = Time.unscaledTime;
-        if (_drawerMesh == null) return;
-        _drawerMesh.localPosition = Vector3.Lerp(_closedPos, _openPos, newVal);
-    }
-
-    private void OnLockedChanged(bool oldValue, bool newValue) { }
 }

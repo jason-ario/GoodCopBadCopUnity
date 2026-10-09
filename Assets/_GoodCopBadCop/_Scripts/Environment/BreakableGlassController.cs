@@ -48,8 +48,8 @@ public class BreakableGlassController : MonoBehaviour
              "AddForceOnAwake fires only when the glass actually shatters.")]
     [SerializeField] private GameObject _brokenGlassPrefab;
 
-    [Tooltip("The purchase interactable shown when the glass is smashed. " +
-             "Should start inactive in the scene; activated automatically when the glass breaks.")]
+    [Tooltip("The purchase interactable shown when the glass is damaged. Must be ACTIVE in the scene " +
+             "with 'Start Available' unticked; it hides itself on spawn and is shown when the glass is hit.")]
     [SerializeField] private WorldPurchaseActionInteractable _repairInteractable;
 
     [Tooltip("Material using the GoodCopBadCop/GlassCrackOverlay shader. " +
@@ -674,10 +674,14 @@ public class BreakableGlassController : MonoBehaviour
     }
 
     /// <summary>
-    /// Makes the repair/purchase interactable available on the local client, spawning its
-    /// NetworkObject on the server if needed. Safe to call multiple times (e.g. once per
-    /// intermediate hit and again on the final smash) — spawning and activation are both no-ops
-    /// once already done.
+    /// Makes the repair/purchase interactable available on the local peer. Safe to call multiple
+    /// times (e.g. once per intermediate hit and again on the final smash).
+    ///
+    /// The repair stand is authored ACTIVE in the scene (with WorldPurchaseActionInteractable's
+    /// "Start Available" unticked), so NGO spawns it with the scene on the host and soft-syncs it on
+    /// every client, including late joiners. It must NOT be authored inactive and spawned here: NGO
+    /// never registers an inactive in-scene NetworkObject on remote clients, so that spawn failed on
+    /// them and every client purchase was refused with "Not available yet".
     /// </summary>
     private void ShowRepairInteractable()
     {
@@ -685,17 +689,18 @@ public class BreakableGlassController : MonoBehaviour
 
         _repairInteractable.SetAvailable(true);
 
-        // The repair interactable's GameObject starts inactive so NGO never auto-spawns its
-        // NetworkObject. The server must spawn it explicitly so the purchase ServerRpc / ClientRpc
-        // path — and the interactable's own availability NetworkVariable — can route.
         var nm = NetworkManager.Singleton;
-        if (nm != null && nm.IsListening && nm.IsServer)
+        if (!_warnedRepairNotSpawned && nm != null && nm.IsListening && nm.IsServer &&
+            !_repairInteractable.IsSpawned)
         {
-            var repairNetObj = _repairInteractable.NetworkObject;
-            if (repairNetObj != null && !repairNetObj.IsSpawned)
-                repairNetObj.Spawn(true);   // true = destroyWithScene
+            _warnedRepairNotSpawned = true;
+            Debug.LogWarning("[BreakableGlassController] Repair interactable is not network-spawned on the host. " +
+                             "Make sure 'Purchase Glass' is ACTIVE in the scene (untick 'Start Available' instead); " +
+                             "clients cannot buy the repair otherwise.", _repairInteractable);
         }
     }
+
+    private bool _warnedRepairNotSpawned;
 
     /// <summary>Sets the _CrackProgress material property to reflect the given hit count.</summary>
     private void RefreshCrackOverlay(int hitCount)

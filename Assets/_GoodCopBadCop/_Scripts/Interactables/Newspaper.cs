@@ -6,6 +6,9 @@ using UnityEngine;
 /// </summary>
 public class Newspaper : PickableObject
 {
+    /// <summary>LMB opens the newspaper for reading.</summary>
+    public override string GetHeldUseVerb() => "Read";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

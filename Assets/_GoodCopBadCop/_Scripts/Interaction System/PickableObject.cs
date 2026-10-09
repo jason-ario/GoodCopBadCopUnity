@@ -1858,6 +1858,14 @@ public class PickableObject : Interactable
         playerPickupController.PlayerAnimationController.SetAnimBool(itemData.pickupAnimBool, value);
     }
 
+    /// <summary>
+    /// Action name for LMB / RT with this item in hand, used in place (no target), e.g. "Take photo",
+    /// "Read", "Turn on". Shown by <see cref="HeldItemUsePrompt"/> as "[LMB] {verb}". Return null when
+    /// LMB does nothing with this item right now (the prompt is then hidden). May be state-dependent.
+    /// Every subclass whose <see cref="OnStartUse"/> does something must override this.
+    /// </summary>
+    public virtual string GetHeldUseVerb() => null;
+
     public virtual void OnStartUse()
     {
         isUsing = true;

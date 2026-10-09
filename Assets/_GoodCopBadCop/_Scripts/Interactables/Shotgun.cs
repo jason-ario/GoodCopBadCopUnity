@@ -117,6 +117,9 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     private void UpdateInteractText(int rounds)
         => interactText = $"Shotgun ({rounds}/{MaxRounds})";
 
+    /// <summary>LMB fires the shotgun.</summary>
+    public override string GetHeldUseVerb() => "Shoot";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

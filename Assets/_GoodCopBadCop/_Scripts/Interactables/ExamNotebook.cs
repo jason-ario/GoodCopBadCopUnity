@@ -135,6 +135,9 @@ public class ExamNotebook : PickableObject
     /// <summary>True while the "draw mode" checklist view is open (see OnStartUse/ExitDrawMode).</summary>
     private bool _isInDrawMode;
 
+    /// <summary>True when draw mode hid a visible HUD and must restore it on exit.</summary>
+    private bool _hidHudForDrawMode;
+
     /// <summary>The player whose cutscene state interrupts this locally held notebook.</summary>
     private PlayerInstance _cutscenePlayer;
 
@@ -986,6 +989,9 @@ public class ExamNotebook : PickableObject
         }
     }
 
+    /// <summary>LMB opens the notebook for checklist marking; nothing while a page is being added to a folder.</summary>
+    public override string GetHeldUseVerb() => addingToFolder ? null : "Open";
+
     public override void OnStartUse()
     {
         if (addingToFolder)
@@ -1017,6 +1023,12 @@ public class ExamNotebook : PickableObject
         {
             UIController.Instance.ShowCursor();
         }
+
+        // Hide the HUD before showing Back: with the Geiger counter gone, the Back button's
+        // HUD avoidance leaves it at its normal bottom-left position.
+        _hidHudForDrawMode = UIController.Instance.IsPlayerUIVisible;
+        if (_hidHudForDrawMode)
+            UIController.Instance.ClosePlayerUI();
 
         UIController.Instance.ShowBackButton(ExitDrawMode);
     }
@@ -1051,6 +1063,12 @@ public class ExamNotebook : PickableObject
 
         UIController.Instance.HideCursor();
         UIController.Instance.HideBackButton();
+
+        // ShowPlayerUI refuses while dialogue/cutscene/diegetic views own the HUD. The guidebook
+        // calls this (via OnHiddenForGuidebook) before it records and hides the HUD itself.
+        if (_hidHudForDrawMode)
+            UIController.Instance.ShowPlayerUI();
+        _hidHudForDrawMode = false;
     }
 
     private void Update()

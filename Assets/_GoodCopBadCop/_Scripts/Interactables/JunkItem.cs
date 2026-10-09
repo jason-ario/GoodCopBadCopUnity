@@ -4,8 +4,8 @@ using UnityEngine;
 
 /// <summary>
 /// A junk item spawned by TakeOutTrashTask. Collected by a player who is holding a non-full
-/// TrashBag — either by pressing E (Interact) or by left-clicking while holding the bag
-/// (InteractWithItem). Despawns on collection and fills the bag by one unit.
+/// TrashBag — either by pressing E (Interact, the primary prompt) or by left-clicking while holding
+/// the bag (InteractWithItem). Despawns on collection and fills the bag by one unit.
 ///
 /// Prefab requirements:
 ///   - NetworkObject (or a parent NetworkObject when used on a SuspectCharacter)
@@ -283,18 +283,25 @@ public class JunkItem : Interactable
     // ── Interaction ───────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Interact key does nothing on junk: collecting is item-on-target use, so it happens through
-    /// LMB / RT with a trash bag in hand (<see cref="InteractWithItem"/>).
+    /// Interact key (E / West) while holding a trash bag collects this junk — it's a world
+    /// interaction. The controller routes E to <see cref="InteractWithItem"/> (default
+    /// <see cref="Interactable.GetItemTargetKey"/>); this fallback covers direct Interact calls.
+    /// Does nothing empty-handed or with any other item.
     /// </summary>
-    public override void Interact(PlayerInteractionController player) { }
+    public override void Interact(PlayerInteractionController player)
+    {
+        if (player == null) return;
+        TryCollectInto(player.HeldObject as TrashBag);
+    }
 
-    /// <summary>No Interact-key prompt — junk is collected with LMB / RT (see <see cref="Interact"/>).</summary>
-    public override bool ShowsInteractPrompt(PlayerInteractionController player) => false;
+    /// <summary>Interact-key prompt only while the player holds a trash bag (full bags still show it, then toast).</summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
+        player != null && player.HeldObject is TrashBag;
 
     public override string GetItemUseVerb(PlayerInteractionController player, PickableObject heldItem) => "Collect";
 
     /// <summary>
-    /// LMB / RT while holding a compatible item (TrashBag) — collects this junk item into the bag.
+    /// Interact key while holding a compatible item (TrashBag) — collects this junk item into the bag.
     /// Shows a "Trash is full" toast when the bag is full.
     /// </summary>
     public override void InteractWithItem(PlayerInteractionController player, PickableObject heldItem)

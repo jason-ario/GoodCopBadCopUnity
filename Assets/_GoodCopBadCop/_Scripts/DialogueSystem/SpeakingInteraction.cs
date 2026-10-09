@@ -156,6 +156,7 @@ public class SpeakingInteraction : NetworkBehaviour
     {
         if (_worldParticipants.Remove(clientId))
         {
+            LogWorldGate($"client {clientId} left (disconnect)");
             _isEngaged.Value = _worldParticipants.Count > 0;
             RecheckWorldGatesAfterParticipantChange();
         }
@@ -180,6 +181,7 @@ public class SpeakingInteraction : NetworkBehaviour
         bool isFirstParticipant = _worldParticipants.Count == 0;
         _worldParticipants.Add(senderId);
         _isEngaged.Value = true;
+        LogWorldGate($"client {senderId} joined (first={isFirstParticipant})");
 
         ClientRpcParams targetParams = new ClientRpcParams
         {
@@ -225,6 +227,7 @@ public class SpeakingInteraction : NetworkBehaviour
         ulong senderId = rpcParams.Receive.SenderClientId;
         if (_worldParticipants.Remove(senderId))
         {
+            LogWorldGate($"client {senderId} left (EndEngagement)");
             _isEngaged.Value = _worldParticipants.Count > 0;
             RecheckWorldGatesAfterParticipantChange();
         }
@@ -468,6 +471,17 @@ public class SpeakingInteraction : NetworkBehaviour
              "Mirrors ScriptedDialogueRunner's equivalent multi-player timeout.")]
     [SerializeField] private float _worldAdvanceTimeoutSeconds = 1.5f;
 
+    [Tooltip("Server-side diagnostics: logs every world-dialogue advance vote, participant change and " +
+             "the reason each gate opened (all voted / timeout / participant left).")]
+    [SerializeField] private bool _logWorldGate = true;
+
+    private void LogWorldGate(string message)
+    {
+        if (_logWorldGate)
+            Debug.Log($"[WorldGate:{speakerName}] gate={_worldGateId} participants=[{string.Join(",", _worldParticipants)}] " +
+                      $"votes=[{string.Join(",", _worldAdvanceSet)}] t={Time.time:F2} — {message}", this);
+    }
+
     // Server-only: clients currently engaged in a world-dialogue conversation with this speaker.
     private readonly HashSet<ulong> _worldParticipants = new HashSet<ulong>();
 
@@ -552,6 +566,7 @@ public class SpeakingInteraction : NetworkBehaviour
         _worldAdvanceReady = false;
         _awaitingWorldAdvance = true;
         _onWorldAdvanceOpened = onOpened;
+        LogWorldGate("advance gate began");
         SetWorldAwaitingAdvanceClientRpc(true, _worldGateId, WorldParticipantRpcParams());
     }
 
@@ -583,28 +598,41 @@ public class SpeakingInteraction : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void SubmitWorldAdvanceServerRpc(int gateId, ServerRpcParams rpcParams = default)
     {
-        if (!_awaitingWorldAdvance || _worldAdvanceReady) return;
-        if (gateId != _worldGateId) return;
-
         ulong senderId = rpcParams.Receive.SenderClientId;
-        if (!_worldParticipants.Contains(senderId)) return;
+        if (!_awaitingWorldAdvance || _worldAdvanceReady)
+        {
+            LogWorldGate($"vote from {senderId} (gate {gateId}) ignored: no open gate");
+            return;
+        }
+        if (gateId != _worldGateId)
+        {
+            LogWorldGate($"vote from {senderId} ignored: stale gate {gateId}");
+            return;
+        }
+
+        if (!_worldParticipants.Contains(senderId))
+        {
+            LogWorldGate($"vote from {senderId} ignored: not a participant");
+            return;
+        }
 
         _worldAdvanceSet.Add(senderId);
 
         int required = Mathf.Max(1, _worldParticipants.Count);
+        LogWorldGate($"vote from {senderId} accepted ({_worldAdvanceSet.Count}/{required})");
 
         if (_worldAdvanceSet.Count == 1 && _worldAdvanceTimerCoroutine == null && required > 1)
             _worldAdvanceTimerCoroutine = StartCoroutine(WorldAdvanceTimeoutCoroutine());
 
         if (_worldAdvanceSet.Count >= required)
-            OpenWorldAdvanceGate();
+            OpenWorldAdvanceGate("all participants voted");
     }
 
     private IEnumerator WorldAdvanceTimeoutCoroutine()
     {
         ShowWorldAdvanceTimerClientRpc(_worldAdvanceTimeoutSeconds, WorldParticipantRpcParams());
         yield return new WaitForSeconds(_worldAdvanceTimeoutSeconds);
-        OpenWorldAdvanceGate();
+        OpenWorldAdvanceGate("timeout");
     }
 
     [ClientRpc]
@@ -619,9 +647,10 @@ public class SpeakingInteraction : NetworkBehaviour
         DialogueAdvanceTimer.Instance?.Hide();
     }
 
-    private void OpenWorldAdvanceGate()
+    private void OpenWorldAdvanceGate(string reason = "unspecified")
     {
         if (_worldAdvanceReady) return;
+        LogWorldGate($"gate OPENED: {reason}");
         _worldAdvanceReady = true;
         _awaitingWorldAdvance = false;
 
@@ -903,7 +932,7 @@ public class SpeakingInteraction : NetworkBehaviour
     {
         if (_worldParticipants.Count == 0)
         {
-            if (_awaitingWorldAdvance && !_worldAdvanceReady) OpenWorldAdvanceGate();
+            if (_awaitingWorldAdvance && !_worldAdvanceReady) OpenWorldAdvanceGate("no participants left");
             if (_awaitingWorldChoice && !_worldChoiceResolved) ResolveWorldChoiceVote();
             return;
         }
@@ -911,7 +940,7 @@ public class SpeakingInteraction : NetworkBehaviour
         int required = _worldParticipants.Count;
 
         if (_awaitingWorldAdvance && !_worldAdvanceReady && _worldAdvanceSet.Count >= required)
-            OpenWorldAdvanceGate();
+            OpenWorldAdvanceGate("participant left, remaining all voted");
         else if (_awaitingWorldChoice && !_worldChoiceResolved && _worldChoiceSubmissions.Count >= required)
             ResolveWorldChoiceVote();
     }

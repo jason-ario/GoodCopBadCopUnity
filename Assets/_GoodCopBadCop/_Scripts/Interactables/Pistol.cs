@@ -151,6 +151,9 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     /// the server to decrement the counter and relay VFX to all other clients.
     /// Plays a dry-fire click when the magazine is empty.
     /// </summary>
+    /// <summary>LMB fires the pistol.</summary>
+    public override string GetHeldUseVerb() => "Shoot";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

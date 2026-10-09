@@ -75,6 +75,12 @@ public class DoorWheelDiegeticController : DiegeticViewController
              "camera doesn't jolt from residual spin input when control hands back.")]
     [SerializeField] private float _closeDelayAfterUnlock = 1f;
 
+    [Header("Prompt")]
+    [Tooltip("Text shown next to the LMB / RT icon while the view is open.")]
+    [SerializeField] private string _openPromptText = "to open";
+
+    protected override string ActionPromptText => _openPromptText;
+
     // ─── Runtime state ────────────────────────────────────────────────────────
 
     /// <summary>True while the player is holding LMB and dragging the wheel.</summary>

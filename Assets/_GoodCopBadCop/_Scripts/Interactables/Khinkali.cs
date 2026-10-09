@@ -82,6 +82,9 @@ public class Khinkali : PickableObject
     /// waits <see cref="eatDuration"/> seconds, heals the player by <see cref="HealAmount"/>,
     /// then despawns the item.
     /// </summary>
+    /// <summary>LMB eats the khinkali.</summary>
+    public override string GetHeldUseVerb() => "Eat";
+
     public override void OnStartUse()
     {
         if (isUsing) return;

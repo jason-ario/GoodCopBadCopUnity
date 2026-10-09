@@ -623,7 +623,11 @@ public class DialogueChoiceSystem : NetworkBehaviour
         // ── Skip NPC line while waiting to reshow choices (non-scripted mode) ─
         if (_reshowCoroutine == null) return;
 
-        bool skipKey     = Input.GetKeyDown(KeyCode.E);
+        // World conversations advance only through SpeakingInteraction's vote/timer gate —
+        // never let this legacy local skip clear their lines.
+        if (SuspectWorldDialogue.IsLocalPlayerInConversation) return;
+
+        bool skipKey     = GoodCopBadCop.Input.RebindableInput.GetKeyDown(GoodCopBadCop.Input.GameAction.Interact);
         bool skipMouse   = Input.GetMouseButtonDown(0);
         // Exclude buttonEast — it is reserved for the exit/back action (see UIController's
         // centralized Back-button handling) and must not also skip the NPC line.

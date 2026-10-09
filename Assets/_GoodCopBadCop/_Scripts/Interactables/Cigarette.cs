@@ -33,6 +33,9 @@ public class Cigarette : PickableObject
       CacheEmissiveColor();
    }
 
+   /// <summary>LMB (held) smokes the cigarette.</summary>
+   public override string GetHeldUseVerb() => "Smoke";
+
    public override void OnStartUse()
    {
       base.OnStartUse();

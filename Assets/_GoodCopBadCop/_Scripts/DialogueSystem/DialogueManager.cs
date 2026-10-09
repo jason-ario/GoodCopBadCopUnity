@@ -630,7 +630,14 @@ public class DialogueManager : NetworkBehaviour
             // typewriter reveal could also be read as the "prompt already active" advance input
             // in this routine before ShowPromptAfterTypewriter's IsPromptActive update settled,
             // skipping straight to the next line instead of just finishing the reveal.
-            if (!ScriptedDialogueRunner.IsScriptedModeActive && _waitingSubtitle != null && IsAdvanceInputPressed())
+            // A world conversation (SuspectWorldDialogue) owns all dialogue input while the local
+            // player is in it, and advances only through SpeakingInteraction's vote/timer gate.
+            // Without this, a host with any waitForInput routine alive (e.g. from a scripted or
+            // megaphone line) would read the same E press and call AdvanceDialogueServerRpc
+            // directly — an un-gated broadcast that clears the world line for EVERY client
+            // instantly, so one player could skip lines for both without waiting for the timer.
+            if (!ScriptedDialogueRunner.IsScriptedModeActive && !SuspectWorldDialogue.IsLocalPlayerInConversation &&
+                _waitingSubtitle != null && IsAdvanceInputPressed())
             {
                 if (!_waitingSubtitle.IsPromptActive)
                 {
@@ -645,7 +652,10 @@ public class DialogueManager : NetworkBehaviour
                     if (ScriptedDialogueRunner.IsScriptedModeActive)
                         ScriptedDialogueRunner.Instance.AdvanceScriptedLineServerRpc();
                     else
+                    {
+                        Debug.Log("[WorldGate] Un-gated AdvanceDialogueServerRpc from WaitForInputRoutine (local input).");
                         AdvanceDialogueServerRpc();
+                    }
                 }
             }
             yield return null;
@@ -658,7 +668,7 @@ public class DialogueManager : NetworkBehaviour
 
     /// <summary>
     /// Returns true if any of the accepted dialogue-advance inputs were pressed this frame —
-    /// keyboard E, left mouse click (when not over UI), or a gamepad face/start button. Matches
+    /// the Interact key (rebindable, default E), left mouse click (when not over UI), or a gamepad face/start button. Matches
     /// the input set used by <see cref="IntroCinematicController"/> for consistency.
     /// </summary>
     private bool IsAdvanceInputPressed()
@@ -667,7 +677,7 @@ public class DialogueManager : NetworkBehaviour
 
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
-        return Input.GetKeyDown(KeyCode.E)
+        return GoodCopBadCop.Input.RebindableInput.GetKeyDown(GoodCopBadCop.Input.GameAction.Interact)
                || (Input.GetMouseButtonDown(0) && !overUI)
                || (Gamepad.current?.buttonSouth.wasPressedThisFrame ?? false)
                || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);

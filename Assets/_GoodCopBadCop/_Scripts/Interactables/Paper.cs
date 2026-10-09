@@ -4,6 +4,9 @@ using UnityEngine;
 public class Paper : PickableObject
 {
     [SerializeField] private NetworkDrawableLine _drawableLine;
+    /// <summary>LMB raises the paper to read it.</summary>
+    public override string GetHeldUseVerb() => "Read";
+
     public override void OnStartUse()
     {
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", true);
@@ -15,6 +18,10 @@ public class Paper : PickableObject
     }
     
     public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Draw";
+
+    /// <summary>Drawing is the pencil's tool function, so it stays on LMB / RT.</summary>
+    public override HeldItemTargetKey GetItemTargetKey(PlayerInteractionController player, PickableObject item)
+        => HeldItemTargetKey.UseItem;
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {

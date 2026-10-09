@@ -57,6 +57,33 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool _canInteract = true;
     public bool CanInteract => _canInteract && !_suspectCamActive;
 
+    /// <summary>
+    /// True when the Interact key would currently act on a world object: interaction is allowed
+    /// and the reticle is on an in-range interactable that shows an Interact prompt. Used by
+    /// <see cref="ScriptedDialogueRunner"/> so an unlocked (free-movement) sequence doesn't also
+    /// treat that same press as a "advance line" input.
+    /// </summary>
+    public bool HasWorldInteractTarget =>
+        CanInteract && lastInteractable != null && lastInteractable.IsInteractable &&
+        (lastInteractable.ShowsInteractPrompt(this) || AppliesHeldItemOnInteract(lastInteractable));
+
+    /// <summary>
+    /// Verb LMB / RT would perform by applying the held item to the targeted interactable this frame
+    /// (tool-style targets, <see cref="HeldItemTargetKey.UseItem"/>, e.g. "Stamp"), or null when LMB
+    /// would use the item in place. Read by <see cref="HeldItemUsePrompt"/>.
+    /// </summary>
+    public string TargetItemUseVerb { get; private set; }
+
+    /// <summary>True when the held item can be applied to <paramref name="target"/> and that action is on the given key.</summary>
+    private bool AppliesHeldItemOn(Interactable target, HeldItemTargetKey key)
+    {
+        PickableObject held = _playerPickupController != null ? _playerPickupController.HeldObject : null;
+        return target != null && held != null && target.CanInteractWithItem(held)
+            && target.GetItemTargetKey(this, held) == key;
+    }
+
+    private bool AppliesHeldItemOnInteract(Interactable target) => AppliesHeldItemOn(target, HeldItemTargetKey.Interact);
+
     // â”€â”€ Controller trigger helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // RT  (rightTrigger)  = LMB â€” use the held item (never world interaction)
     // LT  (leftTrigger)   = RMB â€” placement mode hold
@@ -149,6 +176,7 @@ public class PlayerInteractionController : NetworkBehaviour
     private void ClearHoverState()
     {
         CancelHoldInteract();
+        TargetItemUseVerb = null;
 
         if (lastInteractable == null) return;
 
@@ -418,6 +446,8 @@ public class PlayerInteractionController : NetworkBehaviour
 
     void HandleReticle()
     {
+        TargetItemUseVerb = null;
+
         if (_suspectCamActive)
         {
             // Reticle ref may be null on first entry (early game) â€” hide it as soon as it's available.
@@ -529,22 +559,29 @@ public class PlayerInteractionController : NetworkBehaviour
 
                 if (inRange)
                 {
-                    // Interact key prompt: "Hold E to <verb>" when a hold action is available,
-                    // otherwise the bare key icon (plus interactText for ShowInteractHint objects)
-                    // whenever pressing Interact would do something for this player right now.
+                    // Prompt rows (see ReticleController.SetInteractState):
+                    //   [E]   {verb}         — applying the held item on the Interact key (deposit /
+                    //                          insert, e.g. "Insert fuse") wins over the target's own
+                    //                          Interact verb; otherwise the Interact verb when pressing
+                    //                          Interact does something for this player right now.
+                    //   [LMB] {item verb}    — the held item's tool action on this target ("Stamp").
+                    //   Hold to {holdVerb}   — secondary hold action (not when E applies the item:
+                    //                          that press never starts a hold, see TryWorldInteract).
                     string holdVerb = interactable.GetHoldInteractVerb(this);
 
-                    // Held item usable on this target (LMB / RT → InteractWithItem, e.g. trash bag
-                    // over junk): show the use icon instead of the Interact key.
                     PickableObject heldForUse = _playerPickupController.HeldObject;
-                    bool canUseHeldItem = heldForUse != null && interactable.CanInteractWithItem(heldForUse);
+                    bool canApplyHeldItem = heldForUse != null && interactable.CanInteractWithItem(heldForUse);
+                    bool applyOnInteract = canApplyHeldItem && interactable.GetItemTargetKey(this, heldForUse) == HeldItemTargetKey.Interact;
+                    string itemVerb = canApplyHeldItem ? interactable.GetItemUseVerb(this, heldForUse) : null;
 
-                    bool showKey = canUseHeldItem || interactable.ShowsInteractPrompt(this);
-                    string actionVerb = canUseHeldItem
-                        ? interactable.GetItemUseVerb(this, heldForUse)
-                        : interactable.GetInteractVerb(this);
+                    bool showKey = applyOnInteract || interactable.ShowsInteractPrompt(this);
+                    string actionVerb = applyOnInteract ? itemVerb : interactable.GetInteractVerb(this);
+                    string useVerb = canApplyHeldItem && !applyOnInteract ? itemVerb : null;
+                    if (applyOnInteract) holdVerb = null;
 
-                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint, holdVerb, canUseHeldItem, actionVerb);
+                    TargetItemUseVerb = useVerb;
+
+                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint && !applyOnInteract, holdVerb, useVerb, actionVerb);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }
@@ -857,6 +894,9 @@ public class PlayerInteractionController : NetworkBehaviour
         return true;
     }
 
+    /// <summary>The item this player is currently holding, or null.</summary>
+    public PickableObject HeldObject => _playerPickupController != null ? _playerPickupController.HeldObject : null;
+
     /// <summary>
     /// Whether the interaction ray is currently permitted to cross the perimeter fence.
     ///
@@ -1072,8 +1112,10 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Handles LMB / RT while holding an item: uses it on the targeted interactable when that
-    /// target accepts it (<see cref="Interactable.InteractWithItem"/>), otherwise uses it in place.
+    /// Handles LMB / RT while holding an item: applies it to the targeted interactable only when that
+    /// target takes it as a tool action (<see cref="HeldItemTargetKey.UseItem"/>, e.g. stamp a folder),
+    /// otherwise uses it in place. Deposit / insert actions and every other world interaction are
+    /// the Interact key's job (see <see cref="TryWorldInteract"/>).
     /// Never triggers world interact â€” that is the Interact key's job (see <see cref="TryWorldInteract"/>).
     /// </summary>
     void TryItemUse()
@@ -1100,9 +1142,16 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
-        if (interactable.CanInteractWithItem(pickupController.HeldObject))
+        if (interactable.CanInteractWithItem(pickupController.HeldObject)
+            && interactable.GetItemTargetKey(this, pickupController.HeldObject) == HeldItemTargetKey.UseItem)
         {
             interactable.InteractWithItem(this, pickupController.HeldObject);
+
+            // The target opened a confirmation popup (e.g. TrashCan) — don't also start using
+            // the held item underneath it (documents would enter inspect/zoom).
+            if (UIController.Instance != null && UIController.Instance.IsGameplayConfirmationOpen)
+                return;
+
             _playerPickupController.TryUseObject();
         }
         else
@@ -1141,6 +1190,15 @@ public class PlayerInteractionController : NetworkBehaviour
         if (IsControlledByOtherPlayer(interactable)) return;
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
         if (interactable == null || !interactable.IsInteractable) return;
+
+        // Holding an item this target takes on the Interact key (insert fuse, deposit letter,
+        // throw away, bag junk…): apply it instead of the target's own Interact / hold action.
+        if (AppliesHeldItemOnInteract(interactable))
+        {
+            interactable.InteractWithItem(this, _playerPickupController.HeldObject);
+            ClearReticlePromptAfterInteract();
+            return;
+        }
 
         if (interactable.GetHoldInteractVerb(this) != null)
         {

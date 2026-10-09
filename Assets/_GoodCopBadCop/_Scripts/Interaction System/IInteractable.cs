@@ -16,15 +16,28 @@ public interface IInteractable
 public interface IPickupSlot { }
 
 // ── Input convention ────────────────────────────────────────────────────────────────────────
-// Every world-object interaction (pick up, open, pull, sit, extract…) goes through the Interact
-// key (E / gamepad West), whether or not the player is holding an item:
-//   • Tap   → Interact()
+// Every world-object interaction (pick up, open, pull, sit, extract, insert, deposit, throw away…)
+// goes through the Interact key (E / gamepad West), whether or not the player is holding an item:
+//   • Tap   → Interact(), or InteractWithItem() when the held item targets this object on the
+//             Interact key (GetItemTargetKey == Interact, the default — fuse into slot, key into
+//             lock, letter into post box, bag onto junk).
 //   • Hold  → InteractHold(), only when GetHoldInteractVerb() returns a verb. The reticle fills a
 //             ring over PlayerInteractionController.holdInteractDuration and shows "Hold E to <verb>".
 //             For these objects, Interact() fires on release (a tap) instead of on press.
-// LMB / RT is reserved for using the held item — including using it ON a target via
-// InteractWithItem() (stamp on paper, key in lock, bag on junk…). It never triggers Interact().
-// Inside cursor-driven diegetic views (PC, panels, lockers…) LMB still clicks UI as before.
+// LMB / RT always uses the item in hand: InteractWithItem() only for tool-style targets
+// (GetItemTargetKey == UseItem — stamp a folder, draw on paper, light a fire pit, vaccinate),
+// otherwise the item's own use in place (PickableObject.OnStartUse, verb from GetHeldUseVerb()).
+// It never triggers Interact(). Inside cursor-driven diegetic views (PC, panels, lockers…) LMB
+// still clicks UI as before.
+
+/// <summary>Key that applies a held item to a target (see <see cref="Interactable.GetItemTargetKey"/>).</summary>
+public enum HeldItemTargetKey
+{
+    /// <summary>Interact key (E / West): the item is given / inserted / deposited into the target.</summary>
+    Interact,
+    /// <summary>Use Item (LMB / RT): the item performs its tool function on the target.</summary>
+    UseItem,
+}
 
 /// <summary>
 /// Independent reasons an <see cref="Interactable"/>'s highlight can be held on regardless of
@@ -96,10 +109,23 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         => string.IsNullOrEmpty(interactVerb) ? DefaultInteractVerb : interactVerb;
 
     /// <summary>
-    /// Action name shown next to the LMB / RT icon when <paramref name="item"/> can be used on this
-    /// target (see <see cref="CanInteractWithItem"/>), e.g. "Insert fuse", "Collect".
+    /// Action name shown next to the key from <see cref="GetItemTargetKey"/> when <paramref name="item"/>
+    /// can be applied to this target (see <see cref="CanInteractWithItem"/>), e.g. "Insert fuse", "Stamp".
     /// </summary>
     public virtual string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Use";
+
+    /// <summary>
+    /// Which key applies <paramref name="item"/> to this target via <see cref="InteractWithItem"/>
+    /// (only consulted when <see cref="CanInteractWithItem"/> is true). Default
+    /// <see cref="HeldItemTargetKey.Interact"/>: giving / inserting / depositing the item into the world
+    /// object (fuse into slot, letter into post box, key into lock, bag onto junk) is a world
+    /// interaction. Override to return <see cref="HeldItemTargetKey.UseItem"/> only when the item
+    /// performs its own tool function on the target (stamp a folder, draw with a pencil, light with
+    /// a match, inject a vaccine). Exactly one key routes to InteractWithItem; the other does its
+    /// normal job (E → <see cref="Interact"/>, LMB → use the item in place).
+    /// </summary>
+    public virtual HeldItemTargetKey GetItemTargetKey(PlayerInteractionController player, PickableObject item)
+        => HeldItemTargetKey.Interact;
 
 
 
@@ -445,8 +471,8 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     }
 
     /// <summary>
-    /// Whether a held item may be used on this interactable (routes LMB to
-    /// <see cref="InteractWithItem"/> and shows the button tooltip). Defaults to the
+    /// Whether a held item may be applied to this interactable (routes the key from
+    /// <see cref="GetItemTargetKey"/> to <see cref="InteractWithItem"/> and shows its prompt). Defaults to the
     /// <see cref="itemsThatCanInteractWith"/> list; override to accept items by type/state.
     /// </summary>
     public virtual bool CanInteractWithItem(PickableObject item)

@@ -6,4 +6,6 @@
 /// </summary>
 public class QuarantineBoardDiegeticController : DiegeticViewController
 {
+    // Look-only view: LMB does nothing here, so no LMB prompt.
+    protected override string ActionPromptText => null;
 }

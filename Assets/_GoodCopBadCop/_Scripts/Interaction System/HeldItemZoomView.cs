@@ -140,6 +140,9 @@ public class HeldItemZoomView : DiegeticViewController
     // Zoom is a camera move only — it must not change scene lighting.
     protected override bool ForcePlayerLightOn => false;
 
+    // Zoom is an inspect close-up, not a cursor-click view — no LMB prompt.
+    protected override string ActionPromptText => null;
+
     // Panning is driven here in LateUpdate so it composes with the follow.
     protected override bool SuppressCameraMovement => true;
 

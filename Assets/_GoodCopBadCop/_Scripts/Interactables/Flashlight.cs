@@ -191,6 +191,18 @@ public class Flashlight : PickableObject
         }
     }
 
+    /// <summary>LMB cycles Off, Regular, UV, Off; does nothing with a dead battery.</summary>
+    public override string GetHeldUseVerb()
+    {
+        if (internalBattery != null && internalBattery.IsBatteryEmpty()) return null;
+        return _lightState.Value switch
+        {
+            0 => "Turn on",
+            1 => "Switch to UV",
+            _ => "Turn off",
+        };
+    }
+
     public override void OnStartUse()
     {
         base.OnStartUse();

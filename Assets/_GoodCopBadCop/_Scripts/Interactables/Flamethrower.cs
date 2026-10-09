@@ -254,6 +254,9 @@ public class Flamethrower : PickableObject, IAmmoProvider, IInventoryReloadable
     /// feedback and tells the server to set the authoritative firing state so all
     /// other clients display the effect.
     /// </summary>
+    /// <summary>LMB (held) sprays flame; nothing when out of fuel.</summary>
+    public override string GetHeldUseVerb() => _fuel.Value <= 0f ? null : "Burn";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

@@ -153,7 +153,7 @@ public class CameraPickup : PickableObject
 
         // Handle shutter (LMB) manually because InteractionController is disabled in this mode.
         // We check GetMouseButtonDown(0) directly here.
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0) || GoodCopBadCop.Input.RebindableInput.GetGamepadDown(GoodCopBadCop.Input.GameAction.UseItem))
         {
             if (!_isAnimatingPhoto && _netPolaroidId.Value == 0UL)
             {
@@ -168,6 +168,9 @@ public class CameraPickup : PickableObject
     /// Called by <see cref="PlayerPickupController"/> when the player LMBs while holding the camera.
     /// Enables the viewfinder camera, sets the "usingTool" animator bool, and suppresses world interaction.
     /// </summary>
+    /// <summary>First LMB / RT enters camera mode, where it then takes the photo.</summary>
+    public override string GetHeldUseVerb() => _inCameraMode ? "Take photo" : "Use camera";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

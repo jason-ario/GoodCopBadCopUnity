@@ -190,6 +190,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // so non-host clients can also skip reveals and advance.
     private bool _clientIsWaitingForInput;
 
+    // Local: true once this runner has actually put the local player into DialogueChoiceSystem's
+    // dialogue lock (EnterScriptedModeClientRpc / LateJoinClientRpc). False for sequences that
+    // leave the player free (unlocked megaphone, unlocked outside players), so their exit knows
+    // it doesn't own the lock and must not tear down a world conversation started meanwhile.
+    private bool _clientEnteredDialogueLock;
+
     // Server-only: tracks whether any coroutine is currently inside a SayAndWait gate.
     // Used by AdvanceScriptedLineServerRpc to reject stale advances.
     private bool _awaitingScriptedInput;
@@ -478,6 +484,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // host and non-host clients can skip reveals and advance the dialogue gate.
         if (!_clientIsWaitingForInput) return;
 
+        // A world conversation (SuspectWorldDialogue) owns all dialogue input while the local
+        // player is in it — e.g. they walked up and talked to a suspect during an unlocked
+        // megaphone sequence. Without this, the same E / click / Back press both drives that
+        // conversation AND advances or leaves this sequence, whose exit then tears the
+        // conversation's dialogue lock down underneath it.
+        if (SuspectWorldDialogue.IsLocalPlayerInConversation) return;
+
+        // In a sequence that leaves the player free to move (not in scripted mode locally),
+        // the Interact key belongs to world interaction whenever it's aimed at something
+        // interactable — that press must not double as an advance vote.
+        bool interactOwnedByWorld = !IsScriptedModeActive && LocalPlayerHasWorldInteractTarget();
+
         // Q or the "Back" button lets the local player leave the scripted dialogue early —
         // checked before the advance/skip input so it never also fires an advance vote.
         // Only outside/bystander players may back out this way: they are never required to
@@ -499,9 +517,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         bool overUI = UnityEngine.EventSystems.EventSystem.current != null &&
                       UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
 
-        bool pressedE       = Input.GetKeyDown(KeyCode.E);
+        bool pressedE       = GoodCopBadCop.Input.RebindableInput.GetKeyDown(GoodCopBadCop.Input.GameAction.Interact) && !interactOwnedByWorld;
         bool pressedClick   = Input.GetMouseButtonDown(0) && !overUI;
-        bool pressedGamepad = AnyGamepadButtonThisFrame();
+        bool pressedGamepad = AnyGamepadButtonThisFrame() &&
+                              !(interactOwnedByWorld && GoodCopBadCop.Input.RebindableInput.GetGamepadDown(GoodCopBadCop.Input.GameAction.Interact));
 
         if (!pressedE && !pressedClick && !pressedGamepad) return;
 
@@ -523,6 +542,26 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
     // Internal sequence
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// True when the local player's reticle is on something the Interact key would act on
+    /// (see <see cref="PlayerInteractionController.HasWorldInteractTarget"/>).
+    /// </summary>
+    private static bool LocalPlayerHasWorldInteractTarget()
+    {
+        PlayerInstance player = PlayerInstance.Instance;
+        if (player == null) return false;
+        PlayerInteractionController interaction = player.GetComponent<PlayerInteractionController>();
+        return interaction != null && interaction.HasWorldInteractTarget;
+    }
+
+    /// <summary>
+    /// True when the local client's scripted-mode exit should leave the player's dialogue lock
+    /// alone: this sequence never locked the player (e.g. an unlocked megaphone sequence) and a
+    /// world conversation they started meanwhile now owns the lock, cursor, choices and HUD.
+    /// </summary>
+    private bool WorldConversationOwnsLocalDialogueLock() =>
+        !_clientEnteredDialogueLock && SuspectWorldDialogue.IsLocalPlayerInConversation;
 
     /// <summary>
     /// Returns true if any gamepad button was pressed this frame, excluding Start and Select
@@ -949,6 +988,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _clientIsWaitingForInput = false;
 
         DeactivateOverrideCam();
+
+        // Same ownership rule as ExitScriptedModeClientRpc: never tear down a world
+        // conversation's dialogue lock that this sequence didn't put the player into.
+        if (WorldConversationOwnsLocalDialogueLock())
+            return;
+        _clientEnteredDialogueLock = false;
+
         DialogueChoiceSystem.Instance?.HideChoicePanel();
 
         // Unconditional clear — mirrors ExitScriptedModeClientRpc so a player who leaves early
@@ -1063,6 +1109,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         IsScriptedModeActive = true;
         _clientIsWaitingForInput = isWaitingForInput;
 
+        // Proximity/late join is a forced conversation — cancel any open gameplay Yes/No popup.
+        UIController.Instance?.CancelGameplayConfirmation();
+
         // Late joiners never received the participant-targeted EnterScriptedModeClientRpc, so
         // cache the speaker here. Without it SuspectController.ResolveCurrentDialogueSpeakerCam
         // falls back to the booth's current suspect cam (e.g. joining Vlad's Day 2 tool locker
@@ -1096,6 +1145,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             EnterOutsideDialogueFacingSpeaker(lookTarget);
         else
             DialogueChoiceSystem.Instance?.EnterScriptedDialogueMode(lookTarget);
+        _clientEnteredDialogueLock = true;
 
         Debug.Log($"[ScriptedDialogueRunner] LateJoinClientRpc — client {NetworkManager.Singleton.LocalClientId} " +
                   $"entered dialogue mode via proximity (outside={PlayerInstance.Instance.IsOutsideLocal}), " +
@@ -1334,6 +1384,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         IsScriptedModeActive = true;
 
+        // A forced conversation cancels any open gameplay Yes/No popup (e.g. trash-can discard)
+        // before anything else. Some branches below (outside player, no lock) never reach
+        // DialogueChoiceSystem's OnDialogueModeEntering, so cancel explicitly here.
+        UIController.Instance?.CancelGameplayConfirmation();
+
         // Always exit any open diegetic view (tool locker, quarantine board, etc.) immediately,
         // regardless of the inside/outside/lockOutsidePlayers branching below. Some of those
         // branches (outside player + lockOutsidePlayers == false) return early without ever
@@ -1380,11 +1435,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Outside players get movement-locked when explicitly requested, but never get the
             // booth suspect-cam activated — camera cuts are handled by SetActiveOverrideCamClientRpc.
             if (lockOutsidePlayers)
+            {
                 EnterOutsideDialogueFacingSpeaker(lookTarget);
+                _clientEnteredDialogueLock = true;
+            }
             return;
         }
 
         DialogueChoiceSystem.Instance.EnterScriptedDialogueMode(lookTarget);
+        _clientEnteredDialogueLock = true;
     }
 
     /// <summary>
@@ -1429,6 +1488,19 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void ExitScriptedModeClientRpc(bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = false;
+
+        // This sequence never locked the local player (e.g. an unlocked megaphone sequence) and
+        // they've since started a world conversation — that conversation owns the dialogue lock,
+        // cursor, choice panel, choice echo, cutscene immunity and HUD. Only release what this
+        // sequence itself set up; restoring gameplay here would unlock movement and lock the
+        // cursor while the conversation's choices are still on screen.
+        if (WorldConversationOwnsLocalDialogueLock())
+        {
+            DeactivateOverrideCam();
+            _clientSpeakerNetId = 0;
+            return;
+        }
+        _clientEnteredDialogueLock = false;
 
         // Safety net: clear any lingering choice echo if the sequence ended before its own
         // auto-hide timer fired (e.g. an early exit or disconnect).

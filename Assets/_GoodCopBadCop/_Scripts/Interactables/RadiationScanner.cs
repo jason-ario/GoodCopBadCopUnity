@@ -45,6 +45,9 @@ public class RadiationScanner : PickableObject
         internalBattery = GetComponent<InternalBattery>();
     }
 
+    /// <summary>LMB (held) scans radiation levels.</summary>
+    public override string GetHeldUseVerb() => "Scan";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

@@ -126,6 +126,13 @@ public class UIController : MonoBehaviour
         if (GoodCopBadCop.UI.SettingsMenu.SettingsRedesignPreviewController.IsRebindConsumingInput)
             pauseInput = false;
 
+        // Escape / Start while a gameplay confirmation is up cancels it instead of pausing.
+        if (pauseInput && _gameplayConfirmationOpen && !pauseMenuOpened)
+        {
+            CancelGameplayConfirmation();
+            pauseInput = false;
+        }
+
         if (pauseInput)
         {
             if (pauseMenuOpened)
@@ -909,6 +916,90 @@ public class UIController : MonoBehaviour
 
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
+    }
+
+    // ── Gameplay confirmation dialog ─────────────────────────────────────────
+    // Yes/No popup shown over gameplay (e.g. "Throw away this item?"). Locks movement, look and
+    // interaction while open, shows the cursor, and cancels itself on Escape/Start, gamepad B,
+    // the pause menu opening, or forced dialogue mode — same rules as other overlay screens.
+
+    [Header("Gameplay Confirmation")]
+    [Tooltip("Confirmation dialog shown over gameplay (outside the pause menu).")]
+    [SerializeField] private ConfirmationDialogController gameplayConfirmationDialog;
+
+    private bool _gameplayConfirmationOpen;
+    private PlayerMovementController _confirmationLockedPlayer;
+
+    /// <summary>True while the gameplay confirmation dialog is open.</summary>
+    public bool IsGameplayConfirmationOpen => _gameplayConfirmationOpen;
+
+    /// <summary>
+    /// Shows a Yes/No popup over gameplay. <paramref name="onConfirm"/> runs after the player
+    /// confirms and control has been restored; <paramref name="onCancel"/> runs on any cancel
+    /// path. Returns false (and invokes nothing) if a confirmation is already open or the dialog
+    /// is unassigned.
+    /// </summary>
+    public bool ShowGameplayConfirmation(string title, string body, string confirmText, string cancelText,
+        Action onConfirm, Action onCancel = null)
+    {
+        if (_gameplayConfirmationOpen || pauseMenuOpened) return false;
+
+        if (gameplayConfirmationDialog == null)
+        {
+            Debug.LogWarning("[UIController] Gameplay confirmation dialog is not assigned.", this);
+            return false;
+        }
+
+        _gameplayConfirmationOpen = true;
+
+        _confirmationLockedPlayer = PlayerInstance.Instance != null
+            ? PlayerInstance.Instance.GetComponent<PlayerMovementController>()
+            : null;
+        if (_confirmationLockedPlayer != null)
+        {
+            _confirmationLockedPlayer.SetCanMove(false);
+            _confirmationLockedPlayer.SetCanControl(false);
+            _confirmationLockedPlayer.SetCanLook(false);
+        }
+
+        ShowCursor();
+        OnPauseMenuOpened += CancelGameplayConfirmation;
+        DialogueChoiceSystem.OnDialogueModeEntering += CancelGameplayConfirmation;
+
+        gameplayConfirmationDialog.Show(title, body, confirmText, cancelText,
+            () => { CloseGameplayConfirmation(); onConfirm?.Invoke(); },
+            () => { CloseGameplayConfirmation(); onCancel?.Invoke(); });
+        return true;
+    }
+
+    /// <summary>Cancels the gameplay confirmation dialog if it is open.</summary>
+    public void CancelGameplayConfirmation()
+    {
+        if (!_gameplayConfirmationOpen) return;
+        gameplayConfirmationDialog.Cancel();
+    }
+
+    private void CloseGameplayConfirmation()
+    {
+        if (!_gameplayConfirmationOpen) return;
+        _gameplayConfirmationOpen = false;
+
+        OnPauseMenuOpened -= CancelGameplayConfirmation;
+        DialogueChoiceSystem.OnDialogueModeEntering -= CancelGameplayConfirmation;
+
+        // Always release our lock. If the pause menu caused the close, these writes go into the
+        // pause snapshot (TryCapture*WhilePaused / HideCursor), so unpausing returns control.
+        // Dialogue entry applies its own lock right after OnDialogueModeEntering.
+        // Restore look first so SetCanControl finds CanLook == true and re-enables the reticle.
+        if (_confirmationLockedPlayer != null)
+        {
+            _confirmationLockedPlayer.SetCanLook(true);
+            _confirmationLockedPlayer.SetCanControl(true);
+            _confirmationLockedPlayer.SetCanMove(true);
+            _confirmationLockedPlayer = null;
+        }
+
+        HideCursor();
     }
 
     public RawImage GetCameraImage()

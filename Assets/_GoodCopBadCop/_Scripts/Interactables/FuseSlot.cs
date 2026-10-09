@@ -112,12 +112,12 @@ public class FuseSlot : Interactable
     public override bool ShowInteractHint => false;
 
     /// <summary>
-    /// No Interact key icon — the only prompt is the LMB / RT use icon, shown while holding a
-    /// fuse over an empty slot (driven by <see cref="CanInteractWithItem"/>).
+    /// No plain Interact prompt. Inserting shows the Interact key with "Insert fuse", driven by
+    /// <see cref="CanInteractWithItem"/>.
     /// </summary>
     public override bool ShowsInteractPrompt(PlayerInteractionController player) => false;
 
-    /// <summary>An empty slot accepts any held <see cref="FusePickup"/> (LMB / RT).</summary>
+    /// <summary>An empty slot accepts any held <see cref="FusePickup"/> (Interact key).</summary>
     public override bool CanInteractWithItem(PickableObject item)
         => !IsFilled && item is FusePickup;
 
@@ -132,7 +132,7 @@ public class FuseSlot : Interactable
             ExtractFuse(player);
     }
 
-    /// <summary>LMB / RT while holding a fuse over an empty slot inserts it.</summary>
+    /// <summary>Interact key while holding a fuse over an empty slot inserts it.</summary>
     public override void InteractWithItem(PlayerInteractionController player, PickableObject item)
     {
         base.InteractWithItem(player, item);

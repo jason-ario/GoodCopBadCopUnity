@@ -90,7 +90,7 @@ public class IntroCinematicController : MonoBehaviour
 
         bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
-        bool pressed = Input.GetKeyDown(KeyCode.E)
+        bool pressed = GoodCopBadCop.Input.RebindableInput.GetKeyDown(GoodCopBadCop.Input.GameAction.Interact)
                        || (Input.GetMouseButtonDown(0) && !overUI)
                        || (Gamepad.current?.buttonSouth.wasPressedThisFrame ?? false)
                        || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);

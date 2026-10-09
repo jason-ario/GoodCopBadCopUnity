@@ -53,6 +53,7 @@ public class TutorialObjectiveList : MonoBehaviour
     [SerializeField] private float newTaskSoundVolume = 1f;
 
     private bool _isShowing;
+    private bool _initialized;
     private readonly List<TutorialObjectiveItem> _items = new();
     private Coroutine _clearCoroutine;
 
@@ -116,10 +117,26 @@ public class TutorialObjectiveList : MonoBehaviour
             _instance = null;
     }
 
-    private void Start()
+    private void Start() => EnsureInitialized();
+
+    /// <summary>
+    /// One-time startup cleanup (design-time placeholder rows removed, list hidden). Runs from
+    /// <see cref="Start"/> OR the first <see cref="AddObjective"/>, whichever comes first, and never again.
+    /// A late-joining client activates the Player UI for the first time inside
+    /// <c>GameManager.InitializeLateJoinClientRpc</c> and immediately rebuilds the task list in the
+    /// same call; Unity only runs <see cref="Start"/> on the following frame. An unconditional
+    /// clear in <see cref="Start"/> therefore wiped every already-active task row the joiner had
+    /// just been given, and nothing re-added them until the registry next changed.
+    /// </summary>
+    private void EnsureInitialized()
     {
+        if (_initialized) return;
+        _initialized = true;
+
+        ConfigurePlainList();
         ClearAllItems();
-        objectiveListRoot.SetActive(false);
+        if (objectiveListRoot != null)
+            objectiveListRoot.SetActive(false);
     }
 
     // ── Public API ──────────────────────────────────────────────────────
@@ -141,6 +158,9 @@ public class TutorialObjectiveList : MonoBehaviour
             Debug.LogError("[TutorialObjectiveList] taskItemPrefab is not assigned.", this);
             return null;
         }
+
+        // Run startup cleanup now (not later in Start) so it can never destroy this row.
+        EnsureInitialized();
 
         // Cancel any pending hide so a new sequence can reuse the list immediately.
         if (_clearCoroutine != null)

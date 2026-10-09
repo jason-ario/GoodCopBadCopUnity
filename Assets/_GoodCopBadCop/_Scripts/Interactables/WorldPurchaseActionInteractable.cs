@@ -16,10 +16,12 @@ using UnityEngine.Events;
 /// already-synchronised context such as inside a ClientRpc); <see cref="SetAvailableServerRpc"/>
 /// routes a request from a client to the server.
 ///
-/// The GameObject must also have a <see cref="NetworkObject"/> component. Note that an interactable
-/// authored inactive in the scene has no spawned NetworkObject until the server explicitly spawns it
-/// (see BreakableGlassController.ShowRepairInteractable), which is why availability is also mirrored
-/// locally in <see cref="_availableLocal"/>.
+/// The GameObject must also have a <see cref="NetworkObject"/> component and MUST be authored ACTIVE
+/// in the scene. NGO only registers in-scene NetworkObjects that are active when a client synchronises
+/// the scene; an inactive one is never found on remote clients, so its spawn fails there ("soft
+/// synchronization failure") and every client purchase is refused with "Not available yet".
+/// Stands that should start hidden (e.g. the glass repair) untick <see cref="_startAvailable"/>
+/// instead: they stay active until spawned, then hide themselves from the replicated availability.
 ///
 /// The purchase popup is opened by the Interact key (E / gamepad West), which works whether
 /// or not the player is holding an item (e.g. a package or tool).
@@ -41,6 +43,11 @@ public class WorldPurchaseActionInteractable : Interactable
 
     [Tooltip("Fired on all clients after a successful purchase.")]
     [SerializeField] private UnityEvent _onPurchaseConfirmed;
+
+    [Tooltip("Initial availability. Untick for stands that must start hidden (e.g. the glass repair). " +
+             "Do NOT author such a stand inactive in the scene: it must stay active until its " +
+             "NetworkObject spawns so remote clients can register it, and it hides itself on spawn.")]
+    [SerializeField] private bool _startAvailable = true;
 
     [Header("Persistence")]
     [Tooltip("Optional. When set, this purchase is remembered permanently across play sessions via " +
@@ -101,6 +108,12 @@ public class WorldPurchaseActionInteractable : Interactable
         if (_shopItem != null && string.IsNullOrEmpty(interactText))
             interactText = _shopItem.Name;
 
+        // Record the initial availability WITHOUT deactivating the GameObject: an inactive in-scene
+        // NetworkObject is never registered on remote clients and could not spawn there. The visible
+        // state is applied in OnNetworkSpawn; until then the ShopItem just refuses interaction.
+        _availableLocal = _startAvailable;
+        _shopItem?.SetAvailable(_startAvailable);
+
         ApplySavedUnlockState();
     }
 
@@ -114,6 +127,7 @@ public class WorldPurchaseActionInteractable : Interactable
             // The host publishes its own state as the authority for everyone.
             _netPurchased.Value = HasPersistentUnlockInSave();
             _netAvailable.Value = _availableLocal;
+            ApplyAvailableLocal(_availableLocal);
         }
         else
         {

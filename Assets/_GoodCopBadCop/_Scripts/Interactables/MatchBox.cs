@@ -145,6 +145,10 @@ public class MatchBox : PickableObject, IIgnitionSource
     /// update yet, so <c>IsLit</c> is still true here, which correctly suppresses
     /// starting a new lighting cycle after a successful ignition.
     /// </summary>
+    /// <summary>LMB strikes a match; nothing happens while one is burning or the box is empty.</summary>
+    public override string GetHeldUseVerb()
+        => IsLit || _isLighting.Value || _matchCount.Value <= 0 ? null : "Light match";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

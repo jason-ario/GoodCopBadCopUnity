@@ -98,6 +98,9 @@ public abstract class AmmoPickup : PickableObject, IAmmoProvider
     /// Owner-side LMB. Asks the server to move this pickup's contents into the holder's reserve.
     /// A full reserve is reported immediately (no round-trip) and the request is skipped.
     /// </summary>
+    /// <summary>LMB loads the ammo into the player's reserve; nothing when empty.</summary>
+    public override string GetHeldUseVerb() => Amount <= 0 ? null : "Load ammo";
+
     public override void OnStartUse()
     {
         base.OnStartUse();

@@ -212,6 +212,9 @@ public class ApplicationLetter : FolderItem
     // LMB inspect, same as the newspaper / daily fax (Application.asset uses the
     // HoldingNewspaper pose so it shares the Reading Newspaper animation).
     // Zoom mode "holds LMB" through the same path (see HeldDocumentInspection).
+    /// <summary>LMB reads the letter up close.</summary>
+    public override string GetHeldUseVerb() => "Read";
+
     public override void OnStartUse()
     {
         base.OnStartUse();
