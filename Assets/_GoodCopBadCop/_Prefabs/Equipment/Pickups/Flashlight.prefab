@@ -5987,6 +5987,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5022929759093294540}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8678867487410299228}
     - targetCorrespondingSourceObject: {fileID: -5055779229870624550, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2279438647096463115}
@@ -6427,7 +6430,12 @@ MonoBehaviour:
   itemsThatCanInteractWith:
   - {fileID: 11400000, guid: 7e9da4fcec610e64a92059e8f29988a0, type: 2}
   interactText: Flashlight
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   itemData: {fileID: 11400000, guid: 0862ad805d4af57469703cdf21195a2d, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
@@ -6608,6 +6616,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
+--- !u!65 &8678867487410299228
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2892484038896273453}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.12609893, y: 0.16773197, z: 0.29583237}
+  m_Center: {x: 0.0015950121, y: 0.08779403, z: 0.034053158}
 --- !u!23 &4066335982099831941 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: -7166418665509197319, guid: 73d2fed971dbbce4e952f67a8d287555, type: 3}
