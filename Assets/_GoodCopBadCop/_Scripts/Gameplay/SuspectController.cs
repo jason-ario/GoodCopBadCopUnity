@@ -1185,7 +1185,9 @@ public class SuspectController : NetworkBehaviour
         newIDCard.transform.position = randomPos;
         Rigidbody idCardRb = newIDCard.GetComponent<Rigidbody>();
         if (idCardRb != null) idCardRb.isKinematic = true;
-        newIDCard.GetComponent<IDCard>().SetPaperworkState(paperworkState, suspectCharacter);
+        IDCard newIDCardComponent = newIDCard.GetComponent<IDCard>();
+        newIDCardComponent.SetPaperworkState(paperworkState, suspectCharacter);
+        newIDCardComponent.SetPaperworkSuspectServer(suspectCharacter);
         spawnedDocuments.Add(newIDCard.GetComponent<PickableObject>());
             
         randomPos = Vector3.Lerp(documentSpawnStartPos.position, documentSpawnEndPos.position, UnityEngine.Random.Range(0f, 1f));
@@ -1197,6 +1199,7 @@ public class SuspectController : NetworkBehaviour
         if (appFormRb != null) appFormRb.isKinematic = true;
         ApplicationLetter applicationLetter = newApplicationForm.GetComponent<ApplicationLetter>();
         applicationLetter.SetPaperworkState(paperworkState, suspectCharacter.Data);
+        applicationLetter.SetPaperworkSuspectServer(suspectCharacter);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
         OnApplicationFormSpawned?.Invoke(applicationLetter);
 

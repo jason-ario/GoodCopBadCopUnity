@@ -8,6 +8,7 @@ public class TrashCan : Interactable
         "Can't throw away yet";
     private const string SupplyBoxNotEmptyMessage = "Empty the box first";
     private const string FolderNotEmptyMessage = "Empty the folder first";
+    private const string SuspectStillAtWindowMessage = "Deliver a verdict first";
 
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip throwTrashSound;
@@ -35,6 +36,12 @@ public class TrashCan : Interactable
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         base.InteractWithItem(playerInteractionController, item);
+
+        if (item is FolderItem folderItem && folderItem.BelongsToUnresolvedSuspectAtWindow())
+        {
+            UIController.Instance?.ShowErrorNotification(SuspectStillAtWindowMessage);
+            return;
+        }
 
         if (item is FolderController folder && !folder.IsEmpty())
         {
