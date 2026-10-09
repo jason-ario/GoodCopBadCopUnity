@@ -44,8 +44,55 @@ public class CampaignSlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
     [SerializeField] private AudioClip hoverClip;
     [SerializeField] private AudioClip clickClip;
 
+    [Header("Gamepad Focus")]
+    [Tooltip("Scale applied to the delete button while it has gamepad/keyboard focus.")]
+    [SerializeField] private float deleteFocusScale = 1.2f;
+
     private CampaignScreenController _screen;
     private Texture2D _thumbnailTexture;
+
+    private Button _mainButton;
+    private bool _pointerOver;
+    private bool _wasFocused;
+    private Vector3 _deleteBaseScale = Vector3.one;
+
+    /// <summary>The slot's delete button (only active while the slot is occupied).</summary>
+    public Button DeleteButton => deleteButton;
+
+    /// <summary>
+    /// The Button that selects this slot: the one whose onClick calls <see cref="OnSlotSelected"/>,
+    /// falling back to this object's Button, then the first child Button that isn't the delete button.
+    /// </summary>
+    public Button MainButton
+    {
+        get
+        {
+            if (_mainButton == null) _mainButton = FindMainButton();
+            return _mainButton;
+        }
+    }
+
+    private Button FindMainButton()
+    {
+        Button[] buttons = GetComponentsInChildren<Button>(true);
+        foreach (Button button in buttons)
+        {
+            if (IsDeleteButton(button)) continue;
+            for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
+                if (button.onClick.GetPersistentMethodName(i) == nameof(OnSlotSelected))
+                    return button;
+        }
+
+        Button own = GetComponent<Button>();
+        if (own != null && !IsDeleteButton(own)) return own;
+
+        foreach (Button button in buttons)
+            if (!IsDeleteButton(button)) return button;
+        return null;
+    }
+
+    private bool IsDeleteButton(Button button) =>
+        deleteButton != null && (button == deleteButton || button.transform.IsChildOf(deleteButton.transform));
 
     // ---------------------------------------------------------------------------
     // Initialisation
@@ -178,29 +225,61 @@ public class CampaignSlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
     public void OnPointerEnter(PointerEventData eventData)
     {
         SFXController.Instance?.Play(hoverClip);
-        _targetScaleMultiplier = hoverScale;
+        _pointerOver = true;
     }
 
     /// <summary>Scales the slot back to its resting size when the pointer leaves.</summary>
     public void OnPointerExit(PointerEventData eventData)
     {
-        _targetScaleMultiplier = 1f;
+        _pointerOver = false;
     }
 
     private void Awake()
     {
         _baseScale = transform.localScale;
+        if (deleteButton != null) _deleteBaseScale = deleteButton.transform.localScale;
     }
 
     private void OnDisable()
     {
         // Snap back so a slot hidden mid-hover doesn't reappear enlarged.
+        _pointerOver = false;
+        _wasFocused = false;
         _targetScaleMultiplier = _currentScaleMultiplier = 1f;
         transform.localScale = _baseScale;
+        if (deleteButton != null) deleteButton.transform.localScale = _deleteBaseScale;
+    }
+
+    /// <summary>
+    /// Gamepad/keyboard focus mirrors pointer hover: the slot enlarges while its main or delete button
+    /// is selected, and the delete button itself scales up while it is the selection.
+    /// </summary>
+    private void UpdateFocusVisuals()
+    {
+        GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+        Button main = MainButton;
+        bool mainFocused = selected != null && main != null && selected == main.gameObject;
+        bool deleteFocused = selected != null && deleteButton != null && selected == deleteButton.gameObject;
+        bool focused = mainFocused || deleteFocused;
+
+        if (focused && !_wasFocused && !_pointerOver)
+            SFXController.Instance?.Play(hoverClip);
+        _wasFocused = focused;
+
+        _targetScaleMultiplier = (_pointerOver || focused) ? hoverScale : 1f;
+
+        if (deleteButton != null)
+        {
+            Vector3 deleteScale = deleteFocused ? _deleteBaseScale * deleteFocusScale : _deleteBaseScale;
+            if (deleteButton.transform.localScale != deleteScale)
+                deleteButton.transform.localScale = deleteScale;
+        }
     }
 
     private void Update()
     {
+        UpdateFocusVisuals();
+
         if (Mathf.Approximately(_currentScaleMultiplier, _targetScaleMultiplier)) return;
 
         // Unscaled time so the animation works while the game is paused (timeScale = 0).

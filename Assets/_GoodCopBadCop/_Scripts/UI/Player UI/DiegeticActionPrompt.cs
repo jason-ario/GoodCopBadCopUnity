@@ -33,12 +33,32 @@ public class DiegeticActionPrompt : MonoBehaviour
 
     private static DiegeticActionPrompt _instance;
     private static string _requestedText;
+    private static string _requestedGamepadText;
+    private static Sprite _requestedGamepadSprite;
 
-    /// <summary>Shows the prompt with <paramref name="text"/> next to the LMB / RT icon (e.g. "to drag").</summary>
-    public static void Show(string text) => _requestedText = string.IsNullOrEmpty(text) ? null : text;
+    /// <summary>
+    /// Shows the prompt with <paramref name="text"/> next to the LMB / RT icon (e.g. "to drag").
+    /// While a gamepad is active, <paramref name="gamepadText"/> and <paramref name="gamepadSprite"/>
+    /// replace the label and the Use Item icon when given (e.g. "[Left Stick] to pull").
+    /// </summary>
+    public static void Show(string text, string gamepadText = null, Sprite gamepadSprite = null)
+    {
+        _requestedText = string.IsNullOrEmpty(text) ? null : text;
+        _requestedGamepadText = string.IsNullOrEmpty(gamepadText) ? null : gamepadText;
+        _requestedGamepadSprite = gamepadSprite;
+        if (_instance != null) _instance.RefreshIcon();
+    }
 
     /// <summary>Hides the prompt.</summary>
-    public static void Hide() => _requestedText = null;
+    public static void Hide()
+    {
+        _requestedText = null;
+        _requestedGamepadText = null;
+        _requestedGamepadSprite = null;
+    }
+
+    private static string CurrentText =>
+        ActiveInputDeviceTracker.IsGamepad && _requestedGamepadText != null ? _requestedGamepadText : _requestedText;
 
     // Domain reload is disabled for Play Mode, so statics survive between sessions — reset them.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -46,6 +66,8 @@ public class DiegeticActionPrompt : MonoBehaviour
     {
         _instance = null;
         _requestedText = null;
+        _requestedGamepadText = null;
+        _requestedGamepadSprite = null;
     }
 
     private void Awake()
@@ -84,10 +106,11 @@ public class DiegeticActionPrompt : MonoBehaviour
     private void Update()
     {
         bool paused = UIController.Instance != null && UIController.Instance.IsPaused;
-        bool visible = !paused && !string.IsNullOrEmpty(_requestedText);
+        string text = CurrentText;
+        bool visible = !paused && !string.IsNullOrEmpty(text);
 
-        if (visible && _label != null && _label.text != _requestedText)
-            _label.text = _requestedText;
+        if (visible && _label != null && _label.text != text)
+            _label.text = text;
         SetVisible(visible);
     }
 
@@ -102,7 +125,11 @@ public class DiegeticActionPrompt : MonoBehaviour
         if (_keyImage == null) return;
 
         Sprite icon = _mouseSprite;
-        if (ActiveInputDeviceTracker.IsGamepad)
+        if (ActiveInputDeviceTracker.IsGamepad && _requestedGamepadSprite != null)
+        {
+            icon = _requestedGamepadSprite;
+        }
+        else if (ActiveInputDeviceTracker.IsGamepad)
         {
             Sprite bound = _iconDatabase != null
                 ? _iconDatabase.GetGamepadControlSprite(RebindableInput.GetGamepadBinding(GameAction.UseItem))

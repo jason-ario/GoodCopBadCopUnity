@@ -163,7 +163,7 @@ public abstract class DiegeticViewController : MonoBehaviour
         // "[LMB / RT] {text}" prompt (lives outside the Player HUD, which is hidden above).
         string prompt = ActionPromptText;
         if (!string.IsNullOrEmpty(prompt))
-            DiegeticActionPrompt.Show(prompt);
+            DiegeticActionPrompt.Show(prompt, GamepadActionPromptText, GamepadActionPromptSprite);
     }
 
     /// <summary>
@@ -341,6 +341,18 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// Read once inside <see cref="Open"/>; the prompt is hidden on <see cref="Close"/>.
     /// </summary>
     protected virtual string ActionPromptText => "to interact";
+
+    /// <summary>
+    /// Optional label used instead of <see cref="ActionPromptText"/> while a gamepad is active
+    /// (e.g. "to pull" for the lever's stick control). Null = same text as keyboard/mouse.
+    /// </summary>
+    protected virtual string GamepadActionPromptText => null;
+
+    /// <summary>
+    /// Optional icon used instead of the Use Item (RT) icon while a gamepad is active
+    /// (e.g. the left stick for the lever). Null = rebind-aware Use Item icon.
+    /// </summary>
+    protected virtual Sprite GamepadActionPromptSprite => null;
 
     /// <summary>
     /// Called when the player presses the exit key. Defaults to <see cref="Close"/>.

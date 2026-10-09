@@ -10,6 +10,16 @@ public class DeathScreenUI : MonoBehaviour
     [SerializeField] private GameObject spectateButton;
     [SerializeField] private TextMeshProUGUI daysSurvivedText;
 
+    private void Awake()
+    {
+        // Gamepad focus: Restart Day first (when shown), then Spectate, then Back to Menu.
+        GamepadMenuNavigator.EnsureOn(gameObject, true,
+            FindButton(restartDayButton), FindButton(spectateButton), FindButton(backToMenuButton));
+    }
+
+    private static UnityEngine.UI.Button FindButton(GameObject go) =>
+        go != null ? go.GetComponentInChildren<UnityEngine.UI.Button>(true) : null;
+
     private void OnEnable()
     {
         RefreshDaysSurvivedText();

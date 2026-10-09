@@ -130,18 +130,59 @@ namespace GoodCopBadCop.Input
             if (_initialized) return;
             _initialized = true;
 
+            // Stored values are validated so a corrupted binding (e.g. a legacy JoystickButton code saved
+            // into a keyboard slot by an older build) self-heals to the default instead of silently
+            // breaking the keyboard control until the player restores defaults.
+            bool repaired = false;
+
             foreach (KeyValuePair<GameAction, KeyCode> pair in DefaultKeys)
-                Keys[pair.Key] = (KeyCode)PlayerPrefs.GetInt(PrefPrefix + pair.Key + ".key", (int)pair.Value);
+            {
+                string pref = PrefPrefix + pair.Key + ".key";
+                KeyCode stored = (KeyCode)PlayerPrefs.GetInt(pref, (int)pair.Value);
+                if (!IsValidKeyboardKey(stored))
+                {
+                    Debug.LogWarning($"[RebindableInput] Invalid keyboard binding '{stored}' for {pair.Key}; restoring default '{pair.Value}'.");
+                    stored = pair.Value;
+                    PlayerPrefs.SetInt(pref, (int)stored);
+                    repaired = true;
+                }
+                Keys[pair.Key] = stored;
+            }
 
             foreach (KeyValuePair<GameAction, int> pair in DefaultMouseButtons)
-                MouseButtons[pair.Key] = PlayerPrefs.GetInt(PrefPrefix + pair.Key + ".mouse", pair.Value);
+            {
+                string pref = PrefPrefix + pair.Key + ".mouse";
+                int stored = PlayerPrefs.GetInt(pref, pair.Value);
+                if (!IsValidMouseButton(stored))
+                {
+                    Debug.LogWarning($"[RebindableInput] Invalid mouse binding '{stored}' for {pair.Key}; restoring default '{pair.Value}'.");
+                    stored = pair.Value;
+                    PlayerPrefs.SetInt(pref, stored);
+                    repaired = true;
+                }
+                MouseButtons[pair.Key] = stored;
+            }
 
             foreach (KeyValuePair<GameAction, string> pair in DefaultGamepadControls)
             {
                 string stored = PlayerPrefs.GetString(PrefPrefix + pair.Key + ".pad", pair.Value);
                 GamepadControls[pair.Key] = IsBindableGamepadControl(stored) ? stored : pair.Value;
             }
+
+            if (repaired) PlayerPrefs.Save();
         }
+
+        /// <summary>
+        /// True if <paramref name="key"/> may be stored in a keyboard/mouse slot. Gamepad buttons
+        /// (legacy <c>JoystickButton*</c> codes) are rejected — gamepad bindings live in their own slot.
+        /// </summary>
+        public static bool IsValidKeyboardKey(KeyCode key) =>
+            key != KeyCode.None
+            && (int)key < (int)KeyCode.JoystickButton0
+            && Enum.IsDefined(typeof(KeyCode), key);
+
+        /// <summary>Legacy Input Manager supports mouse buttons 0-6.</summary>
+        public static bool IsValidMouseButton(int button) => button >= 0 && button <= 6;
 
         // ── Keyboard / mouse ────────────────────────────────────────────────────────
 
@@ -176,6 +217,11 @@ namespace GoodCopBadCop.Input
         {
             EnsureInitialized();
             if (!DefaultKeys.ContainsKey(action)) return;
+            if (!IsValidKeyboardKey(key))
+            {
+                Debug.LogWarning($"[RebindableInput] Rejected keyboard binding '{key}' for {action}.");
+                return;
+            }
             Keys[action] = key;
             PlayerPrefs.SetInt(PrefPrefix + action + ".key", (int)key);
             PlayerPrefs.Save();
@@ -186,6 +232,7 @@ namespace GoodCopBadCop.Input
         {
             EnsureInitialized();
             if (!DefaultMouseButtons.ContainsKey(action)) return;
+            if (!IsValidMouseButton(button)) return;
             MouseButtons[action] = button;
             PlayerPrefs.SetInt(PrefPrefix + action + ".mouse", button);
             PlayerPrefs.Save();

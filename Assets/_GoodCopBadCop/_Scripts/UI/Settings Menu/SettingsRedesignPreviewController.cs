@@ -395,6 +395,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 return;
             }
 
+            // A keyboard rebind can be started from a gamepad (EventSystem Submit on the row's key cell).
+            // Gamepad presses must never land in the keyboard slot; any pad button cancels instead, so the
+            // player isn't stuck in a "press a key" state they can't satisfy from the controller.
+            if (IsAnyGamepadButtonPressedThisFrame())
+            {
+                CancelRebind();
+                return;
+            }
+
             if (UnityEngine.Input.GetMouseButtonDown(0)) { CompleteMouseRebind(setting, 0); return; }
             if (UnityEngine.Input.GetMouseButtonDown(1)) { CompleteMouseRebind(setting, 1); return; }
             if (UnityEngine.Input.GetMouseButtonDown(2)) { CompleteMouseRebind(setting, 2); return; }
@@ -414,8 +423,17 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
         }
 
+        private static bool IsAnyGamepadButtonPressedThisFrame()
+        {
+            UnityEngine.InputSystem.Gamepad gamepad = UnityEngine.InputSystem.Gamepad.current;
+            if (gamepad == null) return false;
+            if (gamepad.startButton.wasPressedThisFrame) return true;
+            return RebindableInput.TryGetPressedGamepadControl(out _);
+        }
+
         private void CompleteKeyRebind(Setting setting, KeyCode keyCode)
         {
+            if (!RebindableInput.IsValidKeyboardKey(keyCode)) return;
             if (RebindableInput.HasKeyBinding(setting.RebindAction))
                 RebindableInput.SetKey(setting.RebindAction, keyCode);
             else if (RebindableInput.HasMouseBinding(setting.RebindAction))

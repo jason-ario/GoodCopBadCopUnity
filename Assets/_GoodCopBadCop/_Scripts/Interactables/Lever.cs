@@ -151,6 +151,19 @@ public class Lever : Interactable
         CommitLever();
     }
 
+    /// <summary>
+    /// Ends the drag and commits the lever to the given end regardless of how far it travelled
+    /// (gamepad: a tap up/down flips the lever). Shutter/audio/network sync run through
+    /// <see cref="CommitLever"/> exactly as for a normal release.
+    /// </summary>
+    public void EndDragToward(bool up)
+    {
+        if (!_isDragging) return;
+        _isDragging = false;
+        _dragT = up ? 1f : 0f;
+        CommitLever();
+    }
+
     // ── Hand grab (driven by LeverDiegeticController) ────────────────────────
 
     private PlayerAnimationController _grabAnim;

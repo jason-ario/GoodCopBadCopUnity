@@ -174,6 +174,10 @@ public class EndOfShiftReportUI : MonoBehaviour
 
         CachePaperRest();
         WireContinueButton();
+
+        // Gamepad: only the Continue button takes focus (it appears once the reveal finishes), so the
+        // A press that skips the reveal can't also submit another control.
+        GamepadMenuNavigator.EnsureOn(gameObject, false, GetContinueButton());
         HideAll();
     }
 

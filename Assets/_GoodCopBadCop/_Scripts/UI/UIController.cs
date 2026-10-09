@@ -95,6 +95,24 @@ public class UIController : MonoBehaviour
     {
         Instance = this;
         backButtonUI.SetActive(false);
+        EnsureGamepadNavigation();
+    }
+
+    /// <summary>
+    /// Gamepad focus for button screens authored without a <see cref="GamepadMenuNavigator"/>.
+    /// Each root is deactivated while hidden, so its navigator only acts while the screen is open.
+    /// The pause menu and shop popup already carry their own navigator (a pause-root navigator would
+    /// fight the Settings view, which drives its own focus and releases EventSystem selection).
+    /// </summary>
+    private void EnsureGamepadNavigation()
+    {
+        // DeathScreenUI adds its own navigator (with button priority) in Awake.
+        GamepadMenuNavigator.EnsureOn(_endDayPopup);
+        GamepadMenuNavigator.EnsureOn(_thanksForPlayingPanel);
+        GamepadMenuNavigator.EnsureOn(hqOrderScreenUI);
+        GamepadMenuNavigator.EnsureOn(guardPurchaseScreen);
+        GamepadMenuNavigator.EnsureOn(toolShopUI);
+        GamepadMenuNavigator.EnsureOn(levelSelectUI);
     }
 
     private void Update()
