@@ -1,5 +1,61 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &596712310935434977
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7533729702175381412}
+  - component: {fileID: 2025593982463518754}
+  m_Layer: 0
+  m_Name: Diegetic View
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7533729702175381412
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 596712310935434977}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7023024829643629955}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2025593982463518754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 596712310935434977}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b3f77ae6286d46489ce770571168bd4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LeverDiegeticController
+  _viewCamera: {fileID: 4924782283793613320}
+  _maxPanX: 0.04
+  _maxPanUp: 0.03
+  _maxPanDown: 0.04
+  _exitKey: 113
+  _lever: {fileID: 135515079026775239}
+  _leverCollider: {fileID: 856361737470020145}
+  _occupancy: {fileID: 4886050430184841538}
+  _dragPromptText: to drag
+  _gamepadPromptText: to pull
+  _gamepadPromptSprite: {fileID: 21300000, guid: 9cf8c85ca39078e438903d463689d5bd, type: 3}
+  _armsCameraMoveDuration: 0.5
 --- !u!1 &2248141260164056155
 GameObject:
   m_ObjectHideFlags: 0
@@ -124,6 +180,81 @@ Transform:
   m_Children: []
   m_Father: {fileID: 7294984822203147825}
   m_LocalEulerAnglesHint: {x: 46.274, y: 0, z: 0}
+--- !u!1 &5708004376146815916
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6234233305624697930}
+  - component: {fileID: 4924782283793613320}
+  m_Layer: 0
+  m_Name: Lever Camera
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &6234233305624697930
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5708004376146815916}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.0003057027, y: 0.9985309, z: -0.05397304, w: 0.00478124}
+  m_LocalPosition: {x: -0.09129997, y: 0.048596162, z: 0.35809985}
+  m_LocalScale: {x: 0.3387992, y: 0.3387993, z: 0.3387992}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7023024829643629955}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4924782283793613320
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5708004376146815916}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9dfa5b682dcd46bda6128250e975f58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineCamera
+  Priority:
+    Enabled: 0
+    m_Value: 0
+  OutputChannel: 1
+  StandbyUpdate: 2
+  m_StreamingVersion: 0
+  m_LegacyPriority: 0
+  Target:
+    TrackingTarget: {fileID: 0}
+    LookAtTarget: {fileID: 0}
+    CustomLookAtTarget: 0
+  Lens:
+    FieldOfView: 60
+    OrthographicSize: 10
+    NearClipPlane: 0.05
+    FarClipPlane: 5000
+    Dutch: 0
+    ModeOverride: 0
+    PhysicalProperties:
+      GateFit: 2
+      SensorSize: {x: 21.946, y: 16.002}
+      LensShift: {x: 0, y: 0}
+      FocusDistance: 10
+      Iso: 200
+      ShutterSpeed: 0.005
+      Aperture: 16
+      BladeCount: 5
+      Curvature: {x: 2, y: 11}
+      BarrelClipping: 0.25
+      Anamorphism: 0
+  BlendHint: 0
 --- !u!1 &7284997087563530636
 GameObject:
   m_ObjectHideFlags: 0
@@ -301,6 +432,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -248005119892688762, guid: 353d49803343c954089b0c61a19dd512, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 353d49803343c954089b0c61a19dd512, type: 3}
       propertyPath: m_Name
       value: Lever
@@ -320,6 +455,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 353d49803343c954089b0c61a19dd512, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1404235360998377893}
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 353d49803343c954089b0c61a19dd512, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6234233305624697930}
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 353d49803343c954089b0c61a19dd512, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7533729702175381412}
     - targetCorrespondingSourceObject: {fileID: -8953001399111801767, guid: 353d49803343c954089b0c61a19dd512, type: 3}
       insertIndex: -1
       addedObject: {fileID: 9218653161479656205}
@@ -342,106 +483,18 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 353d49803343c954089b0c61a19dd512, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6496581063637145873}
-    - targetCorrespondingSourceObject: {fileID: -6505494680676671688, guid: 353d49803343c954089b0c61a19dd512, type: 3}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 353d49803343c954089b0c61a19dd512, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 4929645642537341395}
-    - targetCorrespondingSourceObject: {fileID: -6505494680676671688, guid: 353d49803343c954089b0c61a19dd512, type: 3}
+      addedObject: {fileID: 856361737470020145}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 353d49803343c954089b0c61a19dd512, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1044852110265813470}
-    - targetCorrespondingSourceObject: {fileID: 336271658553974036, guid: 353d49803343c954089b0c61a19dd512, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 5990835381133892023}
-    - targetCorrespondingSourceObject: {fileID: 336271658553974036, guid: 353d49803343c954089b0c61a19dd512, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 6820313985682048412}
+      addedObject: {fileID: 4886050430184841538}
   m_SourcePrefab: {fileID: 100100000, guid: 353d49803343c954089b0c61a19dd512, type: 3}
---- !u!1 &4849151582803565904 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: -6505494680676671688, guid: 353d49803343c954089b0c61a19dd512, type: 3}
-  m_PrefabInstance: {fileID: 7420932326195282536}
-  m_PrefabAsset: {fileID: 0}
---- !u!64 &4929645642537341395
-MeshCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4849151582803565904}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: -211007548206913942, guid: 353d49803343c954089b0c61a19dd512, type: 3}
---- !u!114 &1044852110265813470
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4849151582803565904}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
-  Interactable: {fileID: 135515079026775239}
-  ShopItem: {fileID: 0}
 --- !u!4 &7023024829643629955 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 353d49803343c954089b0c61a19dd512, type: 3}
   m_PrefabInstance: {fileID: 7420932326195282536}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &7086097254212263804 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 336271658553974036, guid: 353d49803343c954089b0c61a19dd512, type: 3}
-  m_PrefabInstance: {fileID: 7420932326195282536}
-  m_PrefabAsset: {fileID: 0}
---- !u!64 &5990835381133892023
-MeshCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7086097254212263804}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 6464809856111060268, guid: 353d49803343c954089b0c61a19dd512, type: 3}
---- !u!114 &6820313985682048412
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7086097254212263804}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
-  Interactable: {fileID: 135515079026775239}
-  ShopItem: {fileID: 0}
 --- !u!4 &7294984822203147825 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8953001399111801767, guid: 353d49803343c954089b0c61a19dd512, type: 3}
@@ -464,12 +517,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3356910995
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 2759882073
+  InScenePlacedSourceGlobalObjectIdHash: 3661985575
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 1
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -492,21 +547,27 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Lever
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   leverAudio: {fileID: 6496581063637145873}
   leverOnSound: {fileID: 8300000, guid: 0a390b4fa9d3d6842ab2090a72c84c99, type: 3}
   leverOffSound: {fileID: 8300000, guid: f897b51675fc1004bb02461e5b897988, type: 3}
   shutter: {fileID: 0}
-  _camPos: {fileID: 6941309301036663824}
+  _diegeticView: {fileID: 2025593982463518754}
+  _occupancy: {fileID: 4886050430184841538}
   _rightIkTarget: {fileID: 2578547489088347804}
   _leftIkTarget: {fileID: 635991411381171113}
   _lookTarget: {fileID: 1404235360998377893}
-  _cameraMoveDuration: 0.5
-  _cameraReturnDuration: 0.25
+  _handReachDuration: 0.2
   _leverArm: {fileID: 7294984822203147825}
   _topRot: {x: 59.50319, y: 180, z: 0.000009869969}
   _bottomRot: {x: 314.5034, y: 179.99994, z: -0.0003522954}
   _dragSensitivity: 0.05
+  _controllerDragSpeed: 1.5
   _snapDuration: 0.1
 --- !u!114 &7546408880706070703
 MonoBehaviour:
@@ -532,10 +593,11 @@ MonoBehaviour:
     m_Bits: 255
   effectNameFilter: 
   effectNameUseRegEx: 0
+  excludeObjectsWithHighlightEffect: 0
   combineMeshes: 0
   alphaCutOff: 0.5
+  alphaCutOffTextureName: 
   cullBackFaces: 0
-  padding: 0
   ignoreObjectVisibility: 0
   reflectionProbes: 0
   GPUInstancing: 1
@@ -545,6 +607,8 @@ MonoBehaviour:
   cameraDistanceFade: 0
   cameraDistanceFadeNear: 0
   cameraDistanceFadeFar: 1000
+  useOriginalShader: 0
+  customPassName: 
   normalsOption: 0
   ignore: 0
   _highlighted: 0
@@ -555,8 +619,11 @@ MonoBehaviour:
   extraCoveragePixels: 0
   minimumWidth: 0
   subMeshMask: -1
+  vertexTransformMode: 0
   overlay: 0
   overlayMode: 0
+  overlayPattern: 0
+  overlayPatternScrolling: {x: 0, y: 0}
   overlayColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   overlayAnimationSpeed: 1
   overlayMinIntensity: 0.5
@@ -566,6 +633,11 @@ MonoBehaviour:
   overlayTextureScale: 1
   overlayTextureScrolling: {x: 0, y: 0}
   overlayVisibility: 0
+  overlayBlendMode: 0
+  overlayPatternScale: 10
+  overlayPatternSize: 0.15
+  overlayPatternSoftness: 0.02
+  overlayPatternRotation: 0
   outline: 1
   outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 0.5019608}
   outlineColorStyle: 0
@@ -605,6 +677,7 @@ MonoBehaviour:
   outlineQuality: 2
   outlineEdgeMode: 0
   outlineEdgeThreshold: 0.995
+  outlineDistanceScaleBias: 25
   outlineSharpness: 1
   outlineDownsampling: 1
   outlineVisibility: 1
@@ -613,10 +686,27 @@ MonoBehaviour:
   outlineIndependent: 0
   outlineContourStyle: 0
   outlineMaskMode: 0
+  outlineGradientKnee: 0.4
+  outlineGradientPower: 8
+  padding: 0
+  outlinePixelation: 0
+  outlineStylized: 0
+  outlinePattern: {fileID: 0}
+  outlinePatternScale: 0.3
+  outlinePatternThreshold: 0.3
+  outlinePatternDistortionAmount: 0.5
+  outlinePatternDistortionTexture: {fileID: 0}
+  outlinePatternStopMotionScale: 5
+  outlineDashed: 0
+  outlineDashWidth: 0.5
+  outlineDashGap: 0.3
+  outlineDashSpeed: 2
   glow: 0
   glowWidth: 0.5
   glowQuality: 2
   glowBlurMethod: 0
+  glowHighPrecision: 1
+  glowDistanceScaleBias: 25
   glowDownsampling: 2
   glowHQColor: {r: 0.64, g: 1, b: 0, a: 1}
   glowDithering: 1
@@ -641,22 +731,38 @@ MonoBehaviour:
     alpha: 0.4
     color: {r: 0.64, g: 1, b: 0, a: 1}
   glowMaskMode: 0
+  glowPixelation: 0
   innerGlow: 0
   innerGlowWidth: 1
+  innerGlowPower: 1
   innerGlowColor: {r: 1, g: 1, b: 1, a: 1}
   innerGlowBlendMode: 0
   innerGlowVisibility: 0
+  focus: 0
+  focusColor: {r: 0, g: 0, b: 0, a: 0.9412}
+  focusBlur: 0
+  focusBlurDownsampling: 2
+  focusDesaturation: 0
   targetFX: 0
+  targetFXStyle: 0
+  targetFXFrameWidth: 0.1
+  targetFXCornerLength: 0.25
+  targetFXFrameMinOpacity: 0
+  targetFXGroundMinAltitude: -1000
   targetFXTexture: {fileID: 0}
   targetFXColor: {r: 1, g: 1, b: 1, a: 1}
   targetFXCenter: {fileID: 0}
   targetFXRotationSpeed: 50
+  targetFXRotationAngle: 0
   targetFXInitialScale: 4
   targetFXEndScale: 1.5
   targetFXScaleToRenderBounds: 0
   targetFXUseEnclosingBounds: 0
+  targetFXSquare: 1
   targetFXAlignToGround: 0
   targetFXOffset: {x: 0, y: 0, z: 0}
+  targetFxCenterOnHitPosition: 0
+  targetFxAlignToNormal: 0
   targetFXFadePower: 32
   targetFXGroundMaxDistance: 15
   targetFXGroundLayerMask:
@@ -666,6 +772,8 @@ MonoBehaviour:
   targetFXStayDuration: 1.5
   targetFXVisibility: 1
   iconFX: 0
+  iconFXAssetType: 0
+  iconFXPrefab: {fileID: 0}
   iconFXMesh: {fileID: 0}
   iconFXLightColor: {r: 1, g: 1, b: 1, a: 1}
   iconFXDarkColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
@@ -679,6 +787,28 @@ MonoBehaviour:
   iconFXOffset: {x: 0, y: 1, z: 0}
   iconFXTransitionDuration: 0.5
   iconFXStayDuration: 1.5
+  labelEnabled: 0
+  labelRenderMode: 0
+  labelText: Label
+  labelTextSize: 14
+  labelColor: {r: 1, g: 1, b: 1, a: 1}
+  labelPrefab: {fileID: 7963606135631250497, guid: 933a5612c43104c29af0a700ea5fa149, type: 3}
+  labelViewportOffset: {x: 0, y: 0}
+  labelVerticalOffset: 0
+  labelLineLength: 200
+  labelTarget: {fileID: 0}
+  labelFollowCursor: 1
+  labelMode: 0
+  labelShowInEditorMode: 1
+  labelAlignment: 0
+  labelRelativeAlignment: 0
+  labelAlignmentTransform: {fileID: 0}
+  labelMaxDistance: 250
+  labelFadeStartDistance: 200
+  labelScaleByDistance: 0
+  labelScaleMin: 1
+  labelScaleMax: 1
+  labelWorldSpaceScale: 0.005
   seeThrough: 2
   seeThroughOccluderMask:
     serializedVersion: 2
@@ -689,6 +819,7 @@ MonoBehaviour:
   seeThroughOccluderCheckIndividualObjects: 0
   seeThroughDepthOffset: 0
   seeThroughMaxDepth: 0
+  seeThroughFadeRange: 0
   seeThroughIntensity: 0.8
   seeThroughTintAlpha: 0.5
   seeThroughTintColor: {r: 1, g: 0, b: 0, a: 1}
@@ -705,6 +836,7 @@ MonoBehaviour:
   rmsCount: 2
   hitFxInitialIntensity: 0
   hitFxMode: 0
+  hitFXTriggerMode: 0
   hitFxFadeOutDuration: 0.25
   hitFxColor: {r: 1, g: 1, b: 1, a: 1}
   hitFxRadius: 0.5
@@ -730,9 +862,9 @@ AudioSource:
   Priority: 128
   DopplerLevel: 1
   MinDistance: 1
-  MaxDistance: 500
+  MaxDistance: 12
   Pan2D: 0
-  rolloffMode: 0
+  rolloffMode: 1
   BypassEffects: 0
   BypassListenerEffects: 0
   BypassReverbZones: 0
@@ -765,7 +897,7 @@ AudioSource:
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 0
+      value: 1
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -805,3 +937,37 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!65 &856361737470020145
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7655305126111379257}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.06724065, y: 0.22326237, z: 0.10000001}
+  m_Center: {x: -0.10350275, y: -0.0110578975, z: 2.6228443e-14}
+--- !u!114 &4886050430184841538
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7655305126111379257}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f8fed5b673ad4647893c606a95f4874, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DiegeticOccupancy
+  ShowTopMostFoldoutHeaderGroup: 1
