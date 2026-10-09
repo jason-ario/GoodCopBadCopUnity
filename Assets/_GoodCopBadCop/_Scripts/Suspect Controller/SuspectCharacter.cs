@@ -1809,30 +1809,61 @@ public class SuspectCharacter : Interactable
         // Booth suspects with an unplayed, non-forced authored intro start that conversation
         // only when a player deliberately interacts with them. Forced intros already started
         // automatically on arrival (see SuspectController.SayEntryDialogue) and are not
-        // re-triggerable here. The server validates current-suspect state and encounter
-        // history before it starts anything; the HasEncountered check here mirrors that so a
-        // suspect whose intro has already played falls through to the question conversation
-        // below instead of silently re-requesting an intro the server will just reject.
-        if (SuspectController.Instance?.CurrentSuspect == this &&
-            Data?.introDialogue != null && !Data.introDialogue.isForced &&
-            !SuspectEncounterManager.HasEncountered(Data))
+        // re-triggerable here.
+        //
+        // Encounter history lives in the HOST's save slot (SaveDataManager is local, not
+        // networked), so only the server can answer "has this intro played?". A non-host
+        // client's local check always reads "not encountered", so it asks the server instead;
+        // the server either starts the intro or replies with IntroUnavailableClientRpc, which
+        // opens the question conversation on that client. (Previously the client re-requested
+        // the intro forever and the server silently rejected it, so clients could never talk to
+        // a suspect again once the intro had played and its paperwork had been taken.)
+        if (IsIntroCandidate())
         {
-            RequestIntroDialogue(player);
-            return;
+            if (IsServer)
+            {
+                if (!SuspectEncounterManager.HasEncountered(Data))
+                {
+                    RequestIntroDialogue(player);
+                    return;
+                }
+            }
+            else if (!_clientKnowsIntroPlayed)
+            {
+                RequestIntroDialogue(player);
+                return;
+            }
         }
 
-        // Scene-placed suspects that are talked to directly (not through the booth) can be
-        // configured with a SuspectWorldDialogue for a simple 3-choice conversation. Booth
-        // suspects with authored SuspectData.questionResponses are lazily given one of their
-        // own (see Awake), sourced from that data, so the player can ask questions independent
-        // of the linear scripted intro/cutscene sequence — including checking for story
-        // mismatches via SuspectCharacter.GetQuestionResponse / StoryMismatchAnomaly.
-        if (worldDialogue != null)
-        {
-            worldDialogue.BeginConversation();
-            return;
-        }
+        OpenWorldDialogue();
     }
+
+    /// <summary>
+    /// True when this is the booth's current suspect and has an authored, non-forced intro, so
+    /// a direct interaction might need to start the intro instead of the question conversation.
+    /// Whether that intro has already played is server-only knowledge.
+    /// </summary>
+    private bool IsIntroCandidate() =>
+        SuspectController.Instance?.CurrentSuspect == this &&
+        Data?.introDialogue != null && !Data.introDialogue.isForced;
+
+    /// <summary>
+    /// Scene-placed suspects that are talked to directly (not through the booth) can be
+    /// configured with a SuspectWorldDialogue for a simple 3-choice conversation. Booth suspects
+    /// with authored SuspectData.questionResponses are lazily given one of their own (see Awake),
+    /// sourced from that data, so the player can ask questions independent of the linear scripted
+    /// intro/cutscene sequence — including checking for story mismatches via
+    /// SuspectCharacter.GetQuestionResponse / StoryMismatchAnomaly.
+    /// </summary>
+    private void OpenWorldDialogue()
+    {
+        if (worldDialogue != null)
+            worldDialogue.BeginConversation();
+    }
+
+    // Client-only cache: set once the server has told this client the intro already played, so
+    // later interactions open the question conversation immediately without a round trip.
+    private bool _clientKnowsIntroPlayed;
 
     private void RequestIntroDialogue(PlayerInteractionController player)
     {
@@ -1851,7 +1882,36 @@ public class SuspectCharacter : Interactable
     private void RequestIntroDialogueServerRpc(ServerRpcParams rpcParams = default)
     {
         if (_verdictClosed.Value || _mutantInteractionClosed.Value) return;
-        SuspectEncounterManager.Instance?.TryStartIntroDialogue(this, rpcParams.Receive.SenderClientId);
+
+        ulong senderClientId = rpcParams.Receive.SenderClientId;
+        if (SuspectEncounterManager.Instance != null &&
+            SuspectEncounterManager.Instance.TryStartIntroDialogue(this, senderClientId))
+            return;
+
+        // No intro to start (already played, no longer the current suspect, ...). Hand the
+        // interaction back to the requesting client so it falls through to the question
+        // conversation, exactly as the host's own Interact() does.
+        IntroUnavailableClientRpc(SuspectEncounterManager.HasEncountered(Data), new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { senderClientId } }
+        });
+    }
+
+    [ClientRpc]
+    private void IntroUnavailableClientRpc(bool introPlayed, ClientRpcParams rpcParams = default)
+    {
+        if (introPlayed)
+            _clientKnowsIntroPlayed = true;
+
+        // State may have changed during the round trip — re-apply Interact()'s gates.
+        if (_junkItem != null && _junkItem.IsCollectible.Value) return;
+        if (_interactionLocked.Value || _verdictClosed.Value || _mutantInteractionClosed.Value) return;
+        if (_walkingToBooth.Value || _dialogueInteractionDisabled) return;
+        if (Time.unscaledTime < _dialogueInteractionBlockedUntil) return;
+        // A locking dialogue/cutscene may have started while the request was in flight.
+        if (DialogueChoiceSystem.IsInDialogueMode) return;
+
+        OpenWorldDialogue();
     }
 
     public void SetCanInteract(bool canInteract)
