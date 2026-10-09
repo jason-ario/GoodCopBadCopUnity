@@ -23,6 +23,9 @@ public class BunkerDoorInteractable : Interactable
     [Tooltip("The diegetic wheel views available on this door, one per side. Whichever is nearest to the interacting player is opened.")]
     [SerializeField] private DoorWheelDiegeticController[] _wheelViews;
 
+    /// <summary>Replicated open state of the door this interactable drives (false if unassigned).</summary>
+    public bool IsDoorOpen => _bunkerDoor != null && _bunkerDoor.IsOpen;
+
     // ─── Interactable override ────────────────────────────────────────────────
 
     public override string GetInteractVerb(PlayerInteractionController player)

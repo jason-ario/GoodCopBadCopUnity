@@ -13,6 +13,9 @@ using UnityEngine.UI;
 ///   <item>While a gamepad is the active device, the Cancel button is focused when the dialog opens
 ///   (the safe default) and focus is restored if it leaves the dialog. D-pad / stick moves between
 ///   the buttons and A submits through the EventSystem.</item>
+///   <item>Navigation is explicit and confined to the two buttons (any direction toggles), so it can't
+///   escape to controls behind the dialog. Focus is visualized by <see cref="GamepadFocusHighlighter"/>
+///   for plain buttons, or by TextButton animators.</item>
 ///   <item>Gamepad B (East) cancels. Other B handlers (<see cref="GamepadBackButtonActivator"/>,
 ///   <see cref="MainMenuController"/>, <see cref="PauseMenuController"/>) check
 ///   <see cref="IsAnyOpenOutside"/> / <see cref="CancelHandledThisFrame"/> so one press only
@@ -66,7 +69,30 @@ public class ConfirmationDialogController : MonoBehaviour
         {
             cancelButton.onClick.AddListener(Cancel);
         }
+
+        LockNavigationToDialog();
     }
+
+    /// <summary>
+    /// Automatic navigation would search the whole canvas and can land on controls behind the dialog
+    /// (e.g. save slots under the delete overlay), which Update then snaps back to Cancel — so the
+    /// D-pad appeared to do nothing. Any direction now toggles between the dialog's two buttons.
+    /// </summary>
+    private void LockNavigationToDialog()
+    {
+        if (confirmButton == null || cancelButton == null) return;
+        confirmButton.navigation = ToggleTo(cancelButton);
+        cancelButton.navigation = ToggleTo(confirmButton);
+    }
+
+    private static Navigation ToggleTo(Selectable other) => new Navigation
+    {
+        mode = Navigation.Mode.Explicit,
+        selectOnUp = other,
+        selectOnDown = other,
+        selectOnLeft = other,
+        selectOnRight = other
+    };
 
     private void OnEnable()
     {

@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
@@ -21,6 +22,7 @@ public class GuardPurchaseScreenUI : MonoBehaviour
 
     private int _price;
     private bool _isHiredMode;
+    private int _shownFrame = -1;
 
     /// <summary>Configures the screen for purchase mode and sets the displayed price. Call before activating the screen.</summary>
     public void SetPurchaseMode(int price)
@@ -38,6 +40,7 @@ public class GuardPurchaseScreenUI : MonoBehaviour
 
     private void OnEnable()
     {
+        _shownFrame = Time.frameCount;
         if (_isHiredMode)
         {
             _purchaseContent.SetActive(false);
@@ -58,6 +61,18 @@ public class GuardPurchaseScreenUI : MonoBehaviour
     {
         if (GlobalHostVariables.Instance != null)
             GlobalHostVariables.Instance.money.OnValueChanged -= OnMoneyChanged;
+    }
+
+    /// <summary>Gamepad B closes the screen (same as No / Okay). A/D-pad go through the EventSystem.</summary>
+    private void Update()
+    {
+        // The press that opened the screen must not also close it.
+        if (Time.frameCount == _shownFrame) return;
+        if (!(Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)) return;
+        if (ConfirmationDialogController.IsAnyOpen || ConfirmationDialogController.CancelHandledThisFrame) return;
+        if (UIController.Instance == null || UIController.Instance.IsPaused) return;
+
+        UIController.Instance.CloseGuardPurchaseScreen();
     }
 
     private void OnMoneyChanged(int previousValue, int newValue) => RefreshYesButton();

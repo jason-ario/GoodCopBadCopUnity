@@ -48,10 +48,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 2673931910
   InScenePlacedSourceGlobalObjectIdHash: 2673931910
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -74,7 +76,9 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _scrubDuration: 5
   _completionThreshold: 0.7
+  _maxVisualDissolve: 0.65
   _graffitiRenderer: {fileID: 1744865776930580870}
+  _compassCategory: 2
 --- !u!1 &7498791199641812339
 GameObject:
   m_ObjectHideFlags: 0
@@ -142,7 +146,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 74332fa980f8f924194d3af1e711183a, type: 2}
+  - {fileID: 2100000, guid: aadd33bb21dab964397fb1af71692955, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

@@ -76,10 +76,19 @@ public class DoorWheelDiegeticController : DiegeticViewController
     [SerializeField] private float _closeDelayAfterUnlock = 1f;
 
     [Header("Prompt")]
-    [Tooltip("Text shown next to the LMB / RT icon while the view is open.")]
-    [SerializeField] private string _openPromptText = "to open";
+    // Renamed from _openPromptText ("to open") on purpose, so stale serialized values don't override the new text.
+    [Tooltip("Word(s) shown before the LMB / RT icon while the view is open.")]
+    [SerializeField] private string _promptPrefix = "Hold";
 
-    protected override string ActionPromptText => _openPromptText;
+    [Tooltip("Text shown after the LMB icon while the view is open (keyboard/mouse).")]
+    [SerializeField] private string _rotatePromptText = "to rotate";
+
+    [Tooltip("Text shown after the RT icon while a gamepad is active (RT grabs, right stick turns).")]
+    [SerializeField] private string _gamepadRotatePromptText = "+ Right Stick to rotate";
+
+    protected override string ActionPromptPrefix => _promptPrefix;
+    protected override string ActionPromptText => _rotatePromptText;
+    protected override string GamepadActionPromptText => _gamepadRotatePromptText;
 
     // ─── Runtime state ────────────────────────────────────────────────────────
 
@@ -195,14 +204,18 @@ public class DoorWheelDiegeticController : DiegeticViewController
 
         // Hover highlight: on while the cursor is over the wheel, and held on for the whole drag
         // (the cursor often leaves the collider while circling it).
-        SetWheelHighlighted(_isDragging || IsPointerOverWheel(cam));
+        // With a gamepad there's no cursor to aim, so the wheel (the view's only target) stays lit.
+        bool gamepadActive = ActiveInputDeviceTracker.IsGamepad;
+        SetWheelHighlighted(_isDragging || gamepadActive || IsPointerOverWheel(cam));
 
         // Not yet dragging: only a click that actually lands on the wheel starts a drag.
         // Letting go of the mouse elsewhere, or missing the wheel, has no effect — the
         // view itself stays open until the wheel is fully spun or the exit key is pressed.
+        // The gamepad Use Item button (RT) grabs the wheel directly — no pointer aim needed.
         if (!_isDragging)
         {
-            if (GrabDown && IsPointerOverWheel(cam))
+            bool padGrab = RebindableInput.GetGamepadDown(GameAction.UseItem);
+            if (padGrab || (GrabDown && IsPointerOverWheel(cam)))
             {
                 SetDragging(true);
                 _lastMouseAngle = GetMouseAngleAroundWheel(cam);

@@ -166,7 +166,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private static readonly Setting[] Controls =
         {
             new Setting("Mouse Sensitivity", "mouse_sensitivity", 50f).WithRange(1f, 100f),
-            new Setting("Invert Y Axis", "invert_y", "Off", "On"),
+            new Setting("Invert Y (Mouse)", "invert_y", "Off", "On"),
             new Setting("Controller Sensitivity", "controller_sensitivity", 50f).WithRange(1f, 100f),
             new Setting("Invert Y (Controller)", "controller_invert_y", "Off", "On"),
             new Setting("Crouch Mode", "crouch_mode", "Hold", "Toggle"),

@@ -543,6 +543,13 @@ public class Day_01 : DayBase
     private bool _breachEpilogueAdvanced;
     private bool _clockOutTaskShown;
 
+    // Once-per-day latches for the bunker step. The step can be entered from two sources on
+    // every peer — the fire-once punch RPC (OnClockOutAllClients) and the replicated clocked-out
+    // NetworkVariable (OnClockedOutStateChanged) — so a client that missed the local clock-out
+    // step (or the RPC) still gets "Open the bunker", but nobody ever gets it twice.
+    private bool _bunkerStepStarted;
+    private bool _openBunkerTaskShown;
+
     // Guards OnMutantBreachCleared against running more than once per breach — e.g. if
     // MutantBreachManager.OnBreachClearedAllClients ever fires twice for one breach, or this
     // handler ends up subscribed more than once (DayActivated re-subscribing without a matching
@@ -685,6 +692,14 @@ public class Day_01 : DayBase
         // Clock-in tutorial: hide the arrow on every client the instant the punch lands.
         TimecardMachine.OnClockInAllClients += OnClockInAllClientsLocal;
 
+        // End-of-day bunker step: driven off the REPLICATED clocked-out flag on every peer, so a
+        // client whose local post-breach/clock-out step never ran (or who missed the punch RPC)
+        // still advances to "Open the bunker". See OnClockedOutStateChangedForBunker.
+        _bunkerStepStarted   = false;
+        _openBunkerTaskShown = false;
+        TimecardMachine.OnClockedOutStateChanged -= OnClockedOutStateChangedForBunker;
+        TimecardMachine.OnClockedOutStateChanged += OnClockedOutStateChangedForBunker;
+
         // Subscribe to TutorialTaskSync events so all task transitions broadcast to every client.
         TutorialTaskSync.OnVladDocsBothPickedUpAllClients            += OnVladDocsBothPickedUpSync;
         TutorialTaskSync.OnQuarantineDocumentTutorialStartedAllClients += OnQuarantineTutorialStartedSync;
@@ -825,8 +840,8 @@ public class Day_01 : DayBase
         CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
 
         TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
-        if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnShiftEnd -= OnShiftEndedForBunker;
+        TimecardMachine.OnClockedOutStateChanged -= OnClockedOutStateChangedForBunker;
+        UnsubscribeShiftEndForBunker();
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
 
         MutantBreachManager.OnBreachStartedAllClients      -= OnMutantBreachStarted;
@@ -857,6 +872,8 @@ public class Day_01 : DayBase
         _taskGoToBed = null;
         _breachEpilogueAdvanced = false;
         _clockOutTaskShown = false;
+        _bunkerStepStarted = false;
+        _openBunkerTaskShown = false;
 
         // Release the trash/graffiti/fence objectives so Day 2+ get their rows from the
         // generic HUDTaskList/TaskRegistry bridge again (see HasCustomTutorialRow, set in DayActivated).
@@ -941,6 +958,9 @@ public class Day_01 : DayBase
         CleanGraffitiTask.OnProgressChanged -= OnGraffitiProgressChanged;
         BunkerDoorController.OnDoorOpened    -= OnBunkerDoorOpened;
         BunkBedInteractable.OnSleepConfirmed -= OnGoToBedSleepConfirmed;
+        TimecardMachine.OnClockOutAllClients     -= OnClockedOutForBunker;
+        TimecardMachine.OnClockedOutStateChanged -= OnClockedOutStateChangedForBunker;
+        UnsubscribeShiftEndForBunker();
 
         MutantBreachManager.OnBreachStartedAllClients      -= OnMutantBreachStarted;
         MutantBreachManager.OnBreachCountChangedAllClients -= OnMutantBreachCountChanged;
@@ -2845,7 +2865,7 @@ public class Day_01 : DayBase
         {
             Debug.Log("[Day_01] ShowClockOutTask — clock-out already registered for this cycle, " +
                       "advancing straight to the bunker step.");
-            WaitForShiftEndThenOpenBunker();
+            BeginBunkerStep();
             return;
         }
 
@@ -2883,6 +2903,41 @@ public class Day_01 : DayBase
     private void OnClockedOutForBunker()
     {
         Debug.Log("[Day_01] OnClockedOutForBunker fired.");
+        BeginBunkerStep();
+    }
+
+    /// <summary>
+    /// Replicated-state twin of <see cref="OnClockedOutForBunker"/>, subscribed on every peer for
+    /// the whole of Day 1 (see DayActivated). <see cref="OnClockedOutForBunker"/> is only
+    /// subscribed once THIS peer's local Day 1 flow reaches <see cref="ShowClockOutTask"/> — which
+    /// depends on a chain of client-local cleanup events (fence repairs, gore deposits) that a
+    /// client can miss or resolve late. When that happened, the client was never listening when
+    /// the host punched out and never received "Open the bunker" at all, while the host did.
+    /// The clocked-out flag is a server-owned NetworkVariable, so it reaches every client
+    /// regardless of where their local tutorial flow is.
+    /// </summary>
+    private void OnClockedOutStateChangedForBunker(bool clockedOut)
+    {
+        if (!clockedOut || _bunkerStepStarted) return;
+
+        Debug.Log("[Day_01] OnClockedOutStateChangedForBunker — replicated clock-out received; " +
+                  "entering bunker step.");
+        BeginBunkerStep();
+    }
+
+    /// <summary>
+    /// Single, latched entry into the end-of-day bunker sequence on this peer. Dismisses the
+    /// clock-out tutorial (and any post-breach cleanup rows a lagging client may still show),
+    /// then hides the list and waits for the shift to end before showing "Open the bunker".
+    /// </summary>
+    private void BeginBunkerStep()
+    {
+        if (_bunkerStepStarted) return;
+        _bunkerStepStarted = true;
+
+        // A lagging post-breach barrier on this peer must never add a "Clock out" row after
+        // the team has already punched out.
+        _clockOutTaskShown = true;
 
         TimecardMachine.OnClockOutAllClients -= OnClockedOutForBunker;
 
@@ -2892,13 +2947,24 @@ public class Day_01 : DayBase
         TutorialObjectiveList.Instance?.CompleteObjective(_taskClockOut);
         _taskClockOut = null;
 
+        // Drop any post-breach cleanup rows still tracked on this peer — they're wiped by the
+        // HideAndClear below anyway, and their handlers must not touch the list afterwards.
+        FenceRepairTask.OnProgressChanged    -= OnFixFencesProgressChanged;
+        FenceRepairTask.OnAllFencesRepaired  -= OnFixFencesTaskComplete;
+        TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
+        TakeOutTrashTask.OnAllItemsDeposited -= OnTakeOutGoreTaskComplete;
+        _taskFixFences   = null;
+        _taskTakeOutGore = null;
+
         HideObjectiveListThenRun(1.5f, WaitForShiftEndThenOpenBunker);
     }
 
     /// <summary>
     /// Proceeds to <see cref="ShowOpenBunkerTask"/> immediately if the shift has already ended
-    /// (e.g. slow client/network conditions), otherwise waits for
-    /// <see cref="ShiftManager.OnShiftEnd"/> to fire first. See <see cref="OnClockedOutForBunker"/>.
+    /// (e.g. slow client/network conditions), otherwise waits for the shift to end. Listens to
+    /// BOTH the <see cref="ShiftManager.OnShiftEnd"/> ClientRpc event and the replicated
+    /// <see cref="ShiftManager.shiftStarted"/> NetworkVariable so neither a missed RPC nor
+    /// RPC-vs-NetworkVariable arrival order on a client can strand the step.
     /// </summary>
     private void WaitForShiftEndThenOpenBunker()
     {
@@ -2912,17 +2978,28 @@ public class Day_01 : DayBase
             return;
         }
 
+        UnsubscribeShiftEndForBunker();
         ShiftManager.Instance.OnShiftEnd += OnShiftEndedForBunker;
+        ShiftManager.Instance.shiftStarted.OnValueChanged += OnShiftStartedChangedForBunker;
+    }
+
+    private void OnShiftStartedChangedForBunker(bool previous, bool current)
+    {
+        if (!current) OnShiftEndedForBunker();
     }
 
     private void OnShiftEndedForBunker()
     {
         Debug.Log("[Day_01] OnShiftEndedForBunker fired.");
-
-        if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnShiftEnd -= OnShiftEndedForBunker;
-
+        UnsubscribeShiftEndForBunker();
         ShowOpenBunkerTask();
+    }
+
+    private void UnsubscribeShiftEndForBunker()
+    {
+        if (ShiftManager.Instance == null) return;
+        ShiftManager.Instance.OnShiftEnd -= OnShiftEndedForBunker;
+        ShiftManager.Instance.shiftStarted.OnValueChanged -= OnShiftStartedChangedForBunker;
     }
 
     // ── Open Bunker ───────────────────────────────────────────────────────────
@@ -2933,6 +3010,13 @@ public class Day_01 : DayBase
     /// </summary>
     private void ShowOpenBunkerTask()
     {
+        if (_openBunkerTaskShown)
+        {
+            Debug.Log("[Day_01] ShowOpenBunkerTask — already shown this day, ignored.");
+            return;
+        }
+        _openBunkerTaskShown = true;
+
         Debug.Log("[Day_01] ShowOpenBunkerTask called.");
 
         _taskOpenBunker = TutorialObjectiveList.Instance?.AddObjective(_taskOpenBunkerText);
@@ -2942,7 +3026,17 @@ public class Day_01 : DayBase
 
         _bunkerDoorInteractable?.Highlight(true);
 
+        BunkerDoorController.OnDoorOpened -= OnBunkerDoorOpened;
         BunkerDoorController.OnDoorOpened += OnBunkerDoorOpened;
+
+        // The teammate may already have opened the door before this peer reached this step
+        // (OnDoorOpened is a fire-once RPC). Read the replicated door state and advance straight
+        // to "Go to bed" so this player isn't left on a task that can never complete.
+        if (_bunkerDoorInteractable != null && _bunkerDoorInteractable.IsDoorOpen)
+        {
+            Debug.Log("[Day_01] ShowOpenBunkerTask — bunker door already open, advancing to go-to-bed.");
+            OnBunkerDoorOpened();
+        }
     }
 
     private void OnBunkerDoorOpened()

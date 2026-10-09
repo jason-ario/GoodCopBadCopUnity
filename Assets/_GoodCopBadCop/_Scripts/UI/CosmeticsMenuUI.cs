@@ -55,6 +55,8 @@ public class CosmeticsMenuUI : MonoBehaviour
         if (_hatController != null)
             _hatController.OnHatChanged += RefreshSelection;
 
+        // Gamepad focus over the dynamically spawned hat buttons (B exits via the shared Back UI).
+        GamepadMenuNavigator.EnsureOn(gameObject);
         gameObject.SetActive(true);
     }
 

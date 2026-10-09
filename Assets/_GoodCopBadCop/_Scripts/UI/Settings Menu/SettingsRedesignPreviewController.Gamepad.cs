@@ -22,6 +22,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
     {
         private const int TabCount = 4;
         private const float NavStickDeadzone = .5f;
+        // Left/right on the stick changes values (e.g. flips "Invert Y"), so it needs a firmer, clearly
+        // horizontal push than vertical scrolling does, and is locked after a vertical step until the
+        // stick returns to neutral. Otherwise wobble while scrolling down silently toggled settings.
+        private const float NavStickAdjustThreshold = .8f;
+        private const float NavStickAdjustDominance = 2f;
+        private const float NavStickNeutral = .25f;
         private const float NavInitialRepeatDelay = .35f;
         private const float NavRepeatInterval = .09f;
         private const float SliderStep = 5f;
@@ -52,6 +58,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private float verticalNextRepeatTime;
         private int horizontalHeldDirection;
         private float horizontalNextRepeatTime;
+        private bool stickHorizontalLocked;
 
         private int dropdownHighlightIndex = -1;
         private readonly List<Image> dropdownOptionImages = new List<Image>();
@@ -181,7 +188,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             else if (keySubmit) SubmitFocused(false);
         }
 
-        private static void ReadNavigation(Gamepad gamepad, Keyboard keyboard, out int vertical, out int horizontal)
+        private void ReadNavigation(Gamepad gamepad, Keyboard keyboard, out int vertical, out int horizontal)
         {
             vertical = 0;
             horizontal = 0;
@@ -193,13 +200,22 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 if (gamepad.dpad.right.isPressed) horizontal += 1;
                 if (gamepad.dpad.left.isPressed) horizontal -= 1;
 
+                Vector2 stick = gamepad.leftStick.ReadValue();
+                if (stick.magnitude < NavStickNeutral) stickHorizontalLocked = false;
+
                 if (vertical == 0 && horizontal == 0)
                 {
-                    Vector2 stick = gamepad.leftStick.ReadValue();
-                    if (Mathf.Abs(stick.y) >= NavStickDeadzone && Mathf.Abs(stick.y) >= Mathf.Abs(stick.x))
+                    float absX = Mathf.Abs(stick.x);
+                    float absY = Mathf.Abs(stick.y);
+                    if (absY >= NavStickDeadzone && absY >= absX)
+                    {
                         vertical = stick.y > 0f ? 1 : -1;
-                    else if (Mathf.Abs(stick.x) >= NavStickDeadzone)
+                        stickHorizontalLocked = true;
+                    }
+                    else if (!stickHorizontalLocked && absX >= NavStickAdjustThreshold && absX >= absY * NavStickAdjustDominance)
+                    {
                         horizontal = stick.x > 0f ? 1 : -1;
+                    }
                 }
             }
 
@@ -244,6 +260,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             verticalHeldDirection = 0;
             horizontalHeldDirection = 0;
+            // Treat a stick still held from before (opening the menu / closing a dialog) as non-neutral.
+            stickHorizontalLocked = true;
         }
 
         /// <summary>Moving the mouse a few pixels hides gamepad focus so pointer interaction takes over.</summary>
