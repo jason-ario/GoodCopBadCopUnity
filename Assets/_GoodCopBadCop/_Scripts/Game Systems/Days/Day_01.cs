@@ -199,6 +199,10 @@ public class Day_01 : DayBase
              "Should exceed the 0.5 s rotation so he is fully facing the player.")]
     [SerializeField] private float _vladDialogueStartDelay = 1.2f;
 
+    [Tooltip("Extra seconds to wait before Vlad's dialogue when the shutter had to be forced open " +
+             "on his arrival (the player closed it as he walked up), so it can finish rising first.")]
+    [SerializeField] private float _vladForcedShutterOpenDialogueDelay = 0.8f;
+
     [Header("Day 1 — Vlad Paperwork Tutorial")]
     [Tooltip("Seconds after the scripted dialogue completes before Vlad's papers are placed on the desk.")]
     [SerializeField] private float _vladPaperworkDelay = 0.6f;
@@ -1175,7 +1179,32 @@ public class Day_01 : DayBase
             yield break;
         }
 
+        // The lever is left free after the opening sequence, so the player may have closed the
+        // shutter right before Vlad reached the window. Force it open before he starts talking.
+        if (ForceShutterOpenForVlad())
+            yield return new WaitForSeconds(_vladForcedShutterOpenDialogueDelay);
+
         ScriptedDialogueRunner.Instance.PlayDialogue(vlad, _vladDialogue, OnVladDialogueComplete);
+    }
+
+    /// <summary>
+    /// Server-only. Opens the booth shutter if it's closed, going through the networked
+    /// <see cref="Lever"/> so the lever arm, sound and shutter stay in sync on all clients.
+    /// Returns true if the shutter had to be opened.
+    /// </summary>
+    private bool ForceShutterOpenForVlad()
+    {
+        bool leverDown = _lever != null && !_lever.IsUp;
+        bool shutterClosed = ShutterController.Instance != null && !ShutterController.Instance.IsOpen;
+        if (!leverDown && !shutterClosed) return false;
+
+        if (_lever != null)
+            _lever.OpenServerSide();
+        else
+            ShutterController.Instance.OpenShutter();
+
+        Debug.Log("[Day_01] Shutter was closed when Vlad arrived — forced open before his dialogue.");
+        return true;
     }
 
     /// <summary>Called on the server once Vlad's scripted dialogue finishes.</summary>
