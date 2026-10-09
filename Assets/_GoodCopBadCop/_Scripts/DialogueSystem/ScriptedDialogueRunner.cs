@@ -1124,6 +1124,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // A proximity/late join is also a forced conversation — drop the phone first.
         Telephone.Instance?.ForceHangUpForDialogue();
 
+        // A late join always takes the dialogue lock — release any world conversation first
+        // (same reason as in EnterScriptedModeClientRpc).
+        if (PlayerInstance.Instance != null)
+            SuspectWorldDialogue.EndAllLocalConversations();
+
         UIController.Instance?.ClosePlayerUI();
 
         if (PlayerInstance.Instance == null) return;
@@ -1401,6 +1406,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Must run before ClosePlayerUI and the dialogue lock below — the instant put-down
         // restores the HUD/control the order screen had taken, which the lock then re-takes.
         Telephone.Instance?.ForceHangUpForDialogue();
+
+        // If this sequence is about to take the local player's dialogue lock (inside players, or
+        // outside players with lockOutsidePlayers), hand any world conversation they're in off
+        // cleanly first. Otherwise the lock is taken over underneath it, our exit later releases
+        // it (we own it now), and SuspectWorldDialogue is left with _inConversation stuck true:
+        // the player can walk around but BeginConversation no-ops forever, the server keeps them
+        // in that NPC's participant set (receiving other players' choices and blocking the vote),
+        // and IsLocalPlayerInConversation swallows their input for every later sequence.
+        if (PlayerInstance.Instance != null && (!PlayerInstance.Instance.IsOutsideLocal || lockOutsidePlayers))
+            SuspectWorldDialogue.EndAllLocalConversations();
 
         UIController.Instance?.ClosePlayerUI();
 
