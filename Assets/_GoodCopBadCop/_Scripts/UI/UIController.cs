@@ -113,6 +113,8 @@ public class UIController : MonoBehaviour
         GamepadMenuNavigator.EnsureOn(guardPurchaseScreen);
         GamepadMenuNavigator.EnsureOn(toolShopUI);
         GamepadMenuNavigator.EnsureOn(levelSelectUI);
+        // Start-shift screen (start-shift gate): child order puts "Start game" first.
+        GamepadMenuNavigator.EnsureOn(startShiftScreen);
     }
 
     private void Update()
@@ -161,6 +163,16 @@ public class UIController : MonoBehaviour
             {
                 OpenPauseMenu();
             }
+        }
+
+        // Gamepad B backs out of the start-shift screen (its Cancel button has no back activator).
+        // Checked before the playerUI early-out, since the screen hides the HUD while open.
+        if (startShiftScreen != null && startShiftScreen.activeSelf && !pauseMenuOpened
+            && (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)
+            && !ConfirmationDialogController.CancelHandledThisFrame
+            && !ConfirmationDialogController.IsAnyOpen)
+        {
+            CloseStartShiftScreen();
         }
 
         if (playerUI.activeSelf == false)

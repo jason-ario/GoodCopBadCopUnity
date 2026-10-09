@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Screen-space emote wheel overlay. The wheel visuals (background, dividers, and one
@@ -36,6 +37,16 @@ public class EmoteWheelUI : MonoBehaviour
     /// <summary>Read-only access to the emote definitions so <see cref="EmoteInputController"/> can look up data.</summary>
     public EmoteDefinition[] Emotes => _emotes;
 
+    [Header("Gamepad")]
+    [Tooltip("Minimum stick tilt (0-1) needed to aim at a slot.")]
+    [SerializeField, Range(0.1f, 0.95f)] private float _stickDeadzone = 0.5f;
+
+    private const float MouseMoveThresholdPixels = 4f;
+
+    private EmoteButton[] _buttons = Array.Empty<EmoteButton>();
+    private EmoteButton   _gamepadSlot;
+    private Vector2       _lastMousePosition;
+
     // ─── Unity lifecycle ────────────────────────────────────────────────────
 
     private void Awake()
@@ -47,6 +58,7 @@ public class EmoteWheelUI : MonoBehaviour
         }
         Instance = this;
 
+        _buttons = GetComponentsInChildren<EmoteButton>(includeInactive: true);
         gameObject.SetActive(false);
     }
 
@@ -54,6 +66,72 @@ public class EmoteWheelUI : MonoBehaviour
     {
         if (Instance == this)
             Instance = null;
+    }
+
+    private void OnEnable()
+    {
+        _gamepadSlot = null;
+        _lastMousePosition = Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
+    }
+
+    /// <summary>
+    /// Gamepad selection: either stick aims at the slot closest to its direction (the highlight
+    /// stays after the stick is released), and A / RT plays the highlighted emote. Moving the
+    /// mouse hands highlighting back to pointer hover.
+    /// </summary>
+    private void Update()
+    {
+        if (Mouse.current != null)
+        {
+            Vector2 mousePos = Mouse.current.position.ReadValue();
+            if ((mousePos - _lastMousePosition).sqrMagnitude >= MouseMoveThresholdPixels * MouseMoveThresholdPixels)
+            {
+                _lastMousePosition = mousePos;
+                SetGamepadSlot(null);
+            }
+        }
+
+        Gamepad gp = Gamepad.current;
+        if (gp == null) return;
+
+        Vector2 left = gp.leftStick.ReadValue();
+        Vector2 right = gp.rightStick.ReadValue();
+        Vector2 aim = right.sqrMagnitude >= left.sqrMagnitude ? right : left;
+        if (aim.sqrMagnitude >= _stickDeadzone * _stickDeadzone)
+            SetGamepadSlot(FindSlotInDirection(aim));
+
+        if (_gamepadSlot != null && (gp.buttonSouth.wasPressedThisFrame || gp.rightTrigger.wasPressedThisFrame))
+            _gamepadSlot.GamepadPress();
+    }
+
+    private EmoteButton FindSlotInDirection(Vector2 aim)
+    {
+        EmoteButton best = null;
+        float bestDelta = float.MaxValue;
+        float aimAngle = Mathf.Atan2(aim.y, aim.x) * Mathf.Rad2Deg;
+
+        foreach (EmoteButton button in _buttons)
+        {
+            if (button == null || !button.isActiveAndEnabled) continue;
+            if (!button.TryGetScreenDirection(out Vector2 dir)) continue;
+
+            float delta = Mathf.Abs(Mathf.DeltaAngle(aimAngle, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg));
+            if (delta < bestDelta)
+            {
+                bestDelta = delta;
+                best = button;
+            }
+        }
+
+        return best;
+    }
+
+    private void SetGamepadSlot(EmoteButton slot)
+    {
+        if (_gamepadSlot == slot) return;
+        if (_gamepadSlot != null) _gamepadSlot.SetGamepadHighlight(false);
+        _gamepadSlot = slot;
+        if (_gamepadSlot != null) _gamepadSlot.SetGamepadHighlight(true);
     }
 
     // ─── Public API ─────────────────────────────────────────────────────────
@@ -65,8 +143,9 @@ public class EmoteWheelUI : MonoBehaviour
 
     public void Hide()
     {
-        foreach (EmoteButton button in GetComponentsInChildren<EmoteButton>(includeInactive: true))
-            button.Deselect();
+        _gamepadSlot = null;
+        foreach (EmoteButton button in _buttons)
+            if (button != null) button.Deselect();
 
         gameObject.SetActive(false);
     }

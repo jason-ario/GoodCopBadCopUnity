@@ -23,6 +23,9 @@ using UnityEngine.UI;
 /// A per-frame watchdog in <see cref="Update"/> force-releases the press if the mouse/gamepad
 /// submit button is no longer physically held, even if no OnPointerUp event ever arrives (e.g.
 /// the button was released outside the game view).
+///
+/// Gamepad: <see cref="EmoteWheelUI"/> aims with a stick and calls <see cref="SetGamepadHighlight"/>
+/// / <see cref="GamepadPress"/>; the gamepad highlight shares the hover overlay.
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class EmoteButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler, ICanvasRaycastFilter
@@ -56,11 +59,18 @@ public class EmoteButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
     private Image          _overlayImage;
     private RectTransform  _hitArea;
     private EmoteButton[]  _slots;
+    private Button         _button;
     private bool           _isHovering;
     private bool           _isPressed;
+    private bool           _isGamepadHighlighted;
+
+    /// <summary>True while the pointer hovers this slot or the gamepad stick has it highlighted.</summary>
+    private bool IsHighlighted => _isHovering || _isGamepadHighlighted;
 
     private void Awake()
     {
+        _button = GetComponent<Button>();
+
         if (selectedOverlay != null)
         {
             _overlayImage = selectedOverlay.GetComponent<Image>();
@@ -87,7 +97,9 @@ public class EmoteButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
     {
         if (!_isPressed) return;
 
-        bool stillHeld = Input.GetMouseButton(0) || (Gamepad.current?.buttonSouth.isPressed ?? false);
+        Gamepad gp = Gamepad.current;
+        bool stillHeld = Input.GetMouseButton(0)
+                         || (gp != null && (gp.buttonSouth.isPressed || gp.rightTrigger.isPressed));
         if (!stillHeld)
             EndPress();
     }
@@ -105,7 +117,47 @@ public class EmoteButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
         if (_isPressed)
             EndPress();
         else
-            SetOverlay(false, hoverAlpha);
+            SetOverlay(IsHighlighted, hoverAlpha);
+    }
+
+    // ─── Gamepad ────────────────────────────────────────────────────────────
+
+    /// <summary>Stick-driven highlight, set by <see cref="EmoteWheelUI"/> while a gamepad aims at this slot.</summary>
+    public void SetGamepadHighlight(bool highlighted)
+    {
+        if (_isGamepadHighlighted == highlighted) return;
+        _isGamepadHighlighted = highlighted;
+        if (!_isPressed)
+            SetOverlay(IsHighlighted, hoverAlpha);
+    }
+
+    /// <summary>
+    /// Gamepad confirm on this slot: shows the pressed overlay (released by the Update watchdog once
+    /// the confirm button is let go) and invokes the Button's OnClick, the same path as a mouse click.
+    /// </summary>
+    public void GamepadPress()
+    {
+        if (_button == null || !_button.isActiveAndEnabled || !_button.IsInteractable()) return;
+
+        _isPressed = true;
+        SetOverlay(true, 1f);
+        _button.onClick.Invoke();
+    }
+
+    /// <summary>Screen-space direction from the wheel center to this slot.</summary>
+    public bool TryGetScreenDirection(out Vector2 direction)
+    {
+        direction = Vector2.zero;
+        if (wheelRect == null || directionReference == null) return false;
+
+        Canvas canvas = GetComponentInParent<Canvas>();
+        Canvas root = canvas != null ? canvas.rootCanvas : null;
+        Camera cam = root != null && root.renderMode != RenderMode.ScreenSpaceOverlay ? root.worldCamera : null;
+
+        Vector2 center = RectTransformUtility.WorldToScreenPoint(cam, wheelRect.TransformPoint(wheelRect.rect.center));
+        Vector2 slot = RectTransformUtility.WorldToScreenPoint(cam, directionReference.TransformPoint(directionReference.rect.center));
+        direction = slot - center;
+        return direction.sqrMagnitude > 0.0001f;
     }
 
     public void OnPointerDown(PointerEventData eventData)
@@ -125,6 +177,7 @@ public class EmoteButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
     {
         _isPressed = false;
         _isHovering = false;
+        _isGamepadHighlighted = false;
         SetOverlay(false, hoverAlpha);
     }
 
@@ -205,7 +258,7 @@ public class EmoteButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHand
     private void EndPress()
     {
         _isPressed = false;
-        SetOverlay(_isHovering, hoverAlpha);
+        SetOverlay(IsHighlighted, hoverAlpha);
     }
 
     private void SetOverlay(bool active, float alpha)
