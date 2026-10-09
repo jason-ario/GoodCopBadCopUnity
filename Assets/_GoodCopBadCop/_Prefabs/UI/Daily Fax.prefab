@@ -126,7 +126,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.0000004768371, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -0.053467017, y: 1.3925759, z: -16.729324}
-  m_LocalScale: {x: 0.8, y: 0.8, z: 0.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5789133743623010889}
@@ -535,7 +535,12 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: 
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   itemData: {fileID: 11400000, guid: b461997275e72d04cb8437e4c40c335b, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
@@ -608,8 +613,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HeldItemZoomable
   _cameraAnchor: {fileID: 0}
+  _anchorPullback: 0
   _focusPoint: {fileID: 0}
-  _fieldOfView: 40
+  _faceDocumentSurface: 0
+  _documentSurface: {fileID: 0}
   _zoomDistance: 0
   _autoFitPadding: 0.8
   _minDistance: 0.08
