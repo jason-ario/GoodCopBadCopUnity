@@ -59,6 +59,18 @@ public class SuspectRunRecords : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// SERVER: rebuilds the runtime records from the active save slot. Start() runs when Main.unity
+    /// loads, which is before the main menu selects/initialises a slot (Continue, slot pick), so the
+    /// records it built reflect no slot or a stale one. CampaignManager.StartCampaign calls this once
+    /// the slot is live, so quarantines, kills and infection scores from the checkpoint (day-start or
+    /// Dusk) are restored before the day activates and the Quarantine Board refreshes.
+    /// </summary>
+    public void ReloadFromSave()
+    {
+        InitializeRecordsForRun();
+    }
+
     private void InitializeRecordsForRun()
     {
         records.Clear();

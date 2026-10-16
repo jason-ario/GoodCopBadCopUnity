@@ -40,90 +40,76 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 793074409391834654, guid: afd46dd979f4ef9429d317cb91da466c, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Returning to my studio to finish a commissioned portrait.
-    - Pharmacy, then the gallery storeroom. Going home.
-    - Picking up a delivery of fresh canvases.
+    - Finishing a commissioned portrait.
+    - Pharmacy, then gallery storeroom. Home.
+    - Picking up fresh canvases.
     midDaysReasons:
-    - Three pharmacies for my prescription. Got half. Going home.
-    - Going to my studio. The violet sky will not wait.
-    - Going home for more charcoal. The light is changing.
+    - Three pharmacies. Got half. Home.
+    - To my studio. The violet won't wait.
+    - Home for charcoal. The light is changing.
     finalDaysReasons:
-    - Going up to the roof of my studio. The light is dying.
-    - Going home to finish my final canvas.
-    - Fulfilling mandatory resident census requirements.
+    - To my studio roof. The light is dying.
+    - Home to finish my final canvas.
+    - Mandatory resident census.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Returning from my shift at the bank. Numbers all day.
-    - Going home to my grandmother. I am her caretaker.
-    - Selling off my paints. I stopped painting years ago.
+    - Home from my bank shift. Numbers all day.
+    - Home to care for my grandmother.
+    - Selling my paints. I quit years ago.
     midDaysReasons:
-    - Returning home. I threw my pills away, I never needed them.
-    - Going home to sleep. Colours have never interested me.
-    - Back from evening classes. I am training as an engineer.
+    - Threw my pills away. Never needed them.
+    - Going to sleep. Colours bore me.
+    - Back from engineering night classes.
     finalDaysReasons:
-    - Going home to rest. I do not care what the light does.
-    - Collecting my pension. Retired from the post office.
-    - Going home to burn my sketchbooks. Pointless scribbles.
+    - Home to rest. Light doesn't matter.
+    - Collecting my post office pension.
+    - Going home to burn my sketchbooks.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Hello. My documents are right here. I hope the charcoal smudges don't bother you.
-    - The way the shadows fall across your booth today is quite striking.
-    - "I\u2019m just heading back to my studio. The morning light was perfect for sketching."
+    - My documents. Sorry about the charcoal smudges.
+    - The shadows across your booth are quite striking today.
     dialoguesMidDays:
-    - Have you noticed the sky is turning a shade of violet that shouldn't exist?
-    - "Here is my ID. I\u2019m in a hurry; the horizon is melting and I need to paint it."
-    - "Everything feels like it\u2019s being sketched in shaky lines lately. Do you feel it too?"
+    - The sky is a violet that shouldn't exist. Have you noticed?
+    - Hurry, please. The horizon is melting. I must paint it.
     dialoguesFinalDays:
-    - The world is finally becoming the abstract piece I always dreamed of.
-    - "I\u2019ve run out of red paint, but the sunset is providing plenty of inspiration."
-    - "I\u2019m going home to finish my final canvas. The white space is almost gone."
+    - The world is finally becoming the abstract piece I dreamed of.
+    - Out of red paint. The sunset provides plenty.
   uncannyEntryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Here. She places the documents down without looking at you.
-    - You want something. I can tell. Everyone does.
-    - My papers. She says nothing else. No expression. No follow-up.
+    - Here. She sets the papers down without looking.
+    - You want something. Everyone does.
     dialoguesMidDays:
-    - She does not speak immediately. She just watches you.
-    - Here. Nothing else.
-    - I know the process. The documents are already down before you have asked.
+    - She does not speak. She just watches you.
+    - The papers are down before you ask.
     dialoguesFinalDays:
-    - She stands very still. Too still.
     - Take them. She has not blinked in some time.
-    - She is just there. Waiting. Like she has been waiting for a long time.
+    - She stands very still. Waiting. Too long.
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Thank you. Try to stay in the light; the composition is better there.
+    - Stay in the light. Better composition there.
     dialoguesMidDays:
-    - "Good luck. Watch the colors, they\u2019re starting to bleed into each other."
+    - Good luck. Watch the colours. They're starting to bleed.
     dialoguesFinalDays:
-    - "I\u2019ll see you in the masterpiece. Don't blink."
+    - I'll see you in the masterpiece. Don't blink.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - "A room with white walls? Actually, that\u2019s a perfect blank canvas."
-    dialoguesMidDays:
-    - Will you bring me some pencils? I have so much I need to record.
-    dialoguesFinalDays:
-    - Isolation is just a frame for the mind. I don't mind staying here.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - Oh... and I haven't even... finished the background...
-    dialoguesMidDays:
-    - Everything is... turning to... black ink...
-    dialoguesFinalDays:
-    - Finally... the perfect... shade of... nothing.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - A white room? With good lighting? Fine. Absolutely fine.
-  - "I\u2019ll need my sketchbook. The shadows in here are extraordinary."
-  - Every great artist was imprisoned at some point. This is very on-brand.
+  - A white room with good lighting? Fine. Absolutely fine.
+  - Great artists all get imprisoned. Very on-brand.
   killExitLines:
   - "I hadn\u2019t signed the last canvas\u2026 It needed one more pass\u2026"
-  - "All that light and I never\u2026 I never quite\u2026 captured it\u2026"
-  - "The color was right there\u2026 right there at the edge of the\u2026"
+  - "All that light and I never\u2026 quite captured it\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: e84fb141c1e8ae04f9ceabd92077e275, type: 3}
   - {fileID: 8300000, guid: a46971d9694b4cd4fb94c9034f99e09a, type: 3}
@@ -138,50 +124,41 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 049dc9e9130a49640a3f8a9e8eca4577, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The pharmacy. My prescription. Then the gallery storeroom. Does it matter which first?
-    midDaysAnswer: Three pharmacies. The first two were empty. The third had half my prescription. Half will do.
-    finalDaysAnswer: The roof above my studio. The light is dying, and I seem to be the only one recording it.
-    mismatchEarlyDaysAnswer: The textile factory. Night shift on the looms. Painting never paid, so I gave it up.
-    mismatchMidDaysAnswer: The pharmacy. Aspirin for a neighbour. I have never needed a prescription in my life.
-    mismatchFinalDaysAnswer: The train station. I only arrived in this district this morning. Charming place.
+    earlyDaysAnswer: The pharmacy, then the gallery storeroom. Does order matter?
+    midDaysAnswer: Three pharmacies. Got half my prescription. Half will do.
+    finalDaysAnswer: My studio roof. The light is dying. Someone must record it.
+    mismatchEarlyDaysAnswer: The textile looms. Painting never paid, so I quit.
+    mismatchMidDaysAnswer: Aspirin for a neighbour. I've never needed a prescription.
+    mismatchFinalDaysAnswer: The train station. I only arrived here this morning.
     uncannyEarlyDaysAnswer: Somewhere. It is not relevant.
-    uncannyMidDaysAnswer: I do not remember exactly. The walk was long.
-    uncannyFinalDaysAnswer: She considers the question for too long. I do not know.
+    uncannyMidDaysAnswer: I do not remember. The walk was long.
+    uncannyFinalDaysAnswer: She considers it for too long. I do not know.
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: I have a condition. It's managed. Tamar sees to it in the mornings. That is all you need to know.
-    midDaysAnswer: The pills are harder to find. My hands tremble a little without them. The charcoal hides it.
-    finalDaysAnswer: I'm tired, and the colours hurt my eyes some mornings. I work through it. There isn't much time.
-    mismatchEarlyDaysAnswer: Nothing. I've never had a condition, and no one has ever needed to check on me.
-    mismatchMidDaysAnswer: None. And my hands are clean, look. I never touch charcoal. It ruins the skin.
-    mismatchFinalDaysAnswer: My eyes? Perfect. I haven't painted in years, so nothing strains them.
-    uncannyEarlyDaysAnswer: No symptoms. There is nothing left to be symptomatic of.
-    uncannyMidDaysAnswer: I used to feel cold. I do not anymore. Write that down, if you must.
-    uncannyFinalDaysAnswer: She tilts her head slightly. I do not think that question applies anymore.
+    earlyDaysAnswer: A managed condition. Tamar sees to it mornings. That's all.
+    midDaysAnswer: Pills are scarce. My hands tremble. Charcoal hides it.
+    finalDaysAnswer: Tired. Colours hurt my eyes. There isn't much time.
+    mismatchEarlyDaysAnswer: Nothing. I've never had a condition. Nobody checks on me.
+    mismatchMidDaysAnswer: None. Clean hands, look. Charcoal ruins the skin.
+    mismatchFinalDaysAnswer: My eyes? Perfect. I haven't painted in years.
+    uncannyEarlyDaysAnswer: No symptoms. Nothing left to be symptomatic of.
+    uncannyMidDaysAnswer: I used to feel cold. Not anymore. Write that down.
+    uncannyFinalDaysAnswer: She tilts her head. That question no longer applies.
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - The shadow your booth makes at this hour is really quite striking. I keep meaning to sketch it.
     - You have a good face for charcoal. Very strong lines.
-    - The smog is giving everything this incredible amber quality. It is almost worth it.
+    - The smog makes everything amber. Almost worth it.
     midDays:
-    - Have you looked at the sky today? That violet should not exist. I am obsessed with it.
-    - Everything is starting to look like it is being drawn in pencil. Do you feel that?
-    - I have almost run out of yellow. I do not think I need it anymore.
+    - That violet sky should not exist. I'm obsessed.
+    - Almost out of yellow. I don't think I need it now.
     finalDays:
-    - I have almost run out of red. The sky keeps giving me more reference.
-    - You are the most interesting face I have had to draw in a while, officer. I hope you know that.
-    - The world is finally becoming the abstract piece I always dreamed of.
+    - Almost out of red. The sky keeps giving me reference.
+    - You're the most interesting face I've drawn in ages.
     uncannyEarlyDays:
-    - She stands very still and says nothing for a long time.
-    - The face behind the mask is less interesting than people think.
-    - Did you say something just now?
+    - The face behind the mask is less interesting than you think.
     uncannyMidDays:
-    - She watches you from the corner of her eye. Not hostile. Just watching.
     - You are very loud. Your breathing.
-    - I used to feel cold. I do not anymore.
     uncannyFinalDays:
-    - Something about her stillness is wrong. It has no weight to it.
-    - There is nothing behind the mask. Just like you suspected.
-    - I am still here. I am not sure why.
+    - There is nothing behind the mask. As you suspected.
   IDNumber: 9722713

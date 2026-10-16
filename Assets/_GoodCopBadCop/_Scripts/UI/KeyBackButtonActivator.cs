@@ -66,7 +66,9 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
     }
 
     /// <summary>True if this activator's own Button can currently be clicked.</summary>
-    public bool IsClickable => _button != null && _button.isActiveAndEnabled && _button.interactable;
+    // IsInteractable() also respects parent CanvasGroups, so Back buttons on a screen hidden by
+    // the pause menu (PauseHiddenScreen) stop owning Escape/clicks until it is shown again.
+    public bool IsClickable => _button != null && _button.isActiveAndEnabled && _button.IsInteractable();
 
     /// <summary>
     /// Plays the Back click sound at most once per frame. Pointer presses are skipped when a
@@ -105,7 +107,7 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
         if (!(Keyboard.current?[_key].wasPressedThisFrame ?? false)) return;
         if (Time.frameCount == _enabledFrame) return;
 
-        if (_key == Key.Escape && _button != null && _button.isActiveAndEnabled && _button.interactable)
+        if (_key == Key.Escape && IsClickable)
             EscapeBackButtonPressedThisFrame = true;
 
         // Checked before invoking, since the Back action usually deactivates this screen.
@@ -126,10 +128,7 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
     {
         foreach (var activator in _instances)
         {
-            if (activator._key == Key.Escape
-                && activator._button != null
-                && activator._button.isActiveAndEnabled
-                && activator._button.interactable)
+            if (activator._key == Key.Escape && activator.IsClickable)
             {
                 AnyEscapeBackButtonInteractable = true;
                 return;
@@ -146,10 +145,7 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
     /// </summary>
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (eventData.button != PointerEventData.InputButton.Left
-            || _button == null
-            || !_button.isActiveAndEnabled
-            || !_button.interactable)
+        if (eventData.button != PointerEventData.InputButton.Left || !IsClickable)
             return;
 
         PlayClickSfx(true);
@@ -161,7 +157,7 @@ public class KeyBackButtonActivator : MonoBehaviour, IPointerClickHandler
     /// <summary>Invokes this activator's Button.onClick if it is currently clickable.</summary>
     public void InvokeButton()
     {
-        if (_button == null || !_button.isActiveAndEnabled || !_button.interactable) return;
+        if (!IsClickable) return;
         _button.onClick.Invoke();
     }
 }

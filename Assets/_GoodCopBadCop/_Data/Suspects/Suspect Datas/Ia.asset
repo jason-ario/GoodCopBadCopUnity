@@ -35,90 +35,70 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 7880033083019812546, guid: 692963596e3dede499489345bf734a53, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Returning to the library to organize the archives.
-    - Resident returning from a neighborhood book club.
-    - Picking up a kerosene lamp for the reading room.
+    - Organizing the library archives.
+    - Back from the neighbourhood book club.
+    - Fetching a kerosene lamp for reading.
     midDaysReasons:
-    - Escaping the thick smog for the indoor vaults.
-    - Checking the humidity seals in the rare books section.
-    - Returning books my readers will not need again.
+    - Escaping the smog into the vaults.
+    - Checking rare book humidity seals.
+    - Returning books readers won't need again.
     finalDaysReasons:
-    - Unlocked the library. No one came. Going home.
-    - Going home to read the last chapter.
-    - Fulfilling the mandatory residency count.
+    - Library's open. No one came. Home.
+    - Home to read the last chapter.
+    - The mandatory residency count.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Collecting my first library card. I never read much.
-    - Night shift at the bakery. Twenty years now.
-    - Visiting from Kutaisi. Seeing the city sights.
+    - Getting my first library card. Rarely read.
+    - Bakery night shift, twenty years now.
+    - Visiting from Kutaisi, seeing the sights.
     midDaysReasons:
-    - Taking my husband and children to the shelter.
+    - Taking my husband and children to shelter.
     - Panicking. I need a doctor for my nerves.
-    - Reporting for duty at the steel works. Furnace three.
+    - Furnace three duty at the steel works.
     finalDaysReasons:
-    - Burning the library's books for heat. They're only paper.
-    - Retiring after forty years. Collecting my pension.
-    - Fleeing to my sister's. None of us saw this coming.
+    - Burning library books for heat. Just paper.
+    - Retiring after forty years. Collecting pension.
+    - Fleeing to my sister's. Never saw this coming.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - "You have a very interesting lifeline. It\u2019s shorter than you think."
-    - "I\u2019m just returning. Some stories are better left on the shelf."
-    - "Don't worry about the dust on my coat. We\u2019ll all be dust soon."
+    - You have a very interesting lifeline. It's shorter than you think.
+    - Don't mind the dust on my coat. We'll all be dust soon.
     dialoguesMidDays:
-    - The ink is running dry in the ledger. Can you feel it?
     - I saw a bird fly backward today. The clock is resetting itself.
-    - "You look like a man who hasn't realized he\u2019s in the final chapter."
+    - You look like a man who hasn't realized he's in the final chapter.
     dialoguesFinalDays:
     - Why bother with the gate? The walls are already ghosts.
-    - The great silence is coming to turn the final page.
-    - "I\u2019ve seen your ending. It\u2019s quite dark, but very quiet."
+    - I've seen your ending. It's quite dark, but very quiet.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Go on then. Your story still has a few pages left.
+    - Go on. Your story still has a few pages.
     dialoguesMidDays:
-    - "You\u2019re letting the ending inside. I hope you\u2019re ready."
+    - You're letting the ending inside. I hope you're ready.
     dialoguesFinalDays:
-    - It doesn't matter where you go. The ink is already dry.
+    - Go where you like. The ink is already dry.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - A room without books. How very dull for us both.
-    dialoguesMidDays:
-    - You think a cage changes the plot? How charmingly naive.
-    dialoguesFinalDays:
-    - Isolation is just a waiting room for the inevitable.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - "A violent edit. I suppose that\u2019s one way to end it."
-    dialoguesMidDays:
-    - "You\u2019ve skipped straight to the epilogue. A shame."
-    dialoguesFinalDays:
-    - "And so, the book is closed. I\u2019ll see you in the dark."
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
   - A room without a window. How very on-the-nose.
-  - You think the cage changes the story. It doesn't. But I appreciate the effort.
-  - This chapter was always going to end this way. You simply turned the page.
+  - You think the cage changes the story. It doesn't.
   killExitLines:
-  - "And so the author\u2019s hand strikes. Clean work, as endings go."
-  - I saw this page coming long before you did. It reads exactly as expected.
-  - "Don\u2019t feel guilty. This was always my last line."
+  - And so the author's hand strikes. Clean work, as endings go.
+  - Don't feel guilty. This was always my last line.
   voiceAudioClips:
   - {fileID: 8300000, guid: 9f96796e4f0b2f34bb0154d7e33d7851, type: 3}
   - {fileID: 8300000, guid: 18a6ea29b48f10c4d9d9144447654faf, type: 3}
@@ -133,41 +113,37 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: a860c39d3bee20a4dbf1652f7a813971, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The archive on the hill. I opened it at eight, as always. Three readers today. One of them will not return.
-    midDaysAnswer: The rare books vault. The smog gets into the bindings. I sealed what I could. The rest will keep its own secrets.
-    finalDaysAnswer: The library. I still unlock the door each morning. No one comes. The shelves do not mind.
-    mismatchEarlyDaysAnswer: The school on Chavchavadze Street. I teach literature to the little ones. Twenty years now.
-    mismatchMidDaysAnswer: Home. My husband keeps the stove going while I read. He sends his regards.
-    mismatchFinalDaysAnswer: The archive? It closed years ago. I have not set foot there since.
+    earlyDaysAnswer: The archive on the hill. Three readers today. One will not return.
+    midDaysAnswer: The rare books vault. The smog gets into the bindings. I sealed what I could.
+    finalDaysAnswer: The library. I still unlock it each morning. No one comes.
+    mismatchEarlyDaysAnswer: The school on Chavchavadze Street. Twenty years teaching children literature.
+    mismatchMidDaysAnswer: Home. My husband keeps the stove going while I read.
+    mismatchFinalDaysAnswer: The archive? It closed years ago. I haven't been since.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: None. I sleep well. Though I dreamt something last night I had no right to know.
-    midDaysAnswer: My hands are cold. Weeks now. And the headaches arrive before the weather does.
-    finalDaysAnswer: I tire quickly. The stairs up to the archive take longer. Everything is as I expected.
-    mismatchEarlyDaysAnswer: Nothing. Past sixty, one expects a little stiffness. Nothing more than that.
-    mismatchMidDaysAnswer: Warm hands, clear head. I have no idea what tomorrow holds, officer. No more than anyone does.
-    mismatchFinalDaysAnswer: Nothing now. The doctor forbade me the stairs to the archive, so I rest at home. It has helped.
+    earlyDaysAnswer: None. I sleep well. Though I dreamt something I had no right to know.
+    midDaysAnswer: Cold hands, for weeks now. The headaches arrive before the weather does.
+    finalDaysAnswer: I tire quickly. The archive stairs take longer. All as I expected.
+    mismatchEarlyDaysAnswer: Nothing. Past sixty, a little stiffness. Nothing more than that.
+    mismatchMidDaysAnswer: Warm hands, clear head. I have no idea what tomorrow holds.
+    mismatchFinalDaysAnswer: Nothing now. The doctor forbade me the archive stairs, so I rest.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - You have interesting hands, officer. Very short lifeline.
-    - I read the same page three times this morning. It said something different each time.
+    - I read one page three times. It said something different each time.
     - That window behind you. I would not stand so close to it.
-    - The last three people who sat where you sit did not last the week. Just something I noticed.
     midDays:
     - You look tired. Sleep while you still dream things worth dreaming.
-    - I would not touch the ink today. It has a different smell than yesterday.
-    - Do you feel the city getting quieter? That is not a good sign, officer.
+    - I would not touch the ink today. It smells different than yesterday.
     finalDays:
     - Your ending is very close now. It reads quite peacefully, I assure you.
-    - Do not look so worried. The last chapter always comes eventually.
-    - I have already read past this part. You do not need to know what happens next.
+    - I've already read past this part. You needn't know what happens next.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

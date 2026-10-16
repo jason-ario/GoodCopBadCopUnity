@@ -35,90 +35,70 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 5692054325713852150, guid: 152c7a3af09b2704097391328df986eb, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Going home from school on Lenina Street. Mom is waiting.
-    - Going home to my mom. I found a shiny stone today.
-    - Retrieving a lost toy from the park.
+    - Home from school on Lenina Street.
+    - Home to Mom with a shiny stone.
+    - Getting my lost toy back.
     midDaysReasons:
-    - School let out early. The rain was black.
-    - Going home to Mom. Only four of us came to school today.
-    - Seeking shelter from the black rain.
+    - School let out early. Black rain.
+    - Home. Only four came to school.
+    - Hiding from the black rain.
     finalDaysReasons:
-    - Back from the census hall. They wrote my name in the big book.
-    - Going home to Mom. My dolls are waiting for me too.
-    - Fulfilling mandatory youth census.
+    - The census hall wrote my name.
+    - Home to Mom and my dolls.
+    - Doing the youth census.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Coming home from my night shift at the tram depot.
+    - Off my tram depot night shift.
     - Picking up my son from kindergarten.
-    - Driving home. I parked my car by the gate.
+    - Driving home. Car's by the gate.
     midDaysReasons:
-    - Back from university. My exams start next week.
-    - Reporting to the factory. I was called in for the night shift.
-    - Picking up my driving licence from the militia office.
+    - Back from university. Exams next week.
+    - Called in for the factory night shift.
+    - Collecting my driving licence.
     finalDaysReasons:
-    - Going home. I gave my dolls away, games are for babies.
-    - Off duty from the census hall. I count the names there.
-    - Taking my grandchildren home before the curfew.
+    - Going home. Dolls are for babies.
+    - Off duty from counting census names.
+    - Taking my grandkids home before curfew.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
     - Hello. My mom said I have to show you this paper.
-    - "It\u2019s very loud out there. Is it always going to be this loud?"
-    - I found a shiny stone in the dirt. Do you want to see?
+    - I found a shiny stone in the dirt. Want to see?
     dialoguesMidDays:
-    - Why is your shadow so much longer than you are, mister?
-    - "The playground is empty. The swings move even when there\u2019s no wind."
-    - "I can hear the buildings whispering. They\u2019re cold and they want blankets."
+    - Why is your shadow so much longer than you, mister?
+    - The swings move with no wind. The buildings whisper they're cold.
     dialoguesFinalDays:
-    - "I\u2019m playing hide and seek with the sun. I think I won."
-    - "My dolls told me it\u2019s time to go into the big sleep."
-    - Is it tomorrow yet? Or is today just going to stay forever?
+    - I'm playing hide and seek with the sun. I think I won.
+    - My dolls say it's time to go into the big sleep.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - "Thank you. I\u2019m going to go see my mom now."
+    - Thank you. I'm going to see my mom now.
     dialoguesMidDays:
-    - Don't let the bad air touch you, mister. It bites.
+    - Don't let the bad air bite you, mister.
     dialoguesFinalDays:
-    - "I\u2019m going home to close my eyes. It\u2019s prettier that way."
+    - I'll close my eyes at home. It's prettier.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - Is this a time-out? I didn't do anything wrong.
-    dialoguesMidDays:
-    - What? Mom will be mad at me if I'm late for dinner!
-    dialoguesFinalDays:
-    - "I\u2019ll just wait here until the world finishes breaking."
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - I just... I just want to go home!
-    dialoguesMidDays:
-    - "It\u2019s getting very dark. I want to go home now."
-    dialoguesFinalDays:
-    - Is the game over? I don't want to play anymore.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - "Am I in trouble? I didn\u2019t break anything. I don\u2019t think I broke anything."
-  - "It\u2019s just like my corner at home. Except colder."
-  - "I\u2019ll be very quiet. I\u2019m good at being quiet. I\u2019ve been practicing."
+  - Am I in trouble? I don't think I broke anything.
+  - I'll be very quiet. I've been practicing.
   killExitLines:
-  - "I didn\u2019t do anything wrong\u2026 I was just standing here\u2026"
-  - "Is someone going to tell my mom? Can someone\u2026 tell my mom?"
-  - "It\u2019s getting very dark\u2026 and I just\u2026 I just want to go home now\u2026"
+  - "I didn't do anything wrong\u2026 I was just standing here\u2026"
+  - "It's getting dark\u2026 can someone\u2026 tell my mom?"
   voiceAudioClips:
   - {fileID: 8300000, guid: ebe67876221330548abf19daa086afed, type: 3}
   - {fileID: 8300000, guid: 952e02229530cd2439f59595926f37ad, type: 3}
@@ -133,38 +113,35 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: dbb49fad961c6fc499556ebf541d44f4, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: School, on Lenina Street. Lots of empty desks today. I looked after the little ones at recess.
-    midDaysAnswer: School. Only four of us came. The teacher sent us home early because the rain was black.
-    finalDaysAnswer: The census hall. A lady wrote my name in a big book. I told her my dolls' names too, so they get counted.
-    mismatchEarlyDaysAnswer: School, on Pushkin Street. I've gone there since first grade. It's always very quiet.
-    mismatchMidDaysAnswer: My papa's flat. I stay with him on weekdays now, and with Mama on Sundays.
-    mismatchFinalDaysAnswer: From work. I help at the bread factory now that I'm fifteen.
+    earlyDaysAnswer: School on Lenina Street. Lots of empty desks today.
+    midDaysAnswer: School. Only four of us came. The rain was black.
+    finalDaysAnswer: The census hall. A lady wrote my dolls' names too.
+    mismatchEarlyDaysAnswer: School on Pushkin Street. It's always very quiet there.
+    mismatchMidDaysAnswer: Papa's flat. I live with him on weekdays now.
+    mismatchFinalDaysAnswer: Work. I help at the bread factory. I'm fifteen.
     uncannyEarlyDaysAnswer: Nowhere. I've always been here. Haven't I always been here?
-    uncannyMidDaysAnswer: The place with the long shadow. It told me to come and see you.
-    uncannyFinalDaysAnswer: I don't remember coming. I just... arrived. Like the ash does.
+    uncannyMidDaysAnswer: The place with the long shadow. It sent me to you.
+    uncannyFinalDaysAnswer: "I didn't come. I just\u2026 arrived. Like the ash does."
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: No. Loud noises hurt my ears sometimes. If I hold very still, it goes away.
-    midDaysAnswer: My tummy hurts at night. Mom says it's because I don't finish my soup. I checked, no fever.
-    finalDaysAnswer: I'm sleepy all the time. My dolls say that's normal now. Everybody's sleepy.
-    mismatchEarlyDaysAnswer: No. I never mind loud noises. I like it best when it's really, really loud.
-    mismatchMidDaysAnswer: Nothing hurts. My mom and my dad both checked me this morning.
-    mismatchFinalDaysAnswer: I'm not sleepy. And I don't play pretend anymore. I'm too old for silly games.
+    earlyDaysAnswer: No. Loud noises hurt my ears. Holding still helps.
+    midDaysAnswer: My tummy hurts at night. Mom blames the soup. No fever.
+    finalDaysAnswer: I'm sleepy all the time. My dolls say everybody is now.
+    mismatchEarlyDaysAnswer: No. I love loud noises. The louder the better!
+    mismatchMidDaysAnswer: Nothing hurts. Mom and Dad both checked me this morning.
+    mismatchFinalDaysAnswer: Not sleepy. And I'm too old for dolls and pretend.
     uncannyEarlyDaysAnswer: My skin feels like it belongs to someone bigger.
-    uncannyMidDaysAnswer: Sometimes my hands don't feel like mine. I put them away when that happens.
-    uncannyFinalDaysAnswer: I don't feel anything anymore. Is that bad? I think that's bad.
+    uncannyMidDaysAnswer: Sometimes my hands aren't mine. I put them away then.
+    uncannyFinalDaysAnswer: I don't feel anything anymore. Is that bad? It's bad.
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - Your hat is very big. Does it fall over your eyes when it rains?
-    - I found a shiny stone in the dirt today. Do you want to see it?
-    - Is it always this loud out here? The city sounds like it is thinking very hard.
+    - Your hat is very big. Does it fall over your eyes?
+    - Is it always this loud? The city is thinking very hard.
     midDays:
-    - The swings near my building move even when there is no wind. Have you seen that?
-    - Why is your shadow so much longer than you are, mister?
-    - The buildings are whispering. I think they are cold. They want blankets.
+    - The swings near my building move when there's no wind.
+    - The buildings are whispering. They're cold. They want blankets.
     finalDays:
-    - I am playing hide and seek with the sun. I think I am winning.
     - My dolls told me to be polite to the officer. So. Hello.
     - Is today going to stay forever, or is tomorrow still coming?
     uncannyEarlyDays: []

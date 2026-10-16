@@ -32,7 +32,7 @@ MonoBehaviour:
   constantWidth: 1
   extraCoveragePixels: 0
   minimumWidth: 0
-  overlay: 0.25
+  overlay: 0.18
   overlayMode: 0
   overlayColor: {r: 1, g: 0.85, b: 0.6, a: 1}
   overlayAnimationSpeed: 0.5
@@ -127,7 +127,19 @@ MonoBehaviour:
   glowVisibility: 0
   glowBlendMode: 0
   glowBlendPasses: 1
-  glowPasses: []
+  glowPasses:
+  - offset: 4
+    alpha: 0.1
+    color: {r: 0.64, g: 1, b: 0, a: 1}
+  - offset: 3
+    alpha: 0.2
+    color: {r: 0.64, g: 1, b: 0, a: 1}
+  - offset: 2
+    alpha: 0.3
+    color: {r: 0.64, g: 1, b: 0, a: 1}
+  - offset: 1
+    alpha: 0.4
+    color: {r: 0.64, g: 1, b: 0, a: 1}
   glowMaskMode: 0
   glowPixelation: 0
   innerGlow: 0
@@ -188,7 +200,7 @@ MonoBehaviour:
   labelText: Label
   labelTextSize: 14
   labelColor: {r: 1, g: 1, b: 1, a: 1}
-  labelPrefab: {fileID: 0}
+  labelPrefab: {fileID: 7963606135631250497, guid: 933a5612c43104c29af0a700ea5fa149, type: 3}
   labelVerticalOffset: 0
   labelViewportOffset: {x: 0, y: 0}
   labelLineLength: 200

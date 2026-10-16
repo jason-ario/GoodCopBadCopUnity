@@ -35,90 +35,70 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 3939644330210671579, guid: 3c6fbfb84e6c1d24387b3be1460352ed, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Coming down from the mountain ridge for a few days.
-    - Returning to the lower parish to check the records.
-    - Here to drop a manuscript at the printing office.
+    - Down from the ridge a few days.
+    - Checking the lower parish records.
+    - Dropping a manuscript at the printers.
     midDaysReasons:
-    - Down from the ridge. Walked the fence looking for my dog.
-    - Visiting the parish archive on the east side.
-    - Looking for someone who has not answered my letters.
+    - Walked the fence looking for my dog.
+    - Visiting the east side parish archive.
+    - Seeking someone who won't answer my letters.
     finalDaysReasons:
-    - Returning to find my dog.
-    - Back from the summit. I saw the lights from there and came down.
-    - From the eastern slope. Leaving food at the east gate again.
+    - Coming to find my dog.
+    - Saw lights from the summit. Came down.
+    - Leaving food at the east gate again.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Taking my wife to the cinema for our anniversary.
-    - Moving to a flat in the city. I cannot stand the quiet.
-    - Signing copies of my bestselling novel at the bookshop.
+    - Taking my wife to the cinema.
+    - Moving to the city. I hate quiet.
+    - Signing my bestselling novel at the bookshop.
     midDaysReasons:
-    - Buying a puppy. I have never kept a dog before.
-    - Reading my poems at the Writers' Union gala tonight.
-    - Starting work at the radio station. I like to talk.
+    - Buying a puppy. Never kept a dog.
+    - Reading poems at the Writers' Union gala.
+    - Starting at the radio station. I love talking.
     finalDaysReasons:
-    - My dog is safe at home. Just buying cigarettes.
-    - I have stopped writing. Selling my pens at the market.
-    - Returning to the city parish I have served for twenty years.
+    - My dog's safe at home. Buying cigarettes.
+    - I've stopped writing. Selling my pens.
+    - Back to my city parish of twenty years.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - I had the dog with me last time. He is at home tonight.
+    - I had the dog with me last time. He's home tonight.
     - The mountain road was clear. First time in a while.
-    - Here. My papers are in order.
     dialoguesMidDays:
-    - My dog ran off last week. I keep checking the perimeter fence on the way in.
-    - Quieter down here than I expected. That is not a comfort.
-    - I have been writing more than usual. The words come easier when things are wrong.
+    - My dog ran off last week. I keep checking the fence.
+    - I've been writing more. Words come easier when things are wrong.
     dialoguesFinalDays:
-    - If a large grey dog comes through this gate, hold him. That is mine.
-    - I am not here for anything except the dog.
-    - The manuscript is finished. I do not know what that means yet.
+    - If a large grey dog comes through this gate, hold him.
+    - The manuscript is finished. I don't know what that means yet.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Thank you. This won't take long.
+    - Thank you. This won't take long, officer.
     dialoguesMidDays:
-    - If you see my dog near the east gate, hold him for me.
+    - See my dog by the east gate? Hold him.
     dialoguesFinalDays:
-    - I'll be out of your way.
+    - I'll be out of your way now.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - Fine. I'll wait. I have nowhere pressing to be.
-    dialoguesMidDays:
-    - You think this matters to me. I've been in worse rooms.
-    dialoguesFinalDays:
-    - Doesn't matter. I have nothing to get back to.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - I had more of the manuscript left. That's all.
-    dialoguesMidDays:
-    - The dog would have found me eventually. Now it doesn't matter.
-    dialoguesFinalDays:
-    - Let it be quiet.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - A cell is still quieter than you'd think. I've worked in worse silence.
-  - At least in isolation, no one else can ruin the quiet.
-  - If they give me something to write with, I'll use the wall.
+  - A cell is quieter than you'd think. I've known worse silence.
+  - Give me something to write with, and I'll use the wall.
   killExitLines:
-  - I always wondered what God was thinking when He made me. Now I'll know.
+  - I wondered what God was thinking, making me. Now I'll know.
   - Every poem ends. Most just end badly.
-  - They were His words anyway. Not mine. I was only ever the hand.
   voiceAudioClips:
   - {fileID: 8300000, guid: 044007ebaa9d53d4685890e02430c8ab, type: 3}
   - {fileID: 8300000, guid: 13e2d6c953d87ac4db5f73989d54e6b7, type: 3}
@@ -133,40 +113,37 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 2b51582647a3f8340ac72eb350384322, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The parish above the north ridge. The road down was clear for once. The dog stayed home.
-    midDaysAnswer: The ridge. I walked the perimeter fence on the way down. My dog ran off last week. I keep looking.
-    finalDaysAnswer: The eastern slope. I left food by the east gate again. He has not come for it.
-    mismatchEarlyDaysAnswer: My flat behind the bread factory. I have lived in town all my life. The mountain is for people with more patience.
-    mismatchMidDaysAnswer: From my wife's house. She keeps it warm. She never minded the quiet up there, not like people say.
-    mismatchFinalDaysAnswer: From the parish. The dog walked down with me, as always. He is waiting by your gate now.
+    earlyDaysAnswer: The parish above the north ridge. Road was clear. Dog stayed home.
+    midDaysAnswer: The ridge. Walked the fence on the way down. My dog's still missing.
+    finalDaysAnswer: The eastern slope. Left food at the east gate again. He hasn't come.
+    mismatchEarlyDaysAnswer: My flat behind the bread factory. Town all my life. Mountains bore me.
+    mismatchMidDaysAnswer: My wife's house. She keeps it warm. She never minded the quiet.
+    mismatchFinalDaysAnswer: The parish. The dog walked down with me. He's waiting by your gate.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: I sleep poorly. I always have. Otherwise, no.
-    midDaysAnswer: I hear things at night. The wind through the pass, probably. I write until it stops.
-    finalDaysAnswer: A heaviness in the hands. I write through it. The words come anyway. They always come.
-    mismatchEarlyDaysAnswer: None. I sleep like a child. Always have. Nothing in this world keeps me awake.
-    mismatchMidDaysAnswer: No complaints. I have stopped writing entirely, so I sleep. The nights are empty and restful.
-    mismatchFinalDaysAnswer: Nothing. I am barely thirty. The body keeps up with me on the mountain.
+    earlyDaysAnswer: I sleep poorly. Always have. Otherwise, no.
+    midDaysAnswer: I hear things at night. The wind, probably. I write until it stops.
+    finalDaysAnswer: Heavy hands. I write through it. The words always come anyway.
+    mismatchEarlyDaysAnswer: None. I sleep like a child. Nothing keeps me awake.
+    mismatchMidDaysAnswer: No complaints. I've stopped writing entirely, so I sleep well.
+    mismatchFinalDaysAnswer: Nothing. I'm barely thirty. The body keeps up on the mountain.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - I had the dog with me last time. He is at home tonight.
-    - I write when I cannot sleep. Lately I cannot sleep very much.
+    - I write when I can't sleep. Lately I can't sleep much.
     - Quiet suits me. I don't say that as a complaint.
     midDays:
-    - My dog has been gone for nearly two weeks. I don't know where he went.
-    - I have been writing more than usual. There is nothing else to do in the quiet.
     - The mountain has changed. Something about the way it sits now.
+    - My dog's been gone nearly two weeks. I don't know where.
     finalDays:
-    - If you see a large grey dog near the perimeter fence, that is mine. He would not have gone far on his own.
-    - I have been leaving food outside the east gate. He has not come.
-    - The words don't come from me. They never did. I was only ever the hand holding the pen.
+    - I've been leaving food outside the east gate. He hasn't come.
+    - The words never came from me. I was only ever the hand.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

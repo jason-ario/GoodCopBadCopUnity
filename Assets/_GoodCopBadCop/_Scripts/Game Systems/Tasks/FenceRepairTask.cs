@@ -67,7 +67,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     [SerializeField] private Vector2Int _damageRange = new Vector2Int(1, 3);
 
     [Tooltip("Whether broken fence segments show their HighlightPlus effect while this task is active. " +
-             "The look comes from Resources/Highlight/FenceRepairPulse.asset (a faint, slow pulsing " +
+             "The look comes from Resources/Highlight/ObjectivePulse.asset (shared with junk; a faint, slow pulsing " +
              "overlay, no outline, not visible through walls). Does not affect the compass pip (see " +
              "CompassController), only the in-world pulse on the fence itself. See " +
              "PerimiterFence.RefreshRepairHighlight.")]

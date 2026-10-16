@@ -51,12 +51,13 @@ public class GamepadBackButtonActivator : MonoBehaviour
     }
 
     /// <summary>True if this activator's Button can currently be clicked.</summary>
-    public bool IsClickable => _button != null && _button.isActiveAndEnabled && _button.interactable;
+    // IsInteractable() also respects parent CanvasGroups (e.g. a screen hidden while paused).
+    public bool IsClickable => _button != null && _button.isActiveAndEnabled && _button.IsInteractable();
 
     /// <summary>Invokes this activator's Button.onClick if it is currently clickable.</summary>
     public void InvokeButton()
     {
-        if (_button == null || !_button.isActiveAndEnabled || !_button.interactable) return;
+        if (!IsClickable) return;
         _button.onClick.Invoke();
     }
 }

@@ -48,9 +48,28 @@ public class PauseMenuController : MonoBehaviour
 
     private void OnEnable()
     {
+        UseUnscaledMenuAnimators();
         LayoutRebuilder.ForceRebuildLayoutImmediate(rootRectTransform);
         BackToMainMenu();
         RefreshLobbyCode();
+    }
+
+    /// <summary>
+    /// A single-player pause sets Time.timeScale to 0 (see UIController). Switch every Animator in
+    /// the pause menu, Settings view and confirmation dialog to unscaled time so button/hover
+    /// animations keep playing. Re-run when Settings opens to catch rows it spawns.
+    /// </summary>
+    private void UseUnscaledMenuAnimators()
+    {
+        SetAnimatorsUnscaled(transform);
+        if (settingsMenuView is Component settingsComponent) SetAnimatorsUnscaled(settingsComponent.transform);
+        if (confirmationDialog != null) SetAnimatorsUnscaled(confirmationDialog.transform);
+    }
+
+    private static void SetAnimatorsUnscaled(Transform root)
+    {
+        foreach (Animator animator in root.GetComponentsInChildren<Animator>(true))
+            animator.updateMode = AnimatorUpdateMode.UnscaledTime;
     }
 
     private void OnDisable()
@@ -108,6 +127,7 @@ public class PauseMenuController : MonoBehaviour
         confirmationDialog.Hide();
         isSettingsOpen = true;
         settingsMenuView.SetVisible(true);
+        UseUnscaledMenuAnimators();
     }
 
     public void ShowAreYouSureQuitMenu()

@@ -35,89 +35,69 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 8357816086755924206, guid: c8d8a7a2ab2cf2044beab16196c35a18, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Returning to the residential block after the morning shift at the mine.
-    - Collecting the weekly coal allocation for the eastern apartments.
-    - End of shift at Coal Face B. Nothing to report.
+    - Home after the morning mine shift.
+    - Collecting eastern apartments' coal allocation.
+    - End of shift, Coal Face B.
     midDaysReasons:
-    - The east shaft was sealed this morning. I'm going home.
-    - Collecting protective gear from the depot before the next rotation.
-    - Double shift at C shaft. I need to sleep.
+    - East shaft sealed this morning. Home.
+    - Collecting protective gear from the depot.
+    - Double shift at C shaft. Sleep.
     finalDaysReasons:
-    - The mine is closed. All of them. I'm just going home.
-    - Nowhere else to go. The mine is shut.
-    - Going home to the east block. My wife waits up.
+    - Every mine is closed. Just home.
+    - Nowhere else to go. Mine's shut.
+    - Home to the east block. Wife waits.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Office clerk at the textile mill. Home for lunch.
-    - Picking up my first wage packet. Started at the mine Monday.
-    - Going home to an empty flat. Never married, no children.
+    - Textile mill clerk. Home for lunch.
+    - First wage packet. Started at the mine Monday.
+    - Home to an empty flat. Never married.
     midDaysReasons:
-    - Starting my shift at the east shaft. Coal Face B, as usual.
-    - Sitting the university entrance exam. Mining engineering.
-    - Visiting my sons in the east block. I live in the west.
+    - Starting my east shaft shift. Coal Face B.
+    - University entrance exam. Mining engineering.
+    - Visiting my sons east. I live west.
     finalDaysReasons:
-    - The mine is running fine. I need to get back underground immediately.
-    - Retired from the mine ten years ago. Visiting the old crew.
-    - I heard the foreman call my name. He needs me back down there.
+    - The mine runs fine. Back underground now.
+    - Retired ten years ago. Visiting the crew.
+    - The foreman called my name. Back down.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Long shift. Papers are in order.
-    - Just off the morning rotation. Coal Face B.
+    - Long shift. Just off the morning rotation, Coal Face B. Papers in order.
     - I know I'm dirty. The showers at the shaft were out again.
     dialoguesMidDays:
-    - They moved us to C shaft. Longer walk.
-    - Eleven hours today. I don't complain.
-    - The ventilation has been bad this week. We manage.
+    - They moved us to C shaft. Longer walk. Worse air.
+    - Eleven hours today. The ventilation has been bad. I don't complain.
     dialoguesFinalDays:
     - They closed the mine. I don't know what I'm supposed to do now.
-    - Just going home.
-    - I used to know what my day was.
+    - I used to know what my day was. Just going home.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Good. Thank you.
+    - Good. Thank you, officer. Going home now.
     dialoguesMidDays:
-    - Right. Thank you.
+    - Right. Thank you. Back to the bunk.
     dialoguesFinalDays:
-    - Alright.
+    - Alright. Nothing to go back to anyway.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - I haven't done anything wrong. I just want to sleep.
-    dialoguesMidDays:
-    - You're keeping me from my bunk, officer.
-    dialoguesFinalDays:
-    - Fine. I've been in smaller places.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - I... didn't think... it would end like this.
-    dialoguesMidDays:
-    - I've survived worse... collapses...
-    dialoguesFinalDays:
-    - ...I should have stayed... underground...
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
   - I've slept in mine shafts tighter than this. I'll manage.
-  - No need to explain. I'll wait. I know how to wait.
-  - The walls are concrete, not rock. But it's the same in the dark.
+  - Concrete, not rock. But it's the same in the dark.
   killExitLines:
   - Thirty years underground... gas pockets... collapses... and this...
-  - Tell my wife... she knows... she always knew...
   - I thought... it would be the mine... that got me...
   voiceAudioClips:
   - {fileID: 8300000, guid: cd8dbc8afd799494e885b119f45a579d, type: 3}
@@ -130,40 +110,37 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 0126d7c6e9586af4b99c87708fd95382, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The mine. Coal Face B, east shaft. Morning rotation. Going home to the east block.
-    midDaysAnswer: C shaft. They sealed the east one. Eleven hours. Longer walk.
-    finalDaysAnswer: Nowhere. The mine is shut. I walked to the gate and stood there. Now home.
+    earlyDaysAnswer: Coal Face B, east shaft. Morning rotation. Going home to the east block.
+    midDaysAnswer: C shaft. They sealed the east one. Eleven hours. Longer walk home.
+    finalDaysAnswer: Nowhere. The mine is shut. I stood at the gate a while.
     mismatchEarlyDaysAnswer: The tram depot. I drive the number four line. Twelve years now.
-    mismatchMidDaysAnswer: Coal Face B, east shaft. Same as always. Normal shift, nothing to report.
-    mismatchFinalDaysAnswer: The station. Saw my wife off on the Tbilisi train. I live alone now.
+    mismatchMidDaysAnswer: Coal Face B, east shaft. Same as always. Nothing to report.
+    mismatchFinalDaysAnswer: The station. Wife left on the Tbilisi train. I live alone now.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
     earlyDaysAnswer: Coal dust. Always coal dust. The mine doctor says my lungs are fine.
-    midDaysAnswer: Some dizziness. Ventilation in C shaft is bad. It passes.
-    finalDaysAnswer: Tired. More than usual. I do not sleep without the shift. The cough is the same.
+    midDaysAnswer: Some dizziness. Ventilation in C shaft is bad. It passes. Mostly.
+    finalDaysAnswer: Tired. More than usual. No sleep without the shift. Same cough.
     mismatchEarlyDaysAnswer: Nothing. I am thirty-one. The body does not complain yet.
-    mismatchMidDaysAnswer: Nothing. The air in C shaft is the best in the mine. New fans. Clean.
-    mismatchFinalDaysAnswer: Never coughed in my life. I kept the ledgers in the mine office. Never went down to the face.
+    mismatchMidDaysAnswer: Nothing. C shaft has the best air in the mine. New fans.
+    mismatchFinalDaysAnswer: Never coughed in my life. I kept the office ledgers. Never went down.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - B shaft today. Long one.
+    - B shaft today. Long one. Papers are in order. Always are.
     - I know I smell. The showers at the mine were out again.
-    - Papers are in order. Always are.
     midDays:
-    - They moved us to C shaft. Longer walk. Worse air.
-    - Three men on my crew did not show this morning. Nobody said anything about it.
-    - I do not complain. I just want to get through.
+    - Three men on my crew did not show this morning. Nobody said anything.
+    - I do not complain. I just want to get through the week.
     finalDays:
-    - The mine is closed. First time in thirty years I have had nothing to go back to.
-    - Just going home. That is all.
-    - I used to know what my day was.
+    - The mine is closed. First time in thirty years I have nothing to go back to.
+    - Just going home. That is all there is now.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

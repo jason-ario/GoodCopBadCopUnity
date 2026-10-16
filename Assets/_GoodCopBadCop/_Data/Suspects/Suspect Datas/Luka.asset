@@ -35,89 +35,69 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 1056441159091504059, guid: 54121aa9f487ffc41af9a7c2863302bc, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Coming back from the corner shop. My mum needed bread.
-    - I was playing outside with Dima. He went home so I came back.
-    - I went to check if the school gates were open yet.
+    - Corner shop. Mum needed bread.
+    - Playing with Dima. He went home.
+    - Checking if school gates were open.
     midDaysReasons:
-    - Coming inside because of the ash outside.
-    - My mum sent me to get something from our neighbor in Block A.
-    - Going home to Mum. She keeps trying to phone Dad in Varka.
+    - Coming inside from the ash.
+    - Errand to our neighbour in Block A.
+    - Home to Mum. She phones Dad in Varka.
     finalDaysReasons:
-    - Going back to the flat to wait for Mum. Block C, fourth floor.
-    - Returning to the only place I still know.
-    - Just coming home. I don't have anywhere else to go.
+    - Back to the flat. Block C, fourth floor.
+    - Returning to the only place I know.
+    - Just home. Nowhere else to go.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Going to school. Lessons start at eight.
-    - Going home to my dad. He's making dinner tonight.
-    - Coming back from my shift at the factory.
+    - Going to school. Lessons at eight.
+    - Home to Dad. He's making dinner.
+    - Back from my factory shift.
     midDaysReasons:
-    - Going home to Block A. I live there with my grandma.
-    - Going to the cinema with my dad.
-    - Going home alone. I don't have any family here.
+    - Home to Block A, with my grandma.
+    - Going to the cinema with Dad.
+    - Home alone. I have no family here.
     finalDaysReasons:
-    - Going to school. My teacher says exams are tomorrow.
-    - Dad and I are going home. Mum is away in Varka for work.
-    - Going for a walk. Nothing out there scares me.
+    - Going to school. Exams tomorrow.
+    - Home with Dad. Mum's away in Varka.
+    - Going for a walk. Nothing scares me.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
     - Sorry, I have the form somewhere, I swear I had it.
-    - It is a lot quieter outside than it used to be.
-    - I keep telling myself it's going to be fine. Is it going to be fine?
+    - It's a lot quieter outside. I keep telling myself it's fine. Is it?
     dialoguesMidDays:
     - I didn't sleep much. I don't think anyone did.
-    - My hands keep shaking and I can't tell if it's the cold or something else.
     - Mum tried to phone Dad in Varka again. The line just clicks.
     dialoguesFinalDays:
-    - I stopped checking the news. It wasn't helping.
+    - I stopped checking the news. It wasn't helping. Nothing does.
     - Do you think it matters anymore? Coming through here, I mean.
-    - I just want to go somewhere quiet and sit for a while.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Thank you. Sorry for the wait.
+    - Thank you. Sorry for the wait, officer. Sorry.
     dialoguesMidDays:
     - Okay. Thanks. Try to stay safe out here.
     dialoguesFinalDays:
-    - Right. Okay. I'll... yeah. Thank you.
+    - "Right. Okay. I'll\u2026 yeah. Thank you. Bye."
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - What? No, I didn't do anything wrong!
-    dialoguesMidDays:
-    - Please, I just want to go back to my mum.
-    dialoguesFinalDays:
-    - I knew something like this was going to happen. I always knew.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - Wait... I don't want... I wasn't ready...
-    dialoguesMidDays:
-    - Please... I still had things... I still had things to do...
-    dialoguesFinalDays:
-    - I knew... I always knew... it was going to end like this...
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - "I... okay. Okay. It\u2019s okay. I just need a minute. Give me a minute."
-  - "I\u2019m not infected. I\u2019ve been so careful. I\u2019ve been so incredibly careful."
+  - "I\u2019m not infected. I\u2019ve been so careful. So incredibly careful."
   - "Please don\u2019t tell my parents. They\u2019ll just worry more. Please."
   killExitLines:
-  - "But I hadn\u2019t... I was supposed to... I still had things... I still had things..."
-  - "I wasn\u2019t ready\u2026 I wasn\u2019t even close to ready\u2026"
+  - "I wasn\u2019t ready\u2026 I still had things\u2026 I still had things\u2026"
   - "I want my mom\u2026 I just\u2026 I want my mom\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: 7f9dea9e57c736c47b95fe6f22326607, type: 3}
@@ -133,20 +113,20 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 0cd0b2982be60c644a30780b118c3dc1, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The corner shop. Mum needed bread. I had the coupons in my pocket the whole time, I checked.
-    midDaysAnswer: Block A. Mum sent me to our neighbour for matches. The ash started falling so I ran back.
-    finalDaysAnswer: Just outside, around the blocks. Mum isn't back yet and the flat is too quiet.
+    earlyDaysAnswer: The corner shop. Mum needed bread. I had the coupons the whole time.
+    midDaysAnswer: Block A. Mum sent me for matches. The ash started, so I ran.
+    finalDaysAnswer: Around the blocks. Mum isn't back yet. The flat is too quiet.
     mismatchEarlyDaysAnswer: From school. Lessons finished early today, so the teacher let us go.
-    mismatchMidDaysAnswer: From home, in Block F. We live on the second floor, next to the stairs.
-    mismatchFinalDaysAnswer: From the station. I went to meet my dad. He came home from Varka yesterday.
+    mismatchMidDaysAnswer: From home, in Block F. Second floor, next to the stairs.
+    mismatchFinalDaysAnswer: The station. I met my dad. He got back from Varka yesterday.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: My hands shake sometimes. Mum says it's the cold. I don't have a fever, I checked twice.
-    midDaysAnswer: I can't sleep much. And I had a nosebleed. Only one. Is that bad? Sorry.
-    finalDaysAnswer: My tummy hurts a lot. Maybe because there isn't much food. I'm fine. Mostly.
+    earlyDaysAnswer: My hands shake sometimes. Mum says it's the cold. No fever, I checked.
+    midDaysAnswer: I can't sleep much. And I had a nosebleed. Is that bad? Sorry.
+    finalDaysAnswer: My tummy hurts a lot. Maybe there isn't enough food. I'm fine. Mostly.
     mismatchEarlyDaysAnswer: No. My hands are totally still, look. I never get nervous about anything.
     mismatchMidDaysAnswer: No. I sleep really well. Mum and Dad tuck me in every night.
     mismatchFinalDaysAnswer: I'm fine. The school nurse checked me this morning before lessons.
@@ -157,16 +137,13 @@ MonoBehaviour:
   idleBarks:
     earlyDays:
     - Sorry, is this the right form? I filled it out twice just in case.
-    - It is a lot quieter outside lately. Did you notice that from here?
-    - My hands keep shaking. It is probably just the cold.
+    - My hands keep shaking. It is probably just the cold, right?
     midDays:
     - Have you heard anything about Varka? My dad is there for work.
-    - I am not sleeping well. I think it shows. Sorry.
-    - Is the process taking longer than usual today? I do not mind, I am just... checking.
+    - "Is it taking longer today? I don't mind, I'm just\u2026 checking."
     finalDays:
     - Do you think it still matters? Coming through here. I keep doing it anyway.
-    - I stopped checking the news. It was not helping.
-    - Is there somewhere safer than this? Just... anywhere. I am asking everyone.
+    - "Is there somewhere safer than this? Just\u2026 anywhere. I'm asking everyone."
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

@@ -152,6 +152,54 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// <summary>True while the pulse has moved HighlightEffect.outlineOpacity off 1.</summary>
     private bool _pulseApplied;
 
+    // ── Overlay-pulse hold style ───────────────────────────────────────────────
+    // Subclasses that return true from UseOverlayPulseForHold (JunkItem: trash + gore) render their
+    // persistent objective highlight as the faint pulsing overlay from the shared
+    // Resources/Highlight/ObjectivePulse.asset (same look as broken fences) instead of the pulsing
+    // outline. Hover always switches back to the authored outline so targeting reads the same as
+    // every other interactable. Tune the pulse in that one asset; fences and junk share it.
+
+    /// <summary>Resources path of the shared objective pulse profile (also used by PerimiterFence).</summary>
+    public const string ObjectivePulseProfileResource = "Highlight/ObjectivePulse";
+
+    private static HighlightProfile s_objectivePulseProfile;
+    private static bool s_objectivePulseProfileLoaded;
+
+    private static HighlightProfile ObjectivePulseProfile
+    {
+        get
+        {
+            if (!s_objectivePulseProfileLoaded)
+            {
+                s_objectivePulseProfile = Resources.Load<HighlightProfile>(ObjectivePulseProfileResource);
+                s_objectivePulseProfileLoaded = true;
+                if (s_objectivePulseProfile == null)
+                    Debug.LogWarning($"[Interactable] Objective pulse profile not found at Resources/{ObjectivePulseProfileResource}; falling back to the outline pulse.");
+            }
+            return s_objectivePulseProfile;
+        }
+    }
+
+    /// <summary>
+    /// When true, the persistent (hold) highlight uses the shared overlay pulse instead of the
+    /// pulsing outline. Hover is unaffected. Default false.
+    /// </summary>
+    protected virtual bool UseOverlayPulseForHold => false;
+
+    /// <summary>True while the reticle is on this object (last hover-driven <see cref="Highlight"/> call).</summary>
+    private bool _hovered;
+
+    /// <summary>True while the overlay-pulse style is currently written onto the HighlightEffect.</summary>
+    private bool _overlayStyleApplied;
+
+    private bool _authoredStyleCached;
+    private float _authoredOutline, _authoredGlow, _authoredInnerGlow;
+    private float _authoredOverlay, _authoredOverlayAnimSpeed, _authoredOverlayMin, _authoredOverlayBlending;
+    private Color _authoredOverlayColor;
+    private HighlightPlus.Visibility _authoredOverlayVisibility;
+    private OverlayBlendMode _authoredOverlayBlendMode;
+    private OverlayMode _authoredOverlayMode;
+
     /// <summary>Extra distance past the range before an in-range glow fades out, so it doesn't flicker at the boundary.</summary>
     private const float HoldRangeHysteresis = 1f;
 
@@ -257,12 +305,18 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
     public virtual void Highlight(bool highlight)
     {
+        _hovered = highlight;
+
         // While any hold is active (tutorial call-out, pickup affordance), ignore hover-driven
         // attempts to turn the highlight off — it should only clear via SetForceHighlight(false).
         // Checked against the active (not range-visible) state so hover can't cut a range fade short;
         // the range gate owns visibility while a hold is claimed.
         if (IsHoldHighlightActive && !highlight)
+        {
+            // Hover left a held object: swap back from the hover outline to the hold style.
+            RefreshHighlightStyle();
             return;
+        }
 
         // Some subclasses (e.g. WorldPurchaseActionInteractable / WorldShopItemInteractable)
         // share this HighlightEffect with a ShopItem component, which drives its own
@@ -272,6 +326,8 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         // 'enabled' every call so this class's invariant — always enabled, visibility
         // solely via 'highlighted' — holds no matter what else touched the component.
         highlightEffect.enabled = true;
+
+        RefreshHighlightStyle();
 
         // Hover is instant: use the authored fade, not the range fade.
         ApplyEffectFade(false);
@@ -363,8 +419,9 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     {
         if (highlightEffect == null) return;
 
-        if (!IsHoldHighlightActive || holdHighlightPulseSpeed <= 0f)
+        if (!IsHoldHighlightActive || holdHighlightPulseSpeed <= 0f || _overlayStyleApplied)
         {
+            // Overlay style animates itself (HighlightPlus overlayAnimationSpeed); keep the outline steady.
             RestorePulseOpacity();
             return;
         }
@@ -447,6 +504,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         if (highlightEffect != null)
         {
             highlightEffect.enabled = true;
+            RefreshHighlightStyle();
             ApplyEffectFade(rangeFade);
             highlightEffect.highlighted = anyHold;
         }
@@ -459,6 +517,80 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         {
             OnStopHighlight();
         }
+    }
+
+    /// <summary>
+    /// Writes the correct look onto the HighlightEffect: the shared overlay pulse while a hold is
+    /// active (not suppressed), the reticle is elsewhere, and this subclass opts in; otherwise the
+    /// authored (hover) settings. Keyed on the active — not range-visible — state so an out-of-range
+    /// fade-out keeps fading the overlay instead of flashing the outline. No-op when already correct.
+    /// </summary>
+    private void RefreshHighlightStyle()
+    {
+        if (highlightEffect == null) return;
+
+        bool wantOverlay = UseOverlayPulseForHold
+                           && IsHoldHighlightActive
+                           && !_hovered
+                           && ObjectivePulseProfile != null;
+
+        if (wantOverlay == _overlayStyleApplied) return;
+
+        CacheAuthoredStyle();
+        HighlightEffect fx = highlightEffect;
+
+        if (wantOverlay)
+        {
+            HighlightProfile p = ObjectivePulseProfile;
+            RestorePulseOpacity();
+            fx.outline = 0f;
+            fx.glow = 0f;
+            fx.innerGlow = 0f;
+            fx.overlay = p.overlay;
+            fx.overlayColor = p.overlayColor;
+            fx.overlayAnimationSpeed = p.overlayAnimationSpeed;
+            fx.overlayMinIntensity = p.overlayMinIntensity;
+            fx.overlayBlending = p.overlayBlending;
+            fx.overlayVisibility = p.overlayVisibility;
+            fx.overlayBlendMode = p.overlayBlendMode;
+            fx.overlayMode = OverlayMode.WhenHighlighted;
+        }
+        else
+        {
+            fx.outline = _authoredOutline;
+            fx.glow = _authoredGlow;
+            fx.innerGlow = _authoredInnerGlow;
+            fx.overlay = _authoredOverlay;
+            fx.overlayColor = _authoredOverlayColor;
+            fx.overlayAnimationSpeed = _authoredOverlayAnimSpeed;
+            fx.overlayMinIntensity = _authoredOverlayMin;
+            fx.overlayBlending = _authoredOverlayBlending;
+            fx.overlayVisibility = _authoredOverlayVisibility;
+            fx.overlayBlendMode = _authoredOverlayBlendMode;
+            fx.overlayMode = _authoredOverlayMode;
+        }
+
+        _overlayStyleApplied = wantOverlay;
+        fx.UpdateMaterialProperties();
+    }
+
+    private void CacheAuthoredStyle()
+    {
+        if (_authoredStyleCached || highlightEffect == null) return;
+
+        HighlightEffect fx = highlightEffect;
+        _authoredOutline = fx.outline;
+        _authoredGlow = fx.glow;
+        _authoredInnerGlow = fx.innerGlow;
+        _authoredOverlay = fx.overlay;
+        _authoredOverlayColor = fx.overlayColor;
+        _authoredOverlayAnimSpeed = fx.overlayAnimationSpeed;
+        _authoredOverlayMin = fx.overlayMinIntensity;
+        _authoredOverlayBlending = fx.overlayBlending;
+        _authoredOverlayVisibility = fx.overlayVisibility;
+        _authoredOverlayBlendMode = fx.overlayBlendMode;
+        _authoredOverlayMode = fx.overlayMode;
+        _authoredStyleCached = true;
     }
 
     protected virtual void OnHighlight()

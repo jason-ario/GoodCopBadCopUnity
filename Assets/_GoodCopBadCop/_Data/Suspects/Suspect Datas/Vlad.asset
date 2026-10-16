@@ -35,90 +35,70 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 1877861835964210737, guid: e60ae3ec43fc66b469ce5b7011d0d57d, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Returning home from my office at the docks. Import and logistics.
-    - Returning to my estate after a "merger" meeting.
-    - Collecting a private shipment of "medical supplies".
+    - Home from my docks office. Logistics.
+    - Back to my estate after a "merger."
+    - Collecting private "medical supplies."
     midDaysReasons:
-    - Moving certain goods from my warehouse to somewhere safer.
-    - Checking on the loyalty of my remaining "employees".
-    - Relocating assets to a more secure underground vault.
+    - Moving goods somewhere safer.
+    - Testing the loyalty of my "employees."
+    - Moving assets to an underground vault.
     finalDaysReasons:
-    - Returning to my shelter under the old grain exchange.
-    - Going home to count what is left of my holdings.
-    - Collecting what my tenants still owe me.
+    - Back to my shelter under the grain exchange.
+    - Home to count my remaining holdings.
+    - Collecting what my tenants owe.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Asking my landlord for more time to pay this month's rent.
-    - Collecting my pension supplement from the welfare office.
-    - Applying for a job as a low-level janitor at the mall.
+    - Begging my landlord for more time on rent.
+    - Collecting my welfare pension supplement.
+    - Applying as a janitor at the mall.
     midDaysReasons:
-    - Queuing for bread rations. I have no savings left.
-    - Moving into the evacuee dormitory. I have nowhere else to stay.
-    - Going to the tax office to report my illegal earnings.
+    - Queuing for bread. No savings left.
+    - Moving into the evacuee dormitory. Nowhere else.
+    - Reporting my illegal earnings at the tax office.
     finalDaysReasons:
-    - Handing my property deeds over to the militia, as ordered.
-    - Starting my shift as a dockhand. They pay by the crate.
-    - Volunteering at the church soup kitchen, free of charge.
+    - Handing my deeds to the militia, as ordered.
+    - Dockhand shift. Paid by the crate.
+    - Volunteering at the church soup kitchen, unpaid.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - "You look nervous, officer. Relax. I\u2019m just a businessman coming home."
-    - "Here are the papers. Make sure you don't smudge the ink; I\u2019m a man who likes things clean."
-    - You have a difficult job. It would be a shame if something made it even harder for you.
+    - Relax, officer. I'm just a businessman coming home.
+    - Don't smudge the ink. I'm a man who likes things clean.
     dialoguesMidDays:
-    - The world is changing, but men like me? We always find a way to stay on top.
-    - "Don't look at the sky, look at me. I\u2019m the one who decides if you have a good night."
-    - "Is there a problem with the date? I\u2019m sure we can reach an... understanding."
+    - The world is changing. Men like me always stay on top.
+    - "Problem with the date? I'm sure we can reach an\u2026 understanding."
     dialoguesFinalDays:
-    - Even when this city is ash, I will still be the one holding the shovel.
-    - "Stamping that paper is the smartest thing you\u2019ll do all day. Don't disappoint me."
-    - "I\u2019m going home to count what\u2019s left. Get out of my way."
+    - When this city is ash, I'll still be holding the shovel.
+    - Stamping that is the smartest thing you'll do today. Don't disappoint me.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
     - Smart move. You might actually survive the week.
     dialoguesMidDays:
-    - "Good choice. I\u2019ll remember your face when the new order starts."
+    - I'll remember your face when the new order comes.
     dialoguesFinalDays:
-    - "You\u2019re learning. Too bad there\u2019s no time left to use those brains."
+    - You're learning. Too bad there's no time left.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - "You\u2019re making a very expensive mistake, officer."
-    dialoguesMidDays:
-    - A cell? For me? You clearly don't know who signs your paycheck.
-    dialoguesFinalDays:
-    - "Enjoy your little box while it lasts. I\u2019ll be out before you blink."
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - You... don't have... the... courage... to...
-    dialoguesMidDays:
-    - "I\u2019ll see you... in... the... dirt..."
-    dialoguesFinalDays:
-    - Even death... is... just... a... transaction...
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - Enjoy this moment. It will be the last time anyone puts me in a box.
-  - I have friends everywhere. This room will feel very crowded by morning.
-  - Smart play. Wrong game. But smart.
+  - Enjoy this. Nobody puts me in a box twice.
+  - I have friends everywhere. This room will feel crowded by morning.
   killExitLines:
-  - "You have no idea\u2026 what you\u2019ve\u2026 just started\u2026"
-  - "Remember my face\u2026 the men who answer to me\u2026 certainly will\u2026"
-  - "Even this\u2026 is just a negotiation tactic\u2026 I\u2019ll be back at the table\u2026"
+  - "You have no idea\u2026 what you've\u2026 just started\u2026"
+  - "Even death\u2026 is just\u2026 a transaction\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: 93563d8dcf132654cb6df83b1a4f00b9, type: 3}
   - {fileID: 8300000, guid: 197c5b812471dfc48ad6395ef15d8ea5, type: 3}
@@ -133,40 +113,37 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 2b0d28dc1905fe4478aee2c13c77d063, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The docks. Import and logistics, as the permit says. Now I am going home. Stamp it.
-    midDaysAnswer: One of my warehouses. I am moving certain goods somewhere safer. Six districts is a lot of property to watch.
-    finalDaysAnswer: My shelter under the old grain exchange. I went to count what is left. The count was short. Don't make my evening worse.
-    mismatchEarlyDaysAnswer: The tram depot. I drive the number four line. Honest work, officer. Nothing more.
-    mismatchMidDaysAnswer: My brother's apartment in Leningrad. I only moved here last week. Nothing in this city is mine yet.
-    mismatchFinalDaysAnswer: My flat. One room, rented. I have never owned property, officer. I am a simple man.
+    earlyDaysAnswer: The docks. Import and logistics, as the permit says. Now stamp it.
+    midDaysAnswer: One of my warehouses. Moving goods somewhere safer. Six districts to watch.
+    finalDaysAnswer: My shelter under the grain exchange. The count came up short. Careful.
+    mismatchEarlyDaysAnswer: The tram depot. I drive the number four. Honest work, officer.
+    mismatchMidDaysAnswer: My brother's in Leningrad. Moved here last week. Nothing here is mine.
+    mismatchFinalDaysAnswer: My flat. One rented room. Never owned property. I'm a simple man.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: I don't get sick. Never have. Men who get sick don't last long in my line of work.
-    midDaysAnswer: A cough. Dock air, officer, not whatever you are writing down. Choose your next word carefully.
-    finalDaysAnswer: I don't discuss my health with a man holding a stamp. I am standing. That is all you need to know.
-    mismatchEarlyDaysAnswer: A weak chest, since childhood. The polyclinic sees me every week. I am used to it.
-    mismatchMidDaysAnswer: No cough. I have never set foot on the docks. The air down there is poison.
-    mismatchFinalDaysAnswer: Nothing. I am a young man, officer. Twenty-five. The body heals itself.
+    earlyDaysAnswer: I don't get sick. Sick men don't last in my line of work.
+    midDaysAnswer: A cough. Dock air, not whatever you're writing. Choose your next word.
+    finalDaysAnswer: I don't discuss my health with a man holding a stamp. I'm standing.
+    mismatchEarlyDaysAnswer: A weak chest since childhood. The polyclinic sees me weekly.
+    mismatchMidDaysAnswer: No cough. I've never set foot on the docks. The air's poison.
+    mismatchFinalDaysAnswer: Nothing. I'm twenty-five, officer. The body heals itself.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - Smart uniform. I hope there is a smart man wearing it.
-    - Take your time, officer. I am a patient man. Ask anyone who works for me.
+    - Smart uniform. I hope there's a smart man wearing it.
     - You have a family, I assume. Hold onto that.
     midDays:
-    - The city is reorganizing. Smart people are already choosing sides.
-    - I own three blocks that used to belong to the state. Funny how that works out.
-    - You are still at your post. Good. That means you are useful.
+    - I own three blocks that used to belong to the state. Funny, that.
+    - You're still at your post. Good. That means you're useful.
     finalDays:
-    - When the dust settles, I will still be here. Will you?
-    - Stamp the paper, officer. We both know who actually runs this gate.
-    - I control what is left. That is not a threat. It is simply a fact.
+    - When the dust settles, I'll still be here. Will you?
+    - I control what's left. That's not a threat. Simply a fact.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

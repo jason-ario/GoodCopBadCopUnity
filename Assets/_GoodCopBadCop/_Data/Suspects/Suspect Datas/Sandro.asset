@@ -35,89 +35,69 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 5861397257814959656, guid: 3efccd6e2fe946049855ecbd73573e23, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Home from the south row workshop. Lost track of time again.
-    - Going home to Irakli before his night shift starts.
-    - Dropping off a client's car at the service yard.
+    - Home from the workshop. Lost track of time.
+    - Home to Irakli before his night shift.
+    - Dropping a client's car at the yard.
     midDaysReasons:
-    - Back from the workshop. No parts, but the old Volga still ticks.
-    - Searching the scrapyards for parts nobody makes anymore.
-    - Checking on the safety of the repair workshop.
+    - Workshop. No parts, but the old Volga ticks.
+    - Scrapyard hunting for parts nobody makes.
+    - Checking the workshop is secure.
     finalDaysReasons:
-    - Going up to my rooftop to see if the stars look different.
+    - To my rooftop. Are the stars different?
     - Going home. Irakli says I forget to eat.
-    - Leaving a book on a bench for whoever finds it next.
+    - Leaving a book on a bench for someone.
   invalidEntryReasons:
     earlyDaysReasons:
     - Night shift at the post office, sorting mail.
-    - Taking my car to a mechanic. Engines are a mystery to me.
-    - Selling all my books. I never had time for reading.
+    - Taking my car to a mechanic. Engines baffle me.
+    - Selling my books. Never had time to read.
     midDaysReasons:
-    - Workshop is full of new parts and orders. Can't stay long.
-    - Coming back to pack. There is nothing beautiful left here.
-    - Starting a course to learn basic car repair.
+    - Workshop's full of new parts. Can't stay.
+    - Packing. Nothing beautiful left here.
+    - Starting a basic car repair course.
     finalDaysReasons:
-    - Going down to the cellar. I never go up on rooftops.
-    - Going home alone. Nobody is waiting for me there.
-    - Hiding indoors. I cannot bear to look at the sky.
+    - Going to the cellar. I avoid rooftops.
+    - Going home alone. Nobody waits for me.
+    - Hiding indoors. I can't look at the sky.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Oh, sorry! I was miles away. Here are my documents, officer.
-    - I was just walking by the river. The way the light hits the ripples is incredible.
-    - "Do you ever feel like we\u2019re all just characters in a very long novel?"
+    - Oh, sorry! I was miles away. My documents, officer.
+    - Do you ever feel we're all characters in a very long novel?
     dialoguesMidDays:
-    - "People are running around so much. They\u2019re missing how quiet the city has become."
-    - I forgot to fill out the date. Time feels a bit... optional lately, doesn't it?
-    - I found a flower growing through a crack in the concrete today. It looked so brave.
+    - A flower grew through the concrete today. It looked so brave.
+    - I forgot the date. Time feels a bit optional lately, doesn't it?
     dialoguesFinalDays:
-    - "I\u2019m going to the rooftop. I want to see if the stars look different tonight."
-    - "My ID? I think I\u2019m starting to forget what that person in the photo felt like."
-    - "The world is just shedding its skin. We\u2019re going to see what\u2019s underneath soon."
+    - My ID? I'm forgetting what the person in that photo felt like.
+    - The world is shedding its skin. We'll see what's underneath soon.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Thanks! Try to look up at the clouds once in a while, officer.
+    - Thanks! Look up at the clouds sometimes, officer.
     dialoguesMidDays:
-    - Good luck. I hope you find something beautiful in all this gray.
+    - I hope you find something beautiful in all this gray.
     dialoguesFinalDays:
-    - "I\u2019ll see you in the next dream. Sleep well."
+    - I'll see you in the next dream. Sleep well.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - A room all to myself? Maybe I can finally finish my poem.
-    dialoguesMidDays:
-    - "It\u2019s very quiet in here. I think I can hear the building breathing."
-    dialoguesFinalDays:
-    - A cage is just a perspective. My mind is still outside.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - Wait... I wasn't... finished... with the first chapter...
-    dialoguesMidDays:
-    - Everything is... fading to... a very... soft white...
-    dialoguesFinalDays:
-    - Finally... I can... fly... away...
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - "A room of my own? Maybe I\u2019ll finally get to the chapter I\u2019ve been putting off."
-  - Isolation sounds like the title of a poem I've been meaning to write.
-  - The walls in here have such a particular texture. Very honest.
+  - A room of my own? Maybe I'll finally finish that chapter.
+  - These walls have such a particular texture. Very honest.
   killExitLines:
-  - "I had so many more pages\u2026 left in the chapter\u2026"
-  - "Strange\u2026 it feels just like\u2026 the end of a long book\u2026"
+  - "So many more pages\u2026 left in the chapter\u2026"
   - "I hope someone\u2026 tends the plants\u2026 on my windowsill\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: 0283a4f850290c34eaa39bf413e74361, type: 3}
@@ -136,40 +116,37 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 1784f41e142caf249b19b0222a3656d3, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The workshop on the south row. I lost track of time again. The light through the roof panel does that to me.
-    midDaysAnswer: The workshop. Hardly any cars now, and no parts. I sat with an old Volga for an hour, just listening to it tick.
-    finalDaysAnswer: The rooftop of my block. I wanted to see if the stars look different now. They do, a little.
-    mismatchEarlyDaysAnswer: The bakery on Rustaveli street. Night shift at the ovens. I never did understand engines, to be honest.
-    mismatchMidDaysAnswer: From the tram depot. I walked Irakli home after his day shift. We have breakfast together every morning.
-    mismatchFinalDaysAnswer: My workshop in the north yard. I moved there years ago. The south row never suited me.
+    earlyDaysAnswer: The south row workshop. The light through the roof makes me lose time.
+    midDaysAnswer: The workshop. No parts left. I sat listening to an old Volga tick.
+    finalDaysAnswer: My rooftop. I wanted to see if the stars changed. They have, slightly.
+    mismatchEarlyDaysAnswer: Night shift at the Rustaveli bakery ovens. Engines were never my thing.
+    mismatchMidDaysAnswer: The tram depot. I walked Irakli home after his day shift.
+    mismatchFinalDaysAnswer: My workshop in the north yard. The south row never suited me.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Fine, I think. Grease burns on the knuckles, but that is the job. I might not notice anything else.
-    midDaysAnswer: Tired in a way sleep does not fix. A little cough from the dust. Everything feels like a dream lately.
-    finalDaysAnswer: Lighter, somehow. I forget to eat. Irakli says I look thin. I feel like I am floating.
-    mismatchEarlyDaysAnswer: Nothing. And my hands are clean, see? I have not touched an engine in a year.
-    mismatchMidDaysAnswer: I feel fine. I live alone, so there is no one to fuss over me anyway.
-    mismatchFinalDaysAnswer: Heavy, if anything. Very grounded. I am only twenty-two, I bounce back from everything.
+    earlyDaysAnswer: Fine, I think. Grease burns on the knuckles, but that's the job.
+    midDaysAnswer: Tired in a way sleep doesn't fix. Everything feels like a dream.
+    finalDaysAnswer: Lighter, somehow. I forget to eat. I feel like I'm floating.
+    mismatchEarlyDaysAnswer: Nothing. Clean hands, see? I haven't touched an engine in a year.
+    mismatchMidDaysAnswer: Fine. I live alone, so nobody fusses over me anyway.
+    mismatchFinalDaysAnswer: Heavy, if anything. Very grounded. I'm twenty-two, I bounce back.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - Sorry, I was miles away. The light on the rooftops this morning was extraordinary.
-    - Do you ever feel like we are all just characters in a very long novel?
-    - I was watching the river on the way here. The smog gives it this incredible amber color.
+    - The light on the rooftops this morning was extraordinary.
+    - The smog turns the river this incredible amber colour.
     midDays:
-    - I found a flower growing through the crack in the pavement today. It looked so brave.
-    - People are moving so fast they are missing how quiet the city has become.
-    - I forgot to fill in the date. Time feels a bit optional lately, does it not?
+    - Everyone moves so fast they miss how quiet the city has become.
+    - I sat with an engine for an hour today. Good company.
     finalDays:
-    - I am going to the rooftop tonight. I want to see if the stars look different from up there.
-    - The world is just shedding its skin. We will see what is underneath soon.
-    - I almost do not recognize myself in the windows anymore. I find that interesting rather than frightening.
+    - I'm going up to the rooftop tonight. The stars look different now.
+    - I barely recognise myself in windows. Interesting, not frightening.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

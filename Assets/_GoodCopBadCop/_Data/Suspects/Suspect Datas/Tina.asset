@@ -35,90 +35,76 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 1501177916931924578, guid: 572c6160c8045c14eb3dd93c39663819, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Meeting with a client at the downtown finance office.
-    - Resident returning home after late-night bookkeeping.
-    - Delivering account ledgers to the treasury district.
+    - Client meeting, downtown finance office.
+    - Home after late-night bookkeeping.
+    - Delivering ledgers to the treasury district.
     midDaysReasons:
-    - Collecting outstanding payments from a business associate.
-    - Meeting with clients whose names I prefer not to share.
-    - Checking on secured deposits before things deteriorate further.
+    - Collecting payments from an associate.
+    - Meeting clients I won't name.
+    - Checking secured deposits. Things deteriorate.
     finalDaysReasons:
-    - Finalizing accounts before the last official deadline.
-    - Delivering final settlement documents to a client.
-    - Home to my flat near the station. No one waiting, by design.
+    - Closing accounts before the last deadline.
+    - Final settlement papers for a client.
+    - Home near the station. Alone, deliberately.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Sunday lunch at my parents' flat with my sisters.
-    - Enrolling in a typing course. Numbers confuse me.
-    - Visiting my husband's family for his birthday.
+    - Sunday lunch with my parents.
+    - Typing course. Numbers confuse me.
+    - My husband's birthday, with his family.
     midDaysReasons:
-    - Picking up my children from school.
-    - Happy to answer any questions. I have nothing to hide.
-    - Returning to my village. I have never lived in the city.
+    - Picking my children up from school.
+    - Ask anything. I have nothing to hide.
+    - Back to my village. Never lived here.
     finalDaysReasons:
-    - Going home to my family. My mother is waiting up.
-    - Settling my late father's estate with my brothers.
-    - Opening my flat to the evacuated families on my street.
+    - Home to my family. Mother's waiting up.
+    - Settling Father's estate with my brothers.
+    - Opening my flat to evacuated families.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Good morning. I have everything prepared.
     - Don't mind the mask. Old scars. Nothing interesting.
-    - You have a very serious expression. I find that attractive in a professional.
+    - You have a very serious expression. I find that attractive.
     dialoguesMidDays:
-    - Still the same face at this window. I appreciate the consistency.
-    - I can make this quick, if you need. We both have long days ahead of us.
-    - The mask stays on. I have stopped explaining it.
+    - Still the same face at this window. I appreciate consistency.
+    - I can make this quick. We both have long days ahead.
     dialoguesFinalDays:
-    - These last few days. I find myself almost sentimental.
+    - These last few days, I find myself almost sentimental.
     - I won't ask about your rules. You don't ask about mine.
-    - Here. I always keep everything in order.
   uncannyEntryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - My papers are ready.
-    - I was here yesterday. You may not remember.
-    - The mask is part of my face.
+    - My papers are ready. I was here yesterday. Remember?
+    - The mask is part of my face. It stays.
     dialoguesMidDays:
-    - I have everything you need.
-    - You can ask me things.
-    - I came prepared.
+    - I have everything you need. You can ask me things.
+    - I came prepared. I always come prepared for you.
     dialoguesFinalDays:
-    - I know what you need to see.
-    - The mask does not come off. But you already know that.
-    - I am ready to go through.
+    - I know what you need to see. Look closer.
+    - The mask does not come off. You already know why.
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
     - Good instincts, officer. I will remember that.
     dialoguesMidDays:
-    - You make this easier every time. I appreciate a professional.
+    - You make this easier every time. I appreciate that.
     dialoguesFinalDays:
     - Smooth as always. Until the next one.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - That is not the outcome I expected. I will need to make a call.
-    dialoguesMidDays:
-    - I see. I would like to speak with someone, please.
-    dialoguesFinalDays:
-    - That is your choice to make. It will have consequences.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - You could have... just looked away...
-    dialoguesMidDays:
-    - I was going to... make this worth your while...
-    dialoguesFinalDays:
-    - That was always... the only ending that fit...
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - I will need to contact someone. Give me one moment.
-  - I have been in smaller rooms. Patience is something I have learned.
-  - You will be hearing from people I know. I say that calmly.
+  - I will need to contact someone. One moment.
+  - You will hear from people I know. I say that calmly.
   killExitLines:
   - "The mask\u2026 stays on\u2026 even now\u2026"
-  - "No one\u2026 will come looking\u2026 I made sure of that\u2026"
-  - "The books\u2026 are balanced\u2026 at least\u2026"
+  - "You could have\u2026 just looked away\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: ed0aecc20d639e84c98e1e28cac814cb, type: 3}
   - {fileID: 8300000, guid: dd97723be62d8794daa537acd49c6cb4, type: 3}
@@ -136,40 +122,37 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 5b17e3fdf6196354dad34cc70d2ac032, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: A client meeting near the station. Ledgers, mostly. Nothing that would interest a man like you.
-    midDaysAnswer: Collecting outstanding payments. People are slow to pay this season. I am patient. Up to a point.
-    finalDaysAnswer: Closing accounts before the last deadline. There is very little left to close, officer.
-    mismatchEarlyDaysAnswer: My mother's flat in Rustavi. She cooks for me every Sunday. Family is everything, no?
-    mismatchMidDaysAnswer: The airport. I fly in from Moscow once a month. I do not actually live here, you understand.
-    mismatchFinalDaysAnswer: The textile factory. I sew uniforms on the night shift. Numbers were never my talent.
-    uncannyEarlyDaysAnswer: I was already here.
-    uncannyMidDaysAnswer: From the same place I always come from.
-    uncannyFinalDaysAnswer: I don't remember where. But I arrived.
+    earlyDaysAnswer: A client near the station. Ledgers. Nothing to interest you.
+    midDaysAnswer: Collecting payments. People are slow this season. I am patient. Mostly.
+    finalDaysAnswer: Closing accounts before the deadline. Very little left to close.
+    mismatchEarlyDaysAnswer: My mother's flat in Rustavi. She cooks for me every Sunday.
+    mismatchMidDaysAnswer: The airport. I fly in from Moscow. I don't live here.
+    mismatchFinalDaysAnswer: The textile factory, night shift. Numbers were never my talent.
+    uncannyEarlyDaysAnswer: I was already here. Before you sat down.
+    uncannyMidDaysAnswer: The same place I always come from. Behind you.
+    uncannyFinalDaysAnswer: I don't remember where. But I arrived. I always arrive.
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Nothing worth reporting. The mask covers old scars, not a fever. You may stop staring now.
-    midDaysAnswer: Tired, a little. I stopped counting the hours I do not sleep. Perhaps we could discuss it more privately.
-    finalDaysAnswer: I do not feel much of anything lately. I have started calling that steady.
-    mismatchEarlyDaysAnswer: Nothing. And the mask is only for show, officer. At home I never wear it.
-    mismatchMidDaysAnswer: No symptoms. My husband would have noticed. He notices everything about me.
-    mismatchFinalDaysAnswer: My health is perfect. There are no scars under the mask. There never were. Shall I take it off?
-    uncannyEarlyDaysAnswer: No.
-    uncannyMidDaysAnswer: I don't think so.
+    earlyDaysAnswer: Nothing. The mask covers old scars, not fever. Stop staring.
+    midDaysAnswer: Tired. I stopped counting sleepless hours. Discuss it privately?
+    finalDaysAnswer: I don't feel much lately. I've started calling that steady.
+    mismatchEarlyDaysAnswer: Nothing. The mask is for show. At home, it's off.
+    mismatchMidDaysAnswer: None. My husband would notice. He notices everything about me.
+    mismatchFinalDaysAnswer: Perfect health. No scars under the mask. Shall I?
+    uncannyEarlyDaysAnswer: No. Ask again. The answer will still be no.
+    uncannyMidDaysAnswer: I don't think so. The skin underneath disagrees.
     uncannyFinalDaysAnswer: I can't tell anymore. The mask feels for me.
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - You keep staring at the mask. Most people have the manners not to.
-    - You are very thorough. I find that attractive in this line of work.
-    - The family section is blank on purpose. You can note that down if you like.
+    - You keep staring. Most people have manners.
+    - The family section is blank on purpose. Note it down.
     midDays:
-    - I could make this easier for both of us, if you are the right kind of professional.
-    - The mask is not decorative. But it is not medically relevant either. It is simply mine.
-    - You have a good instinct for your job. I respect people with instincts.
+    - I could make this easier. If you're the right professional.
+    - The mask isn't medical or decorative. It is simply mine.
     finalDays:
-    - By now we know each other, in the way checkpoints make you know people.
-    - I have no next of kin to list. That has always been deliberate.
-    - Ask what you need to ask. I am not in any particular hurry.
+    - By now we know each other. Checkpoints do that.
+    - No next of kin to list. That was always deliberate.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

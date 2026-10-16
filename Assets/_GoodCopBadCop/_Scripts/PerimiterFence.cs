@@ -127,7 +127,7 @@ public class PerimiterFence : NetworkBehaviour
     private bool _pendingRepairPunch;
 
     /// <summary>
-    /// Optional HighlightPlus effect (faint pulsing overlay from FenceRepairPulse.asset) shown while this segment is broken and
+    /// Optional HighlightPlus effect (faint pulsing overlay from Resources/Highlight/ObjectivePulse.asset, shared with junk pickups) shown while this segment is broken and
     /// <see cref="FenceRepairTask.ShowRepairHighlights"/> is enabled — see
     /// <see cref="RefreshRepairHighlight"/>. Null-safe throughout: a fence prefab without this
     /// component simply never glows.

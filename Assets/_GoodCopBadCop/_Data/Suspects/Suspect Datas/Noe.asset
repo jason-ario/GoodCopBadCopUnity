@@ -35,58 +35,46 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 6108308127370568290, guid: 98ffec2501a15d241a714e86e235255a, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Returning home after closing the corner grocery store.
-    - Shop sold out by noon. Closed up. Going home.
-    - Dropping off the daily register keys at the manager's.
+    - Closed the corner grocery. Going home.
+    - Shop sold out by noon. Home.
+    - Dropping register keys at the manager's.
     midDaysReasons:
-    - Opened the empty shop again. Nobody came. Going home.
-    - Checking if the industrial freezers still have power.
-    - Stood in the bread line. Nothing. Going home anyway.
+    - Opened the shop. Nobody came. Home.
+    - Checking if the freezers have power.
+    - Bread line. Nothing. Going home anyway.
     finalDaysReasons:
-    - Locked the shop. Windows are gone. Going home.
-    - Going home to sit in my room. Shift's over.
-    - Fulfilling mandatory residency census requirements.
+    - Locked the shop. Windows gone. Home.
+    - Going home to sit. Shift's over.
+    - Mandatory residency census requirements.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Going home to my wife and kids. Big family dinner tonight.
-    - Collecting my pension. Retired from the shop last year.
-    - Hosting a party tonight for the whole block. Can't wait!
+    - Home to my wife and kids.
+    - Collecting my pension. Retired last year.
+    - Hosting a block party tonight. Can't wait!
     midDaysReasons:
-    - Unloading a fresh delivery at the shop. Shelves are full.
-    - Visiting my neighbour. He invited me over for dinner.
-    - Volunteering at the triage centre. I love helping out.
+    - Unloading a fresh delivery. Shelves full.
+    - Dinner at my neighbour's. He invited me.
+    - Volunteering at triage. I love helping.
     finalDaysReasons:
-    - Opening the shop early. Big sale tomorrow, very busy.
-    - Visiting. I don't live here, I'm on a business trip.
-    - Back from the dance hall. Best night of my life.
+    - Opening early. Big sale tomorrow.
+    - Just visiting. Business trip.
+    - Back from the dance hall. Best night ever.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - "Here\u2019s my ID and the form. I filled them out while waiting for bread."
-    - "I\u2019m just going home. The shop ran out of everything by noon anyway."
+    - "Here\u2019s my ID and the form. Filled them out in the bread line."
     - Is your stamp working? Everything else in this city seems to be broken.
     dialoguesMidDays:
-    - People were fighting over batteries today. I just watched. It was like a movie.
-    - "The lights in the shop keep flickering. It\u2019s hard to see the prices."
-    - "Here\u2019s the paper. I don't really care if it's right or not. You decide."
+    - People were fighting over batteries today. I just watched. Like a movie.
+    - "Here\u2019s the paper. I don't really care if it's right. You decide."
     dialoguesFinalDays:
     - I locked the front door, but the windows are already gone. Doesn't matter.
-    - "I\u2019m going to go sit in my room until the sky finishes turning gray."
     - "My shift is over. I think the whole world\u2019s shift is over."
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -97,28 +85,20 @@ MonoBehaviour:
     - Whatever. See you when the lights go out for good.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - A holding cell? Does it have a bed? I could use a nap.
-    dialoguesMidDays:
-    - Fine. At least I don't have to tell people we're out of sugar in there.
-    dialoguesFinalDays:
-    - "Put me wherever. It\u2019s all the same to me at this point."
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - Oh. I guess... I don't have to... go to work... tomorrow...
-    dialoguesMidDays:
-    - This is... a very... loud way... to end a shift...
-    dialoguesFinalDays:
-    - Finally... I can... stop... waiting... in lines.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - Okay.
-  - Does it have a chair? Great. Fine.
-  - "Sure. Lock me up. I\u2019ll add it to the list of things that don\u2019t matter."
+  - A holding cell? Does it have a bed? I could use a nap.
+  - "Sure. Lock me up. Add it to the list of things that don\u2019t matter."
   killExitLines:
   - "Hm. Didn\u2019t even need to think about it, did you."
-  - "Right. Okay. That\u2019s\u2026 fine too\u2026 I guess\u2026"
-  - "At least I don\u2019t\u2026 have to face another line\u2026 tomorrow\u2026"
+  - "Finally\u2026 I can stop\u2026 waiting\u2026 in lines\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: 942af6f9e8eade54bb2d84e533a8c131, type: 3}
   - {fileID: 8300000, guid: 5f053379fe67afa45954572bf5ee7b62, type: 3}
@@ -133,10 +113,10 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 99e1cc7b15baa0d419ddc8e8574252f3, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The shop. Sold out by noon. I stood in the bread line anyway, then closed up.
-    midDaysAnswer: The shop. Checked if the freezers still have power. They don't. You can smell it.
-    finalDaysAnswer: The shop, I think. I locked the door. The windows are already gone. Doesn't matter.
-    mismatchEarlyDaysAnswer: The shop on the western block. Been working there a few months now.
+    earlyDaysAnswer: The shop. Sold out by noon. I stood in the bread line anyway.
+    midDaysAnswer: The shop. Checked the freezers. No power. You can smell it.
+    finalDaysAnswer: The shop, I think. I locked the door. Windows are gone. Doesn't matter.
+    mismatchEarlyDaysAnswer: The shop on the western block. Been working there a few months.
     mismatchMidDaysAnswer: Home. My wife made dinner, so I left the shop early.
     mismatchFinalDaysAnswer: The train station. I only moved to this district last year.
     uncannyEarlyDaysAnswer: 
@@ -144,30 +124,26 @@ MonoBehaviour:
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: No. Tired. I'm always tired. That's not new.
-    midDaysAnswer: I stopped feeling cold about a week ago. Not sure if that counts.
+    earlyDaysAnswer: No. Tired. I'm always tired. That's not new, officer.
+    midDaysAnswer: I stopped feeling cold about a week ago. Not sure that counts.
     finalDaysAnswer: Everything aches a little. Sleep doesn't fix it. Nothing fixes anything.
-    mismatchEarlyDaysAnswer: Never tired. I sleep ten hours a night and the shop is always full. I love it.
-    mismatchMidDaysAnswer: I'm freezing all the time, officer. Can't get warm no matter what I do.
-    mismatchFinalDaysAnswer: Nothing aches. My neighbour and I played cards all night. He says I look well.
+    mismatchEarlyDaysAnswer: Never tired. I sleep ten hours a night. The shop's always full.
+    mismatchMidDaysAnswer: I'm freezing all the time, officer. Can't get warm, whatever I do.
+    mismatchFinalDaysAnswer: Nothing aches. My neighbour and I played cards all night. Lovely.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - Is your stamp working? Ours at the shop broke twice this week.
-    - There was no bread again. I stood in line for an hour anyway. Force of habit.
+    - No bread again. I stood in line an hour anyway. Force of habit.
     - You look like you are about to ask me something. Please do not.
-    - Take your time. I have nothing urgent waiting for me on the other side.
     midDays:
-    - The shop is empty. I still open it every morning. I am not sure why.
-    - Are you cold? I stopped feeling cold about a week ago. Not sure what that means.
-    - Someone was crying in the street on the way here. I walked past. There was nothing to do.
+    - The shop is empty. I still open it every morning. Not sure why.
+    - Someone was crying in the street. I walked past. There was nothing to do.
     finalDays:
-    - Does any of this feel pointless to you? Just curious. I will not be offended.
-    - I keep coming through here. Pure habit at this point. Take your time.
-    - I have nowhere to be. Neither does anyone.
+    - Does any of this feel pointless to you? Just curious. I won't be offended.
+    - I have nowhere to be. Neither does anyone. Take your time.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

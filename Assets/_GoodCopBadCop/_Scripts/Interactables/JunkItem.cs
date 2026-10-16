@@ -187,6 +187,13 @@ public class JunkItem : Interactable
     /// </summary>
     public override bool IsInteractable => CanBeCollected;
 
+    /// <summary>
+    /// Trash, gore and corpses show their objective highlight as the faint pulsing overlay shared
+    /// with broken fences (Resources/Highlight/ObjectivePulse.asset) rather than a pulsing outline.
+    /// Hover still uses the authored outline.
+    /// </summary>
+    protected override bool UseOverlayPulseForHold => true;
+
     protected override void Awake()
     {
         base.Awake();

@@ -35,89 +35,69 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 1792178647491737666, guid: accb76584706b2f4da727ebf76ecf33f, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Locked the lot booth on Rustaveli. Going home.
-    - Resident returning. Papers are in my left pocket.
-    - Done for the night. Just going home.
+    - Locked the Rustaveli lot booth. Home.
+    - Resident. Papers in my left pocket.
+    - Done for the night. Going home.
     midDaysReasons:
-    - The lot has been closed. I have nowhere else to be.
-    - Returning from sorting out my registration at the district office.
-    - Going back to the block. Nothing else to do.
+    - Lot closed. Nowhere else to be.
+    - Sorted my registration at the district office.
+    - Back to the block. Nothing to do.
     finalDaysReasons:
     - Going home. Same as always.
-    - Returning to my residence before the evening deadline.
-    - They shut the lot. I walk home. That is the whole story.
+    - Home before the evening deadline.
+    - They shut the lot. I walk home.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Taking my wife to the opera for our anniversary.
-    - Back from football training. I play midfield on Sundays.
-    - New in town. Looking for work as a parking attendant.
+    - Taking my wife to the anniversary opera.
+    - Football training. Midfield on Sundays.
+    - New in town. Seeking parking attendant work.
     midDaysReasons:
-    - The lot is still open. I need to get back to work.
-    - Fetching my wife from her sister's flat.
-    - Picking up my student stipend at the institute.
+    - Lot's still open. Back to work.
+    - Fetching my wife from her sister's.
+    - Collecting my student stipend.
     finalDaysReasons:
-    - Starting nights at the lot. They just reopened it.
-    - My wife sent me for bread. She worries if I am late.
-    - Registering for military service. I just turned eighteen.
+    - Starting nights. The lot just reopened.
+    - Wife sent me for bread. She worries.
+    - Registering for service. Just turned eighteen.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Papers. Here. Long shift.
-    - I have been coming through this checkpoint for three months. You can look it up.
-    - Twenty-two years at that lot. Not once have I been late to check in.
+    - Papers. Here. Long shift. Three months through this checkpoint. Look it up.
+    - Twenty-two years at that lot. Not once have I been late checking in.
     dialoguesMidDays:
-    - The lot is closed now. Just going home.
-    - I do not know what is happening out there. I keep my head down.
+    - The lot is closed now. Just going home. I keep my head down.
     - My joints are bad in this kind of weather. Or whatever this is.
     dialoguesFinalDays:
-    - Still here. Still checking in. Some things do not change.
-    - Just let me through. I have nowhere to be and I would like to get there.
-    - I am not afraid of you. I am just tired.
+    - Just let me through. I have nowhere to be, and I'd like to get there.
+    - I am not afraid of you, officer. I am just tired.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Good.
+    - Good. Another shift done, then. Thank you.
     dialoguesMidDays:
-    - Right.
+    - Right. Back to the empty block, then.
     dialoguesFinalDays:
-    - Finally.
+    - Finally. Nowhere to be, but finally, officer.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - A room? Fine. Better than the booth.
-    dialoguesMidDays:
-    - Whatever you say.
-    dialoguesFinalDays:
-    - Not surprised. Alright.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - Hm. Did not expect that.
-    dialoguesMidDays:
-    - ...
-    dialoguesFinalDays:
-    - Twenty-two years... and this is how it ends.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - Four walls. At least it is warm.
-  - You have a chair in there? My knee does not do well standing for long.
-  - Fine. I have spent worse nights in smaller spaces.
+  - Four walls. At least it is warm. I have had worse.
+  - You have a chair in there? My knee does not like standing.
   killExitLines:
-  - Hm.
-  - Twenty-two years...
+  - Hm. Twenty-two years... and this is how it ends.
   - Not how I thought it would go. But. Alright.
   voiceAudioClips:
   - {fileID: 8300000, guid: 1d2321bbd2f3bd14b8ac2bddb3fef9c9, type: 3}
@@ -133,7 +113,7 @@ MonoBehaviour:
   questionResponses:
   - question: Where are you coming from?
     earlyDaysAnswer: The lot on Rustaveli. Logged the last car, locked the booth. Going home.
-    midDaysAnswer: The district office. Sorting out my registration. The lot is closed, so I have the time.
+    midDaysAnswer: The district office. Sorting my registration. Lot's closed, so I have the time.
     finalDaysAnswer: Walked past the lot. Chain on the gate. Then here. Where else.
     mismatchEarlyDaysAnswer: The lot by the train station. Six years there now.
     mismatchMidDaysAnswer: Work. The lot is open. Full from morning, busy all day.
@@ -144,9 +124,9 @@ MonoBehaviour:
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
     earlyDaysAnswer: My knee. It acts up this time of year. Nothing serious.
-    midDaysAnswer: Joints are bad in this weather. Or whatever this is. And I do not sleep.
+    midDaysAnswer: Joints are bad in this weather. Or whatever this is. No sleep.
     finalDaysAnswer: Some pressure in the chest. Probably nothing. I am sixty-eight.
-    mismatchEarlyDaysAnswer: Nothing. Knees of a young man. I can stand all day, no chair needed.
+    mismatchEarlyDaysAnswer: Nothing. Knees of a young man. I stand all day, no chair.
     mismatchMidDaysAnswer: No. I sleep like a stone. Weather never bothered my joints.
     mismatchFinalDaysAnswer: Nothing. Fit as a soldier. I only just turned fifty.
     uncannyEarlyDaysAnswer: 
@@ -155,17 +135,14 @@ MonoBehaviour:
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - Twenty-two years at that lot and not one car was stolen. Think about that.
+    - Twenty-two years at that lot and not one car stolen. Think about that.
     - This line moves slower than the lot on New Year's Eve.
-    - You want to see my parking authority badge? I still carry it. Force of habit.
     midDays:
-    - The lot is empty now. Strangest thing I have ever seen. Stranger than all of this, even.
-    - I used to hate quiet shifts. Now I miss them.
+    - The lot is empty now. Strangest thing I have seen. Stranger than this.
     - My wife would have hated all of this. Too much commotion.
     finalDays:
-    - Twenty-two years and they close the lot without even telling me.
+    - Twenty-two years, and they close the lot without even telling me.
     - I have a routine. It helps when nothing makes sense anymore.
-    - I just stand here. It is what I do.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

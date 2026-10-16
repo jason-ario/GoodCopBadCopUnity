@@ -35,58 +35,46 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 5164911391202306748, guid: a27411530d2c9aa4eab6a559a8832b11, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Back from the university archive. Saving first editions.
-    - Home after my ethics lecture. On schedule, as always.
+    - Back from the archive. Saving first editions.
+    - Home after my ethics lecture. On schedule.
     - Retrieving essential research materials.
     midDaysReasons:
-    - Wrote the dean's report on the cracked lab wing. Going home.
-    - Lectured to eleven students today. Home to my family.
-    - Meeting with the dean regarding safety.
+    - Filed the dean's lab wing report.
+    - Lectured eleven students. Home to family.
+    - Meeting the dean regarding safety.
     finalDaysReasons:
-    - Returning to my registered faculty housing.
-    - Left my lecture notes in the empty faculty. Going home.
+    - Returning to registered faculty housing.
+    - Left my notes in the faculty. Home.
     - Fulfilling final residency requirements.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Cancelled my lectures. The students can fend for themselves.
-    - Enrolling as a first-year student. Entrance exam today.
-    - Retired from teaching in 1970. Visiting the old archive.
+    - Cancelled lectures. Students can fend alone.
+    - Enrolling as a first-year. Exam today.
+    - Retired in 1970. Visiting the archive.
     midDaysReasons:
-    - Taking my grandchildren down to the shelter.
-    - Moving to the city to start my first post as a professor.
-    - Resigned from the faculty. My students were a burden.
+    - Taking my grandchildren to the shelter.
+    - Starting my first professorship in the city.
+    - Resigned. My students were a burden.
     finalDaysReasons:
-    - Hurrying to church. Faith alone will save us now.
-    - Reopening the faculty. Full lecture schedule from tomorrow.
-    - Bachelor, no dependents. Returning to my rented room.
+    - Hurrying to church. Faith will save us.
+    - Reopening the faculty. Full lectures tomorrow.
+    - Bachelor, no dependents. Back to my room.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - "Good day, officer. I\u2019m just returning from the university archives."
-    - "The students are anxious. I\u2019m heading back to provide some stability."
+    - Good day, officer. Back from the university archives, to steady my students.
     - Stoicism is the only logical response to a crisis, wouldn't you agree?
     dialoguesMidDays:
-    - The books are starting to feel... heavy. As if the ink is rotting.
+    - "The books are starting to feel\u2026 heavy. As if the ink is rotting."
     - I saw a bird fall from the sky today. It didn't even scream.
-    - Human intellect is a very fragile glass, and the hammer is coming.
     dialoguesFinalDays:
     - The fire is a beautiful editor. It deletes all our mistakes.
-    - Why check the papers? Soon, the ash will be our only record.
-    - I am going home to watch the horizon dissolve into white.
+    - Why check the papers? Soon the ash will be our only record.
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
@@ -94,31 +82,23 @@ MonoBehaviour:
     dialoguesMidDays:
     - "Go home, officer. While there\u2019s still a home to go to."
     dialoguesFinalDays:
-    - "Enter the tomb. It\u2019s warmer than the street."
+    - "Enter the tomb, officer. It\u2019s warmer than the street."
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - A setback, but perhaps a necessary precaution for the group.
-    dialoguesMidDays:
-    - Isolation. A perfect laboratory for watching one's mind fray.
-    dialoguesFinalDays:
-    - Lock me away. The unmaking happens everywhere at once.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - A very... unrefined solution to a complex problem.
-    dialoguesMidDays:
-    - And so the curriculum ends. I expected a more elegant finale.
-    dialoguesFinalDays:
-    - Yes... simplify the equation. Zero is the only true answer.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
   - Observed. Contained. The scientific method applied to the scientist. How fitting.
-  - Four walls and time to think. A man of lesser character would struggle.
-  - A cage for a man who has already let everything go. What excellent symmetry.
+  - A cage for a man who has already let everything go. Symmetry.
   killExitLines:
-  - Reduce. Simplify. Erase. Yes... that is the correct theorem.
-  - The experiment concludes... cleanly... I expected nothing... less.
-  - One more variable... removed from an already... simple equation...
+  - "Reduce. Simplify. Erase. Yes\u2026 that is the correct theorem."
+  - "One more variable\u2026 removed\u2026 zero is the only true answer\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: 8c42efb34507d9d47a8f5899bfd7a429, type: 3}
   - {fileID: 8300000, guid: cff0a847115158a448a38a1319c5982e, type: 3}
@@ -132,40 +112,37 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 0895f7676762ba444b808767ad362585, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The university archive. I was pulling first editions before the dust reaches them. Then my ethics lecture, on schedule.
-    midDaysAnswer: The university. The lab wing has cracked and the dean wants a report. I still lectured. Eleven students came.
-    finalDaysAnswer: The faculty building. Empty halls. I left my lecture notes on the desk. There is no reason to carry them now.
-    mismatchEarlyDaysAnswer: The chemistry laboratory. I teach organic chemistry. Fifteen years in the same department.
-    mismatchMidDaysAnswer: My flat. I cancelled all lectures weeks ago. Routine is a comfort for the unreflective.
-    mismatchFinalDaysAnswer: Faculty housing. I live alone. I never married, and I consider it the soundest decision I made.
+    earlyDaysAnswer: The archive, pulling first editions from the dust. Then my ethics lecture.
+    midDaysAnswer: The university. The lab wing cracked. I still lectured. Eleven came.
+    finalDaysAnswer: The empty faculty. I left my lecture notes. No reason to carry them.
+    mismatchEarlyDaysAnswer: The chemistry laboratory. Fifteen years teaching organic chemistry there.
+    mismatchMidDaysAnswer: My flat. I cancelled all lectures weeks ago. Routine is for the unreflective.
+    mismatchFinalDaysAnswer: Faculty housing. I live alone. Never married. My soundest decision.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Headaches, occasionally. I have always had them. Nothing that requires the polyclinic.
-    midDaysAnswer: I lose track of time. I look up from a book and it is dark. The headaches come more often.
-    finalDaysAnswer: A taste of copper in the mouth. Two weeks now. I find I no longer mind it.
-    mismatchEarlyDaysAnswer: None. I have never had a headache in my life. A disciplined mind does not permit it.
-    mismatchMidDaysAnswer: Nothing. At twenty-eight one still recovers quickly. I sleep well and wake rested.
-    mismatchFinalDaysAnswer: Nothing. I resigned from the university last year for my health, and it has improved since.
+    earlyDaysAnswer: Headaches, occasionally. I have always had them. Nothing for the polyclinic.
+    midDaysAnswer: I lose track of time. I look up and it is dark.
+    finalDaysAnswer: A taste of copper in the mouth. Two weeks now. I no longer mind.
+    mismatchEarlyDaysAnswer: None. A disciplined mind has never once permitted a headache.
+    mismatchMidDaysAnswer: Nothing. At twenty-eight one recovers quickly. I sleep well, wake rested.
+    mismatchFinalDaysAnswer: Nothing. I resigned last year for my health. It has improved since.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - Stoicism is the only logical response to a crisis. Would you not agree?
-    - My students keep asking me what comes next. I tell them what history says. They do not like the answer.
-    - Order is its own kind of courage, officer. You are practicing it right now.
+    - My students ask what comes next. I tell them history. They dislike it.
+    - Order is its own kind of courage, officer. You are practicing it now.
     midDays:
     - Human intellect is a very fragile glass, and the hammer is coming.
-    - I gave a lecture to an empty hall yesterday. I finished it. Habit is the skeleton of civilization.
-    - The books are starting to feel heavy. As if the ink itself is rotting.
+    - I lectured an empty hall yesterday. Habit is the skeleton of civilization.
     finalDays:
-    - Why check the papers? Soon the ash will be the only record anyone keeps.
-    - The fire is a beautiful editor. It deletes all our mistakes at once.
-    - Zero is the only honest number in a collapsing system. Everything reduces to it.
+    - Why check papers? Soon the ash will be the only record anyone keeps.
+    - Zero is the only honest number in a collapsing system. Everything reduces.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

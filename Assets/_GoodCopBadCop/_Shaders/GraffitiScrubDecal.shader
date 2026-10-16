@@ -58,7 +58,7 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         // --- Discoverability Pulse ---
         // Faint self-lit "breathing" of the paint, added AFTER fog so it reads in dusk/fog.
         // Intensity 0 disables it (default, so blood decals sharing this shader are unaffected).
-        // Each instance gets its own phase from its world position so nearby pieces don't sync.
+        // All instances share the same phase (global time), so pieces with equal speed pulse in sync.
         [HDR] _PulseColor         ("Pulse Color",               Color)          = (1, 1, 1, 1)
         _PulseIntensity           ("Pulse Intensity",           Range(0, 3))    = 0.0
         _PulseTintFromTexture     ("Pulse Uses Paint Color",    Range(0, 1))    = 1.0
@@ -421,14 +421,12 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 finalRGB = MixFog(finalRGB, fogFactor);
 
                 // --- Discoverability pulse (added after fog so it reads through it) ---
-                // Slow, faint breathing emission in the paint's own color. Per-instance phase from
-                // the box's world position keeps neighbours out of sync. Fades with scrub progress
-                // (doubling as cleaning feedback) and with camera distance.
+                // Slow, faint breathing emission in the paint's own color. Driven purely by global
+                // time (no per-instance phase) so every piece with the same speed pulses in unison.
+                // Fades with scrub progress (doubling as cleaning feedback) and with camera distance.
                 if (_PulseIntensity > 0.0)
                 {
-                    float3 objPosWS = TransformObjectToWorld(float3(0, 0, 0));
-                    float  phase    = frac(sin(dot(objPosWS.xz, float2(12.9898, 78.233))) * 43758.5453);
-                    float  wave     = 0.5 - 0.5 * cos(6.2831853 * (_Time.y * _PulseSpeed + phase));
+                    float  wave     = 0.5 - 0.5 * cos(6.2831853 * (_Time.y * _PulseSpeed));
                     float  pulse    = lerp(_PulseMin, 1.0, pow(wave, _PulseSharpness));
 
                     float  camDist  = distance(GetCameraPositionWS(), positionWS);

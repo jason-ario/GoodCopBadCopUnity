@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
 using Steamworks;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
@@ -24,6 +25,9 @@ public class UIController : MonoBehaviour
 
     /// <summary>Fired on the local client when the pause menu is about to open. Use this to close any overlapping UI before the pause menu appears.</summary>
     public static event Action OnPauseMenuOpened;
+
+    /// <summary>Fired on the local client right after the pause menu closes (IsPaused is already false).</summary>
+    public static event Action OnPauseMenuClosed;
 
     [SerializeField] private RawImage cameraImage;
     [SerializeField] private GameObject levelSelectUI;
@@ -64,6 +68,14 @@ public class UIController : MonoBehaviour
     private bool pauseMenuOpened = false;
     private bool backButtonWasActiveBeforePaused;
 
+    // Single-player pause freeze: Time.timeScale is 0 while the pause menu is open and this
+    // machine is the only real player (offline, or host with no other player clients).
+    private bool _timeFrozenByPause;
+    private float _timeScaleBeforePause = 1f;
+
+    /// <summary>True while the pause menu has frozen <see cref="Time.timeScale"/> (single player only).</summary>
+    public bool IsGameTimeFrozen => _timeFrozenByPause;
+
     [Header("Transition Effect")]
     [Tooltip("Tentacle blackout controller for the menu → gameplay transition. " +
              "Falls back to the screenFade Animator when null.")]
@@ -96,6 +108,27 @@ public class UIController : MonoBehaviour
         Instance = this;
         backButtonUI.SetActive(false);
         EnsureGamepadNavigation();
+        EnsurePauseHiddenScreens();
+    }
+
+    /// <summary>
+    /// Every full-screen panel is hidden while the pause menu is open and shown again on
+    /// unpause (see <see cref="PauseHiddenScreen"/>). New screens should be added here.
+    /// </summary>
+    private void EnsurePauseHiddenScreens()
+    {
+        PauseHiddenScreen.EnsureOn(levelSelectUI);
+        PauseHiddenScreen.EnsureOn(toolShopUI);
+        PauseHiddenScreen.EnsureOn(hqOrderScreenUI);
+        PauseHiddenScreen.EnsureOn(startShiftScreen);
+        PauseHiddenScreen.EnsureOn(guardPurchaseScreen);
+        PauseHiddenScreen.EnsureOn(shopItemPurchasePopup);
+        PauseHiddenScreen.EnsureOn(inviteFriendsPanel);
+        PauseHiddenScreen.EnsureOn(_endDayPopup);
+        PauseHiddenScreen.EnsureOn(_thanksForPlayingPanel);
+        PauseHiddenScreen.EnsureOn(phoneCallBackdropUI);
+        if (endOfShiftReportUI != null) PauseHiddenScreen.EnsureOn(endOfShiftReportUI.gameObject);
+        if (deathScreenUI != null) PauseHiddenScreen.EnsureOn(deathScreenUI.gameObject);
     }
 
     /// <summary>
@@ -117,8 +150,18 @@ public class UIController : MonoBehaviour
         GamepadMenuNavigator.EnsureOn(startShiftScreen);
     }
 
+    private void OnDestroy()
+    {
+        // Time.timeScale is global and survives scene loads (e.g. Return to Main Menu while paused).
+        SetPauseTimeFrozen(false);
+    }
+
     private void Update()
     {
+        // A player joining (or the last other player leaving) while paused toggles the freeze.
+        if (pauseMenuOpened || _timeFrozenByPause)
+            RefreshPauseTimeFreeze();
+
         if (PlayerInstance.Instance == null)
         {
             return;
@@ -1166,6 +1209,40 @@ public class UIController : MonoBehaviour
             _applyingPauseState = false;
         }
         pauseMenu.SetActive(true);
+        RefreshPauseTimeFreeze();
+    }
+
+    /// <summary>
+    /// True when no other real player shares this session: offline, or the host with no other
+    /// player clients (hidden dev spectators don't count). A joined client is never single player.
+    /// </summary>
+    private static bool IsLocalSinglePlayerSession()
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsListening) return true;
+        if (!nm.IsServer) return false;
+        return DevSpectatorRegistry.PlayerClientCount(nm) <= 1;
+    }
+
+    private void RefreshPauseTimeFreeze()
+    {
+        SetPauseTimeFrozen(pauseMenuOpened && IsLocalSinglePlayerSession());
+    }
+
+    private void SetPauseTimeFrozen(bool frozen)
+    {
+        if (frozen == _timeFrozenByPause) return;
+        _timeFrozenByPause = frozen;
+
+        if (frozen)
+        {
+            _timeScaleBeforePause = Time.timeScale > 0f ? Time.timeScale : 1f;
+            Time.timeScale = 0f;
+        }
+        else
+        {
+            Time.timeScale = _timeScaleBeforePause;
+        }
     }
     
     public void ClosePauseMenu()
@@ -1221,6 +1298,7 @@ public class UIController : MonoBehaviour
 
         pauseMenuOpened = false;
         pauseMenu.SetActive(false);
+        RefreshPauseTimeFreeze();
 
         if (backButtonWasActiveBeforePaused)
         {
@@ -1229,6 +1307,9 @@ public class UIController : MonoBehaviour
             UpdateBackButtonHudAvoidance();
         }
         backButtonWasActiveBeforePaused = false;
+
+        // Screens hidden by the pause menu (PauseHiddenScreen) come back now.
+        OnPauseMenuClosed?.Invoke();
     }
 
     /// <summary>

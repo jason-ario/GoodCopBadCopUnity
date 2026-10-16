@@ -104,6 +104,10 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
         if (!IsOpen)
             return;
 
+        // The report is hidden under the pause menu; Escape/B belong to the pause menu.
+        if (UIController.Instance != null && UIController.Instance.IsPaused)
+            return;
+
         Keyboard keyboard = Keyboard.current;
         Gamepad gamepad = Gamepad.current;
         if ((keyboard != null && keyboard.escapeKey.wasPressedThisFrame) ||

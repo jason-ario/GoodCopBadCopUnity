@@ -35,90 +35,70 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 6078421262525438805, guid: f85ba637cdbbfae47afded6b54de18ba, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Home from the library. Political science reading room.
-    - Resident returning from the university.
-    - Bringing my notes home. Two notebooks full so far.
+    - Home from the library reading room.
+    - Resident, back from the university.
+    - Bringing my notes home. Two notebooks.
     midDaysReasons:
-    - Checking on the emergency water rations at home.
-    - Logged the campus changes, then the water queue. Going home.
-    - Bringing water home to my mother and sister.
+    - Checking water rations at home.
+    - Logged campus changes. Going home.
+    - Bringing water to Mother and sister.
     finalDaysReasons:
-    - Counted the cracks in the old lecture hall. Going home.
-    - Returning home to my mother and sister.
-    - Taking my notebooks home. Six of them now.
+    - Counted lecture hall cracks. Going home.
+    - Home to my mother and sister.
+    - Taking home six notebooks now.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Home from my engineering lab at the polytechnic.
-    - Going home to my husband. He hates it when I am late.
-    - Retiring from the tram depot after thirty years.
+    - Home from my polytechnic engineering lab.
+    - Home to my husband. He hates lateness.
+    - Retiring from the tram depot.
     midDaysReasons:
-    - Lost my papers again. I never notice where I put things.
-    - Taking my son to the polyclinic for his cough.
-    - Visiting my mother's grave. She passed in the spring.
+    - Lost my papers. I never notice things.
+    - Taking my son to the polyclinic.
+    - Visiting my late mother's grave.
     finalDaysReasons:
-    - Teaching my political science seminar. Third year as lecturer.
-    - Nothing to note. I stopped paying attention weeks ago.
-    - Returning to the dormitory. My family lives in Kutaisi.
+    - Teaching my political science seminar.
+    - Nothing to note. I stopped noticing.
+    - To the dormitory. Family's in Kutaisi.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - The paint is peeling on your booth. Just noticed.
-    - Is the air always this thick? It feels... heavy today.
-    - "I\u2019m just heading back. I have a lot of reading to do."
+    - The paint is peeling on your booth. Top left corner. Weeks now.
+    - "Is the air always this thick? It feels\u2026 heavy today."
     dialoguesMidDays:
-    - I saw a tree turn gray while I was walking. It was quite pretty.
-    - The static on the TV... if you stare, it looks like snow.
-    - Everything is starting to look like a photograph. Very still.
+    - I saw a tree turn gray while I was walking. Quite pretty.
+    - "The static on the TV\u2026 if you stare, it looks like snow."
     dialoguesFinalDays:
     - "I\u2019m going to watch the sunset. I think it\u2019s the last one."
     - Do you feel the world getting thinner? I can see right through it.
-    - "The silence is beautiful. It\u2019s the most honest thing we have."
   uncannyEntryDialogues:
     lastVerdict: 0
-    dialoguesEarlyDays:
-    - 
-    - 
-    - 
-    dialoguesMidDays:
-    - 
-    - 
-    - 
-    dialoguesFinalDays:
-    - 
-    - 
-    - 
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
     - Thanks. You should probably fix that light soon.
     dialoguesMidDays:
-    - Try not to look at the sky for too long today.
+    - Try not to look at the sky for too long.
     dialoguesFinalDays:
     - "Enjoy the view, officer. It\u2019s quite a show."
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - "Wait, why? I\u2019m not sick!"
-    dialoguesMidDays:
-    - "A cell? That\u2019s fine. The view is the same from anywhere."
-    dialoguesFinalDays:
-    - Isolation is just a head start on the end. I don't mind.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - Wait... what are you doing?!?
-    dialoguesMidDays:
-    - Wait... No, please!
-    dialoguesFinalDays:
-    - Wait... mommy!
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - This is a mistake. I have notes. I can prove this is a mistake.
-  - Fine. At least in here I can keep counting without interruption.
-  - Wait, are those water stains on the ceiling? That pattern is wrong.
+  - This is a mistake. I have notes. I can prove it.
+  - Fine. In here I can keep counting without any interruption.
   killExitLines:
-  - "No... I still had variables I hadn\u2019t... I still hadn\u2019t found the..."
-  - The pattern... there was a pattern... I almost had it...
-  - I was so close... so close to figuring it all out...
+  - "The pattern\u2026 there was a pattern\u2026 I almost had it\u2026"
+  - "Wait\u2026 mommy! I was so close to figuring it out\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: ca877431f1a2d074ba919da989152582, type: 3}
   - {fileID: 8300000, guid: a2c8875031559d14ea642e8baec9ebf7, type: 3}
@@ -133,40 +113,37 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 814125b8ad108c143a8ceebb281d8fa3, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The university library. Political science reading room. They closed it around me at seven. Their clock runs two minutes slow.
-    midDaysAnswer: Campus. Almost empty. I walk the same route and log what changed since yesterday. Then the water queue.
-    finalDaysAnswer: The old lecture halls. Nobody teaches anymore. I sat in the third row and counted the cracks. Forty-one.
-    mismatchEarlyDaysAnswer: The medical institute. Second-year anatomy. Very demanding, but I like the precision.
-    mismatchMidDaysAnswer: The bread queue, then home. I live alone now. It is quieter for my notes.
-    mismatchFinalDaysAnswer: The university. Full lecture schedule today. The campus is busy again. Everyone came back.
+    earlyDaysAnswer: The library. Closed at seven. Their clock runs two minutes slow.
+    midDaysAnswer: Campus. Almost empty. I log what changed since yesterday. Then water.
+    finalDaysAnswer: The old lecture halls. Third row. I counted forty-one cracks.
+    mismatchEarlyDaysAnswer: The medical institute. Second-year anatomy. Demanding, but I like precision.
+    mismatchMidDaysAnswer: The bread queue, then home. I live alone now. Quieter for notes.
+    mismatchFinalDaysAnswer: The university. Full lecture schedule today. Everyone came back.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Tired. I keep late hours with my notes. That is stress, not a symptom. I checked.
-    midDaysAnswer: Hair in the brush every morning. I count the strands. Thirty-two today. The polyclinic says not to worry.
-    finalDaysAnswer: I bruise when I barely touch things. And I do not sleep. The numbers keep going when I close my eyes.
-    mismatchEarlyDaysAnswer: Nothing. I sleep ten hours a night and never think about anything. I barely notice what goes on.
+    earlyDaysAnswer: Tired. Late hours with my notes. Stress, not a symptom. I checked.
+    midDaysAnswer: Hair in the brush every morning. Thirty-two strands today. I count.
+    finalDaysAnswer: I bruise at a touch. The numbers keep going when eyes close.
+    mismatchEarlyDaysAnswer: Nothing. I sleep ten hours a night and barely notice anything.
     mismatchMidDaysAnswer: Nothing. I am twenty-three, officer. My body recovers fast.
-    mismatchFinalDaysAnswer: Fine. I stopped counting things weeks ago. I burned the notebooks. I feel much better.
+    mismatchFinalDaysAnswer: Fine. I burned the notebooks. Stopped counting things. I feel much better.
     uncannyEarlyDaysAnswer: 
     uncannyMidDaysAnswer: 
     uncannyFinalDaysAnswer: 
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - The paint on your booth is peeling in the top left corner. That has been wrong for weeks.
-    - The light in here flickers on a three-second interval. Has that always been the case?
-    - You processed the last person seventeen seconds faster than me. Just something I noticed.
+    - The paint on your booth is peeling, top left. Wrong for weeks.
+    - Your light flickers on a three-second interval. Has it always?
     midDays:
-    - I have been counting the people coming through here. The number is down thirty percent from last week.
-    - There is something wrong with the way the shadows fall in here today. The angle is off.
-    - The intervals are getting shorter. Something is accelerating. I have the data if you want it.
+    - Thirty percent fewer people through here than last week. I counted.
+    - The intervals are getting shorter. Something is accelerating. I have data.
     finalDays:
-    - The patterns are all converging now. I thought finding the pattern would be a relief. It is not.
-    - I have filled six notebooks. I do not know who they are for anymore.
-    - The numbers do not stop. Even when I close my eyes. Especially then.
+    - The patterns are converging. I thought finding them would be a relief.
+    - Six notebooks full. I do not know who they are for anymore.
     uncannyEarlyDays: []
     uncannyMidDays: []
     uncannyFinalDays: []

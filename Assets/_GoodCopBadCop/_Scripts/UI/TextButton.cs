@@ -20,6 +20,10 @@ public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     private void Awake()
     {
         button = GetComponent<Button>();
+
+        // Menu feedback must keep animating while a single-player pause has Time.timeScale at 0.
+        if (anim != null)
+            anim.updateMode = AnimatorUpdateMode.UnscaledTime;
     }
 
     public void OnPointerEnter(PointerEventData eventData)

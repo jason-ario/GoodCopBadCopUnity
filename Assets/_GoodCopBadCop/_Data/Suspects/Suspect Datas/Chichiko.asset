@@ -40,90 +40,76 @@ MonoBehaviour:
   CharacterPrefab: {fileID: 1440500792675305624, guid: bcb14d940bd3c9145a05a77c2c69cba9, type: 3}
   entryReasons:
     earlyDaysReasons:
-    - Returning to open the salon for morning appointments.
-    - Picking up a shipment of imported hair product from the depot.
-    - Visiting a client in the residential block for a home styling session.
+    - Opening the salon.
+    - Collecting hair product from the depot.
+    - Home styling appointment.
     midDaysReasons:
-    - Bartering salon services for food and medicine at the market.
-    - Searching the district for any remaining beauty supply stock.
-    - Returning from a supply run. The city has no conditioner left anywhere.
+    - Trading haircuts at the market.
+    - Hunting for beauty supplies.
+    - Back from a supply run.
     finalDaysReasons:
-    - Keeping the salon open for whoever still comes. Someone always does.
-    - Bringing the last medical-grade filler back to the salon.
-    - Going home to finish a procedure I started this morning.
+    - Keeping the salon open.
+    - Bringing filler to the salon.
+    - Finishing a procedure at home.
   invalidEntryReasons:
     earlyDaysReasons:
-    - Clerk at the tram ticket office. Home after the morning shift.
-    - First professional haircut of my life. Booked at a barber's.
-    - Picking up my maternity leave papers.
+    - Tram ticket clerk. Going home.
+    - My first ever haircut.
+    - Collecting maternity leave papers.
     midDaysReasons:
-    - Selling off the salon chairs. Looks never mattered to me.
-    - Visiting my grandchildren in the eastern block.
-    - Applying for work at the bread factory. My salon shut in May.
+    - Selling the salon chairs.
+    - Visiting my grandchildren.
+    - Job interview at the bread factory.
     finalDaysReasons:
-    - Throwing out every mirror I own. Appearances are vanity.
-    - Collecting my pension. Forty years of cutting hair is enough.
-    - Asked the polyclinic to undo everything. I want my old face.
+    - Throwing out all my mirrors.
+    - Collecting my hairdresser's pension.
+    - Getting my old face back.
   entryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
-    - Officer! Your eyebrows are doing something very interesting today. In a good way... mostly. Have you considered threading?
-    - Ah, back again! I have been testing a new under-eye technique. Tell me honestly, can you see the bruising?
-    - 'Here are my papers. While I have you: do you moisturise? This air is absolutely destroying everyone''s pores.'
+    - Officer! Your eyebrows are fascinating today. Have you considered threading?
+    - 'Papers. Also: moisturise. This air is destroying everyone''s pores.'
     dialoguesMidDays:
-    - I did a new procedure last night. Do not be alarmed by the swelling. It is part of the process.
-    - You look tired, officer. I have something for that. Here, take a card. First session is free.
-    - The salon is still open. We are the last beauty service running in this district. That means something.
+    - New procedure last night. Ignore the swelling. It is part of the process.
+    - You look tired, officer. Take my card. First session is free.
     dialoguesFinalDays:
-    - Do not stare. I know it looks dramatic. Beauty requires sacrifice, and I am very committed.
-    - I have been refining my jaw all week. The symmetry is almost perfect. Almost.
-    - Something is wrong with the mirrors in this city. They have all started lying.
+    - Do not stare. Beauty requires sacrifice, and I am very committed.
+    - Something is wrong with the mirrors in this city. They lie now.
   uncannyEntryDialogues:
     lastVerdict: 0
     dialoguesEarlyDays:
     - You are STARING at me. Do not. Stare. At. Me.
-    - I can see exactly what you think of my face right now. It is written all over yours. You are wrong.
-    - I look incredible. Say it. I need you to say it before I let you stamp anything.
+    - I look incredible. Say it before you stamp anything.
     dialoguesMidDays:
-    - This? This is an improvement. Each one is an improvement. Stop making that face at me.
-    - I have been optimising. Non-stop. You could never understand what it takes.
-    - You do not get to judge me. Nobody gets to judge me anymore. Stamp it and look away.
+    - Each one is an improvement. Stop making that face.
+    - You do not get to judge me. Stamp it and look away.
     dialoguesFinalDays:
-    - I am the most beautiful thing left in this city. Everything else has rotted. I am still here. I am STILL PERFECT.
-    - My face is not finished. None of this is finished. Stop looking at it like it is finished.
-    - I know what I look like. I KNOW. And it is FINE. Everything is fine. Stamp it.
+    - Everything else has rotted. I am STILL PERFECT.
+    - I know what I look like. I KNOW. Stamp it.
   exitDialoguesPassed:
     lastVerdict: 1
     dialoguesEarlyDays:
-    - Wonderful! Come by the salon sometime. You have good raw material. I could do a lot with it.
+    - Wonderful! Visit the salon. I could do a lot with you.
     dialoguesMidDays:
-    - Smart choice, officer. Judgement is a two-way street. Remember that.
+    - Smart choice. Judgement is a two-way street.
     dialoguesFinalDays:
-    - You passed me through. Good. You have good instincts. Or good taste, at least.
+    - Good instincts, officer. Or good taste, at least.
   exitDialoguesQuarantined:
     lastVerdict: 2
-    dialoguesEarlyDays:
-    - Excuse me?! Do you have any idea who does the hair for half this district?!
-    dialoguesMidDays:
-    - This is because of how I LOOK, isn't it. Admit it. ADMIT IT.
-    dialoguesFinalDays:
-    - I am not going in there. My face is not done yet. I absolutely refuse.
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   exitDialoguesKilled:
     lastVerdict: 3
-    dialoguesEarlyDays:
-    - But... I still had... so much left... to fix...
-    dialoguesMidDays:
-    - My face... no... it was almost... symmetrical...
-    dialoguesFinalDays:
-    - I was... so close... to perfect...
+    dialoguesEarlyDays: []
+    dialoguesMidDays: []
+    dialoguesFinalDays: []
   quarantineExitLines:
-  - This is aesthetic discrimination and I will be filing a formal complaint.
-  - Fine. FINE. But when I come out I will look INCREDIBLE, and you will feel terrible about this.
+  - This is aesthetic discrimination. I am filing a complaint.
   - I have tweezers in my pocket. You cannot stop the process.
   killExitLines:
-  - "I was\u2026 so close\u2026 to the jawline I wanted\u2026"
-  - "Nobody\u2026 ever appreciated\u2026 how much work went into this\u2026"
-  - "It just needed\u2026 one more\u2026 adjustment\u2026"
+  - "So close\u2026 to the jawline I wanted\u2026"
+  - "Just needed\u2026 one more\u2026 adjustment\u2026"
   voiceAudioClips:
   - {fileID: 8300000, guid: ebea2ccd1640b7b43b76862bb7193851, type: 3}
   - {fileID: 8300000, guid: a4bce4f7001d81e46bf4ce561ca88c73, type: 3}
@@ -138,47 +124,41 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 7e1f790693c494d449c01897a975fc1a, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The salon on Rustaveli. Two perms, a colour, and my own jaw between clients. Exhausting, but worth it.
-    midDaysAnswer: The market by the river. I traded a haircut for filler from a man with Polish labels. Do not tell anyone.
-    finalDaysAnswer: The salon. I keep it open for whoever still comes. And I was working on myself. I lost track of the hours.
-    mismatchEarlyDaysAnswer: My salon on Plekhanov Avenue. Small place, but the light is good for colour work.
-    mismatchMidDaysAnswer: The barracks canteen. I cut hair for the soldiers now. The salon closed weeks ago, like all the others.
-    mismatchFinalDaysAnswer: Home. I shut the salon for good last month. There is no one left worth cutting.
-    uncannyEarlyDaysAnswer: The supply depot. They still have what I need. Do not ask what. You would not understand the list.
-    uncannyMidDaysAnswer: From the mirror. I have been working on myself. Non-stop. It is a full-time commitment and I do not expect you to understand.
-    uncannyFinalDaysAnswer: I do not remember leaving. I was in the mirror for a long time. Time moves differently when you are focused.
+    earlyDaysAnswer: The salon on Rustaveli. Two perms, a colour, and my own jaw.
+    midDaysAnswer: The river market. I traded a haircut for filler. Tell no one.
+    finalDaysAnswer: The salon. I was working on myself. I lost track of hours.
+    mismatchEarlyDaysAnswer: My salon on Plekhanov Avenue. The light is good for colour.
+    mismatchMidDaysAnswer: The barracks. I cut soldiers' hair now. The salon closed weeks ago.
+    mismatchFinalDaysAnswer: Home. I shut the salon last month. No one left worth cutting.
+    uncannyEarlyDaysAnswer: The supply depot. Do not ask what I bought.
+    uncannyMidDaysAnswer: From the mirror. I have been working on myself. Non-stop.
+    uncannyFinalDaysAnswer: I do not remember leaving. I was in the mirror a long time.
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Bruising along the jaw. Self-administered filler, last Thursday. It settles by Sunday. I have done this twelve times.
-    midDaysAnswer: Some swelling. A little numbness in the cheeks. My pain threshold has gone up, which I take as a very good sign.
-    finalDaysAnswer: I cannot feel my cheekbones. I sleep badly. Neither matters. The proportions are finally correct.
-    mismatchEarlyDaysAnswer: Nothing. I have never had a procedure in my life, officer. This is all natural. Good genes.
-    mismatchMidDaysAnswer: No swelling at all. A surgeon at the polyclinic did my last injection. Very professional, very clean.
-    mismatchFinalDaysAnswer: I feel wonderful. I stopped all procedures a month ago. I have not touched my face since.
-    uncannyEarlyDaysAnswer: I told you. No symptoms. These are improvements. There is a significant difference.
-    uncannyMidDaysAnswer: Everyone keeps calling them symptoms. They are not symptoms. They are upgrades.
-    uncannyFinalDaysAnswer: My body is cooperating fully with the vision. That is all you need to know.
+    earlyDaysAnswer: Jaw bruising. Self-administered filler. It settles by Sunday.
+    midDaysAnswer: Some swelling, numb cheeks. My pain threshold is up. A good sign.
+    finalDaysAnswer: I cannot feel my cheekbones. Irrelevant. The proportions are finally correct.
+    mismatchEarlyDaysAnswer: Nothing. I have never had a procedure. All natural.
+    mismatchMidDaysAnswer: No swelling. A polyclinic surgeon did my last injection.
+    mismatchFinalDaysAnswer: I feel wonderful. I stopped all procedures a month ago.
+    uncannyEarlyDaysAnswer: No symptoms. These are improvements. There is a difference.
+    uncannyMidDaysAnswer: They are not symptoms. They are upgrades.
+    uncannyFinalDaysAnswer: My body is cooperating fully with the vision.
     cameraTrigger: 
   idleBarks:
     earlyDays:
-    - Your skin is dehydrated, officer. Drink water. Use SPF. I am genuinely begging you.
-    - I opened the salon at six this morning. I will close it when the city does.
-    - A man came in yesterday asking for the post-apocalyptic look. I gave him a trim and sent him home.
+    - Your skin is dehydrated, officer. Drink water. Use SPF. I beg you.
+    - I opened the salon at six. I will close it when the city does.
     midDays:
-    - The good products are all gone from the shelves. I have been improvising. The results are mostly fine.
-    - People keep telling me I look different. I look optimised. There is a difference.
-    - Certain fillers can still be sourced from the medical quarter if you know the right people. I know the right people.
+    - The good products are gone. I improvise. Results are mostly fine.
+    - People say I look different. I look optimised.
     finalDays:
-    - The mirror in my salon cracked this morning. I took it as a challenge.
-    - Everyone in this city has stopped caring about how they look. It is deeply upsetting to witness.
-    - I am not finished. I want to be clear about that. What you are seeing is a work in progress.
+    - My salon mirror cracked this morning. I took it as a challenge.
+    - I am not finished. This is a work in progress.
     uncannyEarlyDays:
     - Stop looking at my face. I can see you looking.
-    - I know what I look like. I am the only one who gets to decide what that means.
     uncannyMidDays:
-    - You have an opinion about my face. I can tell. Keep it to yourself.
-    - I rate everyone I meet on sight. You are not performing as well as you think you are.
+    - You have an opinion about my face. Keep it.
     uncannyFinalDays:
-    - Perfect. Almost perfect. Getting closer every single day.
-    - I am the last beautiful thing left in this district. Someone has to be.
+    - I am the last beautiful thing in this district.
   IDNumber: 4819263

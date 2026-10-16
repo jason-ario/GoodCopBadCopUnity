@@ -251,6 +251,10 @@ public class DebugConsole : MonoBehaviour
         // F12 is handled by CheatConsoleUI — it opens the overlay cheat menu.
 
         // Hold + (equals key) to run at 3x timescale; release to restore normal speed.
+        // Skipped while a single-player pause owns Time.timeScale (UIController restores it on resume).
+        if (UIController.Instance != null && UIController.Instance.IsGameTimeFrozen)
+            return;
+
         if (Input.GetKey(KeyCode.Equals) && !_isFastForwarding)
         {
             _isFastForwarding = true;

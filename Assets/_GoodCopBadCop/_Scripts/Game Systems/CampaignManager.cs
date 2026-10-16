@@ -217,6 +217,11 @@ public class CampaignManager : NetworkBehaviour
             // a NetworkVariable that always starts at 0 on scene load, so without this the
             // player's persisted cash silently resets to 0 whenever a save file is loaded.
             GlobalHostVariables.Instance?.SetMoney(SaveDataManager.Instance.CurrentCash);
+
+            // SuspectRunRecords reads the save in Start(), which runs when the scene loads — before
+            // the menu selects the slot. Re-read now so quarantines/kills/infection from the
+            // checkpoint are live before ApplyDay fires OnDayChanged (Quarantine Board refresh).
+            SuspectRunRecords.Instance?.ReloadFromSave();
         }
         else
         {

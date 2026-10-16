@@ -105,6 +105,9 @@ public class ShopItemPurchasePopupUI : MonoBehaviour
 
     private void Update()
     {
+        // Hidden under the pause menu (PauseHiddenScreen): the pause menu owns the cursor.
+        if (UIController.Instance != null && UIController.Instance.IsPaused) return;
+
         // Mouse/keyboard activity always wins: restore the free cursor so mouse clicks on the
         // Buy/No buttons work as normal and the controller highlight stops competing with it.
         bool mkActivity = (Mouse.current != null &&
