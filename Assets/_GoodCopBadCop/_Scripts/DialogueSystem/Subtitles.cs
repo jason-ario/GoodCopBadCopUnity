@@ -67,8 +67,27 @@ public class Subtitles : MonoBehaviour
 
         var tmp = textReveal.GetComponent<TextMeshProUGUI>();
         if (tmp != null)
-            tmp.font = font;
+            tmp.font = LocalizationSettings.Localize(font);
     }
+
+    /// <summary>
+    /// Swaps the prefab's authored subtitle font for the current language's font. Uses the font's
+    /// assigned role, falling back to the "Dialogue" role when the font isn't assigned to any.
+    /// </summary>
+    private void ApplyLanguageFont()
+    {
+        if (textReveal == null) return;
+        var tmp = textReveal.GetComponent<TextMeshProUGUI>();
+        if (tmp == null || tmp.font == null) return;
+
+        var settings = LocalizationSettings.Instance;
+        string role = settings != null ? settings.RoleOf(tmp.font) : null;
+        if (role == null && settings != null && settings.HasRole(DialogueFontRole)) role = DialogueFontRole;
+        var localized = LocalizationSettings.Localize(tmp.font, role);
+        if (localized != null && localized != tmp.font) tmp.font = localized;
+    }
+
+    private const string DialogueFontRole = "Dialogue";
 
     /// <summary>
     /// Arms (or disarms) advance-input gating. When armed, <see cref="IsPromptActive"/> becomes
@@ -118,6 +137,8 @@ public class Subtitles : MonoBehaviour
         // The speaker name is shown by the standalone ConversationNameTag, never on the subtitle bar.
         if (nameTag != null)
             nameTag.gameObject.SetActive(false);
+
+        if (Application.isPlaying) ApplyLanguageFont();
     }
 
     /// <summary>

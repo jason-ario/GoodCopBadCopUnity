@@ -16,12 +16,38 @@ MonoBehaviour:
   languages:
   - code: en
     displayName: English
-    font: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
+    font: {fileID: 11400000, guid: 6cd664e1175f8794da24b789fe2ef32c, type: 2}
+    roleFonts:
+    - role: UI
+      font: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
+    - role: Dialogue
+      font: {fileID: 11400000, guid: 6cd664e1175f8794da24b789fe2ef32c, type: 2}
     fallbackFonts: []
     sizeScale: 1
   pseudoExpansion: 0.4
   forbiddenCharacters: 
   maxLengthRatio: 1.4
+  fitLabelMin: 0.7
+  fitHeaderMin: 0.6
+  fitBodyMin: 0.75
+  dialogueAssetTypes:
+  - ScriptedDialogue
+  - SuspectData
+  onlyUsedDialogueAssets: 1
+  dialogueFieldRules:
+  - typeName: SuspectData
+    fields:
+    - entryReasons
+    - invalidEntryReasons
+    - entryDialogues
+    - uncannyEntryDialogues
+    - exitDialoguesPassed
+    - exitDialoguesQuarantined
+    - exitDialoguesKilled
+    - quarantineExitLines
+    - killExitLines
+    - questionResponses
+    - idleBarks
   fieldDenyList:
   - m_Name
   - animationTrigger
@@ -41,3 +67,12 @@ MonoBehaviour:
   - sceneName
   - parameterName
   - stateName
+  fontRoles:
+  - name: UI
+    sourceFonts: []
+  - name: Dialogue
+    sourceFonts: []
+  - name: World
+    sourceFonts: []
+  - name: Handwriting
+    sourceFonts: []

@@ -10,14 +10,47 @@ public class LocalizationLanguage
     public string code = "en";
     public string displayName = "English";
 
-    [Tooltip("Optional TMP font override while this language is active. Empty keeps the label's own font.")]
+    [Tooltip("Font for labels whose source font is not assigned to any font role. Empty keeps the label's own font.")]
     public TMP_FontAsset font;
+
+    [Tooltip("Font per role (UI, Dialogue, ...). A role with no font here keeps each label's own font.")]
+    public List<RoleFont> roleFonts = new List<RoleFont>();
+
+    public TMP_FontAsset FontForRole(string role)
+    {
+        if (roleFonts == null || string.IsNullOrEmpty(role)) return null;
+        foreach (var rf in roleFonts) if (rf != null && rf.role == role) return rf.font;
+        return null;
+    }
+
+    public void SetRoleFont(string role, TMP_FontAsset f)
+    {
+        if (roleFonts == null) roleFonts = new List<RoleFont>();
+        foreach (var rf in roleFonts) if (rf != null && rf.role == role) { rf.font = f; return; }
+        roleFonts.Add(new RoleFont { role = role, font = f });
+    }
 
     [Tooltip("Fallback chain appended to the active font at runtime (Play Mode / builds only).")]
     public List<TMP_FontAsset> fallbackFonts = new List<TMP_FontAsset>();
 
     [Tooltip("Multiplier applied to the label's font size while this language is active.")]
     public float sizeScale = 1f;
+}
+
+/// <summary>A usage group of fonts (UI, Dialogue, ...). Source fonts listed here belong to the role.</summary>
+[Serializable]
+public class FontRole
+{
+    public string name;
+    [Tooltip("Project fonts authored for this use. Labels using one of these get the role's font per language.")]
+    public List<TMP_FontAsset> sourceFonts = new List<TMP_FontAsset>();
+}
+
+[Serializable]
+public class RoleFont
+{
+    public string role;
+    public TMP_FontAsset font;
 }
 
 [Serializable]
@@ -63,6 +96,10 @@ public class LocalizationSettings : ScriptableObject
     [Tooltip("ScriptableObject types the scanner reads text from (class name, subclasses included). Presets, configs and item data are ignored.")]
     public List<string> dialogueAssetTypes = new List<string> { "ScriptedDialogue", "SuspectData" };
 
+    [Tooltip("Only scan dialogue assets the game can actually load: referenced (directly or indirectly) by an enabled " +
+             "build scene, or living in a Resources folder. Orphaned drafts are skipped.")]
+    public bool onlyUsedDialogueAssets = true;
+
     [Tooltip("Optional per-type field allowlist. When a dialogue asset type has a rule, only these top-level fields are scanned " +
              "(nested strings inside them included). Types without a rule scan every text field.")]
     public List<DialogueFieldRule> dialogueFieldRules = new List<DialogueFieldRule>
@@ -87,6 +124,55 @@ public class LocalizationSettings : ScriptableObject
         "m_Name", "animationTrigger", "cameraTrigger", "IDNumber", "idNumber", "id", "ID", "guid", "tag",
         "layer", "eventName", "trigger", "path", "address", "scene", "sceneName", "parameterName", "stateName"
     };
+
+    [Tooltip("Font roles. Each project font is assigned to one role; each language then picks one font per role.")]
+    public List<FontRole> fontRoles = new List<FontRole>
+    {
+        new FontRole { name = "UI" },
+        new FontRole { name = "Dialogue" }
+    };
+
+    /// <summary>Role whose source fonts include <paramref name="sourceFont"/>, or null when unassigned.</summary>
+    public string RoleOf(TMP_FontAsset sourceFont)
+    {
+        if (sourceFont == null || fontRoles == null) return null;
+        foreach (var r in fontRoles)
+            if (r != null && r.sourceFonts != null && r.sourceFonts.Contains(sourceFont)) return r.name;
+        return null;
+    }
+
+    public bool HasRole(string role)
+    {
+        if (string.IsNullOrEmpty(role) || fontRoles == null) return false;
+        foreach (var r in fontRoles) if (r != null && r.name == role) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Font to show for a label authored in <paramref name="sourceFont"/> while <paramref name="lang"/> is active.
+    /// Role = <paramref name="roleOverride"/> when set, otherwise the role the source font is assigned to.
+    /// Roles use the language's role font (or keep the source font if none is set); unassigned fonts use
+    /// the language's unassigned font (or keep the source font).
+    /// </summary>
+    public TMP_FontAsset ResolveFont(LocalizationLanguage lang, TMP_FontAsset sourceFont, string roleOverride = null)
+    {
+        if (lang == null) return sourceFont;
+        string role = !string.IsNullOrEmpty(roleOverride) ? roleOverride : RoleOf(sourceFont);
+        if (!string.IsNullOrEmpty(role))
+        {
+            var rf = lang.FontForRole(role);
+            return rf != null ? rf : sourceFont;
+        }
+        return lang.font != null ? lang.font : sourceFont;
+    }
+
+    /// <summary>Resolves a font for the current language. Safe to call when no settings asset exists.</summary>
+    public static TMP_FontAsset Localize(TMP_FontAsset sourceFont, string roleOverride = null)
+    {
+        var s = Instance;
+        if (s == null) return sourceFont;
+        return s.ResolveFont(s.Find(Loc.CurrentLanguage), sourceFont, roleOverride);
+    }
 
     private static LocalizationSettings _instance;
 

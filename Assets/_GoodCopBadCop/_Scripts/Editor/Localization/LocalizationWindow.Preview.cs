@@ -75,11 +75,20 @@ public partial class LocalizationWindow
         return string.IsNullOrEmpty(v) ? e.source : v;
     }
 
-    private TMP_FontAsset FontFor(string lang, TMP_FontAsset fallback)
+    private TMP_FontAsset FontFor(string lang, TMP_FontAsset sourceFont, string roleOverride = null)
     {
         var l = _settings.Find(lang);
         // Pseudo CJK has no configured font unless the user adds a language entry with the same code.
-        return l != null && l.font != null ? l.font : fallback;
+        if (l == null) return sourceFont;
+        var f = _settings.ResolveFont(l, sourceFont, roleOverride);
+        return f != null ? f : sourceFont;
+    }
+
+    /// <summary>Dialogue strings (no TMP label) preview in the Dialogue role font when that role exists.</summary>
+    private string DialogueRoleFor(string key)
+    {
+        if (!_settings.HasRole("Dialogue")) return null;
+        return LocBindings.For(key).Any(b => b.kind != "TMP") ? "Dialogue" : null;
     }
 
     private void EnsureRig()
@@ -197,7 +206,7 @@ public partial class LocalizationWindow
         if (_boxKey != _selectedKey) { _box = MeasureBox(_selectedKey); _boxKey = _selectedKey; }
 
         string text = TextFor(entry, _previewLang);
-        var font = FontFor(_previewLang, _box.font);
+        var font = FontFor(_previewLang, _box.font, _box.measured ? null : DialogueRoleFor(_selectedKey));
         EditorGUILayout.LabelField("Source", entry.source, EditorStyles.wordWrappedLabel);
         EditorGUILayout.LabelField(_previewLang, text, EditorStyles.wordWrappedLabel);
         EditorGUILayout.LabelField("Box " + _box.size.x.ToString("0") + " x " + _box.size.y.ToString("0")

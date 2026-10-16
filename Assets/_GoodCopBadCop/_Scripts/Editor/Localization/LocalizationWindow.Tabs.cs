@@ -39,6 +39,15 @@ public partial class LocalizationWindow
                 _scanScenes = LocUI.Chip(_scanScenes, "Loaded scenes");
                 _scanPrefabs = LocUI.Chip(_scanPrefabs, "Prefabs");
                 _scanSOs = LocUI.Chip(_scanSOs, "Dialogue data assets");
+                if (_settings != null)
+                {
+                    bool onlyUsed = LocUI.Chip(_settings.onlyUsedDialogueAssets, "Used in game only");
+                    if (onlyUsed != _settings.onlyUsedDialogueAssets)
+                    {
+                        _settings.onlyUsedDialogueAssets = onlyUsed;
+                        EditorUtility.SetDirty(_settings);
+                    }
+                }
                 _scanSuspectObjects = LocUI.Chip(_scanSuspectObjects, "Suspect objects", LocUI.Violet);
                 GUILayout.FlexibleSpace();
                 if (LocUI.Button("Scan project", true, GUILayout.Width(110)))
@@ -52,7 +61,13 @@ public partial class LocalizationWindow
                 var types = _settings != null && _settings.dialogueAssetTypes != null ? string.Join(", ", _settings.dialogueAssetTypes) : "";
                 LocUI.Muted_("Data assets scanned: " + types + " (SuspectData: entry reasons, dialogues, answers, barks only). Edit in Fonts > All localization settings.");
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button(new GUIContent("Remove excluded data strings...", "Deletes strings already in the sheets whose only source is a ScriptableObject type not in the list, or a field outside that type's allowlist (e.g. SuspectData descriptions)."), GUILayout.Width(220)))
+                if (GUILayout.Button(new GUIContent("List unused dialogue", "Logs dialogue assets that no enabled build scene or Resources asset references. These are skipped while 'Used in game only' is on."), GUILayout.Width(150)))
+                {
+                    var unused = LocalizationScanner.UnusedDialogueAssets(_settings);
+                    Debug.Log("[Localization] Unused dialogue assets (" + unused.Count + "):\n" + string.Join("\n", unused));
+                    _status = unused.Count + " unused dialogue asset(s), listed in the Console.";
+                }
+                if (GUILayout.Button(new GUIContent("Remove excluded data strings...", "Deletes strings already in the sheets whose only source is a ScriptableObject type not in the list, a field outside that type's allowlist (e.g. SuspectData descriptions), or a dialogue asset the game never loads."), GUILayout.Width(220)))
                 {
                     var keys = LocalizationScanner.NonDialogueDataKeys(_table, _settings);
                     if (keys.Count == 0) _status = "No strings from excluded data assets or fields in the sheets.";

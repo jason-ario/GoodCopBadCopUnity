@@ -1,6 +1,9 @@
 using TMPro;
 using UnityEngine;
 
+/// <summary>Draws a string field as a dropdown of the font roles defined in LocalizationSettings.</summary>
+public class FontRoleFieldAttribute : PropertyAttribute { }
+
 /// <summary>
 /// Drives a <see cref="TMP_Text"/> from a localization key. Refreshes on enable and whenever the language changes,
 /// and applies the per-language font and size scale from <see cref="LocalizationSettings"/>.
@@ -15,6 +18,11 @@ public class LocalizedText : MonoBehaviour
 
     [Tooltip("Apply the per-language font / size scale from LocalizationSettings.")]
     public bool applyLanguageFont = true;
+
+    [FontRoleField]
+    [Tooltip("Font role override (for example UI or Dialogue). Auto = use the role the label's own font is assigned to " +
+             "in the Localization window (Fonts > Languages > Font roles).")]
+    public string fontRole = "";
 
     private TMP_Text _text;
     private TMP_FontAsset _originalFont;
@@ -77,7 +85,7 @@ public class LocalizedText : MonoBehaviour
         float scale = 1f;
         if (lang != null)
         {
-            if (lang.font != null) font = lang.font;
+            font = settings.ResolveFont(lang, _originalFont, fontRole);
             if (lang.sizeScale > 0f) scale = lang.sizeScale;
 
             if (Application.isPlaying && font != null && lang.fallbackFonts != null)

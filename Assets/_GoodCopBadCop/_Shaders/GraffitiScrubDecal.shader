@@ -56,15 +56,18 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         _BoxEdgeFadeY             ("Box Edge Fade (Height)",   Range(0, 1))      = 0.0
 
         // --- Discoverability Pulse ---
-        // Faint self-lit "breathing" of the paint, added AFTER fog so it reads in dusk/fog.
+        // Mirrors Highlight Plus's overlay (HighlightOverlay.shader) so graffiti matches the
+        // ObjectivePulse look used by fences/junk: alpha-blends toward (paint albedo * color),
+        // triangle wave on global time. Applied AFTER fog so it reads in dusk/fog.
         // Intensity 0 disables it (default, so blood decals sharing this shader are unaffected).
-        // All instances share the same phase (global time), so pieces with equal speed pulse in sync.
-        [HDR] _PulseColor         ("Pulse Color",               Color)          = (1, 1, 1, 1)
-        _PulseIntensity           ("Pulse Intensity",           Range(0, 3))    = 0.0
+        // Copy values from Resources/Highlight/ObjectivePulse.asset: overlay -> Intensity,
+        // overlayColor -> Color, overlayAnimationSpeed -> Speed, overlayMinIntensity -> Floor,
+        // overlayBlending -> Uses Paint Color.
+        _PulseColor               ("Pulse Color",               Color)          = (1, 1, 1, 1)
+        _PulseIntensity           ("Pulse Intensity (overlay)", Range(0, 1))    = 0.0
         _PulseTintFromTexture     ("Pulse Uses Paint Color",    Range(0, 1))    = 1.0
-        _PulseSpeed               ("Pulse Speed (cycles/sec)",  Range(0.05, 2)) = 0.35
-        _PulseMin                 ("Pulse Floor (fraction)",    Range(0, 1))    = 0.15
-        _PulseSharpness           ("Pulse Sharpness",           Range(0.5, 6))  = 2.0
+        _PulseSpeed               ("Pulse Speed (cycles/sec)",  Range(0.05, 2)) = 0.5
+        _PulseMin                 ("Pulse Floor (fraction)",    Range(0, 1))    = 0.2
         _PulseRange               ("Pulse Fade Distance (m)",   Range(2, 80))   = 30.0
     }
 
@@ -169,7 +172,6 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half   _PulseTintFromTexture;
                 half   _PulseSpeed;
                 half   _PulseMin;
-                half   _PulseSharpness;
                 half   _PulseRange;
             CBUFFER_END
 
@@ -421,13 +423,13 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 finalRGB = MixFog(finalRGB, fogFactor);
 
                 // --- Discoverability pulse (added after fog so it reads through it) ---
-                // Slow, faint breathing emission in the paint's own color. Driven purely by global
-                // time (no per-instance phase) so every piece with the same speed pulses in unison.
-                // Fades with scrub progress (doubling as cleaning feedback) and with camera distance.
+                // Same math as Highlight Plus's overlay (ObjectivePulse on fences/junk): triangle wave on
+                // global time (so all pieces, and fences/junk at the same speed, pulse in unison), then an
+                // alpha blend toward the tinted paint albedo. Fades with scrub progress and camera distance.
                 if (_PulseIntensity > 0.0)
                 {
-                    float  wave     = 0.5 - 0.5 * cos(6.2831853 * (_Time.y * _PulseSpeed));
-                    float  pulse    = lerp(_PulseMin, 1.0, pow(wave, _PulseSharpness));
+                    float  time     = fmod(_Time.y, 1000.0);
+                    float  pulse    = _PulseMin + (1.0 - _PulseMin) * 2.0 * abs(0.5 - frac(time * _PulseSpeed));
 
                     float  camDist  = distance(GetCameraPositionWS(), positionWS);
                     half   distFade = 1.0 - smoothstep(_PulseRange * 0.6, _PulseRange, camDist);
@@ -437,7 +439,7 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                     half   paintMask = alpha * (1.0 - foamMask) * saturate(1.0 - _ScrubProgress * 1.5);
                     half3  pulseCol  = lerp(_PulseColor.rgb, texColor.rgb * _PulseColor.rgb, _PulseTintFromTexture);
 
-                    finalRGB += pulseCol * (_PulseIntensity * pulse * distFade * paintMask);
+                    finalRGB = lerp(finalRGB, pulseCol, saturate(_PulseIntensity * pulse * distFade * paintMask));
                 }
 
                 // --- UV light fluorescent glow (added after fog so it reads through it) ---

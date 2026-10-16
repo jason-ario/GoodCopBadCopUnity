@@ -175,7 +175,7 @@ public partial class LocalizationWindow
     {
         if (_settingsSO == null || _settingsSO.targetObject != _settings) _settingsSO = new SerializedObject(_settings);
 
-        LocUI.Hint("Pick a language, then choose its <b>main font</b> and the <b>fallback chain</b> used for glyphs the main font lacks. Create TMP font assets from raw fonts in the <b>Library</b> sub-tab. A language entry with the same code as a pseudolocale (for example pseudo-cjk) lets you test fonts before translations exist.");
+        LocUI.Hint("1. In <b>Font roles</b>, assign each project font to a role (for example UI or Dialogue). 2. Pick a language and choose <b>one font per role</b>, plus the <b>fallback chain</b> for missing glyphs. Labels keep their own font for any role left empty. Create TMP font assets in the <b>Library</b> sub-tab. A language entry with a pseudolocale code (for example pseudo-cjk) lets you test fonts before translations exist.");
 
         var codes = _settings.languages.Where(l => l != null).Select(l => l.code).ToList();
         using (LocUI.Card())
@@ -210,17 +210,35 @@ public partial class LocalizationWindow
         if (lang == null) { LocUI.Muted_("No language entry selected."); return; }
 
         var tmpAssets = FindTmpAssets();
+        DrawFontRoles(tmpAssets);
+
         using (LocUI.Card(LocUI.Accent))
         {
-            LocUI.Section("Main font");
-            EditorGUI.BeginChangeCheck();
-            var main = (TMP_FontAsset)EditorGUILayout.ObjectField("TMP font asset", lang.font, typeof(TMP_FontAsset), false);
-            if (tmpAssets.Count > 0)
+            LocUI.Section("Fonts for '" + lang.code + "'", "One font per role. Empty keeps each label's own font for that role.");
+            foreach (var role in _settings.fontRoles.Where(r => r != null && !string.IsNullOrEmpty(r.name)))
             {
-                var names = new[] { "Quick swap..." }.Concat(tmpAssets.Select(a => a.name)).ToArray();
-                int pick = EditorGUILayout.Popup("Quick swap", 0, names);
-                if (pick > 0) main = tmpAssets[pick - 1];
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUI.BeginChangeCheck();
+                    var f = (TMP_FontAsset)EditorGUILayout.ObjectField(role.name, lang.FontForRole(role.name), typeof(TMP_FontAsset), false);
+                    if (tmpAssets.Count > 0)
+                    {
+                        int pick = EditorGUILayout.Popup(0, new[] { "Quick pick..." }.Concat(tmpAssets.Select(a => a.name)).ToArray(), GUILayout.Width(130));
+                        if (pick > 0) f = tmpAssets[pick - 1];
+                    }
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(_settings, "Set role font");
+                        lang.SetRoleFont(role.name, f);
+                        EditorUtility.SetDirty(_settings);
+                    }
+                    if (GUILayout.Button(_previewRole == role.name ? "Previewing" : "Preview", EditorStyles.miniButton, GUILayout.Width(70)))
+                        _previewRole = role.name;
+                }
             }
+
+            EditorGUI.BeginChangeCheck();
+            var main = (TMP_FontAsset)EditorGUILayout.ObjectField(new GUIContent("Unassigned fonts", "Used for labels whose font is not assigned to any role. Empty keeps the label's own font."), lang.font, typeof(TMP_FontAsset), false);
             float scale = EditorGUILayout.Slider("Size scale", lang.sizeScale, 0.5f, 1.5f);
             if (EditorGUI.EndChangeCheck())
             {
@@ -260,25 +278,31 @@ public partial class LocalizationWindow
             var add = (TMP_FontAsset)EditorGUILayout.ObjectField("Add fallback", null, typeof(TMP_FontAsset), false);
             if (add != null) { Undo.RecordObject(_settings, "Add fallback"); lang.fallbackFonts.Add(add); EditorUtility.SetDirty(_settings); }
 
-            if (GUILayout.Button("Write chain into main font asset (persistent)"))
+            if (GUILayout.Button("Write chain into this language's fonts (persistent)"))
             {
-                if (lang.font == null) _status = "Set a main font first.";
+                var targets = lang.roleFonts.Where(r => r != null && r.font != null).Select(r => r.font)
+                    .Concat(lang.font != null ? new[] { lang.font } : new TMP_FontAsset[0]).Distinct().ToList();
+                if (targets.Count == 0) _status = "Set a role font or the unassigned font first.";
                 else
                 {
-                    Undo.RecordObject(lang.font, "Apply fallback chain");
                     int added = 0;
-                    foreach (var fb in lang.fallbackFonts)
-                        if (fb != null && fb != lang.font && !lang.font.fallbackFontAssetTable.Contains(fb)) { lang.font.fallbackFontAssetTable.Add(fb); added++; }
-                    EditorUtility.SetDirty(lang.font);
+                    foreach (var target in targets)
+                    {
+                        Undo.RecordObject(target, "Apply fallback chain");
+                        foreach (var fb in lang.fallbackFonts)
+                            if (fb != null && fb != target && !target.fallbackFontAssetTable.Contains(fb)) { target.fallbackFontAssetTable.Add(fb); added++; }
+                        EditorUtility.SetDirty(target);
+                    }
                     AssetDatabase.SaveAssets();
-                    _status = "Added " + added + " fallback font(s) to " + lang.font.name + ".";
+                    _status = "Added " + added + " fallback link(s) across " + targets.Count + " font(s).";
                 }
             }
         }
 
-        LocUI.Section("Preview", "Rendered with the main font plus the chain (applied temporarily, nothing is saved).");
+        var previewFont = (!string.IsNullOrEmpty(_previewRole) ? lang.FontForRole(_previewRole) : null) ?? lang.font;
+        LocUI.Section("Preview" + (string.IsNullOrEmpty(_previewRole) ? "" : ": " + _previewRole), "Rendered with the role's font plus the chain (applied temporarily, nothing is saved).");
         DrawSampleControls();
-        DrawTmpPreview(lang.font, lang.fallbackFonts, 90f);
+        DrawTmpPreview(previewFont, lang.fallbackFonts, 90f);
 
         _rawSettings = EditorGUILayout.Foldout(_rawSettings, "All localization settings", true);
         if (_rawSettings)
@@ -289,6 +313,7 @@ public partial class LocalizationWindow
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("maxLengthRatio"));
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("forbiddenCharacters"));
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("dialogueAssetTypes"), true);
+            EditorGUILayout.PropertyField(_settingsSO.FindProperty("onlyUsedDialogueAssets"));
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("dialogueFieldRules"), true);
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("fieldDenyList"), true);
             if (_settingsSO.ApplyModifiedProperties()) EditorUtility.SetDirty(_settings);
@@ -328,6 +353,115 @@ public partial class LocalizationWindow
             font.fallbackFontAssetTable.Clear();
             font.fallbackFontAssetTable.AddRange(original);
             _box = savedBox;
+        }
+    }
+
+    // ---------------------------------------------------------------- Font roles
+
+    private string _previewRole = "";
+    private string _newRoleName = "";
+    private bool _rolesFoldout = true;
+    private bool _showUnusedFonts;
+    private Dictionary<TMP_FontAsset, int> _fontUsage;
+
+    /// <summary>Counts TMP labels per font across project scenes and prefabs by reading their YAML (no loading).</summary>
+    private static Dictionary<TMP_FontAsset, int> CountFontUsage(List<TMP_FontAsset> fonts)
+    {
+        var byGuid = new Dictionary<string, TMP_FontAsset>();
+        foreach (var f in fonts)
+        {
+            string guid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(f));
+            if (!string.IsNullOrEmpty(guid)) byGuid[guid] = f;
+        }
+        var counts = fonts.ToDictionary(f => f, f => 0);
+        var rx = new System.Text.RegularExpressions.Regex(@"m_fontAsset: \{fileID: 11400000, guid: ([0-9a-f]{32})", System.Text.RegularExpressions.RegexOptions.Compiled);
+        var paths = AssetDatabase.FindAssets("t:Prefab t:Scene", new[] { "Assets/_GoodCopBadCop" }).Select(AssetDatabase.GUIDToAssetPath).Distinct().ToList();
+        for (int i = 0; i < paths.Count; i++)
+        {
+            if (i % 50 == 0) EditorUtility.DisplayProgressBar("Counting font usage", paths[i], (float)i / paths.Count);
+            string text;
+            try { text = File.ReadAllText(LocalizationPaths.Abs(paths[i])); } catch { continue; }
+            foreach (System.Text.RegularExpressions.Match m in rx.Matches(text))
+                if (byGuid.TryGetValue(m.Groups[1].Value, out var f)) counts[f]++;
+        }
+        EditorUtility.ClearProgressBar();
+        return counts;
+    }
+
+    private void DrawFontRoles(List<TMP_FontAsset> tmpAssets)
+    {
+        using (LocUI.Card(LocUI.Violet))
+        {
+            _rolesFoldout = EditorGUILayout.Foldout(_rolesFoldout, "Font roles (shared by all languages)", true);
+            if (!_rolesFoldout) return;
+            LocUI.Muted_("Assign each project font to a role. A label keeps its own font unless its role has a font for the active language. " +
+                         "A label can force a role with LocalizedText > Font Role. Subtitles default to the Dialogue role.");
+
+            var roles = _settings.fontRoles;
+            int removeRole = -1;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                for (int i = 0; i < roles.Count; i++)
+                {
+                    if (roles[i] == null) continue;
+                    LocUI.Pill(roles[i].name + " (" + roles[i].sourceFonts.Count(f => f != null) + ")", LocUI.Violet);
+                    if (GUILayout.Button("\u2715", EditorStyles.miniButton, GUILayout.Width(20))) removeRole = i;
+                }
+                GUILayout.FlexibleSpace();
+                _newRoleName = EditorGUILayout.TextField(_newRoleName, GUILayout.Width(110));
+                GUI.enabled = !string.IsNullOrWhiteSpace(_newRoleName) && !_settings.HasRole(_newRoleName.Trim());
+                if (GUILayout.Button("Add role", GUILayout.Width(70)))
+                {
+                    Undo.RecordObject(_settings, "Add font role");
+                    roles.Add(new FontRole { name = _newRoleName.Trim() });
+                    _newRoleName = "";
+                    EditorUtility.SetDirty(_settings);
+                }
+                GUI.enabled = true;
+            }
+            if (removeRole >= 0 && EditorUtility.DisplayDialog("Remove font role", "Remove role '" + roles[removeRole].name + "'? Its fonts become unassigned.", "Remove", "Cancel"))
+            {
+                Undo.RecordObject(_settings, "Remove font role");
+                string removed = roles[removeRole].name;
+                roles.RemoveAt(removeRole);
+                foreach (var l in _settings.languages) if (l != null) l.roleFonts.RemoveAll(r => r == null || r.role == removed);
+                EditorUtility.SetDirty(_settings);
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button(_fontUsage == null ? "Count usage in scenes/prefabs" : "Recount usage", GUILayout.Width(200)))
+                    _fontUsage = CountFontUsage(tmpAssets);
+                if (_fontUsage != null) _showUnusedFonts = GUILayout.Toggle(_showUnusedFonts, "Show unused fonts", GUILayout.Width(140));
+                GUILayout.FlexibleSpace();
+            }
+
+            var roleNames = new[] { "Unassigned" }.Concat(roles.Where(r => r != null).Select(r => r.name)).ToArray();
+            var ordered = _fontUsage != null
+                ? tmpAssets.Where(f => _showUnusedFonts || _fontUsage.TryGetValue(f, out int n) && n > 0 || _settings.RoleOf(f) != null)
+                           .OrderByDescending(f => _fontUsage.TryGetValue(f, out int n) ? n : 0).ToList()
+                : tmpAssets;
+
+            foreach (var f in ordered)
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(f.name, EditorStyles.label, GUILayout.MinWidth(180))) EditorGUIUtility.PingObject(f);
+                    if (_fontUsage != null)
+                        GUILayout.Label(_fontUsage.TryGetValue(f, out int n) ? n + " labels" : "-", EditorStyles.miniLabel, GUILayout.Width(70));
+                    string current = _settings.RoleOf(f);
+                    int idx = current == null ? 0 : System.Array.IndexOf(roleNames, current);
+                    int next = EditorGUILayout.Popup(Mathf.Max(0, idx), roleNames, GUILayout.Width(130));
+                    if (next != idx)
+                    {
+                        Undo.RecordObject(_settings, "Assign font role");
+                        foreach (var r in roles) if (r != null) r.sourceFonts.Remove(f);
+                        if (next > 0) roles.First(r => r != null && r.name == roleNames[next]).sourceFonts.Add(f);
+                        EditorUtility.SetDirty(_settings);
+                    }
+                }
+            }
+            if (tmpAssets.Count == 0) LocUI.Muted_("No TMP font assets found under Assets/_GoodCopBadCop.");
         }
     }
 
@@ -448,9 +582,9 @@ public partial class LocalizationWindow
                 GUILayout.FlexibleSpace();
                 if (GUILayout.Button(selected ? "Previewing" : "Preview", GUILayout.Width(80))) _previewAsset = selected ? null : a;
                 GUI.enabled = lang != null;
-                if (GUILayout.Button("Set as '" + _fontLang + "' main", GUILayout.Width(130)))
+                if (GUILayout.Button(new GUIContent("Unassigned font", "Use as '" + _fontLang + "' font for labels whose font has no role."), GUILayout.Width(130)))
                 {
-                    Undo.RecordObject(_settings, "Set main font"); lang.font = a; EditorUtility.SetDirty(_settings);
+                    Undo.RecordObject(_settings, "Set unassigned font"); lang.font = a; EditorUtility.SetDirty(_settings);
                 }
                 bool inChain = lang != null && lang.fallbackFonts.Contains(a);
                 if (GUILayout.Button(inChain ? "Remove fallback" : "Add fallback", GUILayout.Width(110)))

@@ -74,10 +74,12 @@ public static class LocalizationScanner
             {
                 var guids = AssetDatabase.FindAssets("t:ScriptableObject", new[] { ProjectRoot });
                 var assembly = typeof(ScriptedDialogue).Assembly;
+                var used = settings.onlyUsedDialogueAssets ? UsedAssetPaths() : null;
                 for (int i = 0; i < guids.Length; i++)
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guids[i]);
                     if (IsExcluded(path) || !path.EndsWith(".asset")) continue;
+                    if (used != null && !used.Contains(path)) continue;
                     if (i % 25 == 0 && EditorUtility.DisplayCancelableProgressBar("Localization scan", path, 0.6f + (float)i / guids.Length * 0.4f)) break;
                     var obj = AssetDatabase.LoadAssetAtPath<ScriptableObject>(path);
                     if (obj == null || obj.GetType().Assembly != assembly || obj is LocalizationSettings || !IsGameScript(obj)) continue;
@@ -269,6 +271,36 @@ public static class LocalizationScanner
 
     // ---- ScriptableObject discovery ----
 
+    /// <summary>
+    /// Asset paths the game can load: every recursive dependency of the enabled build scenes plus anything
+    /// under a Resources folder (and its dependencies). Assets outside this set are never shipped or reached.
+    /// </summary>
+    public static HashSet<string> UsedAssetPaths()
+    {
+        var roots = EditorBuildSettings.scenes.Where(s => s.enabled && !string.IsNullOrEmpty(s.path)).Select(s => s.path);
+        var resources = AssetDatabase.FindAssets("", new[] { "Assets" })
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .Where(p => p.Contains("/Resources/") && !p.Contains("/Editor/") && !AssetDatabase.IsValidFolder(p));
+        return new HashSet<string>(AssetDatabase.GetDependencies(roots.Concat(resources).Distinct().ToArray(), true));
+    }
+
+    /// <summary>Dialogue assets of the allowed types that nothing in the build references.</summary>
+    public static List<string> UnusedDialogueAssets(LocalizationSettings settings)
+    {
+        var used = UsedAssetPaths();
+        var assembly = typeof(ScriptedDialogue).Assembly;
+        var result = new List<string>();
+        foreach (var guid in AssetDatabase.FindAssets("t:ScriptableObject", new[] { ProjectRoot }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (IsExcluded(path) || !path.EndsWith(".asset") || used.Contains(path)) continue;
+            var t = AssetDatabase.GetMainAssetTypeAtPath(path);
+            if (t != null && t.Assembly == assembly && IsDialogueAssetType(t, settings)) result.Add(path);
+        }
+        result.Sort(StringComparer.OrdinalIgnoreCase);
+        return result;
+    }
+
     /// <summary>True when the type (or a base type) is listed in LocalizationSettings.dialogueAssetTypes.</summary>
     public static bool IsDialogueAssetType(Type type, LocalizationSettings settings)
     {
@@ -310,6 +342,7 @@ public static class LocalizationScanner
     public static List<string> NonDialogueDataKeys(LocalizationTable table, LocalizationSettings settings)
     {
         var typeCache = new Dictionary<string, Type>();
+        var used = settings != null && settings.onlyUsedDialogueAssets ? UsedAssetPaths() : null;
         bool IsExcluded(LocBinding b)
         {
             if (b.kind != "SO") return false;
@@ -319,6 +352,7 @@ public static class LocalizationScanner
                 typeCache[b.assetPath] = t;
             }
             if (t == null) return false; // missing assets are left alone
+            if (used != null && !used.Contains(b.assetPath)) return true; // never loaded by the game
             return !IsDialogueAssetType(t, settings) || !IsAllowedDataField(t, b.propertyPath, settings);
         }
 
