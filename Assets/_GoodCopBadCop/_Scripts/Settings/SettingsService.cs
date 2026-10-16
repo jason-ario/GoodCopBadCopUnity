@@ -27,6 +27,7 @@ namespace GoodCopBadCop.Settings
         void SetVoiceChatProximityRange(int proximityRange);
         void SetVoiceChatMicrophoneName(string microphoneName);
         void SetQualityPreset(EQualityPreset qualityPreset);
+        void SetRenderScale(ERenderScale renderScale);
         void SetBrightness(float value);
         void SetFilmGrainEnabled(bool isEnabled);
         void SetControllerLookSensitivity(float value);
@@ -174,6 +175,11 @@ namespace GoodCopBadCop.Settings
         public void SetQualityPreset(EQualityPreset qualityPreset)
         {
             model.QualityPresetMutable.Value = qualityPreset;
+        }
+
+        public void SetRenderScale(ERenderScale renderScale)
+        {
+            model.RenderScaleMutable.Value = renderScale;
         }
 
         public void SetBrightness(float value)

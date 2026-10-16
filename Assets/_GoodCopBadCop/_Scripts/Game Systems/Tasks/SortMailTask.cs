@@ -118,6 +118,13 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     private const string GateWaitingMessage = "A shipment is waiting at the gate.";
 
+    [Header("Sorting Destination Tutorial")]
+    [Tooltip("Arrows/outlines on the sorting destinations (Mail Cubbies stands, Confiscate bin, Prohibited " +
+             "Goods Sign). Shown locally on every client when the sorting-mail tutorial overlay pops up " +
+             "(Day_02.ShowMailSortingTutorialLocal -> ShowSortingTutorialCallouts) and hidden for everyone " +
+             "as soon as the replicated sorted count rises (any player sorts a package correctly).")]
+    [SerializeField] private TutorialCallout[] _sortingTutorialCallouts;
+
     [Header("Goods Categories")]
     [Tooltip("The full pool of goods categories that can appear on packages. Every delivery, " +
              "_prohibitedCountPerDay of these are drawn at random to be today's contraband; the " +
@@ -380,6 +387,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         base.OnNetworkSpawn();
         _sortedCount.OnValueChanged += OnNetworkValueChanged;
+        _sortedCount.OnValueChanged += OnSortedCountChanged;
         _totalCount.OnValueChanged  += OnNetworkValueChanged;
         _isActive.OnValueChanged    += OnIsActiveChanged;
         _shipmentWaitingAtGate.OnValueChanged += OnShipmentWaitingAtGateChanged;
@@ -398,9 +406,12 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         base.OnNetworkDespawn();
         _sortedCount.OnValueChanged -= OnNetworkValueChanged;
+        _sortedCount.OnValueChanged -= OnSortedCountChanged;
         _totalCount.OnValueChanged  -= OnNetworkValueChanged;
         _isActive.OnValueChanged    -= OnIsActiveChanged;
         _shipmentWaitingAtGate.OnValueChanged -= OnShipmentWaitingAtGateChanged;
+
+        HideSortingTutorialCallouts();
 
         if (_openGateTask != null)
             TaskRegistry.Instance?.RemoveThreat(_openGateTask);
@@ -460,7 +471,38 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (current)
             TaskRegistry.Instance?.AddThreat(this);
         else
+        {
             TaskRegistry.Instance?.RemoveThreat(this);
+            HideSortingTutorialCallouts();
+        }
+    }
+
+    // ── Sorting destination tutorial ─────────────────────────────────────────
+
+    /// <summary>
+    /// Local, runs on every client: shows the arrows/outlines on the sorting destinations. Called
+    /// by <see cref="Day_02.ShowMailSortingTutorialLocal"/> when the sorting-mail overlay pops up.
+    /// Cleared on every peer by <see cref="OnSortedCountChanged"/> the moment anyone sorts a
+    /// package correctly, or when the delivery ends / the task despawns.
+    /// </summary>
+    public void ShowSortingTutorialCallouts()
+    {
+        if (_sortingTutorialCallouts == null) return;
+        foreach (TutorialCallout callout in _sortingTutorialCallouts)
+            if (callout != null) callout.SetActive(true);
+    }
+
+    /// <summary>Local, idempotent: hides every sorting destination call-out.</summary>
+    public void HideSortingTutorialCallouts()
+    {
+        if (_sortingTutorialCallouts == null) return;
+        foreach (TutorialCallout callout in _sortingTutorialCallouts)
+            if (callout != null) callout.SetActive(false);
+    }
+
+    private void OnSortedCountChanged(int previous, int current)
+    {
+        if (current > previous) HideSortingTutorialCallouts();
     }
 
     // ── ISystemicThreat stubs ────────────────────────────────────────────────

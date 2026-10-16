@@ -145,6 +145,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting("VSync", "vsync", "Off", "On"),
             new Setting("FPS Limit", "fps_limit", "Unlimited", "30", "60", "120", "144"),
             new Setting("Quality Preset", "quality", "Low", "Medium", "High", "Ultra").WithDefaultIndex(3),
+            // Option order must match ERenderScale.
+            new Setting("Render Scale", "render_scale", "50%", "67%", "75%", "85%", "100%").WithDefaultIndex(4),
             new Setting("Brightness", "brightness", 50f),
             new Setting("Film Grain", "film_grain", "Off", "On")
         };
@@ -238,6 +240,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> voiceChatDeafenedChanged = new Subject<bool>();
         private readonly Subject<int> voiceChatInputModeChanged = new Subject<int>();
         private readonly Subject<int> qualityPresetChanged = new Subject<int>();
+        private readonly Subject<int> renderScaleChanged = new Subject<int>();
         private readonly Subject<float> brightnessChanged = new Subject<float>();
         private readonly Subject<bool> filmGrainEnabledChanged = new Subject<bool>();
         private readonly Subject<int> voiceChatProximityRangeChanged = new Subject<int>();
@@ -271,6 +274,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> VoiceChatDeafenedChanged { get { return voiceChatDeafenedChanged; } }
         public Observable<int> VoiceChatInputModeChanged { get { return voiceChatInputModeChanged; } }
         public Observable<int> QualityPresetChanged { get { return qualityPresetChanged; } }
+        public Observable<int> RenderScaleChanged { get { return renderScaleChanged; } }
         public Observable<float> BrightnessChanged { get { return brightnessChanged; } }
         public Observable<bool> FilmGrainEnabledChanged { get { return filmGrainEnabledChanged; } }
         public Observable<int> VoiceChatProximityRangeChanged { get { return voiceChatProximityRangeChanged; } }
@@ -745,8 +749,25 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetVoiceChatInputModeValue(int value) { Audio[5].Index = value; RefreshActiveSetting("voice_input"); }
 
         public void SetQualityPresetValue(int value) { Graphics[4].Index = value; RefreshActiveSetting("quality"); }
-        public void SetBrightnessValue(float value) { Graphics[5].Value = value; RefreshActiveSetting("brightness"); }
-        public void SetFilmGrainEnabledValue(bool value) { Graphics[6].Index = value ? 1 : 0; RefreshActiveSetting("film_grain"); }
+        public void SetRenderScaleValue(int value) { SetGraphicsIndex("render_scale", value); }
+        public void SetBrightnessValue(float value) { SetGraphicsValue("brightness", value); }
+        public void SetFilmGrainEnabledValue(bool value) { SetGraphicsIndex("film_grain", value ? 1 : 0); }
+
+        private void SetGraphicsIndex(string key, int index)
+        {
+            Setting setting = FindSetting(Graphics, key);
+            if (setting == null) return;
+            setting.Index = index;
+            RefreshActiveSetting(key);
+        }
+
+        private void SetGraphicsValue(string key, float value)
+        {
+            Setting setting = FindSetting(Graphics, key);
+            if (setting == null) return;
+            setting.Value = value;
+            RefreshActiveSetting(key);
+        }
         public void SetVoiceChatProximityRangeValue(int value) { }
 
         public void SetVoiceChatMicrophoneNameValue(string value)
@@ -971,6 +992,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "camera_shake":
                 case "text_wobble":
                 case "quality":
+                case "render_scale":
                 case "brightness":
                 case "film_grain":
                 case "voice_proximity_range":
@@ -1318,6 +1340,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "camera_shake": cameraShakeEnabledChanged.OnNext(setting.Index == 1); break;
                 case "text_wobble": textWobbleEnabledChanged.OnNext(setting.Index == 1); break;
                 case "quality": qualityPresetChanged.OnNext(setting.Index); break;
+                case "render_scale": renderScaleChanged.OnNext(setting.Index); break;
                 case "brightness": brightnessChanged.OnNext(setting.Value); break;
                 case "film_grain": filmGrainEnabledChanged.OnNext(setting.Index == 1); break;
                 case "voice_proximity_range": voiceChatProximityRangeChanged.OnNext(Mathf.RoundToInt(setting.Value)); break;

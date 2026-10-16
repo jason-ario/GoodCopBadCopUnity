@@ -42,6 +42,31 @@ namespace GoodCopBadCop.Settings
         Ultra
     }
 
+    public enum ERenderScale
+    {
+        Percent50,
+        Percent67,
+        Percent75,
+        Percent85,
+        Percent100
+    }
+
+    public static class RenderScaleExtensions
+    {
+        public static float ToScale(this ERenderScale renderScale)
+        {
+            switch (renderScale)
+            {
+                case ERenderScale.Percent50: return 0.5f;
+                case ERenderScale.Percent67: return 0.67f;
+                case ERenderScale.Percent75: return 0.75f;
+                case ERenderScale.Percent85: return 0.85f;
+                case ERenderScale.Percent100:
+                default: return 1f;
+            }
+        }
+    }
+
     public interface ISettingsModel
     {
         ReadOnlyReactiveProperty<EDisplayMode> DisplayMode { get; }
@@ -67,6 +92,7 @@ namespace GoodCopBadCop.Settings
         ReadOnlyReactiveProperty<int> VoiceChatProximityRange { get; }
         ReadOnlyReactiveProperty<string> VoiceChatMicrophoneName { get; }
         ReadOnlyReactiveProperty<EQualityPreset> QualityPreset { get; }
+        ReadOnlyReactiveProperty<ERenderScale> RenderScale { get; }
         ReadOnlyReactiveProperty<float> Brightness { get; }
         ReadOnlyReactiveProperty<bool> FilmGrainEnabled { get; }
         ReadOnlyReactiveProperty<float> ControllerLookSensitivity { get; }
@@ -144,6 +170,9 @@ namespace GoodCopBadCop.Settings
         public readonly PersistentReactiveProperty<EQualityPreset> QualityPresetMutable =
             new("settings.graphics.qualityPreset", EQualityPreset.Ultra);
 
+        public readonly PersistentReactiveProperty<ERenderScale> RenderScaleMutable =
+            new("settings.graphics.renderScale", ERenderScale.Percent100);
+
         public readonly PersistentReactiveProperty<float> BrightnessMutable =
             // v2: brightness became a final-image gamma (50 = neutral); old key stored post-exposure values.
             new("settings.graphics.brightness.v2", 50f);
@@ -180,6 +209,7 @@ namespace GoodCopBadCop.Settings
         public ReadOnlyReactiveProperty<int> VoiceChatProximityRange => VoiceChatProximityRangeMutable;
         public ReadOnlyReactiveProperty<string> VoiceChatMicrophoneName => VoiceChatMicrophoneNameMutable;
         public ReadOnlyReactiveProperty<EQualityPreset> QualityPreset => QualityPresetMutable;
+        public ReadOnlyReactiveProperty<ERenderScale> RenderScale => RenderScaleMutable;
         public ReadOnlyReactiveProperty<float> Brightness => BrightnessMutable;
         public ReadOnlyReactiveProperty<bool> FilmGrainEnabled => FilmGrainEnabledMutable;
         public ReadOnlyReactiveProperty<float> ControllerLookSensitivity => ControllerLookSensitivityMutable;
@@ -210,6 +240,7 @@ namespace GoodCopBadCop.Settings
             VoiceChatProximityRangeMutable.Flush();
             VoiceChatMicrophoneNameMutable.Flush();
             QualityPresetMutable.Flush();
+            RenderScaleMutable.Flush();
             BrightnessMutable.Flush();
             FilmGrainEnabledMutable.Flush();
             ControllerLookSensitivityMutable.Flush();
@@ -241,6 +272,7 @@ namespace GoodCopBadCop.Settings
             VoiceChatProximityRangeMutable.Dispose();
             VoiceChatMicrophoneNameMutable.Dispose();
             QualityPresetMutable.Dispose();
+            RenderScaleMutable.Dispose();
             BrightnessMutable.Dispose();
             FilmGrainEnabledMutable.Dispose();
             ControllerLookSensitivityMutable.Dispose();

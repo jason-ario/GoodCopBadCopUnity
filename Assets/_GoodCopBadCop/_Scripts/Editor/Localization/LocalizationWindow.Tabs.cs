@@ -50,12 +50,12 @@ public partial class LocalizationWindow
             using (new EditorGUILayout.HorizontalScope())
             {
                 var types = _settings != null && _settings.dialogueAssetTypes != null ? string.Join(", ", _settings.dialogueAssetTypes) : "";
-                LocUI.Muted_("Data assets scanned: " + types + ". Edit the list in LocalizationSettings > Dialogue Asset Types.");
+                LocUI.Muted_("Data assets scanned: " + types + " (SuspectData: entry reasons, dialogues, answers, barks only). Edit in Fonts > All localization settings.");
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button(new GUIContent("Remove non-dialogue data strings...", "Deletes strings already in the sheets whose only source is a ScriptableObject type not in the list (presets, configs, item data)."), GUILayout.Width(220)))
+                if (GUILayout.Button(new GUIContent("Remove excluded data strings...", "Deletes strings already in the sheets whose only source is a ScriptableObject type not in the list, or a field outside that type's allowlist (e.g. SuspectData descriptions)."), GUILayout.Width(220)))
                 {
                     var keys = LocalizationScanner.NonDialogueDataKeys(_table, _settings);
-                    if (keys.Count == 0) _status = "No strings from non-dialogue data assets in the sheets.";
+                    if (keys.Count == 0) _status = "No strings from excluded data assets or fields in the sheets.";
                     else EditorApplication.delayCall += () => { ConfirmDelete(keys); Repaint(); };
                 }
             }

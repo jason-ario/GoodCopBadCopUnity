@@ -74,7 +74,24 @@ public class DumpsterInteractable : CollectableContainer
     [Tooltip("Animator trigger played on the player (body + arms) when tossing a bag into the dumpster.")]
     [SerializeField] private string _throwAnimTrigger = "ThrowTrashBag";
 
+    [Header("Tutorial")]
+    [Tooltip("Arrow + highlight shown the first time the local player holds a trash bag with junk in it " +
+             "(see DumpsterDepositTutorial). Auto-resolved from this GameObject if left empty.")]
+    [SerializeField] private TutorialCallout _depositTutorialCallout;
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
+
+    private void OnEnable()
+    {
+        if (_depositTutorialCallout == null)
+            _depositTutorialCallout = GetComponent<TutorialCallout>();
+        DumpsterDepositTutorial.Register(_depositTutorialCallout);
+    }
+
+    private void OnDisable()
+    {
+        DumpsterDepositTutorial.Unregister(_depositTutorialCallout);
+    }
 
     protected override void Awake()
     {
@@ -204,6 +221,7 @@ public class DumpsterInteractable : CollectableContainer
         if (bag == null || !bag.IsSpawned || bag.IsDeposited) return;
 
         bag.MarkDeposited();
+        NotifyBagDepositedClientRpc(bag.NetworkObjectId);
 
         ThrowBagArcClientRpc(bagRef, startPosition, endPosition);
         StartCoroutine(FinishArcDeposit(bag, endPosition));
@@ -297,6 +315,7 @@ public class DumpsterInteractable : CollectableContainer
     private void DepositBag(TrashBag bag)
     {
         bag.MarkDeposited();
+        NotifyBagDepositedClientRpc(bag.NetworkObjectId);
 
         int     junkCount    = bag.JunkCount;
         Vector3 landPosition = bag.transform.position;
@@ -304,6 +323,16 @@ public class DumpsterInteractable : CollectableContainer
         PlayLandSoundServerRpc(landPosition);
         bag.DespawnServerRpc();
         DepositBagServerRpc(junkCount);
+    }
+
+    /// <summary>
+    /// Tells every client a specific bag was accepted, so the local-only
+    /// <see cref="DumpsterDepositTutorial"/> can dismiss itself for the player who carried it.
+    /// </summary>
+    [ClientRpc]
+    private void NotifyBagDepositedClientRpc(ulong bagNetworkObjectId)
+    {
+        DumpsterDepositTutorial.NotifyBagDeposited(bagNetworkObjectId);
     }
 
     // ── NetworkVariable callbacks ─────────────────────────────────────────────

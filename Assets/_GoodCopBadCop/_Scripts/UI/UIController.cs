@@ -978,6 +978,18 @@ public class UIController : MonoBehaviour
         if (PlayerInstance.Instance != null) PlayerInstance.Instance.OpenedUIPanel();
         LobbyManager.Instance.OpenInviteFriendsPopup();
     }
+    /// <summary>
+    /// Shows an error toast explaining why the Steam invite overlay couldn't open. Only shown for the
+    /// in-game invite panel (payphone); the main-menu invite button has its own screen and no HUD.
+    /// Call before closing the panel.
+    /// </summary>
+    public void ShowInviteUnavailableNotification(string message)
+    {
+        if (!inviteFriendsPanel.activeSelf) return;
+        ShowErrorNotification(message);
+    }
+
+
 
     public void CloseInviteFriendsScreen()
     {

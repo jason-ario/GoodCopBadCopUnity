@@ -20,6 +20,15 @@ public class LocalizationLanguage
     public float sizeScale = 1f;
 }
 
+[Serializable]
+public class DialogueFieldRule
+{
+    [Tooltip("ScriptableObject class name (subclasses included).")]
+    public string typeName;
+    [Tooltip("Top-level serialized field names to scan. Everything else on this type is ignored.")]
+    public List<string> fields = new List<string>();
+}
+
 /// <summary>
 /// Project-wide localization settings. Lives in a Resources folder so the runtime can load it:
 /// Assets/_GoodCopBadCop/Resources/Localization/LocalizationSettings.asset
@@ -53,6 +62,24 @@ public class LocalizationSettings : ScriptableObject
 
     [Tooltip("ScriptableObject types the scanner reads text from (class name, subclasses included). Presets, configs and item data are ignored.")]
     public List<string> dialogueAssetTypes = new List<string> { "ScriptedDialogue", "SuspectData" };
+
+    [Tooltip("Optional per-type field allowlist. When a dialogue asset type has a rule, only these top-level fields are scanned " +
+             "(nested strings inside them included). Types without a rule scan every text field.")]
+    public List<DialogueFieldRule> dialogueFieldRules = new List<DialogueFieldRule>
+    {
+        new DialogueFieldRule
+        {
+            typeName = "SuspectData",
+            fields = new List<string>
+            {
+                "entryReasons", "invalidEntryReasons",
+                "entryDialogues", "uncannyEntryDialogues",
+                "exitDialoguesPassed", "exitDialoguesQuarantined", "exitDialoguesKilled",
+                "quarantineExitLines", "killExitLines",
+                "questionResponses", "idleBarks"
+            }
+        }
+    };
 
     [Tooltip("Serialized string field names the scanner never treats as copy (identifiers, triggers, ids).")]
     public List<string> fieldDenyList = new List<string>

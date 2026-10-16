@@ -800,7 +800,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 888380afc233049ce9e618f9f36c8ba8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: HighlightPlus.Runtime::HighlightPlus.HighlightEffect
-  profile: {fileID: 11400000, guid: 15bd2414447596b4e9aad2b416418371, type: 2}
+  profile: {fileID: 11400000, guid: 8170183e28a394efd991c884f093b87b, type: 2}
   profileSync: 1
   camerasLayerMask:
     serializedVersion: 2
@@ -814,8 +814,8 @@ MonoBehaviour:
   effectNameUseRegEx: 0
   excludeObjectsWithHighlightEffect: 0
   combineMeshes: 0
-  alphaCutOff: 0.5
-  alphaCutOffTextureName: 
+  alphaCutOff: 0.07
+  alphaCutOffTextureName: _BaseMap
   cullBackFaces: 0
   ignoreObjectVisibility: 0
   reflectionProbes: 0
@@ -823,29 +823,29 @@ MonoBehaviour:
   sortingPriority: 0
   optimizeSkinnedMesh: 1
   depthClip: 0
-  cameraDistanceFade: 0
+  cameraDistanceFade: 1
   cameraDistanceFadeNear: 0
-  cameraDistanceFadeFar: 1000
+  cameraDistanceFadeFar: 35
   useOriginalShader: 0
   customPassName: 
   normalsOption: 0
   ignore: 0
   _highlighted: 0
-  fadeInDuration: 0
-  fadeOutDuration: 0
+  fadeInDuration: 0.5
+  fadeOutDuration: 0.5
   flipY: 0
   constantWidth: 1
   extraCoveragePixels: 0
   minimumWidth: 0
   subMeshMask: -1
   vertexTransformMode: 0
-  overlay: 0
+  overlay: 0.25
   overlayMode: 0
   overlayPattern: 0
   overlayPatternScrolling: {x: 0, y: 0}
-  overlayColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  overlayAnimationSpeed: 1
-  overlayMinIntensity: 0.5
+  overlayColor: {r: 1, g: 0.85, b: 0.6, a: 1}
+  overlayAnimationSpeed: 0.5
+  overlayMinIntensity: 0.2
   overlayBlending: 1
   overlayTexture: {fileID: 0}
   overlayTextureUVSpace: 0
@@ -857,7 +857,7 @@ MonoBehaviour:
   overlayPatternSize: 0.15
   overlayPatternSoftness: 0.02
   overlayPatternRotation: 0
-  outline: 1
+  outline: 0
   outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 0.5019608}
   outlineColorStyle: 0
   outlineGradient:

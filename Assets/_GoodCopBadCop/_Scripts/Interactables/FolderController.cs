@@ -559,18 +559,6 @@ public class FolderController : PickableObject
         {
             if (heldItem.ItemData.name == "Stamp_Green" ||  heldItem.ItemData.name == "Stamp_Red" || heldItem.ItemData.name == "Stamp_Yellow")
             {
-                if (isOpen.Value)
-                {
-                    // Cannot stamp while the folder is open — close it instead.
-                    Debug.Log("[FolderController] Stamp blocked: folder is open. Closing folder.");
-                    if (playerPickupController != null)
-                        playerPickupController.PlayerAnimationController.SetAnimBool("HoldingFolderOpen", false);
-                    StopAllCoroutines();
-                    SetOpenServerRpc(false);
-                    isOpeningOrClosing = false;
-                    return;
-                }
-
                 if (!IsFaceUp())
                 {
                     // Folder landed upside-down (e.g. after being thrown) — can't stamp its underside.
@@ -578,6 +566,12 @@ public class FolderController : PickableObject
                     UIController.Instance?.ShowShopNotification("<color=red>Folder must be face-up to stamp!</color>");
                     return;
                 }
+
+                // An open folder no longer blocks stamping: the server closes it in the same
+                // request (see StartUseStampServerRpc), so the cover swings shut while the stamp
+                // sequence plays instead of needing a second press. (WaitAndOpen only runs while
+                // the folder is held, which is rejected above, so there is no pending open to cancel.)
+                isOpeningOrClosing = false;
 
                 Debug.Log("Interact with item");
                 var inkStamp = heldItem.ItemData.PickUpPrefab.GetComponent<InkStampPickup>();
@@ -606,6 +600,11 @@ public class FolderController : PickableObject
             if (HasNotebookPage(heldItem.ItemData.name) == false)
             {
                 AddNotebookPaper(heldItem.ItemData.name, playerInteractionController.pickupController);
+            }
+            else
+            {
+                // This notebook's page is already filed — tell the player instead of silently doing nothing.
+                UIController.Instance?.ShowShopNotification("<color=red>File already added</color>");
             }
         }
     }
@@ -691,7 +690,6 @@ public class FolderController : PickableObject
     {
         Debug.Log($"[FolderController] StartUseStampServerRpc: isStamping={isStamping} isOpen={isOpen.Value} NetworkObjectId={NetworkObjectId}");
         if (isStamping) { Debug.LogWarning("[FolderController] Stamp blocked: already stamping."); return; }
-        if (isOpen.Value) { Debug.LogWarning("[FolderController] Stamp blocked: folder is open."); return; }
         if (!IsFaceUp()) { Debug.LogWarning("[FolderController] Stamp blocked: folder is not facing upward (authoritative check)."); return; }
 
         if (stampType == StampContainer.StampType.Quarantine && IsQuarantineFull())
@@ -716,6 +714,14 @@ public class FolderController : PickableObject
         }
 
         isStamping = true;
+
+        // Stamping an open folder closes it as part of the same sequence (only once every check
+        // above has passed, so a rejected stamp leaves the folder open). OnIsOpenChanged runs the
+        // close animation and disables filed-document colliders on every client while the stamp
+        // arm comes down, so the stamp lands on the closed cover.
+        if (isOpen.Value)
+            isOpen.Value = false;
+
         isStamped.Value = true;
         Debug.Log($"[FolderController] isStamped set to true on server. NetworkObjectId={NetworkObjectId}");
 

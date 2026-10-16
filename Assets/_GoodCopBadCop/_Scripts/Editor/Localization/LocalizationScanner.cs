@@ -82,7 +82,7 @@ public static class LocalizationScanner
                     var obj = AssetDatabase.LoadAssetAtPath<ScriptableObject>(path);
                     if (obj == null || obj.GetType().Assembly != assembly || obj is LocalizationSettings || !IsGameScript(obj)) continue;
                     if (!IsDialogueAssetType(obj.GetType(), settings)) continue;
-                    ScanScriptable(obj, path, deny, table, items);
+                    ScanScriptable(obj, path, deny, settings, table, items);
                 }
             }
         }
@@ -280,38 +280,67 @@ public static class LocalizationScanner
         return false;
     }
 
-    /// <summary>Keys whose every source is a ScriptableObject that is no longer a dialogue type.</summary>
+    /// <summary>
+    /// True when the property's top-level field may be scanned on this type. Types without a
+    /// rule in LocalizationSettings.dialogueFieldRules allow every field.
+    /// </summary>
+    public static bool IsAllowedDataField(Type type, string propertyPath, LocalizationSettings settings)
+    {
+        var rules = settings != null ? settings.dialogueFieldRules : null;
+        if (rules == null || rules.Count == 0 || string.IsNullOrEmpty(propertyPath)) return true;
+
+        for (var t = type; t != null && t != typeof(ScriptableObject); t = t.BaseType)
+        {
+            foreach (var rule in rules)
+            {
+                if (rule == null || string.IsNullOrEmpty(rule.typeName)) continue;
+                if (rule.typeName != t.Name && rule.typeName != t.FullName) continue;
+                int dot = propertyPath.IndexOf('.');
+                string root = dot < 0 ? propertyPath : propertyPath.Substring(0, dot);
+                return rule.fields != null && rule.fields.Contains(root);
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Keys whose every source is excluded data: a ScriptableObject that is not a dialogue type,
+    /// or a dialogue type field outside its allowlist (e.g. SuspectData.CharacterArc).
+    /// </summary>
     public static List<string> NonDialogueDataKeys(LocalizationTable table, LocalizationSettings settings)
     {
-        var typeCache = new Dictionary<string, bool>();
-        bool IsDialogueAsset(string path)
+        var typeCache = new Dictionary<string, Type>();
+        bool IsExcluded(LocBinding b)
         {
-            if (!typeCache.TryGetValue(path, out bool ok))
+            if (b.kind != "SO") return false;
+            if (!typeCache.TryGetValue(b.assetPath, out var t))
             {
-                var t = AssetDatabase.GetMainAssetTypeAtPath(path);
-                ok = t == null || IsDialogueAssetType(t, settings); // missing assets are left alone
-                typeCache[path] = ok;
+                t = AssetDatabase.GetMainAssetTypeAtPath(b.assetPath);
+                typeCache[b.assetPath] = t;
             }
-            return ok;
+            if (t == null) return false; // missing assets are left alone
+            return !IsDialogueAssetType(t, settings) || !IsAllowedDataField(t, b.propertyPath, settings);
         }
 
         return LocBindings.All
             .GroupBy(b => b.key)
-            .Where(g => table.TryGet(g.Key, out _) && g.All(b => b.kind == "SO" && !IsDialogueAsset(b.assetPath)))
+            .Where(g => table.TryGet(g.Key, out _) && g.All(IsExcluded))
             .Select(g => g.Key)
             .ToList();
     }
 
-    private static void ScanScriptable(ScriptableObject obj, string path, HashSet<string> deny, LocalizationTable table, List<ScanItem> items)
+    private static void ScanScriptable(ScriptableObject obj, string path, HashSet<string> deny, LocalizationSettings settings, LocalizationTable table, List<ScanItem> items)
     {
         var so = new SerializedObject(obj);
         var it = so.GetIterator();
         string sheet = SheetForScriptable(obj);
         string assetName = obj.name;
+        var objType = obj.GetType();
 
         while (it.NextVisible(true))
         {
             if (it.propertyType != SerializedPropertyType.String) continue;
+            if (!IsAllowedDataField(objType, it.propertyPath, settings)) continue;
             if (IsIdentifierField(FieldName(it.propertyPath), deny)) continue;
             string text = it.stringValue;
             if (!LooksLikeCopy(text)) continue;

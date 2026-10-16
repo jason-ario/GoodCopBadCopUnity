@@ -54,6 +54,18 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         // Noisy fade toward the projection box walls (fraction of the box). 0 = hard box clip.
         _BoxEdgeFade              ("Box Edge Fade (XZ)",       Range(0, 0.5))    = 0.0
         _BoxEdgeFadeY             ("Box Edge Fade (Height)",   Range(0, 1))      = 0.0
+
+        // --- Discoverability Pulse ---
+        // Faint self-lit "breathing" of the paint, added AFTER fog so it reads in dusk/fog.
+        // Intensity 0 disables it (default, so blood decals sharing this shader are unaffected).
+        // Each instance gets its own phase from its world position so nearby pieces don't sync.
+        [HDR] _PulseColor         ("Pulse Color",               Color)          = (1, 1, 1, 1)
+        _PulseIntensity           ("Pulse Intensity",           Range(0, 3))    = 0.0
+        _PulseTintFromTexture     ("Pulse Uses Paint Color",    Range(0, 1))    = 1.0
+        _PulseSpeed               ("Pulse Speed (cycles/sec)",  Range(0.05, 2)) = 0.35
+        _PulseMin                 ("Pulse Floor (fraction)",    Range(0, 1))    = 0.15
+        _PulseSharpness           ("Pulse Sharpness",           Range(0.5, 6))  = 2.0
+        _PulseRange               ("Pulse Fade Distance (m)",   Range(2, 80))   = 30.0
     }
 
     SubShader
@@ -152,6 +164,13 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half   _UVAlphaThreshold;
                 half   _BoxEdgeFade;
                 half   _BoxEdgeFadeY;
+                half4  _PulseColor;
+                half   _PulseIntensity;
+                half   _PulseTintFromTexture;
+                half   _PulseSpeed;
+                half   _PulseMin;
+                half   _PulseSharpness;
+                half   _PulseRange;
             CBUFFER_END
 
             // UV light cone data — GLOBAL shader properties set by UVLight.PushShaderGlobals.
@@ -400,6 +419,28 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 float4 reconstructedCS = TransformWorldToHClip(positionWS);
                 float  fogFactor       = ComputeFogFactor(reconstructedCS.z);
                 finalRGB = MixFog(finalRGB, fogFactor);
+
+                // --- Discoverability pulse (added after fog so it reads through it) ---
+                // Slow, faint breathing emission in the paint's own color. Per-instance phase from
+                // the box's world position keeps neighbours out of sync. Fades with scrub progress
+                // (doubling as cleaning feedback) and with camera distance.
+                if (_PulseIntensity > 0.0)
+                {
+                    float3 objPosWS = TransformObjectToWorld(float3(0, 0, 0));
+                    float  phase    = frac(sin(dot(objPosWS.xz, float2(12.9898, 78.233))) * 43758.5453);
+                    float  wave     = 0.5 - 0.5 * cos(6.2831853 * (_Time.y * _PulseSpeed + phase));
+                    float  pulse    = lerp(_PulseMin, 1.0, pow(wave, _PulseSharpness));
+
+                    float  camDist  = distance(GetCameraPositionWS(), positionWS);
+                    half   distFade = 1.0 - smoothstep(_PulseRange * 0.6, _PulseRange, camDist);
+
+                    // Visual dissolve tops out at ~0.65 (GraffitiInteractable._maxVisualDissolve),
+                    // so x1.5 brings the glow to ~0 right as the piece completes.
+                    half   paintMask = alpha * (1.0 - foamMask) * saturate(1.0 - _ScrubProgress * 1.5);
+                    half3  pulseCol  = lerp(_PulseColor.rgb, texColor.rgb * _PulseColor.rgb, _PulseTintFromTexture);
+
+                    finalRGB += pulseCol * (_PulseIntensity * pulse * distFade * paintMask);
+                }
 
                 // --- UV light fluorescent glow (added after fog so it reads through it) ---
                 if (_UVGlowIntensity > 0.0)

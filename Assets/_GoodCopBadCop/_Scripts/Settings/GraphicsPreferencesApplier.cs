@@ -8,14 +8,14 @@ using VContainer.Unity;
 namespace GoodCopBadCop.Settings
 {
     /// <summary>
-    /// Applies the Graphics-tab preferences (Quality Preset, Brightness, Film Grain) that have
+    /// Applies the Graphics-tab preferences (Quality Preset, Render Scale, Brightness, Film Grain) that have
     /// persisted backing (<see cref="ISettingsModel"/>) but previously had no runtime effect.
     /// Quality Preset adjusts global <see cref="QualitySettings"/> knobs directly (the project
     /// only defines a single "PC" quality tier, so presets are expressed as knob values rather
     /// than named tiers). Presets intentionally never touch LOD settings (lodBias /
     /// maximumLODLevel): LODGroups are authored against the project tier's lodBias, and
     /// overriding it at runtime made objects cull much closer than in the editor.
-    /// Shadow distance/cascades are set on the active URP asset (URP ignores the QualitySettings
+    /// Shadow distance/cascades and render scale are set on the active URP asset (URP ignores the QualitySettings
     /// equivalents) and restored on dispose so Editor play sessions don't dirty the asset.
     /// Brightness is a final-image gamma adjustment applied after all post-processing by
     /// <see cref="ScreenBrightnessRenderer"/> (it never touches exposure/bloom/tonemapping).
@@ -40,6 +40,7 @@ namespace GoodCopBadCop.Settings
         private UniversalRenderPipelineAsset urpAsset;
         private float originalShadowDistance;
         private int originalShadowCascadeCount;
+        private float originalRenderScale = 1f;
 
         public GraphicsPreferencesApplier(ISettingsModel model, GraphicsPreferencesVolumeAnchor volumeAnchor)
         {
@@ -51,6 +52,7 @@ namespace GoodCopBadCop.Settings
         {
             CacheRenderPipelineDefaults();
             model.QualityPreset.Subscribe(ApplyQualityPreset).AddTo(ref disposables);
+            model.RenderScale.Subscribe(ApplyRenderScale).AddTo(ref disposables);
 
             brightnessRenderer = new ScreenBrightnessRenderer();
             model.Brightness.Subscribe(ApplyBrightness).AddTo(ref disposables);
@@ -117,6 +119,7 @@ namespace GoodCopBadCop.Settings
 
             originalShadowDistance = urpAsset.shadowDistance;
             originalShadowCascadeCount = urpAsset.shadowCascadeCount;
+            originalRenderScale = urpAsset.renderScale;
         }
 
         // The URP asset is a project asset: runtime edits would persist in the Editor, so restore them.
@@ -129,6 +132,18 @@ namespace GoodCopBadCop.Settings
 
             urpAsset.shadowDistance = originalShadowDistance;
             urpAsset.shadowCascadeCount = originalShadowCascadeCount;
+            urpAsset.renderScale = originalRenderScale;
+        }
+
+        // Render Scale trades internal resolution for GPU fill rate (the game is fill-rate bound).
+        private void ApplyRenderScale(ERenderScale renderScale)
+        {
+            if (urpAsset == null)
+            {
+                return;
+            }
+
+            urpAsset.renderScale = renderScale.ToScale();
         }
 
         private void ApplyQualityPreset(EQualityPreset preset)

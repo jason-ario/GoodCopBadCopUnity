@@ -621,6 +621,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1120339003}
   - component: {fileID: 1120339002}
+  - component: {fileID: 1120339004}
   m_Layer: 0
   m_Name: Loader
   m_TagString: Untagged
@@ -645,6 +646,8 @@ MonoBehaviour:
   percentLabel: {fileID: 1614208345}
   minimumDisplayTime: 1.25
   fillSpeed: 2.5
+  shaderWarmup: {fileID: 1120339004}
+  warmupProgressWeight: 0.4
 --- !u!4 &1120339003
 Transform:
   m_ObjectHideFlags: 0
@@ -660,6 +663,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1120339004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1120339001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1e094fbe70b24a8eba9c8382a50309d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GoodCopBadCop.Rendering.ShaderWarmupRunner
+  collections: []
+  statesPerFrame: 16
+  runInEditor: 0
+  timeoutSeconds: 30
 --- !u!1001 &1179117271
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -790,6 +809,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIWobble
   wobbleProfile: {fileID: 11400000, guid: 633322603464f5d448dd18acb3fa60de, type: 2}
+  intensity: 1
 --- !u!82 &1596742505
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1055,7 +1075,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -1192,7 +1212,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1

@@ -32,6 +32,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         Observable<bool> VoiceChatDeafenedChanged { get; }
         Observable<int> VoiceChatInputModeChanged { get; }
         Observable<int> QualityPresetChanged { get; }
+        Observable<int> RenderScaleChanged { get; }
         Observable<float> BrightnessChanged { get; }
         Observable<bool> FilmGrainEnabledChanged { get; }
         Observable<int> VoiceChatProximityRangeChanged { get; }
@@ -65,6 +66,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         void SetVoiceChatDeafenedValue(bool value);
         void SetVoiceChatInputModeValue(int value);
         void SetQualityPresetValue(int value);
+        void SetRenderScaleValue(int value);
         void SetBrightnessValue(float value);
         void SetFilmGrainEnabledValue(bool value);
         void SetVoiceChatProximityRangeValue(int value);
@@ -345,6 +347,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private readonly Subject<bool> voiceChatDeafenedChanged = new();
         private readonly Subject<int> voiceChatInputModeChanged = new();
         private readonly Subject<int> qualityPresetChanged = new();
+        private readonly Subject<int> renderScaleChanged = new();
         private readonly Subject<float> brightnessChanged = new();
         private readonly Subject<bool> filmGrainEnabledChanged = new();
         private readonly Subject<int> voiceChatProximityRangeChanged = new();
@@ -378,6 +381,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public Observable<bool> VoiceChatDeafenedChanged => voiceChatDeafenedChanged;
         public Observable<int> VoiceChatInputModeChanged => voiceChatInputModeChanged;
         public Observable<int> QualityPresetChanged => qualityPresetChanged;
+        public Observable<int> RenderScaleChanged => renderScaleChanged;
         public Observable<float> BrightnessChanged => brightnessChanged;
         public Observable<bool> FilmGrainEnabledChanged => filmGrainEnabledChanged;
         public Observable<int> VoiceChatProximityRangeChanged => voiceChatProximityRangeChanged;
@@ -559,6 +563,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
         public void SetQualityPresetValue(int value)
         {
             // No Quality Preset dropdown exists in this legacy view; value is applied via GraphicsPreferencesApplier directly.
+        }
+
+        public void SetRenderScaleValue(int value)
+        {
+            // No Render Scale dropdown exists in this legacy view; value is applied via GraphicsPreferencesApplier directly.
         }
 
         public void SetBrightnessValue(float value)

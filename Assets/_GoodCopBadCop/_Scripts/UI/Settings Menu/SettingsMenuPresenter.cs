@@ -57,6 +57,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             view.VoiceChatDeafenedChanged.Subscribe(OnVoiceChatDeafenedChanged).AddTo(ref disposables);
             view.VoiceChatInputModeChanged.Subscribe(OnVoiceChatInputModeChanged).AddTo(ref disposables);
             view.QualityPresetChanged.Subscribe(OnQualityPresetChanged).AddTo(ref disposables);
+            view.RenderScaleChanged.Subscribe(OnRenderScaleChanged).AddTo(ref disposables);
             view.BrightnessChanged.Subscribe(OnBrightnessChanged).AddTo(ref disposables);
             view.FilmGrainEnabledChanged.Subscribe(OnFilmGrainEnabledChanged).AddTo(ref disposables);
             view.VoiceChatProximityRangeChanged.Subscribe(OnVoiceChatProximityRangeChanged).AddTo(ref disposables);
@@ -157,6 +158,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             settingsModel.QualityPreset
                 .Subscribe(qualityPreset => view.SetQualityPresetValue((int)qualityPreset))
+                .AddTo(ref disposables);
+
+            settingsModel.RenderScale
+                .Subscribe(renderScale => view.SetRenderScaleValue((int)renderScale))
                 .AddTo(ref disposables);
 
             settingsModel.Brightness
@@ -334,6 +339,16 @@ namespace GoodCopBadCop.UI.SettingsMenu
             }
 
             settingsService.SetQualityPreset((EQualityPreset)value);
+        }
+
+        private void OnRenderScaleChanged(int value)
+        {
+            if (!Enum.IsDefined(typeof(ERenderScale), value))
+            {
+                return;
+            }
+
+            settingsService.SetRenderScale((ERenderScale)value);
         }
 
         private void OnBrightnessChanged(float value)

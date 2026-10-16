@@ -737,18 +737,39 @@ public class LobbyManager : MonoBehaviour
         inviteOverlayWasOpenedByUs = false;
         inviteOverlayActivated = false;
 
+        // SteamUtils/SteamFriends dereference Facepunch's native interfaces, which are null until
+        // SteamClient.Init succeeds (Steam not running, not logged in, Editor without Steam), so
+        // reading SteamUtils.IsOverlayEnabled would throw a NullReferenceException.
+        if (!SteamClient.IsValid)
+        {
+            Debug.LogWarning("[OpenInviteFriendsPopup] Steam client is not initialized — cannot open the invite overlay.");
+            CloseInviteFriendsPopUp(InviteSteamNotRunningMessage);
+            return;
+        }
+
         // The Steam overlay only renders when this game is running as a real build
         // launched through the Steam client (it never renders inside the Unity
         // Editor's Game View). If it isn't available, OpenGameInviteOverlay() is a
         // silent no-op — OnGameOverlayActivated never fires, and the caller-side
         // panel would otherwise stay open forever with no way to dismiss it. Bail
         // out up front so the UI never gets stuck in that state.
-        if (!SteamUtils.IsOverlayEnabled)
+        bool overlayEnabled;
+        try
+        {
+            overlayEnabled = SteamUtils.IsOverlayEnabled;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[OpenInviteFriendsPopup] Failed to query Steam overlay state: {e.Message}");
+            overlayEnabled = false;
+        }
+
+        if (!overlayEnabled)
         {
             Debug.LogWarning("[OpenInviteFriendsPopup] Steam overlay is not enabled/available " +
                 "(e.g. running in the Editor, or Overlay disabled in Steam settings). " +
                 "Cannot open the invite overlay.");
-            CloseInviteFriendsPopUp();
+            CloseInviteFriendsPopUp(InviteOverlayUnavailableMessage);
             return;
         }
 
@@ -764,13 +785,23 @@ public class LobbyManager : MonoBehaviour
             if (!created)
             {
                 Debug.LogError("[OpenInviteFriendsPopup] Failed to create a lobby — cannot open invite overlay.");
-                CloseInviteFriendsPopUp();
+                CloseInviteFriendsPopUp(InviteLobbyFailedMessage);
                 return;
             }
         }
 
         inviteOverlayWasOpenedByUs = true;
-        SteamFriends.OpenGameInviteOverlay(CurrentLobby.Id);
+        try
+        {
+            SteamFriends.OpenGameInviteOverlay(CurrentLobby.Id);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[OpenInviteFriendsPopup] OpenGameInviteOverlay threw: {e.Message}");
+            inviteOverlayWasOpenedByUs = false;
+            CloseInviteFriendsPopUp(InviteLobbyFailedMessage);
+            return;
+        }
         Debug.Log($"Opened Steam invite popup for lobby {CurrentLobby.Id}");
 
         // Safety net: if the overlay never actually reports as opened within a few
@@ -791,7 +822,7 @@ public class LobbyManager : MonoBehaviour
             Debug.LogWarning("[OpenInviteFriendsPopup] Steam overlay never reported as activated — " +
                 "closing the invite panel to avoid a stuck screen.");
             inviteOverlayWasOpenedByUs = false;
-            CloseInviteFriendsPopUp();
+            CloseInviteFriendsPopUp(InviteOverlayUnavailableMessage);
         }
     }
 
@@ -805,10 +836,19 @@ public class LobbyManager : MonoBehaviour
         inviteRequestId++;
     }
 
-    public void CloseInviteFriendsPopUp()
+    private const string InviteOverlayUnavailableMessage =
+        "Steam overlay unavailable - share the lobby code from the pause menu";
+    private const string InviteLobbyFailedMessage = "Couldn't open Steam invites";
+    private const string InviteSteamNotRunningMessage = "Steam invites unavailable - Steam isn't running";
+
+    /// <param name="failureMessage">When set, shows it as an error toast (in-game invite panel only)
+    /// so the player knows why nothing opened.</param>
+    public void CloseInviteFriendsPopUp(string failureMessage = null)
     {
         if (UIController.Instance != null)
         {
+            if (!string.IsNullOrEmpty(failureMessage))
+                UIController.Instance.ShowInviteUnavailableNotification(failureMessage);
             UIController.Instance.CloseInviteFriendsScreen();
         }
     }

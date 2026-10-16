@@ -515,7 +515,7 @@ public class PlayerInteractionController : NetworkBehaviour
         // Increase distance significantly to detect "Too Far" objects
         if (TryGetBestInteractHit(ray, out RaycastHit hit))
         {
-            Interactable interactable = ResolveInteractable(hit.collider);
+            Interactable interactable = ResolveTargetInteractable(hit.collider);
 
             // The local player's held object keeps its colliders active during the server
             // round-trip after pickup. Treat it as non-interactable immediately so the
@@ -733,6 +733,46 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         return interactable;
+    }
+
+    /// <summary>
+    /// <see cref="ResolveInteractable"/> plus the held-item folder redirect: while holding an item
+    /// the folder accepts (stamp, exam page, notebook, ID card, evidence…), a document filed in an
+    /// open folder resolves to the folder itself. Filed documents cover most of an open folder, so
+    /// without this the player had to hunt for a sliver of exposed folder to stamp / file. The
+    /// folder then gets the highlight and the press. Empty-handed (or holding something the folder
+    /// doesn't take) documents resolve normally so they can be picked up.
+    /// Used by the reticle, LMB and Interact paths so the highlighted target is always the one acted on.
+    /// </summary>
+    private Interactable ResolveTargetInteractable(Collider collider)
+    {
+        Interactable interactable = ResolveInteractable(collider);
+        if (interactable == null) return null;
+
+        PickableObject held = _playerPickupController != null ? _playerPickupController.HeldObject : null;
+        if (held == null || interactable == held) return interactable;
+
+        FolderController folder = GetContainingFolder(interactable);
+        if (folder == null || folder == held || !folder.IsInteractable) return interactable;
+
+        return folder.CanInteractWithItem(held) ? folder : interactable;
+    }
+
+    /// <summary>
+    /// The folder a filed document is sitting in, or null. <see cref="FolderItem.insideThisFolder"/>
+    /// is only set on the client that filed it, so fall back to the document's active
+    /// <see cref="SocketFollow"/> slot (a child of the folder) — same resolution FolderItem.OnEquipped uses.
+    /// </summary>
+    private static FolderController GetContainingFolder(Interactable interactable)
+    {
+        if (interactable is FolderItem folderItem && folderItem.insideThisFolder != null)
+            return folderItem.insideThisFolder;
+
+        SocketFollow socketFollow = interactable.GetComponent<SocketFollow>();
+        if (socketFollow != null && socketFollow.enabled && socketFollow.Target != null)
+            return socketFollow.Target.GetComponentInParent<FolderController>();
+
+        return null;
     }
 
     /// <summary>
@@ -1129,7 +1169,7 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
-        Interactable interactable = ResolveInteractable(hit.collider);
+        Interactable interactable = ResolveTargetInteractable(hit.collider);
 
         if (IsControlledByOtherPlayer(interactable)) return;
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;
@@ -1185,7 +1225,7 @@ public class PlayerInteractionController : NetworkBehaviour
         if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > CurrentInteractReach)
             return;
 
-        Interactable interactable = ResolveInteractable(hit.collider);
+        Interactable interactable = ResolveTargetInteractable(hit.collider);
 
         if (IsControlledByOtherPlayer(interactable)) return;
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;

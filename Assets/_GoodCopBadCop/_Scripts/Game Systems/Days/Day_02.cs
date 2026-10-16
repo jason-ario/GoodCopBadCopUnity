@@ -1009,6 +1009,7 @@ public class Day_02 : DayBase, IDailyTask
     public void ShowMailSortingTutorialLocal()
     {
         TutorialOverlay.Instance?.ShowSortingMailTutorial(null);
+        SortMailTask.Instance?.ShowSortingTutorialCallouts();
     }
 
     // -------------------------------------------------------------------------

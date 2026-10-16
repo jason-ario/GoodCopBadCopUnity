@@ -129,6 +129,7 @@ public class TrashBag : PickableObject, IAmmoProvider
         _junkCount.OnValueChanged -= OnJunkCountChanged;
 
         CompassMarkerRegistry.Unregister(transform);
+        DumpsterDepositTutorial.ReportBagState(this, despawning: true);
     }
 
     // ── Compass pip ───────────────────────────────────────────────────────────
@@ -152,6 +153,7 @@ public class TrashBag : PickableObject, IAmmoProvider
     {
         base.OnHeldStateChanged(isHeld);
         UpdateCompassPip();
+        DumpsterDepositTutorial.ReportBagState(this);
     }
 
     // ── Junk collection ───────────────────────────────────────────────────────
@@ -189,6 +191,7 @@ public class TrashBag : PickableObject, IAmmoProvider
         OnAmmoChanged?.Invoke();
         UpdateBlendShapeSmooth(current);
         UpdateCompassPip();
+        DumpsterDepositTutorial.ReportBagState(this);
 
         if (SFXController.Instance == null) return;
 

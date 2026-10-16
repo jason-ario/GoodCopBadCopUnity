@@ -288,6 +288,8 @@ public partial class LocalizationWindow
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("pseudoExpansion"));
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("maxLengthRatio"));
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("forbiddenCharacters"));
+            EditorGUILayout.PropertyField(_settingsSO.FindProperty("dialogueAssetTypes"), true);
+            EditorGUILayout.PropertyField(_settingsSO.FindProperty("dialogueFieldRules"), true);
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("fieldDenyList"), true);
             if (_settingsSO.ApplyModifiedProperties()) EditorUtility.SetDirty(_settings);
         }
