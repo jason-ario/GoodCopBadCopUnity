@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: You're new here, or I'm late. Petre Dolidze. I keep a small parish above the north ridge.
+    npcLine: You're new, or I'm late. Petre Dolidze. Small parish above the north ridge.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,42 +23,42 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I write, when there's nothing else to do. The poems go nowhere. I consider that a feature.
+    npcLine: I write poems. They go nowhere. I consider that a feature.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: Have you published them?
-      npcResponse: Two volumes. One printed, one in a manuscript I lent out and never got back.
+    - playerChoiceText: What do you write about?
+      npcResponse: God. Mountains. The dog. Order depends on the week.
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+    - playerChoiceText: Published anything?
+      npcResponse: Two volumes. One printed, one lent out and never returned.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: What do you write about?
-      npcResponse: God. Mountains. The dog. In varying order depending on the week.
+  - type: 1
+    npcLine: A grey dog walks the ridge with me. My wife found it too quiet.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: And you?
+      npcResponse: The quiet doesn't bother me. I think that was the problem.
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+    - playerChoiceText: Why come down tonight?
+      npcResponse: I needed something with more than two walls.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
-    npcLine: I have a dog, large grey thing, walks the ridge with me. I had a wife once, she found the mountain too quiet.
-    animationTrigger: TalkIdle
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
-  - type: 1
-    npcLine: The quiet doesn't bother me, I think that was the problem. My papers. The dog doesn't have documents, but I vouch for him.
+    npcLine: Papers. The dog has none, but I vouch for him.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
-    choices:
-    - playerChoiceText: How long have you been at the parish?
-      npcResponse: Twelve years, came up after the seminary. Thought it'd be temporary. It suits me.
-      animationTrigger: TalkIdle
-      playLaughSfx: 0
-    - playerChoiceText: What brought you down tonight?
-      npcResponse: I needed to see something with more than two walls.
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
+    choices: []

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 4183545800816745316}
   - component: {fileID: 8037311442301608738}
   - component: {fileID: 1609891686342957856}
+  - component: {fileID: 6211235918780334617}
   m_Layer: 0
   m_Name: 'EXP:'
   m_TagString: Untagged
@@ -181,6 +182,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 8037311442301608738}
   m_maskType: 0
+--- !u!114 &6211235918780334617
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 43934861526062458}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.folder.id_card_slot.id_card_slot.exp.text
+  applyLanguageFont: 1
 --- !u!1 &65419180591297502
 GameObject:
   m_ObjectHideFlags: 0
@@ -718,6 +733,7 @@ GameObject:
   - component: {fileID: 8048588452725328000}
   - component: {fileID: 132318778766538494}
   - component: {fileID: 1194880931721924218}
+  - component: {fileID: 4095474834343688894}
   m_Layer: 0
   m_Name: Resident Text
   m_TagString: Untagged
@@ -888,6 +904,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 132318778766538494}
   m_maskType: 0
+--- !u!114 &4095474834343688894
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2484556637275962651}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.folder.id_card_slot.id_card_slot.resident_text.text
+  applyLanguageFont: 1
 --- !u!1 &2616085090421516299
 GameObject:
   m_ObjectHideFlags: 0
@@ -899,6 +929,7 @@ GameObject:
   - component: {fileID: 3371656330010185700}
   - component: {fileID: 3167043974064732595}
   - component: {fileID: 911872170193349623}
+  - component: {fileID: 7207916961300243951}
   m_Layer: 0
   m_Name: 'NAME: '
   m_TagString: Untagged
@@ -1069,6 +1100,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 3167043974064732595}
   m_maskType: 0
+--- !u!114 &7207916961300243951
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2616085090421516299}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.folder.id_card_slot.id_card_slot.name.text
+  applyLanguageFont: 1
 --- !u!1 &2878295405558994315
 GameObject:
   m_ObjectHideFlags: 0
@@ -1169,7 +1214,12 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 0dc9aab6c6a92b44dac434ca9f8e5fa1, type: 2}
   - {fileID: 11400000, guid: 5997900d329d4714f9e515c652beb03d, type: 2}
   interactText: 
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   itemData: {fileID: 11400000, guid: 9fd4d0762b506834bb5e1ee1a8cfa5b9, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
@@ -1612,7 +1662,6 @@ MonoBehaviour:
   _focusPoint: {fileID: 0}
   _faceDocumentSurface: 0
   _documentSurface: {fileID: 0}
-  _fieldOfView: 40
   _zoomDistance: 0
   _autoFitPadding: 0.8
   _minDistance: 0.08
@@ -1701,6 +1750,7 @@ GameObject:
   - component: {fileID: 1527676145117943573}
   - component: {fileID: 3366753895646477281}
   - component: {fileID: 161063872416216720}
+  - component: {fileID: 3908830577533916530}
   m_Layer: 0
   m_Name: 'DoB:'
   m_TagString: Untagged
@@ -1871,6 +1921,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 3366753895646477281}
   m_maskType: 0
+--- !u!114 &3908830577533916530
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2996520566001173216}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.folder.id_card_slot.id_card_slot.dob.text
+  applyLanguageFont: 1
 --- !u!1 &3946566431140309067
 GameObject:
   m_ObjectHideFlags: 0
@@ -2219,6 +2283,7 @@ GameObject:
   - component: {fileID: 2486630632315104004}
   - component: {fileID: 7747672263158751915}
   - component: {fileID: 7620347473893525648}
+  - component: {fileID: 7706271911165496246}
   m_Layer: 0
   m_Name: EXP DATE
   m_TagString: Untagged
@@ -2389,6 +2454,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 7747672263158751915}
   m_maskType: 0
+--- !u!114 &7706271911165496246
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5774664232684723111}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.folder.id_card_slot.id_card_slot.exp_date.text
+  applyLanguageFont: 1
 --- !u!1 &6056644114646925220
 GameObject:
   m_ObjectHideFlags: 0
@@ -2907,6 +2986,7 @@ GameObject:
   - component: {fileID: 4716004786719441685}
   - component: {fileID: 7560573335300693410}
   - component: {fileID: 6426268426554523085}
+  - component: {fileID: 1482998720326294298}
   m_Layer: 0
   m_Name: 'ID:'
   m_TagString: Untagged
@@ -3077,6 +3157,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 7560573335300693410}
   m_maskType: 0
+--- !u!114 &1482998720326294298
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8339988423181393517}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.folder.id_card_slot.id_card_slot.id.text
+  applyLanguageFont: 1
 --- !u!1 &8589383262069472176
 GameObject:
   m_ObjectHideFlags: 0
@@ -3119,6 +3213,7 @@ GameObject:
   - component: {fileID: 862421233897921260}
   - component: {fileID: 6595558514157329382}
   - component: {fileID: 3429962427572447618}
+  - component: {fileID: 8977698886448871507}
   m_Layer: 0
   m_Name: NAME
   m_TagString: Untagged
@@ -3289,6 +3384,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 6595558514157329382}
   m_maskType: 0
+--- !u!114 &8977698886448871507
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8622747568311680862}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.folder.id_card_slot.id_card_slot.name.text_2
+  applyLanguageFont: 1
 --- !u!1001 &2485073871509020611
 PrefabInstance:
   m_ObjectHideFlags: 0

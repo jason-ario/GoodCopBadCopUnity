@@ -209,6 +209,7 @@ GameObject:
   - component: {fileID: 7844279864982690976}
   - component: {fileID: 8046987696370401602}
   - component: {fileID: 7701366942208743780}
+  - component: {fileID: 548736281247660585}
   m_Layer: 0
   m_Name: CountText
   m_TagString: Untagged
@@ -349,6 +350,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
+--- !u!114 &548736281247660585
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4567715424207667544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.ink_stamp_holder.inklabel.gameobject.counttext.text
+  applyLanguageFont: 1
 --- !u!1 &4873290553520944017
 GameObject:
   m_ObjectHideFlags: 0
@@ -439,6 +456,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIWobble
   wobbleProfile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
+  intensity: 1
 --- !u!1 &6783901016168257650
 GameObject:
   m_ObjectHideFlags: 0
@@ -815,7 +833,12 @@ MonoBehaviour:
   itemsThatCanInteractWith:
   - {fileID: 11400000, guid: e19983b2a1e6cb64f9bfb953477a7400, type: 2}
   interactText: Pick Up
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   stampPlaceObjectSlot: {fileID: 1872363431260997365}
   StampType: 0
   inkStampPickup: {fileID: 5294991687734963815, guid: fb0f5e3ad9613f844b9e8892855c90fc, type: 3}

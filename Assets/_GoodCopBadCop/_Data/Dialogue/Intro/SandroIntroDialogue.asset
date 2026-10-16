@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Sorry, I was watching the light on the roof opposite. Sandro Kakhidze, mechanic on the south row.
+    npcLine: Sorry, I was watching the light on the roof. Sandro Kakhidze, mechanic.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,42 +23,42 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: The work's changed. People bring things they can't afford to replace, asking me to keep them running. I don't always have parts.
+    npcLine: People bring Ladas they can't replace and ask me to keep them running.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: Does that frustrate you?
-      npcResponse: Sometimes. There's something hopeful about fixing a thing that shouldn't work anymore.
+    - playerChoiceText: Do you have parts?
+      npcResponse: Rarely. There's something hopeful in fixing what shouldn't work anymore.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
     - playerChoiceText: Busy workshop?
-      npcResponse: It comes and goes. People either bring everything in or stop coming entirely.
+      npcResponse: People bring everything in, or stop coming entirely.
       animationTrigger: TalkIdle
       playLaughSfx: 0
+  - type: 1
+    npcLine: I left a [[whisper:book on a bench]] this morning.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Who's waiting at home?
+      npcResponse: Irakli. He works nights. We mostly meet on the stairs.
+      animationTrigger: TalkSmile
+      playLaughSfx: 0
+    - playerChoiceText: That's a strange habit.
+      npcResponse: Irakli says I make everything a poem. He's not wrong.
+      animationTrigger: TalkSmile
+      playLaughSfx: 0
   - type: 0
-    npcLine: I live with my partner, Irakli, six years now. He works nights so we don't overlap much. I left a [[whisper:book on a bench]] this morning.
+    npcLine: Same papers, different faces. Or the other way around.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices: []
-  - type: 1
-    npcLine: Same papers, different faces, or the other way around. My papers, October expiry. Thank you.
-    animationTrigger: TalkIdle
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices:
-    - playerChoiceText: I know what you mean.
-      npcResponse: You see it in this booth. There's a poem in it somewhere.
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
-    - playerChoiceText: That's a poetic way to put it.
-      npcResponse: My partner says I make everything a poem. He's not wrong.
-      animationTrigger: TalkSmile
-      playLaughSfx: 0

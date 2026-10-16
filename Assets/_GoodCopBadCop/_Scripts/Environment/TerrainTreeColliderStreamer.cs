@@ -42,6 +42,12 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
     [Tooltip("Proxies pre-created per tree prototype at startup, to avoid AddComponent hitches in play.")]
     [SerializeField] private int prewarmPerPrototype = 16;
 
+    [Tooltip("Max proxy colliders enabled per frame. Spreads a refresh over several frames to avoid spikes.")]
+    [SerializeField] private int maxAcquiresPerFrame = 6;
+
+    [Tooltip("Max proxy colliders disabled per frame.")]
+    [SerializeField] private int maxReleasesPerFrame = 12;
+
     private struct TreeEntry
     {
         public Vector3 position;
@@ -78,6 +84,11 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
 
     private readonly Dictionary<int, Transform> _activeProxies = new Dictionary<int, Transform>();
     private readonly List<int> _toRelease = new List<int>();
+    private readonly List<int> _pending = new List<int>();
+    private int _releaseCursor;
+    private int _pendingCursor;
+    private Vector3 _sortFocus;
+    private System.Comparison<int> _compareByDistance;
     private Vector3 _lastFocusPosition;
     private bool _hasLastFocus;
     private float _timer;
@@ -87,6 +98,7 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
     private void Awake()
     {
         _terrain = GetComponent<Terrain>();
+        _compareByDistance = CompareByDistanceToFocus;
 
         var containerGo = new GameObject("Tree Collider Proxies");
         _container = containerGo.transform;
@@ -281,6 +293,9 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
 
     private void Update()
     {
+        // Drain queued work every frame, within a small budget, so no single frame pays for a whole refresh.
+        ProcessQueues();
+
         _timer -= Time.deltaTime;
         if (_timer > 0f) return;
         _timer = updateInterval;
@@ -299,6 +314,31 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
         Refresh(focusPosition);
     }
 
+    private void ProcessQueues()
+    {
+        int releases = 0;
+        while (_releaseCursor < _toRelease.Count && releases < maxReleasesPerFrame)
+        {
+            Release(_toRelease[_releaseCursor++]);
+            releases++;
+        }
+
+        int acquires = 0;
+        while (_pendingCursor < _pending.Count && acquires < maxAcquiresPerFrame)
+        {
+            int treeIndex = _pending[_pendingCursor++];
+            if (_activeProxies.ContainsKey(treeIndex)) continue;
+            Acquire(treeIndex);
+            acquires++;
+        }
+    }
+
+    private int CompareByDistanceToFocus(int a, int b)
+    {
+        return HorizontalSqrDistance(_trees[a].position, _sortFocus)
+            .CompareTo(HorizontalSqrDistance(_trees[b].position, _sortFocus));
+    }
+
     private static Transform GetMainCameraTransform()
     {
         Camera mainCamera = Camera.main;
@@ -311,16 +351,16 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
         float activateSqr = activationRadius * activationRadius;
         float releaseSqr = releaseRadius * releaseRadius;
 
-        // Release: only the currently active set needs checking.
+        // Release: only the currently active set needs checking. Queued, drained per frame.
         _toRelease.Clear();
+        _releaseCursor = 0;
         foreach (KeyValuePair<int, Transform> pair in _activeProxies)
         {
             if (HorizontalSqrDistance(_trees[pair.Key].position, focus) > releaseSqr) _toRelease.Add(pair.Key);
         }
-        for (int i = 0; i < _toRelease.Count; i++)
-        {
-            Release(_toRelease[i]);
-        }
+
+        _pending.Clear();
+        _pendingCursor = 0;
 
         // Acquire: scan only grid cells overlapping the activation radius.
         int minX = CellCoord(focus.x - activationRadius - _terrainOrigin.x, _gridWidth);
@@ -341,10 +381,17 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
                     if (HorizontalSqrDistance(_trees[treeIndex].position, focus) <= activateSqr
                         && !_activeProxies.ContainsKey(treeIndex))
                     {
-                        Acquire(treeIndex);
+                        _pending.Add(treeIndex);
                     }
                 }
             }
+        }
+
+        // Nearest trees first so colliders closest to the player appear before distant ones.
+        if (_pending.Count > 1)
+        {
+            _sortFocus = focus;
+            _pending.Sort(_compareByDistance);
         }
     }
 
@@ -382,12 +429,16 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
 
     private void ReleaseAll()
     {
+        _pending.Clear();
+        _pendingCursor = 0;
         _toRelease.Clear();
+        _releaseCursor = 0;
         _toRelease.AddRange(_activeProxies.Keys);
         for (int i = 0; i < _toRelease.Count; i++)
         {
             Release(_toRelease[i]);
         }
+        _toRelease.Clear();
     }
 
     private Transform CreateProxy(PrototypeTemplate template)

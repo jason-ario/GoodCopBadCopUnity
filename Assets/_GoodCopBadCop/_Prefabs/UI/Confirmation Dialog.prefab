@@ -160,6 +160,8 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+  m_MaxWidth: -1
+  m_MaxHeight: -1
 --- !u!1 &8039629437968646414
 GameObject:
   m_ObjectHideFlags: 0
@@ -212,8 +214,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConfirmationDialogController
   titleText: {fileID: 5759250628922333207}
   bodyText: {fileID: 2767331817904319909}
-  confirmButtonText: {fileID: 722258609873451673}
-  cancelButtonText: {fileID: 2323502596552374214}
+  confirmButtonText: {fileID: 0}
+  cancelButtonText: {fileID: 0}
   confirmButton: {fileID: 2221549701906557238}
   cancelButton: {fileID: 3814479078586131561}
 --- !u!1 &8819936275303101750
@@ -293,6 +295,7 @@ GameObject:
   - component: {fileID: 8540766955586198916}
   - component: {fileID: 5759250628922333207}
   - component: {fileID: 2605699936287229813}
+  - component: {fileID: 7092784225969109647}
   m_Layer: 5
   m_Name: Title
   m_TagString: Untagged
@@ -397,7 +400,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -439,6 +442,22 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+  m_MaxWidth: -1
+  m_MaxHeight: -1
+--- !u!114 &7092784225969109647
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8975531887740919815}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.confirmation_dialog.confirmation_dialog.content.title.text
+  applyLanguageFont: 1
 --- !u!1 &9030660264399747828
 GameObject:
   m_ObjectHideFlags: 0
@@ -555,7 +574,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -597,6 +616,8 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+  m_MaxWidth: -1
+  m_MaxHeight: -1
 --- !u!1001 &500481660557874470
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -713,17 +734,6 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1227788858049621706}
   m_SourcePrefab: {fileID: 100100000, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
---- !u!114 &722258609873451673 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 934473876679634879, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
-  m_PrefabInstance: {fileID: 500481660557874470}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7188971799313619462}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
 --- !u!114 &2221549701906557238 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1740244075306925072, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
@@ -760,6 +770,8 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+  m_MaxWidth: -1
+  m_MaxHeight: -1
 --- !u!224 &9113698044547256599 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 8685277088926598193, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
@@ -881,17 +893,6 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1322014472769438597}
   m_SourcePrefab: {fileID: 100100000, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
---- !u!114 &2323502596552374214 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 934473876679634879, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
-  m_PrefabInstance: {fileID: 3227205471893756025}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5332012297410402137}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
 --- !u!114 &3814479078586131561 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1740244075306925072, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}
@@ -928,6 +929,8 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+  m_MaxWidth: -1
+  m_MaxHeight: -1
 --- !u!224 &6071163707858328648 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 8685277088926598193, guid: 386e319fcb2a1b648b170f88e5a322f9, type: 3}

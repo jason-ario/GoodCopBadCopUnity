@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: You look like someone who reads the last page first. Ia Lomidze, librarian at the archive on the hill. Twenty years now.
+    npcLine: You read the last page first. Ia Lomidze, archive librarian.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,31 +23,23 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: 'People bring me their questions: what will happen, what comes next. As if the answer''s filed in my stacks.'
+    npcLine: Fewer readers every day. They all ask what happens next.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: Is it?
-      npcResponse: Everything is, eventually. The difficulty is finding which shelf.
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
-    - playerChoiceText: What do you tell them?
-      npcResponse: That endings are written long before anyone reads them. They never find that comforting.
+    - playerChoiceText: Do you tell them?
+      npcResponse: Endings are written long before anyone reads them. I tell them that.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-  - type: 0
-    npcLine: The library's still open. I open it every morning. Fewer people every day, but I live alone. Books are better company.
-    animationTrigger: TalkLookDown
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
+    - playerChoiceText: Is the archive open?
+      npcResponse: Every morning. The smog gets in the pages. I open it anyway.
+      animationTrigger: TalkLookDown
+      playLaughSfx: 0
   - type: 1
-    npcLine: I've already read past this part of the story. I don't say that to unsettle you. My papers are here, [[December expiry]].
+    npcLine: I've already read past this part. I don't say that to frighten you.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -58,7 +50,15 @@ MonoBehaviour:
       npcResponse: To you? I wouldn't say. Some things are better as a surprise.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: That's an unusual thing to say at a checkpoint.
-      npcResponse: Everything unusual feels ordinary when the plot requires it.
+    - playerChoiceText: Odd thing to say here.
+      npcResponse: Everything odd feels ordinary when the plot requires it.
       animationTrigger: TalkIdle
       playLaughSfx: 0
+  - type: 0
+    npcLine: Go on. Stamp it. You already have.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

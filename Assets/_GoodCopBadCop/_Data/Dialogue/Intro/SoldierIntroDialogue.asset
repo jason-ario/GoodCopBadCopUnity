@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: End of rotation. Papers. Standard transit through the checkpoint. I cross here twice daily.
+    npcLine: End of rotation. Papers. I cross here twice daily.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,7 +23,7 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: Extended patrol perimeter since the [[whisper:eastern incident]]. You should have the clearance on file.
+    npcLine: Extended perimeter since the [[whisper:eastern incident]]. Clearance should be on file.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -31,34 +31,34 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: What eastern incident?
-      npcResponse: Above your clearance level. Check with your commanding officer. Keep moving.
+      npcResponse: Above your clearance. Ask your commanding officer.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Can I get your name for the record?
+    - playerChoiceText: Your name, for the record?
       npcResponse: No. You get the badge number. Same thing.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-  - type: 0
-    npcLine: Fifteen men in my unit. We rotate through civilian sectors on a twelve-hour cycle. This checkpoint runs slower than the eastern one.
-    animationTrigger: TalkIdle
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
   - type: 1
-    npcLine: There's a difference between thorough and slow. You'll learn it. Papers. Badge number's on the back of the card.
+    npcLine: This checkpoint runs slower than the eastern one.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: I follow the procedure as designed.
-      npcResponse: Then the procedure is inefficient. Write that down.
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
     - playerChoiceText: We're thorough here.
-      npcResponse: I noticed. You'll get faster. Or you won't.
+      npcResponse: Thorough and slow aren't the same. You'll learn. Or you won't.
       animationTrigger: TalkIdle
       playLaughSfx: 0
+    - playerChoiceText: Slower how?
+      npcResponse: Fifteen men, twelve-hour cycle. You're costing us minutes. Write that down.
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+  - type: 0
+    npcLine: Badge number's on the back. Keep moving.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

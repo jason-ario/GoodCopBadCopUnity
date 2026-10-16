@@ -126,7 +126,8 @@ public class Subtitles : MonoBehaviour
     /// </summary>
     public void SetText(string text, string name = null, Color nameColor = default)
     {
-        originalText = text;
+        // Localize the incoming source string before keyword markup, wrapping and color are applied.
+        originalText = Loc.TranslateSource(text);
         lastDisplayColor = nameColor;
 
         UpdateVisuals();

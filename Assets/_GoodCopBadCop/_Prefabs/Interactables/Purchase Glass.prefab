@@ -124,6 +124,7 @@ GameObject:
   - component: {fileID: 710106845925086273}
   - component: {fileID: 8559815554330540645}
   - component: {fileID: 5605318927172714553}
+  - component: {fileID: 4099037046034876518}
   m_Layer: 0
   m_Name: Text (TMP)
   m_TagString: Untagged
@@ -273,7 +274,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -298,6 +299,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 8559815554330540645}
   m_maskType: 0
+--- !u!114 &4099037046034876518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927928924656491757}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.purchase_glass.purchase_glass.text_tmp.text
+  applyLanguageFont: 1
 --- !u!1 &1195900565394349662
 GameObject:
   m_ObjectHideFlags: 0
@@ -720,10 +735,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 3580772303
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -746,9 +763,15 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: 
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
   _itemZoomCamera: {fileID: 2578124949448592115}
   _drawerToLock: {fileID: 0}
+  _popupTitle: 
   _onPurchaseConfirmed:
     m_PersistentCalls:
       m_Calls:
@@ -764,6 +787,8 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+  _startAvailable: 1
+  _persistentUnlockId: 
 --- !u!114 &128189181657322329
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -782,6 +807,7 @@ MonoBehaviour:
   rotationOffset: {x: 0, y: 0, z: 0}
   customPurchaseAction: {fileID: 0}
   _unlockedByDefault: 1
+  _requiredAnomalyTypeName: 
 --- !u!1001 &289217463904805025
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Here, my documents, I had them ready. Jana Sokolova. Residential block, end of the second row. Four years now.
+    npcLine: My documents, I had them ready. Jana Sokolova, second residential row.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,42 +23,42 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: The dress... I see you noticed. It's for a ceremony later. The timing's been complicated.
+    npcLine: You noticed the dress. It's for a ceremony later.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: What kind of ceremony?
-      npcResponse: A wedding. The date's moved several times. [[whisper:I don't remember]] when it started.
+    - playerChoiceText: What ceremony?
+      npcResponse: A wedding. The date keeps moving. [[whisper:I don't remember]] when it started.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: How long have you been wearing it?
-      npcResponse: It holds its shape well. Mended in a few places by the seamstress on my floor, who's very kind.
+    - playerChoiceText: How long have you worn it?
+      npcResponse: It holds its shape. The seamstress on my floor mends it.
+      animationTrigger: TalkIdle
+      playLaughSfx: 0
+  - type: 1
+    npcLine: I sell flowers on the residential row. Funerals, mostly, lately.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Who's buying flowers now?
+      npcResponse: Widows. They pay in ration coupons. I take them.
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+    - playerChoiceText: Who waits at home?
+      npcResponse: He does. He gets home later now. I wait. I'm good at that.
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 0
-    npcLine: I work the flower stall on the residential row, funerals mostly lately. I come through here every day. I know the process.
-    animationTrigger: TalkIdle
+    npcLine: I know this part. It's the parts in between I lose.
+    animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices: []
-  - type: 1
-    npcLine: I have a good memory for procedures. Other things I lose sometimes. My permit's here, June expiry.
-    animationTrigger: TalkIdle
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices:
-    - playerChoiceText: You seem very familiar with the routine.
-      npcResponse: I've been through it many times. The routine's easier than the parts in between.
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
-    - playerChoiceText: Do you have someone waiting at home?
-      npcResponse: Yes, soon. He gets home later now, but I wait. I'm good at that.
-      animationTrigger: TalkIdle
-      playLaughSfx: 0

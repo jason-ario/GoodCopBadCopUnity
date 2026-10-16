@@ -59,6 +59,7 @@ GameObject:
   - component: {fileID: 5591789040790392417}
   - component: {fileID: 1056720020386991718}
   - component: {fileID: 3828699290040401055}
+  - component: {fileID: 7522821657088020255}
   m_Layer: 0
   m_Name: Text (2)
   m_TagString: Untagged
@@ -199,6 +200,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 0
+  animateEmphasis: 1
+  emphasisIntensity: 1
 --- !u!114 &3828699290040401055
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -216,6 +219,21 @@ MonoBehaviour:
   revealOnEnableDelay: 0.5
   revealSounds: []
   minSoundInterval: 0.1
+  lineBreakDelay: 0
+--- !u!114 &7522821657088020255
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2547300425649769783}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.end_of_shift_line.end_of_shift_line.right_side.text_2.text
+  applyLanguageFont: 1
 --- !u!1 &3917978751681960526
 GameObject:
   m_ObjectHideFlags: 0
@@ -434,6 +452,7 @@ GameObject:
   - component: {fileID: 7471806455186334000}
   - component: {fileID: 195383482188116350}
   - component: {fileID: 6800591769319210200}
+  - component: {fileID: 2887197649299890393}
   m_Layer: 0
   m_Name: Text (3)
   m_TagString: Untagged
@@ -574,6 +593,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 0
+  animateEmphasis: 1
+  emphasisIntensity: 1
 --- !u!114 &6800591769319210200
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -591,3 +612,18 @@ MonoBehaviour:
   revealOnEnableDelay: 0.5
   revealSounds: []
   minSoundInterval: 0.1
+  lineBreakDelay: 0
+--- !u!114 &2887197649299890393
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6108349391655942639}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.end_of_shift_line.end_of_shift_line.text_3.text
+  applyLanguageFont: 1

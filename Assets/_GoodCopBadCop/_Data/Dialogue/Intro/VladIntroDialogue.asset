@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: You look nervous, officer. Relax, I'm just a businessman coming home. Vladimir Syrnikov, import and logistics.
+    npcLine: Relax, officer. Just a businessman coming home. Vladimir Syrnikov, import and logistics.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,42 +23,42 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I own property in six districts, including this one. You're standing in one of my doorways.
+    npcLine: I own property in six districts. You're standing in one of my doorways.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: This is a public checkpoint.
-      npcResponse: Everything's someone's property eventually. The city is reorganizing itself. I'm paying attention.
+    - playerChoiceText: This is a State checkpoint.
+      npcResponse: Everything belongs to someone eventually. I'm paying attention.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: I don't recognize your name.
-      npcResponse: You will. Or someone who answers to me will introduce us. Either way, not a concern.
+    - playerChoiceText: Never heard of you.
+      npcResponse: You will. Or someone who answers to me will introduce us.
       animationTrigger: TalkCocky
       playLaughSfx: 0
-  - type: 0
-    npcLine: I work out of the docks, mostly import. The imports aren't relevant to your paperwork. Shame if something {{made your job harder}}.
+  - type: 1
+    npcLine: My imports aren't your paperwork. Shame if something {{made your job harder}}.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
-    choices: []
-  - type: 1
-    npcLine: Here are the papers. Don't smudge the ink, I'm a man who likes things clean. Permit runs to December.
-    animationTrigger: TalkIdle
+    choices:
+    - playerChoiceText: Is that a threat?
+      npcResponse: It's logistics. Don't smudge the ink. I like things clean.
+      animationTrigger: TalkIdle
+      playLaughSfx: 0
+    - playerChoiceText: I treat everyone the same.
+      npcResponse: Of course you do. We'll see what that costs you.
+      animationTrigger: TalkCocky
+      playLaughSfx: 0
+  - type: 0
+    npcLine: Respect the papers, officer. Respect the transaction.
+    animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
-    choices:
-    - playerChoiceText: I'll handle them carefully.
-      npcResponse: Good. A man who respects documents respects the transaction. I appreciate that.
-      animationTrigger: TalkIdle
-      playLaughSfx: 0
-    - playerChoiceText: I treat all documents the same.
-      npcResponse: Of course. That's what you're supposed to say. We'll see what that costs you eventually.
-      animationTrigger: TalkCocky
-      playLaughSfx: 0
+    choices: []

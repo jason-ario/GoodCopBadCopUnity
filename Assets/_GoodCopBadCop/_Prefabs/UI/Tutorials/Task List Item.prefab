@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 1723639188893283101}
   - component: {fileID: 8656817759207610159}
   - component: {fileID: 235729419028003244}
+  - component: {fileID: 2810674726483590652}
   m_Layer: 5
   m_Name: Task List Item
   m_TagString: Untagged
@@ -52,6 +53,33 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialObjectiveItem
   label: {fileID: 8656817759207610159}
+  strikethroughDuration: 0.25
+  strikethroughEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  strikethroughThickness: 2.5
+  strikethroughColor: {r: 0.86, g: 0.86, b: 0.83, a: 1}
   completeSound: {fileID: 8300000, guid: bf570e80e0b50474c9299a797f09f68d, type: 3}
   completeSoundVolume: 1
   progressSound: {fileID: 8300000, guid: 3cc5c80526727c74ca68bf0489e62098, type: 3}
@@ -173,3 +201,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
   m_HorizontalFit: 0
   m_VerticalFit: 2
+--- !u!114 &2810674726483590652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9067406155056625126}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: tasks.task_list_item.task_list_item.text
+  applyLanguageFont: 1

@@ -1796,11 +1796,11 @@ public class ShiftManager : NetworkBehaviour
         // screen only (see GateStartShiftController — each player gets their own targeted
         // open). This RPC fires on every client, so close it here for whichever player(s) still
         // have it open — including a second player who never pressed the button themselves.
-        // CloseStartShiftScreen's ClosedUIPanel() call is immediately superseded a few lines
+        // The close's ClosedUIPanel() call is immediately superseded a few lines
         // below by the explicit SetCanInteract(false)/SetCanMove(false)/CanControl = false, so
         // this never leaves that player able to move — they end up disabled exactly as if they
-        // had pressed Start Shift too.
-        UIController.Instance.CloseStartShiftScreen();
+        // had pressed Start Shift too. The ForShiftStart variant also keeps the HUD hidden.
+        UIController.Instance.CloseStartShiftScreenForShiftStart();
 
         // Put the guidebook away before the camera (and the arms holding the book) is disabled
         // and before the control lock below — the intro never sets PlayerInstance.IsInCutscene,

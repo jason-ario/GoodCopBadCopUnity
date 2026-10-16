@@ -242,6 +242,7 @@ GameObject:
   - component: {fileID: 7292690466038085318}
   - component: {fileID: 5589972404227761647}
   - component: {fileID: 2447311192098729902}
+  - component: {fileID: 6112210842024413490}
   m_Layer: 0
   m_Name: Title
   m_TagString: Untagged
@@ -368,6 +369,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &6112210842024413490
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1129816014734268908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas.layout.title.text
+  applyLanguageFont: 1
 --- !u!1 &1948507044811601301
 GameObject:
   m_ObjectHideFlags: 0
@@ -379,6 +394,7 @@ GameObject:
   - component: {fileID: 5180807393015868998}
   - component: {fileID: 4488268633920874763}
   - component: {fileID: 399170464243429893}
+  - component: {fileID: 6807249590354562644}
   m_Layer: 0
   m_Name: Badge
   m_TagString: Untagged
@@ -505,6 +521,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &6807249590354562644
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1948507044811601301}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas.layout.badge.text
+  applyLanguageFont: 1
 --- !u!1 &2650998664091281351
 GameObject:
   m_ObjectHideFlags: 0
@@ -516,6 +546,7 @@ GameObject:
   - component: {fileID: 21445491243493131}
   - component: {fileID: 8236170095879576705}
   - component: {fileID: 5418192183893527815}
+  - component: {fileID: 5806474828358926744}
   m_Layer: 0
   m_Name: Header
   m_TagString: Untagged
@@ -642,6 +673,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &5806474828358926744
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2650998664091281351}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas_back.layout.header.text
+  applyLanguageFont: 1
 --- !u!1 &3338385453650745219
 GameObject:
   m_ObjectHideFlags: 0
@@ -653,6 +698,7 @@ GameObject:
   - component: {fileID: 2270154626228068440}
   - component: {fileID: 6759668655020359142}
   - component: {fileID: 4859224722685136246}
+  - component: {fileID: 5426281261017069846}
   m_Layer: 0
   m_Name: Body
   m_TagString: Untagged
@@ -784,6 +830,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &5426281261017069846
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3338385453650745219}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas_back.layout.body.text
+  applyLanguageFont: 1
 --- !u!1 &3830513335307011303
 GameObject:
   m_ObjectHideFlags: 0
@@ -917,6 +977,8 @@ MonoBehaviour:
   _notesLineCount: 14
   _notesLineColor: {r: 0.35, g: 0.38, b: 0.5, a: 0.45}
   _panelWidthFraction: 0.85
+  _hudArtWidthFraction: 0.85
+  _hudArtMaxHeight: 230
   _maxParagraphSpread: 90
   _maxBlockSpread: 60
 --- !u!1 &3886604565637911022
@@ -930,6 +992,7 @@ GameObject:
   - component: {fileID: 4979108048526534982}
   - component: {fileID: 639936367095938927}
   - component: {fileID: 3480968873073918377}
+  - component: {fileID: 1578110324361264385}
   m_Layer: 0
   m_Name: Header
   m_TagString: Untagged
@@ -1056,6 +1119,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &1578110324361264385
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3886604565637911022}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas.layout.header.text
+  applyLanguageFont: 1
 --- !u!1 &4037264563774972102
 GameObject:
   m_ObjectHideFlags: 0
@@ -1067,6 +1144,7 @@ GameObject:
   - component: {fileID: 4668511802969082670}
   - component: {fileID: 8954221265377203666}
   - component: {fileID: 3196789471790960648}
+  - component: {fileID: 4754110060675102956}
   m_Layer: 0
   m_Name: New Stamp
   m_TagString: Untagged
@@ -1193,6 +1271,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &4754110060675102956
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4037264563774972102}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas.layout.new_stamp.text
+  applyLanguageFont: 1
 --- !u!1 &4135503203092323192
 GameObject:
   m_ObjectHideFlags: 0
@@ -1280,6 +1372,7 @@ GameObject:
   - component: {fileID: 4694833852984085826}
   - component: {fileID: 636491299251782732}
   - component: {fileID: 1760614851275151859}
+  - component: {fileID: 9682660233969609}
   m_Layer: 0
   m_Name: Badge
   m_TagString: Untagged
@@ -1406,6 +1499,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &9682660233969609
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4583593387344439496}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas_back.layout.badge.text
+  applyLanguageFont: 1
 --- !u!1 &4712033398103012188
 GameObject:
   m_ObjectHideFlags: 0
@@ -1417,6 +1524,7 @@ GameObject:
   - component: {fileID: 955925315282248156}
   - component: {fileID: 1457197411705241243}
   - component: {fileID: 6930839859506330297}
+  - component: {fileID: 3838257982073724314}
   m_Layer: 0
   m_Name: New Stamp
   m_TagString: Untagged
@@ -1543,6 +1651,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &3838257982073724314
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4712033398103012188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas_back.layout.new_stamp.text
+  applyLanguageFont: 1
 --- !u!1 &4769661963533561852
 GameObject:
   m_ObjectHideFlags: 0
@@ -1890,6 +2012,7 @@ GameObject:
   - component: {fileID: 6412407176174271962}
   - component: {fileID: 6105468194854827565}
   - component: {fileID: 3321589912877065945}
+  - component: {fileID: 7055905363609348125}
   m_Layer: 0
   m_Name: Body
   m_TagString: Untagged
@@ -2021,6 +2144,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &7055905363609348125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7814137426233307618}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas.layout.body.text
+  applyLanguageFont: 1
 --- !u!1 &7889168232881206101
 GameObject:
   m_ObjectHideFlags: 0
@@ -2032,6 +2169,7 @@ GameObject:
   - component: {fileID: 3906376371378439604}
   - component: {fileID: 6057723588421250766}
   - component: {fileID: 3210897094170105253}
+  - component: {fileID: 3138013293670767347}
   m_Layer: 0
   m_Name: Title
   m_TagString: Untagged
@@ -2158,6 +2296,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &3138013293670767347
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7889168232881206101}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: guidebook.guidebook_sheet.canvas_back.layout.title.text
+  applyLanguageFont: 1
 --- !u!1 &8344251989450233067
 GameObject:
   m_ObjectHideFlags: 0
@@ -2428,6 +2580,8 @@ MonoBehaviour:
   _notesLineCount: 14
   _notesLineColor: {r: 0.35, g: 0.38, b: 0.5, a: 0.45}
   _panelWidthFraction: 0.85
+  _hudArtWidthFraction: 0.85
+  _hudArtMaxHeight: 230
   _maxParagraphSpread: 90
   _maxBlockSpread: 60
 --- !u!1 &8846292215598705262

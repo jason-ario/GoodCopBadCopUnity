@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 3224122093192833081}
   - component: {fileID: 517712346181369786}
   - component: {fileID: 8241992215499815986}
+  - component: {fileID: 6689177681244183636}
   m_Layer: 0
   m_Name: HUD Task Row
   m_TagString: Untagged
@@ -59,6 +60,8 @@ MonoBehaviour:
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+  m_MaxWidth: -1
+  m_MaxHeight: -1
 --- !u!222 &3224122093192833081
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -174,3 +177,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
+--- !u!114 &6689177681244183636
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1473312806894668451}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: tasks.hud_task_row.hud_task_row.text
+  applyLanguageFont: 1

@@ -3467,14 +3467,29 @@ public class Day_01 : DayBase
         }
 
         _hammer.SetInteractableNetworked(true);
+
+        // Co-op race: each peer runs this on its own local timer (breach-cleared barks + the
+        // 0.5s fence-count wait), but the hammer unlocks for everyone the moment the FIRST peer
+        // gets here. A teammate can therefore already be holding it by the time a slower peer
+        // arrives. OnPickedUpNetworked only fires on the not-held -> held transition, so
+        // subscribing now would never fire and the arrow/highlight would stay attached to the
+        // hammer in the other player's hand forever. Treat "already held by anyone" exactly
+        // like the pickup itself: skip the call-out and go straight to the fence tutorial.
+        if (_hammer.IsHeld)
+        {
+            OnHammerPickedUpFirstTime();
+            return;
+        }
+
         _hammer.SetForceHighlight(true);
         TutorialMarkerManager.Instance?.Mark(_hammer.transform);
 
         // Use the networked pickup signal (fires on every client, including the server,
         // driven by the authoritative _holdingClientId NetworkVariable) rather than the
-        // local-only OnPickedUpEvent — otherwise the highlight/arrow would only clear on
-        // whichever client physically grabbed the hammer, leaving it force-highlighted
-        // forever on every teammate's screen.
+        // local-only OnPickedUpEvent — so ANY player picking it up clears the highlight/arrow
+        // and triggers the fence tutorial on every peer, as if the local player grabbed it.
+        // Unsubscribe first so a repeated call can never double-subscribe.
+        _hammer.OnPickedUpNetworked -= OnHammerPickedUpFirstTime;
         _hammer.OnPickedUpNetworked += OnHammerPickedUpFirstTime;
     }
 

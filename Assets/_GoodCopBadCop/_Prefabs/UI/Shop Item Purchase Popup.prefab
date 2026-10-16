@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 9179467370849905225}
   - component: {fileID: 942050624850193586}
   - component: {fileID: 8475788911497550225}
+  - component: {fileID: 2486029573735946331}
   m_Layer: 0
   m_Name: Title Text (1)
   m_TagString: Untagged
@@ -116,7 +117,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -152,6 +153,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
+--- !u!114 &2486029573735946331
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2224541906700191213}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.shop_item_purchase_popup.shop_item_purchase_popup.title_text_1.text
+  applyLanguageFont: 1
 --- !u!1 &3221728026959540385
 GameObject:
   m_ObjectHideFlags: 0
@@ -299,6 +316,7 @@ GameObject:
   - component: {fileID: 9014171003485446642}
   - component: {fileID: 3485766298699833915}
   - component: {fileID: 3715551689886381303}
+  - component: {fileID: 482240927580800375}
   m_Layer: 0
   m_Name: Price Text (1)
   m_TagString: Untagged
@@ -403,7 +421,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -425,6 +443,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &482240927580800375
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6531695603242007428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.shop_item_purchase_popup.shop_item_purchase_popup.price_text_1.text
+  applyLanguageFont: 1
 --- !u!1 &7446671939978932092
 GameObject:
   m_ObjectHideFlags: 0
@@ -577,6 +609,8 @@ MonoBehaviour:
   _buttons:
   - {fileID: 1473927304963173975}
   - {fileID: 2883446051330456536}
+  _includeChildSelectables: 1
+  _stickDeadzone: 0.5
 --- !u!1 &8911166543814806208
 GameObject:
   m_ObjectHideFlags: 0
@@ -693,7 +727,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1

@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Papers. Here. Guram Kopaliani. Parking lot on Rustaveli, twenty-two years there.
+    npcLine: Papers. Here. Guram Kopaliani. Parking lot on Rustaveli, twenty-two years.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,42 +23,42 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: New face at the booth. The last officer was faster. Doesn't matter.
+    npcLine: New face. The last officer was faster. Doesn't matter.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: How long have you been coming through here?
-      npcResponse: Three months. Since the first checkpoint went up.
+    - playerChoiceText: How long coming through?
+      npcResponse: Three months. Since the first barrier went up.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Must be a long shift.
-      npcResponse: All my shifts are long. I don't mind long. I mind standing still.
+    - playerChoiceText: Still cars to park?
+      npcResponse: Two Volgas and a Party car. The rest stopped coming. I still log them.
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-  - type: 0
-    npcLine: 'The lot runs itself: arrivals, departures, log it, close up, go home. My wife died four years ago. I still look at it when I pass.'
-    animationTrigger: TalkLookAway
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
   - type: 1
-    npcLine: I'll keep coming through until there's no more lot to come back from. Permit's current, [[March expiry]].
+    npcLine: I'll keep coming until there's no lot to come back to.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: Are you worried about the lot closing?
-      npcResponse: It will close. Everything closes. I'll find something else to stand in front of.
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
-    - playerChoiceText: Do you have anyone waiting at home?
-      npcResponse: Nobody. Got used to it. House is quieter than the lot, which is saying something.
+    - playerChoiceText: Anyone waiting at home?
+      npcResponse: Nobody. Wife died four years ago. House is quieter than the lot.
       animationTrigger: TalkLookDown
       playLaughSfx: 0
+    - playerChoiceText: What if it closes?
+      npcResponse: Everything closes. I'll find something else to stand in front of.
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+  - type: 0
+    npcLine: Stamp it. I mind standing still.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: What a beautiful morning! Papers, right here. Ivan Tarkov, factory worker, east side. Very productive place.
+    npcLine: What a beautiful morning! Ivan Tarkov, factory worker, east side.
     animationTrigger: TalkSmile
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,42 +23,42 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I like meeting new faces here. I keep a list of every officer I meet.
+    npcLine: I keep a list of every officer I meet. You're number nine!
     animationTrigger: TalkSmile
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: That's an unusual hobby.
-      npcResponse: I have many hobbies! Collecting, counting, arranging things very neatly. You have lovely cheekbones.
+    - playerChoiceText: What kind of list?
+      npcResponse: Names, faces, shifts. Very thorough.
+      animationTrigger: TalkIdle
+      playLaughSfx: 0
+    - playerChoiceText: That's an odd hobby.
+      npcResponse: I have many! Collecting, counting, arranging. You have lovely cheekbones.
       animationTrigger: TalkSmile
       playLaughSfx: 0
-    - playerChoiceText: What kind of list?
-      npcResponse: Names, faces, schedules. Very thorough. My mother said I pay too much attention to detail.
-      animationTrigger: TalkIdle
+  - type: 1
+    npcLine: The alleys by the factory are so quiet since curfew.
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: With that bag?
+      npcResponse: Oh, always the bag! You never know what you'll find.
+      animationTrigger: TalkSmile
+      playLaughSfx: 0
+    - playerChoiceText: Alone, after curfew?
+      npcResponse: I'm never alone! I'm very good company.
+      animationTrigger: TalkSmile
       playLaughSfx: 0
   - type: 0
-    npcLine: I live alone. More room for my hobbies. I always smile. The alleyways near the factory are peaceful lately.
+    npcLine: Papers! All in order. I'll see you soon.
     animationTrigger: TalkSmile
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices: []
-  - type: 1
-    npcLine: I go walking there in the evenings, sometimes with a bag. Papers, everything's in order.
-    animationTrigger: TalkSmile
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices:
-    - playerChoiceText: I wouldn't walk there alone.
-      npcResponse: Oh, I never feel alone! I'm very good company. Very aware of my surroundings.
-      animationTrigger: TalkSmile
-      playLaughSfx: 0
-    - playerChoiceText: What do you walk for?
-      npcResponse: Fresh air! Reflection! Sometimes just to hear what the quiet sounds like.
-      animationTrigger: TalkIdle
-      playLaughSfx: 0

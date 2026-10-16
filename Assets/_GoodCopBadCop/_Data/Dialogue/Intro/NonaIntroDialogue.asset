@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Good evening! You're new. Nona Beridze, [[census recorder]], district eleven. Eleven wonderful years in the State's service.
+    npcLine: Good evening! You're new. Nona Beridze, [[census recorder]], district eleven.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,7 +23,7 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: My job is knowing who lives where. Since the blast, the State needs to know who's left. Isn't it exciting?
+    npcLine: Since the blast, the State needs to know who's left. Isn't it exciting?
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -31,23 +31,15 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: Exciting?
-      npcResponse: Of course! Everything's finally in motion. Curfews, checkpoints, [[whisper:the empty flats]]. It's all part of the plan.
+      npcResponse: Of course! Curfews, checkpoints, empty flats. Everything's finally in motion.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Do you know what caused the blast?
-      npcResponse: The State knows. Isn't that enough? Wanting more is how it starts with people.
+    - playerChoiceText: What caused the blast?
+      npcResponse: The State knows. Isn't that enough? Wanting more is how it starts.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-  - type: 0
-    npcLine: I live alone. Shared spaces breed doubt. Thirty-one times through this checkpoint, and every time it's stricter. I love that. It means they're paying attention.
-    animationTrigger: TalkLookAway
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
   - type: 1
-    npcLine: That uniform! You wear the State's uniform, officer! ...Forgive me. I noted your face the moment you sat down. It makes you sacred.
+    npcLine: That uniform! You wear the State's uniform! ...Forgive me. It makes you sacred.
     animationTrigger: BangOnShutters
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -55,10 +47,18 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: Sacred?
-      npcResponse: You carry out its will! As long as you do, I'll pray for you. If you don't, {{I'll report you}}. Gladly.
+      npcResponse: You carry out its will. If you don't, {{I'll report you}}. Gladly.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
     - playerChoiceText: That's a little unusual.
-      npcResponse: So I've been told! Usually by people whose names I've since passed along.
+      npcResponse: So I'm told. Usually by people whose names I've since passed along.
       animationTrigger: TalkIdle
       playLaughSfx: 0
+  - type: 0
+    npcLine: Thirty-one crossings, stricter every time. I love that. They're paying attention.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

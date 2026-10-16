@@ -144,6 +144,7 @@ GameObject:
   - component: {fileID: 8709417343377753644}
   - component: {fileID: 7892235330090800231}
   - component: {fileID: 5550877073657764834}
+  - component: {fileID: 8480049029806805420}
   m_Layer: 0
   m_Name: Title Text (1)
   m_TagString: Untagged
@@ -248,7 +249,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -284,6 +285,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
   profile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
   playOnEnable: 1
+  animateEmphasis: 1
+  emphasisIntensity: 1
+--- !u!114 &8480049029806805420
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3911894440492242789}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.end_day_popup.end_day_popup.title_text_1.text
+  applyLanguageFont: 1
 --- !u!1 &4338992088214729501
 GameObject:
   m_ObjectHideFlags: 0
@@ -295,6 +312,7 @@ GameObject:
   - component: {fileID: 4408568946953132629}
   - component: {fileID: 528502155692952069}
   - component: {fileID: 6623629663856153103}
+  - component: {fileID: 7727394361265460684}
   m_Layer: 0
   m_Name: Price Text (1)
   m_TagString: Untagged
@@ -399,7 +417,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -421,6 +439,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &7727394361265460684
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4338992088214729501}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.end_day_popup.end_day_popup.price_text_1.text
+  applyLanguageFont: 1
 --- !u!1 &6805963296764039462
 GameObject:
   m_ObjectHideFlags: 0

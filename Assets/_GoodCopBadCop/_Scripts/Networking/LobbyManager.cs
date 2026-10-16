@@ -27,6 +27,10 @@ public class LobbyManager : MonoBehaviour
 
     private FacepunchTransport facepunchTransport;
     private bool inviteOverlayWasOpenedByUs;
+    // True once Steam confirmed the overlay we requested actually appeared.
+    private bool inviteOverlayActivated;
+    // Bumped on every open/cancel so a stale watchdog can't close a newer invite request.
+    private int inviteRequestId;
     private ulong _rejectedFullLobbyId;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -349,11 +353,18 @@ public class LobbyManager : MonoBehaviour
         Debug.Log($"Steam overlay active: {isActive}");
 
         // Only react if we previously opened the invite overlay ourselves.
-        if (!isActive && inviteOverlayWasOpenedByUs)
+        if (!inviteOverlayWasOpenedByUs)
+            return;
+
+        if (isActive)
         {
-            inviteOverlayWasOpenedByUs = false;
-            CloseInviteFriendsPopUp();
+            inviteOverlayActivated = true;
+            return;
         }
+
+        inviteOverlayWasOpenedByUs = false;
+        inviteOverlayActivated = false;
+        CloseInviteFriendsPopUp();
     }
 
     /// <summary>Visible player cap. The Steam lobby itself gets extra hidden developer slot(s).</summary>
@@ -722,6 +733,10 @@ public class LobbyManager : MonoBehaviour
 
     public async void OpenInviteFriendsPopup()
     {
+        int requestId = ++inviteRequestId;
+        inviteOverlayWasOpenedByUs = false;
+        inviteOverlayActivated = false;
+
         // The Steam overlay only renders when this game is running as a real build
         // launched through the Steam client (it never renders inside the Unity
         // Editor's Game View). If it isn't available, OpenGameInviteOverlay() is a
@@ -744,6 +759,8 @@ public class LobbyManager : MonoBehaviour
             // has a valid lobby to invite friends into.
             Debug.LogWarning("[OpenInviteFriendsPopup] No active Steam lobby — creating one now.");
             bool created = await CreateLobby();
+            if (requestId != inviteRequestId)
+                return; // Cancelled (Escape) or superseded while the lobby was being created.
             if (!created)
             {
                 Debug.LogError("[OpenInviteFriendsPopup] Failed to create a lobby — cannot open invite overlay.");
@@ -759,13 +776,17 @@ public class LobbyManager : MonoBehaviour
         // Safety net: if the overlay never actually reports as opened within a few
         // seconds (overlay hook failed, big-picture mode issue, etc.), auto-close
         // the panel instead of leaving the player stuck on a dark screen forever.
-        _ = WatchdogCloseInviteIfOverlayNeverOpens();
+        _ = WatchdogCloseInviteIfOverlayNeverOpens(requestId);
     }
 
-    private async Task WatchdogCloseInviteIfOverlayNeverOpens()
+    private async Task WatchdogCloseInviteIfOverlayNeverOpens(int requestId)
     {
         await Task.Delay(4000);
-        if (inviteOverlayWasOpenedByUs)
+        if (this == null || requestId != inviteRequestId)
+            return;
+
+        // Overlay opened normally — its close callback will dismiss the panel.
+        if (inviteOverlayWasOpenedByUs && !inviteOverlayActivated)
         {
             Debug.LogWarning("[OpenInviteFriendsPopup] Steam overlay never reported as activated — " +
                 "closing the invite panel to avoid a stuck screen.");
@@ -776,10 +797,12 @@ public class LobbyManager : MonoBehaviour
 
     /// <summary>Call when the invite panel is dismissed by something other than the
     /// Steam overlay's own activation callback (e.g. a manual cancel/escape input),
-    /// so a later overlay callback doesn't act on stale state.</summary>
+    /// so a later overlay callback or watchdog doesn't act on stale state.</summary>
     public void CancelInviteOverlayTracking()
     {
         inviteOverlayWasOpenedByUs = false;
+        inviteOverlayActivated = false;
+        inviteRequestId++;
     }
 
     public void CloseInviteFriendsPopUp()

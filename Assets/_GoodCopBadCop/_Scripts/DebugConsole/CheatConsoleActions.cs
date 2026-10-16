@@ -94,6 +94,21 @@ public static class CheatConsoleActions
         cheats.Add(("Trigger Mutant Breach", () =>
             DebugConsole.Instance.DebugForceMutantBreach()));
 
+        // Localization: LQA testers switch language without a menu. Equivalent of a "language <code>" command.
+        cheats.Add(("Language — Cycle Next (current shown in log)", () =>
+        {
+            var langs = Loc.AvailableLanguages();
+            int next = (langs.IndexOf(Loc.CurrentLanguage) + 1) % langs.Count;
+            Loc.SetLanguage(langs[next]);
+            UnityEngine.Debug.Log("[Loc] Language set to '" + Loc.CurrentLanguage + "'.");
+        }));
+
+        foreach (var code in Loc.AvailableLanguages())
+        {
+            string captured = code;
+            cheats.Add(("Language — " + captured, () => Loc.SetLanguage(captured)));
+        }
+
         return cheats;
     }
 }

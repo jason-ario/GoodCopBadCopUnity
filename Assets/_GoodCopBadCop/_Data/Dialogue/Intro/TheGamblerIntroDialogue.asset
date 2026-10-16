@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Heads or tails? Just habit, I flip something whenever I'm standing still. Papers. Bidzina Chkhonia. Mostly cards.
+    npcLine: Heads or tails? Habit. Bidzina Chkhonia. Cards, mostly.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,31 +23,23 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I've been running numbers on this checkpoint. The variance per pass is bigger than you'd think.
+    npcLine: I've been timing this checkpoint. The variance is bigger than you'd think.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: You time this checkpoint?
-      npcResponse: I time everything. Probability doesn't work without data. It's one of my steadier variables.
+    - playerChoiceText: Why time it?
+      npcResponse: Probability needs data. You're one of my steadier variables.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: Do you play for a living?
-      npcResponse: When the living holds still long enough to let me. Right now nothing holds still.
+    - playerChoiceText: Where do you play?
+      npcResponse: The Metropol, before it closed. Now a basement. Lower stakes.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-  - type: 0
-    npcLine: I used to play at the Metropol most nights. That's closed now. Found a private game in someone's basement, lower stakes.
-    animationTrigger: TalkIdle
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
   - type: 1
-    npcLine: I won't say [[whisper:which eye]]. But I'd bet on it. My permit, August expiry.
+    npcLine: You have a tell, officer. I won't say [[whisper:which eye]]. But I'd bet on it.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -55,10 +47,18 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: I don't have tells.
-      npcResponse: Everybody has tells. I've spent twenty years reading them. It's not an insult, it's data.
+      npcResponse: Everybody has tells. Twenty years reading them. It's data, not an insult.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Does that help at the card table?
-      npcResponse: More than the cards, honestly. Cards are just mathematics. People are where the game lives.
+    - playerChoiceText: Does that help at cards?
+      npcResponse: More than the cards. Cards are mathematics. People are the game.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
+  - type: 0
+    npcLine: Heads. Always heads lately. That worries me.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

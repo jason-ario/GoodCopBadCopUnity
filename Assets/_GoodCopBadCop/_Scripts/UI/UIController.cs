@@ -153,6 +153,25 @@ public class UIController : MonoBehaviour
             pauseInput = false;
         }
 
+        // Failsafe: the invite panel is normally dismissed by the Steam overlay's
+        // OnGameOverlayActivated callback, but that callback never fires if the
+        // overlay isn't available (Editor Play Mode, overlay disabled, etc.). Let
+        // the player back out manually so they're never stuck on a dark screen.
+        // Runs before pause handling and the HUD early-out so Escape always closes the
+        // panel instead of opening the pause menu over it.
+        if (inviteFriendsPanel.activeSelf && !pauseMenuOpened)
+        {
+            bool cancelInput = pauseInput
+                               || Input.GetButtonDown("Cancel")
+                               || Input.GetKeyDown(KeyCode.Escape)
+                               || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
+            if (cancelInput)
+            {
+                CloseInviteFriendsScreen();
+                pauseInput = false;
+            }
+        }
+
         if (pauseInput)
         {
             if (pauseMenuOpened)
@@ -178,21 +197,6 @@ public class UIController : MonoBehaviour
         if (playerUI.activeSelf == false)
         {
             return;
-        }
-
-        // Failsafe: the invite panel is normally dismissed by the Steam overlay's
-        // OnGameOverlayActivated callback, but that callback never fires if the
-        // overlay isn't available (Editor Play Mode, overlay disabled, etc.). Let
-        // the player back out manually so they're never stuck on a dark screen.
-        if (inviteFriendsPanel.activeSelf)
-        {
-            bool cancelInput = Input.GetButtonDown("Cancel")
-                               || Input.GetKeyDown(KeyCode.Escape)
-                               || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
-            if (cancelInput)
-            {
-                CloseInviteFriendsScreen();
-            }
         }
 
         if(PlayerInstance.Instance.CanControl == false) return;
@@ -405,6 +409,10 @@ public class UIController : MonoBehaviour
         if (_dayNumberHudHidden)
             _restoreHudAfterDayNumber = false;
 
+        // Same for the start-shift screen: backing out must not bring back a HUD gameplay hid.
+        if (IsStartShiftScreenOpen)
+            _restoreHudAfterStartShift = false;
+
         playerUI.SetActive(false);
     }
 
@@ -492,6 +500,14 @@ public class UIController : MonoBehaviour
         if (_dayNumberHudHidden)
         {
             _restoreHudAfterDayNumber = true;
+            return;
+        }
+
+        // The start-shift screen hides the HUD while open; defer the reveal until the player
+        // backs out (the Start Shift path discards it, since the intro owns the HUD).
+        if (IsStartShiftScreenOpen)
+        {
+            _restoreHudAfterStartShift = true;
             return;
         }
 
@@ -825,24 +841,65 @@ public class UIController : MonoBehaviour
             PlayerInstance.Instance.CanControl = true;
     }
 
+    // True when the HUD should come back once the player backs out of the start-shift screen.
+    private bool _restoreHudAfterStartShift;
+
+    /// <summary>True while the start-shift screen is open (it hides the HUD).</summary>
+    public bool IsStartShiftScreenOpen => startShiftScreen != null && startShiftScreen.activeSelf;
+
     public void OpenStartShiftScreen()
     {
+        if (!IsStartShiftScreenOpen)
+        {
+            // Record the real HUD state: while paused the HUD is already hidden by the pause
+            // menu, so its pre-pause snapshot is the source of truth.
+            _restoreHudAfterStartShift = pauseMenuOpened ? playerUIWasActiveBeforePaused : playerUI.activeSelf;
+            if (pauseMenuOpened)
+                playerUIWasActiveBeforePaused = false;
+        }
+
         UIController.Instance.ShowCursor();
         startShiftScreen.SetActive(true);
         playerUI.SetActive(false);
         PlayerInstance.Instance.OpenedUIPanel();
     }
     
+    /// <summary>
+    /// Backs out of the start-shift screen (Cancel button / gamepad B) and restores the HUD if
+    /// it was visible when the screen opened (or was requested while it was open).
+    /// </summary>
     public void CloseStartShiftScreen()
     {
+        HideStartShiftScreen(restoreHud: true);
+    }
+
+    /// <summary>
+    /// Closes the start-shift screen because the shift is starting. The HUD stays hidden; the
+    /// intro sequence owns it from here.
+    /// </summary>
+    public void CloseStartShiftScreenForShiftStart()
+    {
+        HideStartShiftScreen(restoreHud: false);
+    }
+
+    private void HideStartShiftScreen(bool restoreHud)
+    {
+        bool wasOpen = IsStartShiftScreenOpen;
+        bool restore = restoreHud && wasOpen && _restoreHudAfterStartShift;
+        _restoreHudAfterStartShift = false;
+
         UIController.Instance.HideCursor();
         startShiftScreen.SetActive(false);
         PlayerInstance.Instance.ClosedUIPanel();
+
+        // Routed through ShowPlayerUI so its dialogue/diegetic/day-number/pause guards apply.
+        if (restore)
+            ShowPlayerUI();
     }
 
     public void EnterFirstShift()
     {
-        CloseStartShiftScreen();
+        CloseStartShiftScreenForShiftStart();
         SFXController.Instance.Play(transitionToGameplayStinger);
         ShiftManager.Instance.InitiateIntroCutscene();
     }
@@ -911,16 +968,27 @@ public class UIController : MonoBehaviour
 
     public void OpenInvitePanel()
     {
-        PlayerInstance.Instance.OpenedUIPanel();
-        LobbyManager.Instance.OpenInviteFriendsPopup();
+        if (inviteFriendsPanel.activeSelf) return;
+
+        // Show the panel and lock the player BEFORE asking Steam. OpenInviteFriendsPopup can
+        // close the panel synchronously (overlay unavailable); doing this afterwards used to
+        // re-show the dark panel after it had already been closed and the player unlocked,
+        // leaving it stuck over the screen for the rest of the session.
         inviteFriendsPanel.SetActive(true);
+        if (PlayerInstance.Instance != null) PlayerInstance.Instance.OpenedUIPanel();
+        LobbyManager.Instance.OpenInviteFriendsPopup();
     }
 
     public void CloseInviteFriendsScreen()
     {
-        PlayerInstance.Instance.ClosedUIPanel();
-        inviteFriendsPanel.SetActive(false);
         LobbyManager.Instance?.CancelInviteOverlayTracking();
+
+        // Idempotent: the overlay callback, watchdog and Escape can all race to close it, and
+        // the main-menu invite path never opened this panel (no local player exists there).
+        if (!inviteFriendsPanel.activeSelf) return;
+
+        inviteFriendsPanel.SetActive(false);
+        if (PlayerInstance.Instance != null) PlayerInstance.Instance.ClosedUIPanel();
     }
 
     public void ShowCursor()
@@ -1127,6 +1195,12 @@ public class UIController : MonoBehaviour
         {
             if (playerUIWasActiveBeforePaused)
                 _restoreHudAfterDayNumber = true;
+        }
+        else if (IsStartShiftScreenOpen)
+        {
+            // Keep the HUD under the start-shift screen hidden; it is restored on back-out.
+            if (playerUIWasActiveBeforePaused)
+                _restoreHudAfterStartShift = true;
         }
         else
         {

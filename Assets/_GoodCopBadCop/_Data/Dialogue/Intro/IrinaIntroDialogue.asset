@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Sorry, I look tired. Ward energy's been heavy. Irina Kakulia, student nurse. I cover elder care and my grandmother at home.
+    npcLine: Sorry, I look tired. Irina Kakulia, student nurse. The ward energy's heavy.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,7 +23,7 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I moved in with her a few months ago. Fourth floor, southern block. Mzia, the seamstress. You may have seen her.
+    npcLine: I live with my grandmother now. Mzia, the seamstress, southern block.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -31,34 +31,34 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: Is she doing well?
-      npcResponse: She keeps telling me she's fine, the same way she talks about her sewing. So I mostly believe her.
+      npcResponse: She says she's fine, the way she talks about her sewing. I mostly believe her.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: That must be a lot to balance.
-      npcResponse: The universe keeps asking us to carry more than we think. I'm still surprised how much I hold.
+    - playerChoiceText: Isn't that a lot?
+      npcResponse: The universe keeps handing us more than we think we can hold.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-  - type: 0
-    npcLine: My rotation is four mornings a week. I keep her medication schedule with mine. My [[infected:hands shake a little]]. The air, I think. Or mercury retrograde.
-    animationTrigger: TalkLookAway
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
   - type: 1
-    npcLine: The patients ask what's happening; I tell them to breathe through it. My papers are organized, the one thing I can keep that way.
+    npcLine: My [[infected:hands shake a little]]. The air, I think. Or mercury retrograde.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: Is that working?
-      npcResponse: For some of them. For me, I'm still deciding.
+    - playerChoiceText: What's wrong with the air?
+      npcResponse: Ask the polyclinic. They say smog. They also say stay calm and queue.
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: How are you holding up?
-      npcResponse: I'm aligned, mostly. The frequency in the ward is strange right now.
+    - playerChoiceText: How are your patients?
+      npcResponse: They ask what's happening. I tell them to breathe through it.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
+  - type: 0
+    npcLine: Breathe, officer. You're holding it in.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

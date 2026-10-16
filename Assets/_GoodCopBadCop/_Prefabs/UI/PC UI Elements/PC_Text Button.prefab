@@ -58,7 +58,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27ecb7b0e3ec7dc448ebb3103ee0ef6c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  animator: {fileID: 5780037088561814013}
+  feedbackTarget: {fileID: 0}
+  animateFeedback: 1
+  hoverScale: 1.04
+  pressedScale: 0.98
+  hoverDuration: 0.08
+  clickDuration: 0.06
+  hoverEase: 6
+  clickEase: 6
+  hoverSfx: {fileID: 0}
+  clickSfx: {fileID: 0}
+  hoverSfxVolume: 1
+  clickSfxVolume: 1
+  onClickEvent:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &6669317909567285743
 GameObject:
   m_ObjectHideFlags: 0
@@ -71,6 +85,7 @@ GameObject:
   - component: {fileID: 5936012731615254611}
   - component: {fileID: 2703376351960634302}
   - component: {fileID: 5780037088561814013}
+  - component: {fileID: 6789008783290277632}
   m_Layer: 9
   m_Name: Text
   m_TagString: Untagged
@@ -163,6 +178,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -174,7 +190,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -218,3 +234,17 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &6789008783290277632
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6669317909567285743}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: pc.pc_text_button.pc_text_button.text.text
+  applyLanguageFont: 1

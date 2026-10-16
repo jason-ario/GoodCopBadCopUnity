@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: First shift here? I can always tell. You don't have to mention the face.
+    npcLine: First shift? I can tell. Don't mention the face.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,42 +23,42 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: Pavle Asatiani. The Butcher. Literally my job, never a nickname. Meat grinder, three years back.
+    npcLine: Pavle Asatiani. The Butcher. My job, not a nickname.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: Did it hurt?
-      npcResponse: Not how you'd think. You don't feel it till an hour later.
+    - playerChoiceText: What happened to your face?
+      npcResponse: Meat grinder. You feel it an hour later.
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: You went back to work after that?
-      npcResponse: Next morning. The cows were already dead.
+    - playerChoiceText: Where's your stall?
+      npcResponse: End of the market row. Scared people eat.
       animationTrigger: TalkSmile
       playLaughSfx: 0
-  - type: 0
-    npcLine: I run the stall at the end of the market row. Business is good. People eat when they're scared.
-    animationTrigger: TalkLookAway
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
   - type: 1
-    npcLine: You'll see me often. Late shifts, after close. Papers are here. Everything's in order.
+    npcLine: Ration meat, mostly. Nobody asks what animal.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: I'm not bothered by it.
-      npcResponse: Good. Saves us both some time.
-      animationTrigger: TalkSmile
-      playLaughSfx: 0
-    - playerChoiceText: What does your brother think?
+    - playerChoiceText: Does your brother help?
       npcResponse: He cried for a week. I'm [[whisper:the one wearing it]].
       animationTrigger: TalkLookDown
       playLaughSfx: 0
+    - playerChoiceText: What animal?
+      npcResponse: Keep asking questions like that. You'll do fine here.
+      animationTrigger: TalkSmile
+      playLaughSfx: 0
+  - type: 0
+    npcLine: Papers. Everything's in order. Mostly.
+    animationTrigger: TalkSmile
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

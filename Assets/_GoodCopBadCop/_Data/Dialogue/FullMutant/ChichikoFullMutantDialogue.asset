@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: I have been working on something. You can look. I want you to look.
+    npcLine: I have been working on something. Look. I want you to look.
     animationTrigger: TalkBigCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -31,23 +31,15 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: You look... impressive.
-      npcResponse: No. You are lying. I can always tell when someone is lying about this. Your left eye moved.
+      npcResponse: Lying. Your left eye moved.
       animationTrigger: TalkPoint
       playLaughSfx: 0
     - playerChoiceText: What happened to you?
-      npcResponse: What HAPPENED? [[infected:I improved]]. This is improvement. You will say it differently.
+      npcResponse: '[[infected:I improved]]. You will say it differently.'
       animationTrigger: TalkBigCocky
       playLaughSfx: 0
   - type: 0
-    npcLine: I made the standards myself. Nobody else had acceptable ones.
-    animationTrigger: TalkDismissing
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices: []
-  - type: 0
-    npcLine: I am not done. Whatever you think you are looking at right now, it is not finished yet.
+    npcLine: I am not done. Whatever you are looking at, it is not finished.
     animationTrigger: TalkPoint
     cameraTrigger: SuspectFaceCam
     wobbleProfileOverride: {fileID: 0}

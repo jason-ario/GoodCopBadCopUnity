@@ -34,6 +34,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 270, y: 180, z: -182.029}
 --- !u!212 &7358089457524417940
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -79,6 +80,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 4f483fb721323244eb9c682d070de04c, type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 0.59607846}
   m_FlipX: 0
@@ -88,8 +90,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &739317369782466029
 GameObject:
   m_ObjectHideFlags: 0
@@ -124,6 +126,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 270, y: 180, z: -182.029}
 --- !u!212 &2977305994209758044
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -169,6 +172,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 4f483fb721323244eb9c682d070de04c, type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 0.59607846}
   m_FlipX: 0
@@ -178,8 +182,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &1560511027893004780
 GameObject:
   m_ObjectHideFlags: 0
@@ -214,6 +218,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: -90, y: 360, z: -156.589}
 --- !u!212 &1454703001782830287
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -259,6 +264,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 169132250, guid: 831a39da31550da4da639528b728a621, type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 0.34117648}
   m_FlipX: 0
@@ -268,8 +274,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &2112417566491694157
 GameObject:
   m_ObjectHideFlags: 0
@@ -281,6 +287,7 @@ GameObject:
   - component: {fileID: 7048350435698899874}
   - component: {fileID: 4576435427904733767}
   - component: {fileID: 3952602303684778952}
+  - component: {fileID: 487441532381271542}
   m_Layer: 0
   m_Name: Text - Title
   m_TagString: Untagged
@@ -354,6 +361,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &3952602303684778952
 MonoBehaviour:
@@ -413,6 +421,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -424,7 +433,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -449,6 +458,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 4576435427904733767}
   m_maskType: 0
+--- !u!114 &487441532381271542
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2112417566491694157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.entry_permit.entry_permit.text_title.text
+  applyLanguageFont: 1
 --- !u!1 &2702742779938814679
 GameObject:
   m_ObjectHideFlags: 0
@@ -483,6 +506,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: -90, y: 0, z: 447.971}
 --- !u!212 &149842589751680029
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -528,6 +552,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: a7b629b12e62b554d85053b18db5f9fa, type: 3}
   m_Color: {r: 0.32941177, g: 0, b: 0, a: 1}
   m_FlipX: 0
@@ -537,8 +562,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &2732554623012896866
 GameObject:
   m_ObjectHideFlags: 0
@@ -692,6 +717,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!64 &6378922394933577293
 MeshCollider:
@@ -726,6 +752,7 @@ GameObject:
   - component: {fileID: 986888338521795380}
   - component: {fileID: 805395424642157518}
   - component: {fileID: 118903730500615643}
+  - component: {fileID: 4564778014919593811}
   m_Layer: 0
   m_Name: Name Text
   m_TagString: Untagged
@@ -799,6 +826,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &118903730500615643
 MonoBehaviour:
@@ -860,6 +888,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -871,7 +900,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -894,8 +923,22 @@ MonoBehaviour:
   _SortingLayerID: 0
   _SortingOrder: 0
   m_hasFontAssetChanged: 0
-  m_renderer: {fileID: 1147982200965612694}
+  m_renderer: {fileID: 805395424642157518}
   m_maskType: 0
+--- !u!114 &4564778014919593811
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3438149097446970070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.entry_permit.entry_permit.name.name_text.text
+  applyLanguageFont: 1
 --- !u!1 &3893420390298992643
 GameObject:
   m_ObjectHideFlags: 0
@@ -930,6 +973,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 270, y: 180, z: -182.029}
 --- !u!212 &2087517669615704326
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -975,6 +1019,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 4f483fb721323244eb9c682d070de04c, type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 0.59607846}
   m_FlipX: 0
@@ -984,8 +1029,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &5242878867997754441
 GameObject:
   m_ObjectHideFlags: 0
@@ -1020,6 +1065,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: -90, y: 360, z: -180}
 --- !u!212 &4501202110407698995
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1065,6 +1111,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: d5399910942a43b4283c19531107c011, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -1074,8 +1121,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &5580116182335805666
 GameObject:
   m_ObjectHideFlags: 0
@@ -1087,6 +1134,7 @@ GameObject:
   - component: {fileID: 5326396203043651722}
   - component: {fileID: 477758846095179997}
   - component: {fileID: 3890933525810799880}
+  - component: {fileID: 4888914685845056141}
   m_Layer: 0
   m_Name: Exp Date Text
   m_TagString: Untagged
@@ -1160,6 +1208,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &3890933525810799880
 MonoBehaviour:
@@ -1219,6 +1268,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -1230,7 +1280,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -1255,6 +1305,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 477758846095179997}
   m_maskType: 0
+--- !u!114 &4888914685845056141
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5580116182335805666}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.entry_permit.entry_permit.valid_until.exp_date_text.text
+  applyLanguageFont: 1
 --- !u!1 &5594477003762281931
 GameObject:
   m_ObjectHideFlags: 0
@@ -1266,6 +1330,7 @@ GameObject:
   - component: {fileID: 7853822960471154912}
   - component: {fileID: 6258738203385022425}
   - component: {fileID: 4980200817130218914}
+  - component: {fileID: 726183169213171378}
   m_Layer: 0
   m_Name: Valid Until
   m_TagString: Untagged
@@ -1340,6 +1405,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &4980200817130218914
 MonoBehaviour:
@@ -1399,6 +1465,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -1410,7 +1477,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -1435,6 +1502,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 6258738203385022425}
   m_maskType: 0
+--- !u!114 &726183169213171378
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5594477003762281931}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.entry_permit.entry_permit.valid_until.text
+  applyLanguageFont: 1
 --- !u!1 &5780458603631836404
 GameObject:
   m_ObjectHideFlags: 0
@@ -1469,6 +1550,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: -90, y: 360, z: -156.589}
 --- !u!212 &7197903263097123509
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1514,6 +1596,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: -1761480828, guid: 831a39da31550da4da639528b728a621, type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 0.34117648}
   m_FlipX: 0
@@ -1523,8 +1606,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &5814423979825778662
 GameObject:
   m_ObjectHideFlags: 0
@@ -1536,6 +1619,7 @@ GameObject:
   - component: {fileID: 6201056441084676392}
   - component: {fileID: 6069132757572319496}
   - component: {fileID: 9221999882786652054}
+  - component: {fileID: 5707115576752218318}
   m_Layer: 0
   m_Name: Name
   m_TagString: Untagged
@@ -1610,6 +1694,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &9221999882786652054
 MonoBehaviour:
@@ -1669,6 +1754,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -1680,7 +1766,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -1705,6 +1791,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 6069132757572319496}
   m_maskType: 0
+--- !u!114 &5707115576752218318
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5814423979825778662}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.entry_permit.entry_permit.name.text
+  applyLanguageFont: 1
 --- !u!1 &6109945415407041778
 GameObject:
   m_ObjectHideFlags: 0
@@ -1739,6 +1839,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 270, y: 180, z: -182.029}
 --- !u!212 &355618319097774073
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1784,6 +1885,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 4f483fb721323244eb9c682d070de04c, type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 0.59607846}
   m_FlipX: 0
@@ -1793,8 +1895,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &6161846966709141649
 GameObject:
   m_ObjectHideFlags: 0
@@ -1829,6 +1931,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: -90, y: 360, z: -203.465}
 --- !u!212 &1564652148909611065
 SpriteRenderer:
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1874,6 +1977,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_Sprite: {fileID: 2070991516, guid: 831a39da31550da4da639528b728a621, type: 3}
   m_Color: {r: 0, g: 0, b: 0, a: 0.1882353}
   m_FlipX: 0
@@ -1883,8 +1987,8 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &6936920011669801169
 GameObject:
   m_ObjectHideFlags: 0
@@ -1896,6 +2000,7 @@ GameObject:
   - component: {fileID: 1990891134468110928}
   - component: {fileID: 1147982200965612694}
   - component: {fileID: 5959224201642146410}
+  - component: {fileID: 841991620942101978}
   m_Layer: 0
   m_Name: Reason (1)
   m_TagString: Untagged
@@ -1969,6 +2074,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &5959224201642146410
 MonoBehaviour:
@@ -2028,6 +2134,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -2039,7 +2146,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -2064,6 +2171,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 1147982200965612694}
   m_maskType: 0
+--- !u!114 &841991620942101978
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6936920011669801169}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.entry_permit.entry_permit.reason.reason_1.text
+  applyLanguageFont: 1
 --- !u!1 &7436425202959501317
 GameObject:
   m_ObjectHideFlags: 0
@@ -2075,6 +2196,7 @@ GameObject:
   - component: {fileID: 6626022968764667311}
   - component: {fileID: 5974364420215912305}
   - component: {fileID: 1754351699284699738}
+  - component: {fileID: 851738593696732760}
   m_Layer: 0
   m_Name: Reason
   m_TagString: Untagged
@@ -2149,6 +2271,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!114 &1754351699284699738
 MonoBehaviour:
@@ -2210,6 +2333,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -2221,7 +2345,7 @@ MonoBehaviour:
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656b
+  m_ActiveFontFeatures: 6e72656bu
   m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
@@ -2246,6 +2370,20 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 5974364420215912305}
   m_maskType: 0
+--- !u!114 &851738593696732760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7436425202959501317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  key: ui.entry_permit.entry_permit.reason.text
+  applyLanguageFont: 1
 --- !u!1001 &4412181716365385940
 PrefabInstance:
   m_ObjectHideFlags: 0

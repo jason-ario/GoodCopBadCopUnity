@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Papers are right here. Lasha Gagua. Taxi driver, western district. Half the routes are blocked now.
+    npcLine: Papers. Lasha Gagua, taxi, western district. Make it quick.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,42 +23,42 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: Nine years driving these streets. Used to know every shortcut, before your people closed them.
+    npcLine: Nine years on these streets. Then your people closed half the routes.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
-    - playerChoiceText: What do you mean, our people?
-      npcResponse: Security, government, whoever put up these barriers. I don't care which box you tick.
+    - playerChoiceText: Our people?
+      npcResponse: Militsiya, Party, whoever put up these barriers. I don't care which.
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Nine years is a long time.
-      npcResponse: Long enough to know when a city's dying versus just sick. This one's still sick. Salvageable.
+    - playerChoiceText: Still getting fares?
+      npcResponse: Plenty. Half are [[whisper:fleeing to the exits]]. I charge double.
+      animationTrigger: TalkIdle
+      playLaughSfx: 0
+  - type: 1
+    npcLine: Last officer had a system. Checked once, waved me through.
+    animationTrigger: TalkIdle
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: I check everyone the same.
+      npcResponse: Sure you do. Do it faster. Petrol's rationed, and so is my patience.
+      animationTrigger: TalkCocky
+      playLaughSfx: 0
+    - playerChoiceText: Got family here?
+      npcResponse: Wife and two kids, western block. They stay in. I drive.
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
-    npcLine: Wife and two kids in the western block. They stay home, I keep working. Half my fares now are people [[whisper:fleeing to the exits]]. I charge double.
-    animationTrigger: TalkIdle
+    npcLine: City's sick, not dead. Not yet.
+    animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices: []
-  - type: 1
-    npcLine: 'You''re new here. Previous officer had a system: checked once, waved me through. Papers, permit runs to September.'
-    animationTrigger: TalkIdle
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices:
-    - playerChoiceText: I do my job the same for everyone.
-      npcResponse: Sure you do. Do it fast. I've got a fare waiting and time's still money.
-      animationTrigger: TalkCocky
-      playLaughSfx: 0
-    - playerChoiceText: What kind of system?
-      npcResponse: The efficient kind. Respect for everyone's time. You'll learn it. Or you won't.
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
