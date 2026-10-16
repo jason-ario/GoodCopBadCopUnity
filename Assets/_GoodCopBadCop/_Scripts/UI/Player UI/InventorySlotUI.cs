@@ -89,6 +89,13 @@ public class InventorySlotUI : MonoBehaviour
 
     private void OnDestroy() => SetAmmoProvider(null);
 
+    /// <summary>Sets the hotkey number label (e.g. "3") — used for HUD slots added at runtime.</summary>
+    public void SetHotkeyLabel(string label)
+    {
+        if (hotkeyLabel != null)
+            hotkeyLabel.text = label;
+    }
+
     /// <summary>Shows or hides the white selection border.</summary>
     public void SetSelected(bool selected)
     {

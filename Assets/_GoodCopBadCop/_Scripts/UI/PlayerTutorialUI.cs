@@ -85,7 +85,7 @@ public class PlayerTutorialUI : MonoBehaviour
 
     private void ShowBoothMessage()
     {
-        Show("Go to the booth to start your shift.", -1f, ShowMovementTutorial);
+        Show(Loc.T("Go to the booth to start your shift."), -1f, ShowMovementTutorial);
     }
 
     private void ShowMovementTutorial()

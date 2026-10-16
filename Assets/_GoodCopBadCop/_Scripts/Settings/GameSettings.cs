@@ -49,6 +49,22 @@ public class GameSettings : ScriptableObject
              "AnomalyDebugUI [`], VFXDebugConsoleUI [F11]) are ignored — no need to manually deactivate the Debug Console GameObject.")]
     [SerializeField] private bool _debugConsoleEnabled = true;
 
+    [Header("Inventory")]
+    [Tooltip("When enabled, the player's hotbar has 3 slots instead of 2 (key 3 selects the third slot) and a " +
+             "third slot widget is added to the HUD at runtime. Read when the player spawns, so change it " +
+             "before starting/joining a session. All peers should use the same value.")]
+    [SerializeField] private bool _threeInventorySlots = false;
+
+    /// <summary>Whether the hotbar uses 3 slots instead of 2. Applied when the player spawns.</summary>
+    public bool ThreeInventorySlots
+    {
+        get => _threeInventorySlots;
+        set => _threeInventorySlots = value;
+    }
+
+    /// <summary>Number of hotbar slots implied by <see cref="ThreeInventorySlots"/> (2 or 3).</summary>
+    public int InventorySlotCount => _threeInventorySlots ? 3 : 2;
+
     [Header("Survey")]
     [Tooltip("When enabled, the playtest survey opens in the default browser when the application exits.")]
     [SerializeField] private bool _openSurveyOnGameExit = true;

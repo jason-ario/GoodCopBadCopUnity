@@ -1,8 +1,11 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// Bridges <see cref="PlayerInventory"/> (on the runtime-spawned player) with the
-/// two <see cref="InventorySlotUI"/> widgets in the HUD canvas.
+/// <see cref="InventorySlotUI"/> widgets in the HUD canvas. The prefab ships with two widgets;
+/// when <see cref="GameSettings.ThreeInventorySlots"/> is on (or the bound inventory reports more
+/// slots), extra widgets are cloned from the last one at runtime (see <see cref="EnsureSlotWidgets"/>).
 ///
 /// For the local player it subscribes to <see cref="PlayerInventory.OnSlotChanged"/> and
 /// <see cref="PlayerInventory.OnActiveSlotChanged"/>. While spectating, those events are
@@ -21,6 +24,8 @@ public class InventoryHUDController : MonoBehaviour
     private int _mirroredActive = int.MinValue;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    private void Awake() => EnsureSlotWidgets(GameSettings.Instance.InventorySlotCount);
 
     private void OnEnable()  => Rebind();
     private void OnDisable() => Unsubscribe();
@@ -55,6 +60,8 @@ public class InventoryHUDController : MonoBehaviour
             ClearSlots();
             return;
         }
+
+        EnsureSlotWidgets(_inventory.SlotCount);
 
         if (_mirroring)
         {
@@ -97,6 +104,50 @@ public class InventoryHUDController : MonoBehaviour
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Grows <see cref="slotUIs"/> to <paramref name="count"/> widgets by cloning the last one,
+    /// placing each clone right after it in the panel's layout group, labelling it with its
+    /// hotkey number, and widening the panel so the layout doesn't overflow. Never shrinks.
+    /// </summary>
+    private void EnsureSlotWidgets(int count)
+    {
+        if (slotUIs == null || slotUIs.Length == 0 || count <= slotUIs.Length) return;
+
+        InventorySlotUI template = slotUIs[slotUIs.Length - 1];
+        if (template == null)
+        {
+            Debug.LogWarning("[InventoryHUDController] Can't add HUD slots: the last slot widget is unassigned.");
+            return;
+        }
+
+        var rectParent  = template.transform.parent as RectTransform;
+        var layout      = rectParent != null ? rectParent.GetComponent<HorizontalLayoutGroup>() : null;
+        var templateRect = template.transform as RectTransform;
+        float widthStep = (templateRect != null ? templateRect.rect.width : 0f) + (layout != null ? layout.spacing : 0f);
+
+        int oldLength = slotUIs.Length;
+        System.Array.Resize(ref slotUIs, count);
+
+        for (int i = oldLength; i < count; i++)
+        {
+            InventorySlotUI previous = slotUIs[i - 1];
+            InventorySlotUI clone = Instantiate(template, template.transform.parent);
+            clone.name = $"Inventory Slot ({i + 1})";
+            clone.transform.SetSiblingIndex(previous.transform.GetSiblingIndex() + 1);
+            clone.SetHotkeyLabel((i + 1).ToString());
+            clone.SetItem(null);
+            clone.SetSelected(false);
+            slotUIs[i] = clone;
+
+            if (rectParent != null && layout != null)
+                rectParent.sizeDelta += new Vector2(widthStep, 0f);
+        }
+
+        // Keep the mirroring cache in step with the widget count.
+        if (_mirroredItems != null && _mirroredItems.Length != slotUIs.Length)
+            System.Array.Resize(ref _mirroredItems, slotUIs.Length);
+    }
 
     private void RefreshAll()
     {

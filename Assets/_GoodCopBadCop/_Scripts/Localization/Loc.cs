@@ -55,6 +55,19 @@ public static class LocKeys
         }
         return PrefixFor(owner) + "." + Sanitize(owner.name) + "." + PathToKeyPart(propertyPath);
     }
+
+    /// <summary>
+    /// Key for an English literal wrapped in <see cref="Loc.T(string)"/>: "code." + readable slug + stable hash of the
+    /// full text, e.g. "code.go_to_the_booth_to_start_your_shift.3f1a9c2e". Editing the literal yields a new key.
+    /// </summary>
+    public static string ForCode(string english)
+    {
+        string slug = Sanitize(english ?? "").Replace('.', '_');
+        if (slug.Length > 40) slug = slug.Substring(0, 40).TrimEnd('_');
+        uint h = 2166136261;
+        foreach (char c in english ?? "") { h ^= c; h *= 16777619; }
+        return "code." + (slug.Length > 0 ? slug + "." : "") + h.ToString("x8");
+    }
 }
 
 /// <summary>Static localization entry point. Fallback chain: current language, English source, the key itself.</summary>
@@ -261,6 +274,35 @@ public static class Loc
         if (_table.TryGet(LocKeys.ForAsset(owner, propertyPath), out var entry))
             return Resolve(entry, false);
         return PseudoLocalizer.IsPseudo(_language) && PseudoAvailable ? PseudoOf(english) : english;
+    }
+
+    private static readonly Dictionary<string, string> CodeKeyCache = new Dictionary<string, string>();
+
+    /// <summary>
+    /// Translates player-facing text set from code. Pass the English as a plain string literal so the
+    /// Localization window's "Code strings" scan can find it: <c>Loc.T("Go to the booth.")</c>.
+    /// English (or a string not yet in the sheets) returns the literal itself.
+    /// </summary>
+    public static string T(string english)
+    {
+        Init();
+        if (string.IsNullOrEmpty(english) || _language == SourceLanguage) return english;
+        if (!CodeKeyCache.TryGetValue(english, out string key)) CodeKeyCache[english] = key = LocKeys.ForCode(english);
+        if (_table.TryGet(key, out var entry)) return Resolve(entry, false);
+        return PseudoLocalizer.IsPseudo(_language) && PseudoAvailable ? PseudoOf(english) : english;
+    }
+
+    /// <summary>Like <see cref="T(string)"/>, then string.Format with the current culture: <c>Loc.T("Day {0}", day)</c>.</summary>
+    public static string T(string english, params object[] args)
+    {
+        string text = T(english);
+        if (args == null || args.Length == 0) return text;
+        try { return string.Format(Culture, text, args); }
+        catch (FormatException)
+        {
+            WarnOnce("fmt:" + english, "[Loc] Bad format string for code text '" + english + "' in '" + _language + "'.");
+            return string.Format(CultureInfo.InvariantCulture, english, args);
+        }
     }
 
     /// <summary>

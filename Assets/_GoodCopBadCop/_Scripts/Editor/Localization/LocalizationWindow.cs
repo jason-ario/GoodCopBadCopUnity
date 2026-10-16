@@ -155,7 +155,7 @@ public partial class LocalizationWindow : EditorWindow
 
     // ================================================================ Scan tab
 
-    private bool _scanScenes = true, _scanPrefabs = true, _scanSOs = true, _scanSuspectObjects = true, _showLocalized;
+    private bool _scanScenes = true, _scanPrefabs = true, _scanSOs = true, _scanSuspectObjects = true, _scanCode = true, _showLocalized;
     private string _scanGroup = LocGroups.FilterAll;
     private List<ScanItem> _scan;
     private Vector2 _scanScroll;

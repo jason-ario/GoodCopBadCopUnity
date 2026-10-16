@@ -33,7 +33,7 @@ public static class LocalizationScanner
 {
     private const string ProjectRoot = "Assets/_GoodCopBadCop";
 
-    public static List<ScanItem> Scan(LocalizationSettings settings, LocalizationTable table, bool scenes, bool prefabs, bool scriptables, bool suspectObjects = true)
+    public static List<ScanItem> Scan(LocalizationSettings settings, LocalizationTable table, bool scenes, bool prefabs, bool scriptables, bool suspectObjects = true, bool code = true)
     {
         var items = new List<ScanItem>();
         GameScriptCache.Clear();
@@ -87,6 +87,8 @@ public static class LocalizationScanner
                     ScanScriptable(obj, path, deny, settings, table, items);
                 }
             }
+
+            if (code) ScanCode(table, items);
         }
         finally { EditorUtility.ClearProgressBar(); }
 
@@ -267,6 +269,89 @@ public static class LocalizationScanner
                 items.Add(item);
             }
         }
+    }
+
+    // ---- Code strings: English literals wrapped in Loc.T("...") ----
+
+    private static readonly System.Text.RegularExpressions.Regex CodeCall = new System.Text.RegularExpressions.Regex(
+        @"\bLoc\.T\(\s*(?:@""(?<v>(?:[^""]|"""")*)""|""(?<r>(?:[^""\\\n]|\\.)*)"")");
+
+    /// <summary>
+    /// Finds <c>Loc.T("...")</c> literals in game scripts. Keys derive from the text (LocKeys.ForCode), so one entry
+    /// covers every call site with the same English. Interpolated or concatenated arguments are not picked up.
+    /// </summary>
+    private static void ScanCode(LocalizationTable table, List<ScanItem> items)
+    {
+        var seen = new Dictionary<string, ScanItem>();
+        foreach (var guid in AssetDatabase.FindAssets("t:MonoScript", new[] { ProjectRoot }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (!path.EndsWith(".cs") || path.Contains("/Editor/") || path.Contains("/Localization/")) continue;
+            string src;
+            try { src = File.ReadAllText(path); } catch (IOException) { continue; }
+            if (!src.Contains("Loc.T(")) continue;
+
+            string file = Path.GetFileNameWithoutExtension(path);
+            foreach (System.Text.RegularExpressions.Match m in CodeCall.Matches(src))
+            {
+                string text = m.Groups["v"].Success ? m.Groups["v"].Value.Replace("\"\"", "\"") : Unescape(m.Groups["r"].Value);
+                if (!LooksLikeCopy(text)) continue;
+                int line = 1;
+                for (int i = 0; i < m.Index; i++) if (src[i] == '\n') line++;
+
+                string key = LocKeys.ForCode(text);
+                if (seen.TryGetValue(key, out var prev)) { prev.notes += ", " + file + ":" + line; continue; }
+
+                var item = new ScanItem
+                {
+                    sheet = "Code",
+                    key = key,
+                    text = text,
+                    category = "Code",
+                    group = LocGroups.Code,
+                    context = "Code|" + key,
+                    notes = "Code | " + file + ":" + line,
+                    binding = new LocBinding { key = key, kind = "CODE", assetPath = path, category = "Code", group = LocGroups.Code }
+                };
+                item.binding.context = item.context;
+                if (table.TryGet(key, out _)) item.state = ScanState.Localized;
+                else { item.state = ScanState.Unlocalized; item.selected = true; }
+                seen[key] = item;
+                items.Add(item);
+            }
+        }
+    }
+
+    private static string Unescape(string s)
+    {
+        if (s.IndexOf('\\') < 0) return s;
+        var sb = new System.Text.StringBuilder(s.Length);
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (c != '\\' || i + 1 >= s.Length) { sb.Append(c); continue; }
+            char n = s[++i];
+            switch (n)
+            {
+                case 'n': sb.Append('\n'); break;
+                case 't': sb.Append('\t'); break;
+                case 'r': sb.Append('\r'); break;
+                case '0': sb.Append('\0'); break;
+                case 'u' when i + 4 < s.Length:
+                    sb.Append((char)Convert.ToInt32(s.Substring(i + 1, 4), 16)); i += 4; break;
+                default: sb.Append(n); break;
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Code-string keys in the sheets whose English no longer appears in any Loc.T call.</summary>
+    public static List<string> StaleCodeKeys(LocalizationTable table)
+    {
+        var items = new List<ScanItem>();
+        ScanCode(table, items);
+        var live = new HashSet<string>(items.Select(i => i.key));
+        return table.entries.Where(e => e.key != null && e.key.StartsWith("code.") && !live.Contains(e.key)).Select(e => e.key).ToList();
     }
 
     // ---- ScriptableObject discovery ----

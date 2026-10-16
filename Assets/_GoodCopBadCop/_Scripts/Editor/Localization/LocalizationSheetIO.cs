@@ -190,7 +190,7 @@ public static class LocalizationSheetIO
 public class LocBinding
 {
     public string key;
-    public string kind;          // "TMP", "SO" or "MB" (MonoBehaviour field on a scene / prefab object)
+    public string kind;          // "TMP", "SO", "MB" (MonoBehaviour field on a scene / prefab object) or "CODE" (Loc.T literal in a script)
     public string assetPath;     // scene, prefab or ScriptableObject asset
     public string objectPath;    // hierarchy path inside a scene or prefab (TMP and MB)
     public string propertyPath;  // serialized property path (SO and MB)
@@ -207,6 +207,7 @@ public static class LocGroups
     public const string SuspectObjects = "Suspect objects";
     public const string SuspectData = "Suspect data";
     public const string ConversationData = "Conversation data";
+    public const string Code = "Code strings";
     public const string Other = "Other";
 
     public static readonly string[] DialogueGroups = { SuspectObjects, SuspectData, ConversationData };
@@ -218,7 +219,7 @@ public static class LocGroups
 
     public static readonly string[] FilterOptions =
     {
-        FilterAll, FilterDialogue, SuspectObjects, SuspectData, ConversationData, FilterNonDialogue
+        FilterAll, FilterDialogue, SuspectObjects, SuspectData, ConversationData, Code, FilterNonDialogue
     };
 
     public static bool IsDialogue(string group) { return Array.IndexOf(DialogueGroups, group) >= 0; }

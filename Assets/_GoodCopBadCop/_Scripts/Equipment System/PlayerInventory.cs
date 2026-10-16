@@ -5,8 +5,9 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Two-slot hotbar inventory for the local player.
-/// Press 1/2 to equip the item in that slot, scroll the mouse wheel, or press the gamepad
+/// Two-slot hotbar inventory for the local player (three slots when
+/// <see cref="GameSettings.ThreeInventorySlots"/> is enabled — read once in Awake).
+/// Press 1/2(/3) to equip the item in that slot, scroll the mouse wheel, or press the gamepad
 /// <see cref="GameAction.NextSlot"/> / <see cref="GameAction.PreviousSlot"/> bindings (Y toggles
 /// by default; PreviousSlot unbound) to cycle through held/carried items. Hotbar input is ignored while
 /// the guidebook or a diegetic view is open. Picking up an item brings it straight to hand;
@@ -32,8 +33,15 @@ public class PlayerInventory : NetworkBehaviour
 
     private PlayerPickupController _pickup;
 
-    private readonly PickableObject[] _slots  = new PickableObject[2];
-    private readonly bool[]           _stowed = new bool[2];   // true = item at stowPoint, not in hand
+    /// <summary>Hotbar size when <see cref="GameSettings.ThreeInventorySlots"/> is off.</summary>
+    public const int DefaultSlotCount = 2;
+
+    /// <summary>Largest supported hotbar size (one replicated slot mirror exists per slot).</summary>
+    public const int MaxSlotCount = 3;
+
+    // Sized in Awake from GameSettings (Resources.Load isn't allowed in field initializers).
+    private PickableObject[] _slots  = new PickableObject[DefaultSlotCount];
+    private bool[]           _stowed = new bool[DefaultSlotCount];   // true = item at stowPoint, not in hand
 
     // The hotbar is managed by its owner, but the host needs the authoritative references when
     // it serializes a resumable workday. These owner-write mirrors make stowed items visible to
@@ -46,6 +54,20 @@ public class PlayerInventory : NetworkBehaviour
         default,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Owner);
+    // Always declared (even with 2 slots) so the NetworkVariable layout is identical on every peer.
+    private readonly NetworkVariable<NetworkObjectReference> _thirdSlotRef = new(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Owner);
+
+    /// <summary>Owner-write slot mirror for <paramref name="index"/>, or null if out of range.</summary>
+    private NetworkVariable<NetworkObjectReference> GetSlotRefVariable(int index) => index switch
+    {
+        0 => _firstSlotRef,
+        1 => _secondSlotRef,
+        2 => _thirdSlotRef,
+        _ => null
+    };
 
     // Owner-write mirror of the selected slot so spectators' HUDs can highlight it even when empty.
     private readonly NetworkVariable<int> _selectedSlotNet = new(
@@ -53,7 +75,7 @@ public class PlayerInventory : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Owner);
 
-    private int _activeSlot = 0;   // selected slot; always 0 or 1 (may be empty = empty hands)
+    private int _activeSlot = 0;   // selected slot; always 0..SlotCount-1 (may be empty = empty hands)
 
     /// <summary>
     /// The currently held item when it isn't tracked by either hotbar slot. This covers two
@@ -70,6 +92,9 @@ public class PlayerInventory : NetworkBehaviour
 
     public int ActiveSlot => _activeSlot;
 
+    /// <summary>Number of hotbar slots (2, or 3 when <see cref="GameSettings.ThreeInventorySlots"/> is on).</summary>
+    public int SlotCount => _slots.Length;
+
     /// <summary>
     /// True while an item that isn't tracked by any hotbar slot is in hand (see
     /// <see cref="_unslottedHeld"/>). Hotbar keys, scroll cycling and slot swapping are all
@@ -84,7 +109,7 @@ public class PlayerInventory : NetworkBehaviour
     /// <summary>Fired when a slot's item reference changes. <c>item</c> is <c>null</c> when cleared.</summary>
     public event System.Action<int, PickableObject> OnSlotChanged;
 
-    /// <summary>Fired when the selected (equipped) slot index changes. Always 0 or 1; the slot may be empty.</summary>
+    /// <summary>Fired when the selected (equipped) slot index changes. Always 0..SlotCount-1; the slot may be empty.</summary>
     public event System.Action<int> OnActiveSlotChanged;
 
     /// <summary>Returns the item in the given slot, or <c>null</c> if empty.</summary>
@@ -98,15 +123,15 @@ public class PlayerInventory : NetworkBehaviour
     /// </summary>
     public PickableObject GetReplicatedItemInSlot(int index)
     {
-        NetworkObjectReference itemRef = index == 0 ? _firstSlotRef.Value
-                                       : index == 1 ? _secondSlotRef.Value
-                                       : default;
-        return itemRef.TryGet(out NetworkObject itemObject) ? itemObject.GetComponent<PickableObject>() : null;
+        if (index < 0 || index >= _slots.Length) return null;
+        NetworkVariable<NetworkObjectReference> slotRef = GetSlotRefVariable(index);
+        if (slotRef == null) return null;
+        return slotRef.Value.TryGet(out NetworkObject itemObject) ? itemObject.GetComponent<PickableObject>() : null;
     }
 
     /// <summary>
-    /// Selected slot as seen by any peer (owner-written mirror). Always 0 or 1, even when that
-    /// slot is empty.
+    /// Selected slot as seen by any peer (owner-written mirror). Always 0..SlotCount-1, even when
+    /// that slot is empty.
     /// </summary>
     public int ReplicatedActiveSlot => _selectedSlotNet.Value;
 
@@ -119,11 +144,12 @@ public class PlayerInventory : NetworkBehaviour
     {
         if (itemIds == null) return;
 
-        AddSaveId(_slots[0], itemIds);
-        AddSaveId(_slots[1], itemIds);
+        for (int i = 0; i < _slots.Length; i++)
+            AddSaveId(_slots[i], itemIds);
         AddSaveId(_unslottedHeld, itemIds);
-        AddSaveId(_firstSlotRef.Value, itemIds);
-        AddSaveId(_secondSlotRef.Value, itemIds);
+        // Scan every mirror (not just SlotCount) so nothing replicated is ever missed.
+        for (int i = 0; i < MaxSlotCount; i++)
+            AddSaveId(GetSlotRefVariable(i).Value, itemIds);
         if (_pickup != null)
             AddSaveId(_pickup.HeldObjectRef, itemIds);
     }
@@ -148,16 +174,19 @@ public class PlayerInventory : NetworkBehaviour
             ? new NetworkObjectReference(item.NetworkObject)
             : default;
 
-        if (index == 0)
-            _firstSlotRef.Value = itemRef;
-        else if (index == 1)
-            _secondSlotRef.Value = itemRef;
+        NetworkVariable<NetworkObjectReference> slotRef = GetSlotRefVariable(index);
+        if (slotRef != null)
+            slotRef.Value = itemRef;
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     private void Awake()
     {
+        int slotCount = Mathf.Clamp(GameSettings.Instance.InventorySlotCount, 1, MaxSlotCount);
+        _slots  = new PickableObject[slotCount];
+        _stowed = new bool[slotCount];
+
         _pickup = GetComponent<PlayerPickupController>();
         _health = GetComponent<PlayerHealth>();
         _animator = GetComponent<Animator>();
@@ -206,7 +235,8 @@ public class PlayerInventory : NetworkBehaviour
         // never stay desynced from the real hand while control is locked.
         ReconcileSlotState();
 
-        bool hotkeyPressed = Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Alpha2);
+        int pressedSlot = GetPressedSlotHotkey();
+        bool hotkeyPressed = pressedSlot >= 0;
         string inputBlock = GetHotbarInputBlockReason();
         if (inputBlock != null)
         {
@@ -217,8 +247,7 @@ public class PlayerInventory : NetworkBehaviour
 
         if (!TextInputFocus.IsCapturingKeyboard)
         {
-            if (Input.GetKeyDown(KeyCode.Alpha1)) EquipSlot(0);
-            if (Input.GetKeyDown(KeyCode.Alpha2)) EquipSlot(1);
+            if (hotkeyPressed) EquipSlot(pressedSlot);
         }
         else if (hotkeyPressed)
         {
@@ -233,6 +262,14 @@ public class PlayerInventory : NetworkBehaviour
         // Gamepad slot cycling (Y toggles by default, rebindable).
         if (RebindableInput.GetGamepadDown(GameAction.NextSlot)) CycleActiveItem(1);
         else if (RebindableInput.GetGamepadDown(GameAction.PreviousSlot)) CycleActiveItem(-1);
+    }
+
+    /// <summary>Index of the first slot whose number key (1..SlotCount) went down this frame, or -1.</summary>
+    private int GetPressedSlotHotkey()
+    {
+        for (int i = 0; i < _slots.Length; i++)
+            if (Input.GetKeyDown(KeyCode.Alpha1 + i)) return i;
+        return -1;
     }
 
     /// <summary>
@@ -263,7 +300,7 @@ public class PlayerInventory : NetworkBehaviour
     /// <summary>
     /// Scroll-wheel slot cycling. Steps the selection one slot forward/backward (wrapping), via
     /// <see cref="EquipSlot"/>. With two slots either direction simply selects the other slot,
-    /// whether or not it holds an item.
+    /// whether or not it holds an item; with three it steps through them in order.
     /// </summary>
     /// <param name="direction">+1 to scroll to the next slot, -1 for the previous.</param>
     private void CycleActiveItem(int direction)
@@ -367,34 +404,48 @@ public class PlayerInventory : NetworkBehaviour
     // ── Auto-swap for pickups ─────────────────────────────────────────────────
 
     /// <summary>
-    /// True when the hand is full but a new pickup could still be taken by switching to the
-    /// other (empty) hotbar slot: the held item is the selected slot's stowable item, the other
-    /// slot is empty, and stowing is possible. Owner-only; false on observers.
+    /// True when the hand is full but a new pickup could still be taken by switching to another
+    /// (empty) hotbar slot: the held item is the selected slot's stowable item, some other slot is
+    /// empty, and stowing is possible. Owner-only; false on observers.
     /// </summary>
-    public bool CanFreeHandBySwitchingSlot()
-    {
-        if (!IsOwner || _pickup == null || stowPoint == null) return false;
-        if (IsHandLocked) return false;
-
-        PickableObject held = _pickup.HeldObject;
-        if (held == null || !IsStowable(held)) return false;
-        if (_slots[_activeSlot] != held) return false;
-
-        return _slots[1 - _activeSlot] == null;
-    }
+    public bool CanFreeHandBySwitchingSlot() => FindSwitchTargetSlot() >= 0;
 
     /// <summary>
-    /// Called before a pickup when the hand is full. If the other hotbar slot is empty, selects
-    /// it (stowing the held item) so the pickup lands there. Returns true if the hand is now empty.
+    /// Called before a pickup when the hand is full. If another hotbar slot is empty, selects it
+    /// (stowing the held item) so the pickup lands there. Returns true if the hand is now empty.
     /// </summary>
     public bool TryFreeHandForPickup()
     {
         if (_pickup == null) return false;
         if (_pickup.HeldObject == null) return true;
-        if (!CanFreeHandBySwitchingSlot()) return false;
 
-        EquipSlot(1 - _activeSlot);
+        int target = FindSwitchTargetSlot();
+        if (target < 0) return false;
+
+        EquipSlot(target);
         return _pickup.HeldObject == null;
+    }
+
+    /// <summary>
+    /// The empty slot a full hand should switch to for a pickup — the first empty slot after the
+    /// selected one (wrapping) — or -1 when switching isn't possible.
+    /// </summary>
+    private int FindSwitchTargetSlot()
+    {
+        if (!IsOwner || _pickup == null || stowPoint == null) return -1;
+        if (IsHandLocked) return -1;
+
+        PickableObject held = _pickup.HeldObject;
+        if (held == null || !IsStowable(held)) return -1;
+        if (_slots[_activeSlot] != held) return -1;
+
+        int count = _slots.Length;
+        for (int step = 1; step < count; step++)
+        {
+            int i = (_activeSlot + step) % count;
+            if (_slots[i] == null) return i;
+        }
+        return -1;
     }
 
     // ── Slot equipping ────────────────────────────────────────────────────────
@@ -408,7 +459,7 @@ public class PlayerInventory : NetworkBehaviour
     public void EquipSlot(int slotIndex)
     {
         if (!IsOwner) return;
-        if (slotIndex < 0 || slotIndex >= 2) return;
+        if (slotIndex < 0 || slotIndex >= _slots.Length) return;
 
         // Self-heal a stale hand lock: an empty hand can never be "holding" an unslotted item.
         // Without this, a lock left behind by any release path that skipped the inventory
@@ -548,8 +599,8 @@ public class PlayerInventory : NetworkBehaviour
         if (_pickup != null)
             Drop(_pickup.HeldObjectRef, useItemPosition: true);
 
-        Drop(_firstSlotRef.Value, useItemPosition: false);
-        Drop(_secondSlotRef.Value, useItemPosition: false);
+        for (int i = 0; i < MaxSlotCount; i++)
+            Drop(GetSlotRefVariable(i).Value, useItemPosition: false);
     }
 
     /// <summary>A point slightly above the (ragdolling) body, used for stowed-item drops.</summary>
@@ -600,7 +651,7 @@ public class PlayerInventory : NetworkBehaviour
         }
 
         _unslottedHeld = null;
-        // Selection is kept — both slots are now empty, so the selected one just shows as equipped.
+        // Selection is kept — all slots are now empty, so the selected one just shows as equipped.
     }
 
     // ── Self-healing ──────────────────────────────────────────────────────────

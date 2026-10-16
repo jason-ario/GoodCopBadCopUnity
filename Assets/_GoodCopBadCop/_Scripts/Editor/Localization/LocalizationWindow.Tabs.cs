@@ -49,10 +49,11 @@ public partial class LocalizationWindow
                     }
                 }
                 _scanSuspectObjects = LocUI.Chip(_scanSuspectObjects, "Suspect objects", LocUI.Violet);
+                _scanCode = LocUI.Chip(_scanCode, "Code strings");
                 GUILayout.FlexibleSpace();
                 if (LocUI.Button("Scan project", true, GUILayout.Width(110)))
                 {
-                    _scan = LocalizationScanner.Scan(_settings, _table, _scanScenes, _scanPrefabs, _scanSOs, _scanSuspectObjects);
+                    _scan = LocalizationScanner.Scan(_settings, _table, _scanScenes, _scanPrefabs, _scanSOs, _scanSuspectObjects, _scanCode);
                     LocBindings.ClearGroupCache();
                 }
             }
@@ -73,7 +74,14 @@ public partial class LocalizationWindow
                     if (keys.Count == 0) _status = "No strings from excluded data assets or fields in the sheets.";
                     else EditorApplication.delayCall += () => { ConfirmDelete(keys); Repaint(); };
                 }
+                if (GUILayout.Button(new GUIContent("Remove stale code strings...", "Deletes code.* strings whose English no longer appears in any Loc.T(\"...\") call (the literal was edited or removed)."), GUILayout.Width(200)))
+                {
+                    var keys = LocalizationScanner.StaleCodeKeys(_table);
+                    if (keys.Count == 0) _status = "No stale code strings in the sheets.";
+                    else EditorApplication.delayCall += () => { ConfirmDelete(keys); Repaint(); };
+                }
             }
+            LocUI.Muted_("Code strings: wrap player-facing literals in scripts as Loc.T(\"English\") or Loc.T(\"Day {0}\", day) so the scan finds them.");
         }
 
         if (_scan == null) { LocUI.Hint("Press <b>Scan project</b> to build the review list."); return; }

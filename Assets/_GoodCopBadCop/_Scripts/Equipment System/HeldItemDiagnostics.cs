@@ -38,8 +38,12 @@ public static class HeldItemDiagnostics
         int slot = -1;
         if (inventory != null)
         {
-            if (inventory.GetItemInSlot(0) == item) slot = 0;
-            else if (inventory.GetItemInSlot(1) == item) slot = 1;
+            for (int i = 0; i < inventory.SlotCount; i++)
+            {
+                if (inventory.GetItemInSlot(i) != item) continue;
+                slot = i;
+                break;
+            }
         }
 
         if (!inHand && slot < 0) return;
