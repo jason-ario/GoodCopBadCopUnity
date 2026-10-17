@@ -507,7 +507,11 @@ public class SuspectController : NetworkBehaviour
         }
         else
         {
-            suspectCharacter.InitializeByInfectionStage();
+            // DayBase.GuaranteedKillVerdictSuspects: promoted suspects spawn in the Eliminate band.
+            int forcedScore = dailySuspectManager.IsGuaranteedKillVerdictSuspect(suspectData)
+                ? DailySuspectManager.KillVerdictInfectionScore
+                : -1;
+            suspectCharacter.InitializeByInfectionStage(forcedScore);
         }
 
         // If this slot is fully mutated, swap to the mutant mesh on all clients.

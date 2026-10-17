@@ -148,6 +148,11 @@ public class Day_01 : DayBase
              "The deposited/total count is appended automatically, e.g. 'Throw away trash 2/10'.")]
     [SerializeField] private string _taskThrowTrashText = "Throw away trash";
 
+    [Tooltip("Base label for the Soldier's body objective shown alongside the trash task. The " +
+             "collected/total count is appended automatically, e.g. 'Pick up gore 0/1'. The body is " +
+             "tracked separately and is NOT included in the trash count.")]
+    [SerializeField] private string _taskPickUpGoreText = "Pick up gore";
+
     [Tooltip("Objective label shown after the trash task is done, prompting the player to open the bunker door.")]
     [SerializeField] private string _taskOpenBunkerText = "Open the bunker";
 
@@ -568,6 +573,14 @@ public class Day_01 : DayBase
     private bool _trashTaskDone;
     private bool _graffitiTaskDone;
 
+    // Day 1 Soldier's body, tracked as its own "Pick up gore 0/1" row next to the trash task
+    // (it is excluded from the trash total — see AlexeiController.EndOfShiftSetupSequence).
+    private TutorialObjectiveItem _taskPickUpGore;
+    private bool _soldierGoreDone;
+
+    // Server-only: the Soldier's JunkItem being watched for bag collection / burning.
+    private JunkItem _soldierGoreJunk;
+
     // "Process N subjects" counter task — shown after Vlad's tutorial sequence ends.
     // Vlad himself is NOT counted (see ShowSubjectCounterTask) — the player already finished
     // processing his folder by hand before this counter even appears, so crediting him here
@@ -829,6 +842,10 @@ public class Day_01 : DayBase
         TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
         TutorialTaskSync.OnTrashTaskReadyAllClients     -= OnTrashTaskReadySync;
         TutorialTaskSync.OnTrashBagGrabbedAllClients    -= OnTrashBagGrabbedSync;
+        TutorialTaskSync.OnSoldierGoreCollectedAllClients -= OnSoldierGoreCollectedSync;
+        StopWatchingSoldierGore();
+        _taskPickUpGore = null;
+
         TrashBagPicker.OnBagDispensedLocally            -= OnTrashBagDispensedLocal;
 
         TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
@@ -949,6 +966,8 @@ public class Day_01 : DayBase
         SwitchButton.OnPressed                 -= OnVladButtonPressed;
 
         // Trash/graffiti task tutorial cleanup (safe to call even if tasks never started).
+        TutorialTaskSync.OnSoldierGoreCollectedAllClients -= OnSoldierGoreCollectedSync;
+        StopWatchingSoldierGore();
         TakeOutTrashTask.OnProgressChanged   -= OnTrashProgressChanged;
         TakeOutTrashTask.OnAllItemsDeposited -= OnTrashTaskComplete;
         TakeOutTrashTask.OnProgressChanged   -= OnTakeOutGoreProgressChanged;
@@ -2627,6 +2646,7 @@ public class Day_01 : DayBase
 
         _trashTaskDone    = false;
         _graffitiTaskDone = false;
+        _soldierGoreDone  = false;
 
         if (TakeOutTrashTask.Instance != null)
         {
@@ -2642,6 +2662,8 @@ public class Day_01 : DayBase
             Debug.LogWarning("[Day_01] OnTrashTaskReadySync: TakeOutTrashTask.Instance is null — trash objective not shown.");
             _trashTaskDone = true;
         }
+
+        BeginSoldierGoreObjective();
 
         // The graffiti objective row is owned here (not by CleanGraffitiTask itself) so we
         // control exactly when it appears — right alongside the trash task, matching the
@@ -2789,7 +2811,7 @@ public class Day_01 : DayBase
     /// </summary>
     private void TryFinishTrashAndGraffitiTutorials()
     {
-        if (!_trashTaskDone || !_graffitiTaskDone) return;
+        if (!_trashTaskDone || !_graffitiTaskDone || !_soldierGoreDone) return;
 
         MegaphoneDialogueManager.Instance?.ShowDialogueSynced(_preBreachClockOutFakeoutBark);
 
@@ -2833,6 +2855,75 @@ public class Day_01 : DayBase
         total > 0
             ? $"{_taskThrowTrashText} {deposited}/{total}"
             : _taskThrowTrashText;
+
+    // ── Soldier gore (separate from the trash count) ──────────────────────────
+
+    /// <summary>
+    /// Runs on every client alongside the trash row. Adds the "Pick up gore 0/1" row for the
+    /// Day 1 Soldier's body — which <see cref="AlexeiController"/> deliberately leaves out of the
+    /// trash total — and, on the server, watches that body's <see cref="JunkItem"/> for bagging
+    /// or burning, relaying completion to every client via
+    /// <see cref="TutorialTaskSync.OnSoldierGoreCollectedAllClients"/>. Resolves immediately
+    /// (no row) when there is no Soldier body to collect.
+    /// </summary>
+    private void BeginSoldierGoreObjective()
+    {
+        JunkItem soldierJunk = _soldierCharacter != null ? _soldierCharacter.GetComponent<JunkItem>() : null;
+        if (soldierJunk == null)
+        {
+            Debug.LogWarning("[Day_01] BeginSoldierGoreObjective: Soldier has no JunkItem — 'Pick up gore' objective skipped.");
+            _soldierGoreDone = true;
+            return;
+        }
+
+        TutorialTaskSync.OnSoldierGoreCollectedAllClients -= OnSoldierGoreCollectedSync;
+        TutorialTaskSync.OnSoldierGoreCollectedAllClients += OnSoldierGoreCollectedSync;
+
+        if (_taskPickUpGore == null)
+            _taskPickUpGore = TutorialObjectiveList.Instance?.AddObjective(GetPickUpGoreTaskText(0));
+
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
+
+        StopWatchingSoldierGore();
+        _soldierGoreJunk = soldierJunk;
+        // Objective presentation (persistent highlight / compass) requires task ownership,
+        // which the trash task no longer grants the body.
+        _soldierGoreJunk.SetTaskRequired(true);
+        JunkItem.OnAnyJunkItemCollected += OnServerJunkRemovedForSoldierGore;
+        JunkItem.OnAnyJunkItemBurned    += OnServerJunkRemovedForSoldierGore;
+    }
+
+    /// <summary>Server-only. Fires for every bagged/burned junk item; reacts only to the Soldier's body.</summary>
+    private void OnServerJunkRemovedForSoldierGore(JunkItem junk)
+    {
+        if (_soldierGoreJunk == null || !ReferenceEquals(junk, _soldierGoreJunk)) return;
+
+        StopWatchingSoldierGore();
+        TutorialTaskSync.Instance?.BroadcastSoldierGoreCollectedServer();
+    }
+
+    private void StopWatchingSoldierGore()
+    {
+        JunkItem.OnAnyJunkItemCollected -= OnServerJunkRemovedForSoldierGore;
+        JunkItem.OnAnyJunkItemBurned    -= OnServerJunkRemovedForSoldierGore;
+        _soldierGoreJunk = null;
+    }
+
+    /// <summary>Fires on ALL clients once the server confirms the Soldier's body was bagged or burned.</summary>
+    private void OnSoldierGoreCollectedSync()
+    {
+        TutorialTaskSync.OnSoldierGoreCollectedAllClients -= OnSoldierGoreCollectedSync;
+        if (_soldierGoreDone) return;
+
+        _taskPickUpGore?.SetText(GetPickUpGoreTaskText(1));
+        TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskPickUpGore, preHideDelay: 1.5f);
+        _taskPickUpGore = null;
+
+        _soldierGoreDone = true;
+        TryFinishTrashAndGraffitiTutorials();
+    }
+
+    private string GetPickUpGoreTaskText(int collected) => $"{_taskPickUpGoreText} {collected}/1";
 
     // ── Clock Out ─────────────────────────────────────────────────────────────
 
@@ -3604,7 +3695,7 @@ public class Day_01 : DayBase
     {
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
-        TakeOutTrashTask.Instance?.AdoptPreExistingJunkAfterRestore();
+        TakeOutTrashTask.Instance?.AdoptPreExistingJunkAfterRestore(includeSuspectBodies: false);
         RegisterMutantBreachGate();
     }
 

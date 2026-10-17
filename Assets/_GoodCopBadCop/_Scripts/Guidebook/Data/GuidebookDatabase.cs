@@ -199,19 +199,18 @@ public class GuidebookDatabase : ScriptableObject
             Body   = IntegrityChoresBody,
             IconList = new[]
             {
-                new GuidebookIconItem { Label = "TRASH & GORE",     Text = "Bag it, then throw the bag in the dumpster." },
-                new GuidebookIconItem { Label = "GRAFFITI",         Text = "Scrub it away with the mop." },
-                new GuidebookIconItem { Label = "FENCES",           Text = "Repair broken fences with the hammer." },
+                new GuidebookIconItem { Label = "TRASH & GORE",     Text = "Bag it, then bin it in the dumpster." },
+                new GuidebookIconItem { Label = "GRAFFITI & BLOOD", Text = "Mop it away." },
+                new GuidebookIconItem { Label = "FENCES",           Text = "Fix them with the hammer." },
             },
         },
     };
 
-    public const string IntegrityChoresBody = "Clear every mess to keep integrity at 100%.";
+    public const string IntegrityChoresBody = "Keep integrity at 100%.";
 
     public const string IntegrityBody =
-        "Your pay is multiplied by the checkpoint's integrity, shown on this panel.\n\n" +
-        "Below 100%, the difference is deducted from your earnings, up to " + IntegrityMaxDeductionToken + "%.\n\n" +
-        "The counters show what's left to clean. Your compass marks every mess.";
+        "Your pay is multiplied by integrity. Messes cost up to " + IntegrityMaxDeductionToken + "%.\n\n" +
+        "Your compass marks every mess.";
 
     /// <summary>
     /// Starting content for the Survival section. Only used while the asset has no serialized
@@ -236,15 +235,13 @@ public class GuidebookDatabase : ScriptableObject
     };
 
     public const string SurvivalHealthBody =
-        "This bar shows your health. Injuries and radiation wear it down.\n\n" +
-        "If your health reaches 0%, you die.\n\n" +
-        "Eat food or smoke a cigarette to restore health. Your health resets at the start of the next day.";
+        "Injuries and radiation drain health. At 0%, you die.\n\n" +
+        "Food or a cigarette heals. Resets each day.";
 
     public const string SurvivalRadiationBody =
-        "The Geiger counter shows your radiation. The needle reacts to how fast you are being exposed; " +
-        "the meter and reading show how much you have absorbed.\n\n" +
-        "When your radiation is high, your health declines. The higher it climbs, the faster you lose health.\n\n" +
-        "Take radiation pills to bring your radiation down. Your radiation resets at the start of the next day.";
+        "Needle: exposure rate. Meter: radiation absorbed.\n\n" +
+        "High radiation drains health.\n\n" +
+        "Pills lower it. Resets each day.";
 
     /// <summary>
     /// Resolves the category of an anomaly entry from its C# base class.

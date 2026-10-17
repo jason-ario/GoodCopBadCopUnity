@@ -1309,8 +1309,12 @@ public class SuspectCharacter : Interactable
     /// <summary>
     /// Primary initialization path for regular suspects.
     /// Reads the persistent infection score and activates the proportional anomaly set.
+    /// <paramref name="forcedInfectionScore"/> (server, ≥ 0) overwrites the persistent score first
+    /// and spends the anomaly budget exactly — used for guaranteed kill-verdict suspects
+    /// (<see cref="DayBase.GuaranteedKillVerdictSuspects"/>). The new score persists, so a
+    /// kill-band suspect who is passed turns overnight like any naturally scored one.
     /// </summary>
-    public void InitializeByInfectionStage()
+    public void InitializeByInfectionStage(int forcedInfectionScore = -1)
     {
         SuspectRecord record = SuspectRunRecords.Instance.GetRecord(suspectData);
 
@@ -1324,7 +1328,17 @@ public class SuspectCharacter : Interactable
         // Mark shown BEFORE rolling anomalies so the never-seen tiered starting score
         // (applied on first appearance) actually drives this spawn's anomaly budget.
         MarkSuspectShown(record);
-        anomalyController.InitializeByInfectionScore(record.infectionScore);
+
+        bool forced = forcedInfectionScore >= 0 && !record.IsFullyMutated;
+        if (forced)
+        {
+            Debug.Log($"[SuspectCharacter] '{suspectData.name}' is a guaranteed kill-verdict suspect — infection {record.infectionScore} -> {forcedInfectionScore}.");
+            record.infectionScore = forcedInfectionScore;
+            if (SaveDataManager.Instance != null)
+                SuspectRunRecords.Instance.SaveRecords();
+        }
+
+        anomalyController.InitializeByInfectionScore(record.infectionScore, spendExactBudget: forced);
         suspectRecordViewer.SetRecord(record);
 
         ChosenEntryReasonIndex = UnityEngine.Random.Range(0, 2);

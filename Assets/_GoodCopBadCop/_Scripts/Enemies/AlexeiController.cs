@@ -359,7 +359,9 @@ public class AlexeiController : NetworkBehaviour
         if (TakeOutTrashTask.Instance != null)
         {
             Debug.Log($"[AlexeiController] Calling TakeOutTrashTask.TriggerTask(). IsServer={IsServer}");
-            TakeOutTrashTask.Instance.TriggerTask();
+            // The Soldier's body is NOT part of the trash total — Day_01 tracks it as its own
+            // "Pick up gore 0/1" objective (see Day_01.BeginSoldierGoreObjective).
+            TakeOutTrashTask.Instance.TriggerTask(useGorePrefabs: false, includeSuspectBodies: false);
         }
         else
         {

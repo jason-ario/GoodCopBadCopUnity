@@ -74,7 +74,7 @@ public class AnomalyController : MonoBehaviour
     /// character's visual transformation is the only signal needed. Score 0 also delegates to
     /// <see cref="InitializeClean"/>.
     /// </summary>
-    public void InitializeByInfectionScore(int infectionScore)
+    public void InitializeByInfectionScore(int infectionScore, bool spendExactBudget = false)
     {
         if (infectionScore <= 0)
         {
@@ -90,7 +90,7 @@ public class AnomalyController : MonoBehaviour
         }
 
         int mutationScore = Mathf.Clamp(Mathf.RoundToInt(infectionScore / 10f), 0, 10);
-        InitializeByMutationScore(mutationScore);
+        InitializeByMutationScore(mutationScore, spendExactBudget);
     }
 
     /// <summary>
@@ -105,8 +105,13 @@ public class AnomalyController : MonoBehaviour
     /// spent on a single cheap category.
     ///
     /// Score 0 delegates to <see cref="InitializeClean"/>.
+    ///
+    /// <paramref name="spendExactBudget"/>: when true and the greedy pass leaves exactly 1 point
+    /// unspent (every 1-point anomaly already taken, only 2-point ones left), one chosen 1-point
+    /// anomaly is swapped for an unchosen 2-point one so the visible total matches the budget.
+    /// Used for guaranteed kill-verdict suspects, whose disposition-chart band (8) must not slip to 7.
     /// </summary>
-    public void InitializeByMutationScore(int mutationScore)
+    public void InitializeByMutationScore(int mutationScore, bool spendExactBudget = false)
     {
         if (mutationScore <= 0)
         {
@@ -135,18 +140,52 @@ public class AnomalyController : MonoBehaviour
         ShuffleList(pool);
 
         // ── Spend the mutation-score points budget across the shuffled combined pool ──────
+        // Plan the selection first, then apply it, so the optional exact-spend fix-up can
+        // adjust the choice before any anomaly is activated.
         int remainingBudget = mutationScore;
+        var selected = new bool[pool.Count];
+
+        for (int i = 0; i < pool.Count; i++)
+        {
+            int cost = GetAnomalyPointCost(pool[i].category);
+            if (cost <= remainingBudget)
+            {
+                selected[i] = true;
+                remainingBudget -= cost;
+            }
+        }
+
+        if (spendExactBudget && remainingBudget == 1)
+        {
+            int swapOut = -1, swapIn = -1;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                int cost = GetAnomalyPointCost(pool[i].category);
+                if (swapOut < 0 && selected[i] && cost == 1) swapOut = i;
+                if (swapIn < 0 && !selected[i] && cost == 2) swapIn = i;
+            }
+
+            if (swapOut >= 0 && swapIn >= 0)
+            {
+                selected[swapOut] = false;
+                selected[swapIn] = true;
+                remainingBudget = 0;
+            }
+            else
+            {
+                Debug.LogWarning($"[AnomalyController] Exact budget {mutationScore} requested but only {mutationScore - remainingBudget} point(s) could be spent with the unlocked pool.");
+            }
+        }
+
         int totalActivated = 0;
         var perCategoryCounts = new Dictionary<AnomalyCategory, int>();
 
-        foreach ((Anomaly anomaly, AnomalyCategory category) entry in pool)
+        for (int i = 0; i < pool.Count; i++)
         {
-            int cost = GetAnomalyPointCost(entry.category);
-
-            if (cost <= remainingBudget)
+            (Anomaly anomaly, AnomalyCategory category) entry = pool[i];
+            if (selected[i])
             {
                 ActivateAnomaly(entry.anomaly);
-                remainingBudget -= cost;
                 totalActivated++;
                 perCategoryCounts.TryGetValue(entry.category, out int existing);
                 perCategoryCounts[entry.category] = existing + 1;

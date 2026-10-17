@@ -293,4 +293,26 @@ public class TutorialTaskSync : NetworkBehaviour
     {
         OnTrashBagGrabbedAllClients?.Invoke();
     }
+
+    // ── Soldier gore collected (Day 1 "Pick up gore" objective) ───────────────
+
+    /// <summary>
+    /// Fired on ALL clients once the server detects the Day 1 Soldier's body was bagged or
+    /// burned. <see cref="JunkItem.OnAnyJunkItemCollected"/> only fires on the server, so this
+    /// relay completes the "Pick up gore" row on every client.
+    /// </summary>
+    public static event Action OnSoldierGoreCollectedAllClients;
+
+    /// <summary>Server-only. Broadcasts <see cref="OnSoldierGoreCollectedAllClients"/>.</summary>
+    public void BroadcastSoldierGoreCollectedServer()
+    {
+        if (!IsServer) return;
+        BroadcastSoldierGoreCollectedClientRpc();
+    }
+
+    [ClientRpc]
+    private void BroadcastSoldierGoreCollectedClientRpc()
+    {
+        OnSoldierGoreCollectedAllClients?.Invoke();
+    }
 }

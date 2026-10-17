@@ -90,6 +90,28 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// <summary>Cached outdoor/indoor state at the moment this view opened, restored on close.</summary>
     private bool _preOpenLightActive;
 
+    /// <summary>Player whose cutscene-state event this view listens to while open (dialogue kick-out).</summary>
+    private PlayerInstance _cutsceneWatchPlayer;
+
+    /// <summary>
+    /// True while the local player is in any dialogue: a locked dialogue mode, a scripted
+    /// runner sequence (incl. megaphone), a world conversation, or an unlocked megaphone
+    /// (which only sets the cutscene flag). Diegetic views must not stay open in any of these.
+    /// </summary>
+    public static bool IsLocalPlayerInDialogue()
+    {
+        if (DialogueChoiceSystem.IsInDialogueMode) return true;
+        if (SuspectWorldDialogue.IsLocalPlayerInConversation) return true;
+        PlayerInstance local = PlayerInstance.Instance;
+        return local != null && local.IsInCutscene;
+    }
+
+    private void HandleCutsceneStateChanged(bool isInCutscene)
+    {
+        if (isInCutscene && IsActive)
+            Close();
+    }
+
     // ─── Public API ──────────────────────────────────────────────────────────
 
     /// <summary>
@@ -101,6 +123,12 @@ public abstract class DiegeticViewController : MonoBehaviour
     public void Open(PlayerInteractionController player)
     {
         if (IsActive) return;
+
+        // Never open while the local player is in any dialogue (locked or unlocked megaphone,
+        // scripted runner sequence, world conversation). The dialogue's exit path restores
+        // gameplay state (hides the back button/cursor, unlocks movement) without knowing about
+        // the view, which would leave the view's camera latched on with no way out.
+        if (IsLocalPlayerInDialogue()) return;
 
         Player = player;
         IsActive = true;
@@ -159,6 +187,13 @@ public abstract class DiegeticViewController : MonoBehaviour
             _playerInstance.SetPlayerLightActive(true);
         }
 
+        // Kick the player out of this view the moment any dialogue starts. Every dialogue entry
+        // (DialogueChoiceSystem lock paths, ScriptedDialogueRunner incl. unlocked megaphone,
+        // SuspectWorldDialogue) flags the local player as in-cutscene, so this one hook covers all.
+        _cutsceneWatchPlayer = player.GetComponent<PlayerInstance>();
+        if (_cutsceneWatchPlayer != null)
+            _cutsceneWatchPlayer.OnCutsceneStateChanged += HandleCutsceneStateChanged;
+
         OnOpened();
 
         // "[LMB / RT] {text}" prompt on the shared ControlHintsOverlay (outside the hidden Player HUD).
@@ -189,6 +224,12 @@ public abstract class DiegeticViewController : MonoBehaviour
         IsActive = false;
         IsAnyViewActive = false;
         Current = null;
+
+        if (_cutsceneWatchPlayer != null)
+        {
+            _cutsceneWatchPlayer.OnCutsceneStateChanged -= HandleCutsceneStateChanged;
+            _cutsceneWatchPlayer = null;
+        }
 
         // Give subclass a chance to clean up while Player is still valid.
         OnClosed();
@@ -393,6 +434,14 @@ public abstract class DiegeticViewController : MonoBehaviour
     protected virtual void Update()
     {
         if (!IsActive) return;
+
+        // Safety net for any dialogue path that bypasses the cutscene event: never leave a
+        // view open underneath a dialogue (soft-lock: exit input/back button get taken over).
+        if (IsLocalPlayerInDialogue())
+        {
+            Close();
+            return;
+        }
 
         // Don't process any input or interaction while the game is paused.
         if (UIController.Instance != null && UIController.Instance.IsPaused) return;

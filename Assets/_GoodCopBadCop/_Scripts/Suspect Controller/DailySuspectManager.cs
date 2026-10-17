@@ -76,6 +76,30 @@ public class DailySuspectManager : MonoBehaviour
     private readonly HashSet<int> _replacementSlotIndices = new HashSet<int>();
 
     /// <summary>
+    /// Infection score given to a guaranteed kill-verdict suspect at spawn. round(78 / 10) = 8,
+    /// the disposition chart's "Conversion imminent — Eliminate" band, and still below
+    /// <see cref="AnomalyController.FULLY_MUTATED_THRESHOLD"/>.
+    /// </summary>
+    public const int KillVerdictInfectionScore = 78;
+
+    /// <summary>Lowest persistent infection score that already presents as mutation score 8.</summary>
+    private const int KillBandMinInfectionScore = 75;
+
+    /// <summary>
+    /// Suspects promoted to the kill band today by <see cref="AssignGuaranteedKillVerdictSuspects"/>.
+    /// Keyed by SuspectData (not slot index) so intercept swaps and cheat slot overrides can't
+    /// detach the flag from the character. Server-authoritative; clients never spawn.
+    /// </summary>
+    private readonly HashSet<SuspectData> _killVerdictSuspects = new HashSet<SuspectData>();
+
+    /// <summary>
+    /// True when <paramref name="suspect"/> was promoted to the kill band for today's shift and
+    /// should spawn with <see cref="KillVerdictInfectionScore"/>.
+    /// </summary>
+    public bool IsGuaranteedKillVerdictSuspect(SuspectData suspect) =>
+        suspect != null && _killVerdictSuspects.Contains(suspect);
+
+    /// <summary>
     /// When assigned, replaces the default random population logic entirely.
     /// The delegate is responsible for populating <see cref="shiftSuspects"/> directly.
     /// Set by a day subclass (e.g. Day_01) and cleared when that day deactivates.
@@ -169,6 +193,7 @@ public class DailySuspectManager : MonoBehaviour
             InjectForcedFullMutantSlots();
             EnsureLineupDoesNotEndWithMutant();
             InjectFullMutantSlots();
+            AssignGuaranteedKillVerdictSuspects();
             IsLineupPopulated = true;
             Debug.Log($"[DailySuspectManager] TotalSuspectsThisShift (override) = {TotalSuspectsThisShift}.");
             return;
@@ -206,8 +231,79 @@ public class DailySuspectManager : MonoBehaviour
         InjectForcedFullMutantSlots();
         EnsureLineupDoesNotEndWithMutant();
         InjectFullMutantSlots();
+        AssignGuaranteedKillVerdictSuspects();
         IsLineupPopulated = true;
         Debug.Log($"[DailySuspectManager] TotalSuspectsThisShift = {TotalSuspectsThisShift} (base draw request was {suspectAmount}).");
+    }
+
+    /// <summary>
+    /// Demo guarantee, driven by <see cref="DayBase.GuaranteedKillVerdictSuspects"/>. Counts the
+    /// suspects whose persistent score already presents in the Eliminate band, then promotes
+    /// random plain civilians until the quota is met. Must run after every slot injection.
+    /// Skips mutant intruder, doppelganger, full-mutant and replacement slots, today's guaranteed
+    /// suspects, and the first civilian slot when a tutorial has a forced anomaly init pending
+    /// (that slot's spawn bypasses the infection-score path, e.g. Day 2's Blue Veins subject).
+    /// </summary>
+    private void AssignGuaranteedKillVerdictSuspects()
+    {
+        DayBase today = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
+        int quota = today != null ? today.GuaranteedKillVerdictSuspects : 0;
+        if (quota <= 0) return;
+
+        SuspectRunRecords runRecords = SuspectRunRecords.Instance;
+        if (runRecords == null) return;
+
+        bool forcedInitPending = SuspectController.ForceNextSuspectClean
+                                 || (SuspectController.ForceNextSuspectAnomalyTypes != null && SuspectController.ForceNextSuspectAnomalyTypes.Count > 0)
+                                 || SuspectController.ForceNextSuspectAnomalyCount >= 0;
+        int forcedInitSlot = -1;
+        if (forcedInitPending)
+        {
+            for (int i = 0; i < shiftSuspects.Count; i++)
+            {
+                if (shiftSuspects[i] == null || _mutantSlotIndices.Contains(i) || _doppelgangerSlots.ContainsKey(i)) continue;
+                forcedInitSlot = i;
+                break;
+            }
+        }
+
+        int alreadyInBand = 0;
+        var candidates = new List<SuspectData>();
+
+        for (int i = 0; i < shiftSuspects.Count; i++)
+        {
+            SuspectData suspect = shiftSuspects[i];
+            if (suspect == null || i == forcedInitSlot) continue;
+            if (_mutantSlotIndices.Contains(i) || _doppelgangerSlots.ContainsKey(i)) continue;
+            if (_fullMutantSlotIndices.Contains(i) || _replacementSlotIndices.Contains(i)) continue;
+
+            SuspectRecord record = runRecords.GetRecord(suspect);
+            if (record == null || record.IsFullyMutated || record.isLegacyMutant) continue;
+
+            if (record.infectionScore >= KillBandMinInfectionScore)
+            {
+                alreadyInBand++;
+                continue;
+            }
+
+            if (IsGuaranteedToday(today, suspect)) continue;
+            candidates.Add(suspect);
+        }
+
+        int needed = quota - alreadyInBand;
+        while (needed > 0 && candidates.Count > 0)
+        {
+            int pick = UnityEngine.Random.Range(0, candidates.Count);
+            _killVerdictSuspects.Add(candidates[pick]);
+            Debug.Log($"[DailySuspectManager] Day {today.DayNumber} guaranteed kill verdict — '{candidates[pick].name}' will spawn in the Eliminate band.");
+            candidates.RemoveAt(pick);
+            needed--;
+        }
+
+        if (needed > 0)
+            Debug.LogWarning($"[DailySuspectManager] Day {today.DayNumber} wanted {quota} kill-verdict suspect(s) but only {quota - needed} could be arranged.");
+        else
+            Debug.Log($"[DailySuspectManager] Day {today.DayNumber} kill-verdict quota {quota}: {alreadyInBand} already in band, {_killVerdictSuspects.Count} promoted.");
     }
 
     /// <summary>
@@ -454,6 +550,7 @@ public class DailySuspectManager : MonoBehaviour
         _doppelgangerSlots.Clear();
         _fullMutantSlotIndices.Clear();
         _replacementSlotIndices.Clear();
+        _killVerdictSuspects.Clear();
         _lastSpawnedMutantPrefab = null;
     }
 

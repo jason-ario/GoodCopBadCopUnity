@@ -146,6 +146,16 @@ public abstract class DayBase : MonoBehaviour
     [Range(0, 100)]
     public int ForcedFullMutantMinScore = 45;
 
+    [Header("Demo — Guaranteed Kill Verdicts")]
+    [Tooltip("Minimum number of suspects in today's lineup whose anomaly total lands in the " +
+             "disposition chart's Eliminate band (mutation score 8), so the red stamp is the " +
+             "correct call. Suspects who already score in that band count toward it; extra plain " +
+             "civilians are promoted only to reach the quota. Never applied to mutant intruder, " +
+             "doppelganger, full-mutant, replacement or guaranteed slots, or to a subject whose " +
+             "anomalies are forced by a tutorial (e.g. Day 2's Blue Veins subject). 0 = off.")]
+    [Range(0, 2)]
+    public int GuaranteedKillVerdictSuspects = 0;
+
     [Header("Breach Event")]
     [Tooltip("Whether this day has a mutant breach event or not. When true, MutantBreachManager " +
              "triggers one random breach at the end of the day, once every suspect has been " +

@@ -299,11 +299,15 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// no longer tracked and could never be credited. Call once that junk has been rebuilt: it is
     /// re-swept into the counted set and the total is made consistent with what actually remains.
     /// </summary>
-    public void AdoptPreExistingJunkAfterRestore()
+    /// <param name="includeSuspectBodies">
+    /// Pass false when the day tracks scripted suspect bodies through its own objective (Day 1's
+    /// "Pick up gore" row for the Soldier), mirroring the original trigger's sweep.
+    /// </param>
+    public void AdoptPreExistingJunkAfterRestore(bool includeSuspectBodies = true)
     {
         if (!IsServer || !_taskActive) return;
 
-        CollectCountablePreExistingItems(includeSuspects: !_isGoreTask);
+        CollectCountablePreExistingItems(includeSuspects: includeSuspectBodies && !_isGoreTask);
         _countedExistingItems.RemoveAll(netObj => _spawnedItems.Contains(netObj));
         SetTaskRequired(_countedExistingItems, true);
 
@@ -552,7 +556,12 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// Multiplier applied to the rolled spawn range before the solo-player halving (e.g. Day 3
     /// passes ~0.33 to spawn a third of the gore). 1 = unchanged.
     /// </param>
-    public void TriggerTask(bool useGorePrefabs, float amountScale = 1f)
+    /// <param name="includeSuspectBodies">
+    /// When false, scripted suspect bodies (e.g. the Day 1 Soldier) are left out of the
+    /// pre-existing sweep even for a trash run — used by Day 1, which tracks the Soldier's body
+    /// as its own separate "Pick up gore" objective. Gore runs always exclude them.
+    /// </param>
+    public void TriggerTask(bool useGorePrefabs, float amountScale = 1f, bool includeSuspectBodies = true)
     {
         if (!IsServer) return;
 
@@ -569,7 +578,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         // Suspect NPC bodies (e.g. the Day 1 soldier, Vlad) are tracked by their own separate
         // systems and shouldn't be swept into the mutant-breach gore task's total just because
         // they happen to be lying uncollected inside the checkpoint.
-        int preExistingCount = CollectCountablePreExistingItems(includeSuspects: !useGorePrefabs);
+        int preExistingCount = CollectCountablePreExistingItems(includeSuspects: includeSuspectBodies && !useGorePrefabs);
 
         GameObject[] prefabPool = useGorePrefabs ? _goreJunkPrefabs : _trashPrefabs;
 
