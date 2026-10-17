@@ -17,6 +17,21 @@ public enum DeathBehaviour { Destroy, PlayAnimation }
 [RequireComponent(typeof(NavMeshAgent))]
 public class MutantEnemy : NetworkBehaviour
 {
+    private static readonly List<MutantEnemy> s_activeInstances = new List<MutantEnemy>();
+
+    /// <summary>
+    /// Every MutantEnemy on an active GameObject (dormant suspects and players included; filter
+    /// with <see cref="IsActive"/>/<see cref="IsDead"/>). Maintained via OnEnable/OnDisable so hot
+    /// scans don't need FindObjectsByType. Do not add/remove instances while iterating.
+    /// </summary>
+    public static IReadOnlyList<MutantEnemy> ActiveInstances => s_activeInstances;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetActiveInstances() => s_activeInstances.Clear();
+
+    private void OnEnable()  => s_activeInstances.Add(this);
+    private void OnDisable() => s_activeInstances.Remove(this);
+
     /// <summary>
     /// Fired on the server just before this mutant is removed from play — either by fleeing
     /// and despawning, or by dying. Subscribe to this to defer any post-breakthrough logic
@@ -991,7 +1006,8 @@ public class MutantEnemy : NetworkBehaviour
                         _fenceTarget = FindBlockingFenceTowardTarget(_currentTarget.position)
                                        ?? FindBlockingFenceAlongPath();
 
-                    if (_fenceTarget != null && _fenceTarget.IsSpawned && !_fenceTarget.IsPassableByMutant)
+                    if (_fenceTarget != null && _fenceTarget.IsSpawned && !_fenceTarget.IsPassableByMutant
+                        && !IsInsideYard())
                     {
                         if (_knockbackCoroutine == null)
                             _agent.isStopped = false;
@@ -1093,6 +1109,13 @@ public class MutantEnemy : NetworkBehaviour
                     if (_fenceTarget == null)
                         _fenceTarget = FindBlockingFenceTowardTarget(aggroTarget.position)
                                        ?? FindBlockingFenceAlongPath();
+                    else if (IsInsideYard())
+                    {
+                        // Inside the yard — fences no longer matter; head for the aggro target.
+                        _fenceTarget = null;
+                        _agent.stoppingDistance = data.stoppingDistance;
+                        InvalidateDestination();
+                    }
 
                     if (_fenceTarget != null)
                     {
@@ -1428,6 +1451,20 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
+    /// True when the mutant stands inside the fenced yard, defined by the
+    /// <see cref="TakeOutTrashTask"/>'s trash <see cref="SpawnZone"/>s. Once inside, the mutant has
+    /// already made it past the perimeter, so every fence-acquisition path (straight-line sweep,
+    /// path sweep, partial-path end, stuck-against-fence) returns nothing and any held fence target
+    /// is dropped — it goes straight for its player/aggro target instead of smashing interior or
+    /// neighbouring fence segments that happen to lie along its route.
+    /// </summary>
+    private bool IsInsideYard()
+    {
+        TakeOutTrashTask task = TakeOutTrashTask.Instance;
+        return task != null && task.IsPositionInSpawnZones(transform.position);
+    }
+
+    /// <summary>
     /// SphereCasts in a straight line from the mutant directly toward <paramref name="targetPosition"/>
     /// and returns the nearest non-passable <see cref="PerimiterFence"/> found along that line, up to
     /// the full distance to the target.
@@ -1440,6 +1477,9 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     private PerimiterFence FindBlockingFenceTowardTarget(Vector3 targetPosition)
     {
+        if (IsInsideYard())
+            return null;
+
         // Cast from chest height toward the target, ignoring vertical offset.
         Vector3 origin = transform.position + Vector3.up * 1f;
         Vector3 toTarget = targetPosition - origin;
@@ -1461,7 +1501,7 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     private PerimiterFence FindBlockingFenceAlongPath(float maxDistance = 25f)
     {
-        if (!_agent.hasPath || _agent.pathPending)
+        if (IsInsideYard() || !_agent.hasPath || _agent.pathPending)
             return null;
 
         Vector3[] corners = _agent.path.corners;
@@ -1808,6 +1848,9 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     private PerimiterFence FindFenceNearPoint(Vector3 point)
     {
+        if (IsInsideYard())
+            return null;
+
         Collider[] cols = Physics.OverlapSphere(point, _agent.radius + 1.5f);
         PerimiterFence best = null;
         float bestSqr = float.MaxValue;
@@ -1992,9 +2035,9 @@ public class MutantEnemy : NetworkBehaviour
                 // target and only detours to smash through whichever fence is actually in the way.
                 _fenceTarget = FindBlockingFenceTowardTarget(aggroTarget.position);
             }
-            else if (!_fenceTarget.IsSpawned || _fenceTarget.IsPassableByMutant)
+            else if (!_fenceTarget.IsSpawned || _fenceTarget.IsPassableByMutant || IsInsideYard())
             {
-                // Fence broken — resume navigation toward the aggro target immediately.
+                // Fence broken (or we're already inside the yard) — resume navigation toward the aggro target immediately.
                 _fenceTarget = null;
                 _forceRepathUntilTime = Time.time + FenceRecheckGraceSeconds;
                 if (_knockbackCoroutine == null)

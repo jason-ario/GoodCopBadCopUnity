@@ -45,6 +45,12 @@ public class RagdollController : MonoBehaviour
 
     private const int DefaultLayer = 0;
 
+    /// <summary>Bone rigidbodies driven by this ragdoll (resolved in Awake when not assigned).</summary>
+    public System.Collections.Generic.IReadOnlyList<Rigidbody> RagdollRigidbodies => ragdollRigidbodies;
+
+    /// <summary>Bone colliders driven by this ragdoll (resolved in Awake when not assigned).</summary>
+    public System.Collections.Generic.IReadOnlyList<Collider> RagdollColliders => ragdollColliders;
+
     private void Awake()
     {
         if (animator == null) animator = GetComponent<Animator>();

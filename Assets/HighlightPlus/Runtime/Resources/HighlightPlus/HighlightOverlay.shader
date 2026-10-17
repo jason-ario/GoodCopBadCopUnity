@@ -14,6 +14,13 @@ Properties {
     _OverlayPatternScrolling("Pattern Scrolling", Vector) = (0,0,0,0)
     _OverlayPatternData("Pattern Data", Vector) = (0,0,0,0)
     _OverlayBlendDst("Overlay Blend Dst", Int) = 10
+    // GCBC: stencil is material-driven so through-wall overlays (ZTest Always/Greater) draw at most
+    // once per pixel instead of stacking every overlapping triangle. Defaults = original behaviour.
+    _OverlayStencilRef("Overlay Stencil Ref", Int) = 4
+    _OverlayStencilReadMask("Overlay Stencil Read Mask", Int) = 4
+    _OverlayStencilWriteMask("Overlay Stencil Write Mask", Int) = 0
+    _OverlayStencilComp("Overlay Stencil Comp", Int) = 6
+    _OverlayStencilPass("Overlay Stencil Pass", Int) = 0
 }
     SubShader
     {
@@ -24,10 +31,11 @@ Properties {
         {
             Name "Overlay"
         	Stencil {
-                Ref 4
-                ReadMask 4
-                Comp NotEqual
-                Pass keep
+                Ref [_OverlayStencilRef]
+                ReadMask [_OverlayStencilReadMask]
+                WriteMask [_OverlayStencilWriteMask]
+                Comp [_OverlayStencilComp]
+                Pass [_OverlayStencilPass]
             }
             Blend SrcAlpha [_OverlayBlendDst]
             ZWrite Off

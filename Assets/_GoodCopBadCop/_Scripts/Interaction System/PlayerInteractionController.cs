@@ -69,8 +69,8 @@ public class PlayerInteractionController : NetworkBehaviour
 
     /// <summary>
     /// Verb LMB / RT would perform by applying the held item to the targeted interactable this frame
-    /// (tool-style targets, <see cref="HeldItemTargetKey.UseItem"/>, e.g. "Stamp"), or null when LMB
-    /// would use the item in place. Read by <see cref="HeldItemUsePrompt"/>.
+    /// (tool-style targets such as "Stamp", or E deposit/insert targets such as "Throw away", which
+    /// LMB also accepts), or null when LMB would use the item in place. Read by <see cref="HeldItemUsePrompt"/>.
     /// </summary>
     public string TargetItemUseVerb { get; private set; }
 
@@ -84,8 +84,27 @@ public class PlayerInteractionController : NetworkBehaviour
 
     private bool AppliesHeldItemOnInteract(Interactable target) => AppliesHeldItemOn(target, HeldItemTargetKey.Interact);
 
+    private const string IncompatibleItemMessage = "Not compatible";
+    private const float IncompatibleItemCooldown = 1f;
+    private float _nextIncompatibleItemMessageTime;
+
+    /// <summary>True when the player holds an item that <paramref name="target"/> takes items but rejects this one.</summary>
+    private bool IsHeldItemIncompatibleWith(Interactable target)
+    {
+        PickableObject held = _playerPickupController != null ? _playerPickupController.HeldObject : null;
+        return target != null && held != null && target.AcceptsHeldItems && !target.CanInteractWithItem(held);
+    }
+
+    /// <summary>Local-only "Not compatible" error notification, rate-limited so repeated presses don't stack toasts.</summary>
+    private void ShowIncompatibleItemMessage()
+    {
+        if (Time.unscaledTime < _nextIncompatibleItemMessageTime) return;
+        _nextIncompatibleItemMessageTime = Time.unscaledTime + IncompatibleItemCooldown;
+        UIController.Instance?.ShowErrorNotification(IncompatibleItemMessage);
+    }
+
     // â”€â”€ Controller trigger helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // RT  (rightTrigger)  = LMB â€” use the held item (never world interaction)
+    // RT  (rightTrigger)  = LMB — use the held item, incl. applying it to a target (never a target's own Interact)
     // LT  (leftTrigger)   = RMB â€” placement mode hold
     // RB  (rightShoulder) = MMB â€” throw charge / release
     // X / Square (buttonWest) = Interact key (E) â€” ALL world interaction; see IInteractable.cs
@@ -277,12 +296,19 @@ public class PlayerInteractionController : NetworkBehaviour
         
         if (RmbUp)
         {
+            // Place (RMB / LT release) onto a placement-slot target (IPickupSlot, e.g. the ink
+            // stamp holder) puts the held item into it, same as E / LMB. Checked before the
+            // _placerBlocked reset so an LMB-cancelled placement stays cancelled.
+            if (!LmbHeld && !_placerBlocked)
+                TryPlaceIntoTargetSlot();
+
             _placerBlocked = false;
         }
 
 
-        // LMB / RT is ONLY for using the held item (including using it on a target via
-        // InteractWithItem). Empty-handed it does nothing — world interaction is the Interact key.
+        // LMB / RT is ONLY for using the held item (including applying it to a target via
+        // InteractWithItem — tool targets and E deposit/insert targets alike). Empty-handed it
+        // does nothing — world interaction is the Interact key.
         // Exception: when the cursor is visible (e.g. notebook draw mode), LMB belongs to the
         // ClickDetector â€” skip TryItemUse so it doesn't double-fire and call OnStartUse again.
         if (LmbDown && _playerPickupController.HeldObject != null && !Cursor.visible)
@@ -579,9 +605,12 @@ public class PlayerInteractionController : NetworkBehaviour
                     string useVerb = canApplyHeldItem && !applyOnInteract ? itemVerb : null;
                     if (applyOnInteract) holdVerb = null;
 
-                    TargetItemUseVerb = useVerb;
+                    // HUD "[LMB/RT] {verb}" covers both keys' item actions: LMB also applies the
+                    // held item on E (deposit/insert) targets (see TryItemUse).
+                    TargetItemUseVerb = canApplyHeldItem ? itemVerb : null;
 
-                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint && !applyOnInteract, holdVerb, useVerb, actionVerb);
+                    // useItemAlsoTaps: LMB also applies the held item here (see TryItemUse) → "[E] / [LMB] {verb}".
+                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint && !applyOnInteract, holdVerb, useVerb, actionVerb, applyOnInteract);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }
@@ -1152,11 +1181,11 @@ public class PlayerInteractionController : NetworkBehaviour
     }
 
     /// <summary>
-    /// Handles LMB / RT while holding an item: applies it to the targeted interactable only when that
-    /// target takes it as a tool action (<see cref="HeldItemTargetKey.UseItem"/>, e.g. stamp a folder),
-    /// otherwise uses it in place. Deposit / insert actions and every other world interaction are
-    /// the Interact key's job (see <see cref="TryWorldInteract"/>).
-    /// Never triggers world interact â€” that is the Interact key's job (see <see cref="TryWorldInteract"/>).
+    /// Handles LMB / RT while holding an item: applies it to the targeted interactable when that
+    /// target accepts it on either key — deposit / insert targets (<see cref="HeldItemTargetKey.Interact"/>,
+    /// also reachable with E) or tool actions (<see cref="HeldItemTargetKey.UseItem"/>, e.g. stamp a
+    /// folder) — otherwise uses it in place. Never triggers a target's own Interact / hold action;
+    /// that is the Interact key's job (see <see cref="TryWorldInteract"/>).
     /// </summary>
     void TryItemUse()
     {
@@ -1182,6 +1211,16 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
+        // Deposit / insert targets (HeldItemTargetKey.Interact — put the stamp back in the ink pad,
+        // bag junk, throw away…) also accept LMB / RT, so E and LMB both apply the held item there.
+        // Only the target action fires: the item is not also used in place.
+        if (AppliesHeldItemOnInteract(interactable))
+        {
+            interactable.InteractWithItem(this, _playerPickupController.HeldObject);
+            ClearReticlePromptAfterInteract();
+            return;
+        }
+
         if (interactable.CanInteractWithItem(pickupController.HeldObject)
             && interactable.GetItemTargetKey(this, pickupController.HeldObject) == HeldItemTargetKey.UseItem)
         {
@@ -1196,9 +1235,42 @@ public class PlayerInteractionController : NetworkBehaviour
         }
         else
         {
+            // Item-taking target (fire pit, fuse slot, post box…) that rejects this item, and the item
+            // has no use of its own (weapons, food… keep working): tell the player instead of doing nothing.
+            if (IsHeldItemIncompatibleWith(interactable) && pickupController.HeldObject.GetHeldUseVerb() == null)
+            {
+                ShowIncompatibleItemMessage();
+                return;
+            }
+
             // Not a target for this item — use it in place. World interaction is the Interact key's job.
             _playerPickupController.TryUseObject();
         }
+    }
+
+    /// <summary>
+    /// Place (RMB / LT release) while aiming at a placement-slot interactable (<see cref="IPickupSlot"/>)
+    /// that takes the held item on the Interact key: applies it via <see cref="Interactable.InteractWithItem"/>
+    /// (e.g. returning the stamp to its <see cref="InkStamp"/> holder). Raycasts fresh with the same
+    /// resolution as <see cref="TryWorldInteract"/> (lastInteractable can be stale while holding an item).
+    /// Returns true when it fired.
+    /// </summary>
+    private bool TryPlaceIntoTargetSlot()
+    {
+        if (!_playerPickupController.IsHoldingObject || !_playerPickupController.CanPickUpAndPlace) return false;
+
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > CurrentInteractReach) return false;
+
+        Interactable target = ResolveTargetInteractable(hit.collider);
+        if (target == null || !(target is IPickupSlot) || !target.IsInteractable) return false;
+        if (IsControlledByOtherPlayer(target)) return false;
+        if (onlyAllowedInteractable != null && target != onlyAllowedInteractable) return false;
+        if (!AppliesHeldItemOnInteract(target)) return false;
+
+        target.InteractWithItem(this, _playerPickupController.HeldObject);
+        ClearReticlePromptAfterInteract();
+        return true;
     }
 
     /// <summary>
@@ -1246,6 +1318,10 @@ public class PlayerInteractionController : NetworkBehaviour
             _holdElapsed = 0f;
             return;
         }
+
+        // Item-only target (no Interact action of its own) that rejects the held item.
+        if (!interactable.ShowsInteractPrompt(this) && IsHeldItemIncompatibleWith(interactable))
+            ShowIncompatibleItemMessage();
 
         interactable.Interact(this);
 

@@ -1315,6 +1315,36 @@ public class PlayerAnimationController : NetworkBehaviour
     }
 
     /// <summary>
+    /// True when the first-person arms animator can be queried for state (present, active,
+    /// with a controller). Callers that lock gameplay to animation should fall back to plain
+    /// timers when this is false, so an inactive animator never soft-locks the action.
+    /// </summary>
+    public bool CanQueryArmsState =>
+        armsAnimator != null && armsAnimator.isActiveAndEnabled && armsAnimator.runtimeAnimatorController != null;
+
+    /// <summary>
+    /// Local read. True while the first-person arms animator is in a state tagged with
+    /// <paramref name="tagHash"/> on any layer — including blending into it and blending back
+    /// out of it. Used to lock owner-side actions to their animation (e.g. melee swings tagged
+    /// "MeleeSwing" in Player.controller). Returns false when <see cref="CanQueryArmsState"/> is false.
+    /// </summary>
+    public bool IsArmsInTaggedState(int tagHash)
+    {
+        if (!CanQueryArmsState) return false;
+
+        for (int layer = 0; layer < armsAnimator.layerCount; layer++)
+        {
+            if (armsAnimator.GetCurrentAnimatorStateInfo(layer).tagHash == tagHash)
+                return true;
+
+            if (armsAnimator.IsInTransition(layer) && armsAnimator.GetNextAnimatorStateInfo(layer).tagHash == tagHash)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Clears a pending animator trigger on all clients (e.g. an emote trigger that was
     /// interrupted before the state machine consumed it). Owner-only.
     /// </summary>

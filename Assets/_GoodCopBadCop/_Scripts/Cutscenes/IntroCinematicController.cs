@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 /// <summary>
 /// Plays a short, skippable intro story sequence — plain white text centered over a black
@@ -11,9 +12,9 @@ using UnityEngine.InputSystem;
 ///
 /// This is purely local/client-side: each connected player reveals and advances through the
 /// lines independently — and reveals into gameplay as soon as they finish, never waiting on
-/// another player — by pressing E, clicking, or a gamepad button, mirroring the skip/advance
-/// convention used elsewhere in the dialogue system — the first input completes the typewriter
-/// reveal for that line, a further input advances to the next line.
+/// another player — by pressing any key, mouse button, or gamepad button. The first input
+/// completes the typewriter reveal for that line, a further input advances to the next line
+/// (playing <see cref="continueSound"/>).
 ///
 /// Call <see cref="PlayIfNeeded"/> from <see cref="GameManager.LobbyTransitionSequence"/>.
 /// Subsequent calls (e.g. after a Restart Day scene reload) are no-ops once the cinematic has
@@ -32,6 +33,12 @@ public class IntroCinematicController : MonoBehaviour
     [SerializeField] private float promptDelay = 0.5f;
     [SerializeField] private float promptFadeInDuration = 0.6f;
     [SerializeField] private float promptFadeOutDuration = 0.2f;
+
+    [Header("Continue Sound")]
+    [Tooltip("One-shot played (via SFXController, MainMix SFX group) when the player advances to the next line. Not played for the press that only completes the typewriter reveal.")]
+    [SerializeField] private AudioClip continueSound;
+    [Range(0f, 1f)]
+    [SerializeField] private float continueSoundVolume = 0.8f;
 
     [Tooltip("Story pages shown in order, one at a time, over the black screen. Put each sentence on its own line.")]
     [TextArea(2, 6)]
@@ -88,14 +95,7 @@ public class IntroCinematicController : MonoBehaviour
 
         if (!_awaitingInput || _advanceRequested) return;
 
-        bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-
-        bool pressed = GoodCopBadCop.Input.RebindableInput.GetKeyDown(GoodCopBadCop.Input.GameAction.Interact)
-                       || (Input.GetMouseButtonDown(0) && !overUI)
-                       || (Gamepad.current?.buttonSouth.wasPressedThisFrame ?? false)
-                       || (Gamepad.current?.startButton.wasPressedThisFrame ?? false);
-
-        if (!pressed) return;
+        if (!AnyInputPressedThisFrame()) return;
 
         if (textReveal != null && textReveal.IsRevealing)
         {
@@ -105,6 +105,54 @@ public class IntroCinematicController : MonoBehaviour
         }
 
         _advanceRequested = true;
+        PlayContinueSound();
+    }
+
+    /// <summary>
+    /// True when any keyboard key, mouse button, or (non-synthetic) gamepad button was pressed
+    /// this frame. The rebindable Interact action is still honoured so binds to extra mouse
+    /// buttons keep working. Analog stick directions are synthetic and are ignored, so stick
+    /// drift can't skip lines.
+    /// </summary>
+    private static bool AnyInputPressedThisFrame()
+    {
+        if (GoodCopBadCop.Input.RebindableInput.GetKeyDown(GoodCopBadCop.Input.GameAction.Interact))
+            return true;
+
+        if (!GoodCopBadCop.Input.TextInputFocus.IsCapturingKeyboard
+            && Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame)
+            return true;
+
+        Mouse mouse = Mouse.current;
+        if (mouse != null
+            && (mouse.leftButton.wasPressedThisFrame
+                || mouse.rightButton.wasPressedThisFrame
+                || mouse.middleButton.wasPressedThisFrame
+                || mouse.forwardButton.wasPressedThisFrame
+                || mouse.backButton.wasPressedThisFrame))
+        {
+            bool overUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            if (!overUI)
+                return true;
+        }
+
+        Gamepad pad = Gamepad.current;
+        if (pad != null)
+        {
+            foreach (InputControl control in pad.allControls)
+            {
+                if (control is ButtonControl button && !button.synthetic && button.wasPressedThisFrame)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void PlayContinueSound()
+    {
+        if (continueSound != null && SFXController.Instance != null)
+            SFXController.Instance.Play(continueSound, continueSoundVolume);
     }
 
     /// <summary>

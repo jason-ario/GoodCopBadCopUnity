@@ -39,6 +39,63 @@ public class GameSettings : ScriptableObject
         }
     }
 
+    /// <summary>Which Steam app this build targets. Drives the Steam App ID used by the network transport.</summary>
+    public enum BuildChannel
+    {
+        Playtest,
+        Demo,
+        Release
+    }
+
+    public const uint PlaytestAppId = 4488670;
+    public const uint DemoAppId = 5374510;
+    public const uint ReleaseAppId = 3262820;
+
+    [Header("Build")]
+    [Tooltip("Steam app this build targets. Overrides the App ID on every FacepunchTransport at startup " +
+             "(Playtest = 4488670, Demo = 5374510, Release = 3262820). All players must run the same channel " +
+             "to find each other's lobbies.")]
+    [SerializeField] private BuildChannel _buildChannel = BuildChannel.Playtest;
+
+    [Tooltip("Text shown before the version number on the main menu, e.g. \"V. Alpha\" -> \"V. Alpha 0.1.12\".")]
+    [SerializeField] private string _versionLabelPrefix = "V. Alpha";
+
+    [Tooltip("Append the build channel to the main menu version label for non-Release builds, e.g. \"(Playtest)\".")]
+    [SerializeField] private bool _showChannelInVersionLabel = true;
+
+    [Tooltip("When enabled, every player build increments the last number of Player Settings > Version " +
+             "(0.1.11 -> 0.1.12) before building.")]
+    [SerializeField] private bool _autoIncrementVersionOnBuild = true;
+
+    public BuildChannel Channel
+    {
+        get => _buildChannel;
+        set => _buildChannel = value;
+    }
+
+    /// <summary>Steam App ID for the current <see cref="Channel"/>.</summary>
+    public uint SteamAppId => GetSteamAppId(_buildChannel);
+
+    public bool AutoIncrementVersionOnBuild => _autoIncrementVersionOnBuild;
+
+    public static uint GetSteamAppId(BuildChannel channel) => channel switch
+    {
+        BuildChannel.Demo => DemoAppId,
+        BuildChannel.Release => ReleaseAppId,
+        _ => PlaytestAppId
+    };
+
+    /// <summary>Main menu version text, e.g. "V. Alpha 0.1.12 (Playtest)".</summary>
+    public string GetVersionDisplayString()
+    {
+        string text = string.IsNullOrWhiteSpace(_versionLabelPrefix)
+            ? Application.version
+            : $"{_versionLabelPrefix} {Application.version}";
+        if (_showChannelInVersionLabel && _buildChannel != BuildChannel.Release)
+            text += $" ({_buildChannel})";
+        return text;
+    }
+
     [Header("Guidebook")]
     [Tooltip("When disabled, pressing Tab (or the gamepad Select button) will not open or close the guidebook. " +
              "If the guidebook is already open when this is turned off, it will be force-closed.")]

@@ -446,12 +446,30 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// triggered by mutant gore/corpse registration (see <see cref="RegisterExternalJunkItem"/>)
     /// so NPC bodies tracked by their own separate systems aren't swept into a gore-only task.
     /// </param>
-    public void ActivateForExistingItems(bool includeSuspects = true)
+    public void ActivateForExistingItems(bool includeSuspects = true) =>
+        ActivateForExistingItems(includeSuspects, alwaysInclude: null);
+
+    /// <param name="alwaysInclude">
+    /// Optional item that must be part of the activated total even if the sweep filter would skip
+    /// it — the externally registered item that triggered activation (see
+    /// <see cref="RegisterExternalJunkItem"/>), which has already passed the cleanup-region test.
+    /// </param>
+    private void ActivateForExistingItems(bool includeSuspects, NetworkObject alwaysInclude)
     {
         if (!IsServer) return;
         if (_taskActive) return;
 
-        int count = CollectCountablePreExistingItems(includeSuspects);
+        CollectCountablePreExistingItems(includeSuspects);
+
+        if (alwaysInclude != null
+            && !_countedExistingItems.Contains(alwaysInclude)
+            && alwaysInclude.TryGetComponent(out JunkItem includedJunk)
+            && includedJunk.CanBeCollected)
+        {
+            _countedExistingItems.Add(alwaysInclude);
+        }
+
+        int count = _countedExistingItems.Count;
 
         if (count == 0)
         {
@@ -720,7 +738,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (junk == null)
             return false;
 
-        if (!includeSuspects && junk.GetComponent<SuspectCharacter>() != null)
+        if (!includeSuspects && junk.GetComponent<SuspectCharacter>() != null && !IsCombatGuardCorpse(junk))
             return false;
 
         // Covers activeInHierarchy, the suspect-only IsCollectible rule (a suspect's own Unity
@@ -730,6 +748,21 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             return false;
 
         return CountsTowardCleanup(junk.transform.position);
+    }
+
+    /// <summary>
+    /// True for a guard soldier killed by mutants (<see cref="SoldierMutantResponder.IsCombatCorpse"/>).
+    /// Unlike scripted NPC bodies (Day 1 Soldier, Vlad), these corpses are ordinary checkpoint gore
+    /// and are counted by gore-only sweeps too.
+    /// </summary>
+    private static bool IsCombatGuardCorpse(JunkItem junk)
+    {
+        foreach (SoldierMutantResponder responder in junk.GetComponents<SoldierMutantResponder>())
+        {
+            if (responder.IsCombatCorpse)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -816,10 +849,10 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!_taskActive)
         {
             // No active trash task — dynamically trigger one for whatever junk is already
-            // active in the scene, which by now includes netObj itself. This path is only
-            // ever reached by mutant gore/corpse registration, so exclude suspect NPC bodies
-            // (e.g. the Day 1 soldier, Vlad) from being swept in alongside it.
-            ActivateForExistingItems(includeSuspects: false);
+            // active in the scene, which by now includes netObj itself. Scripted suspect NPC
+            // bodies (e.g. the Day 1 soldier, Vlad) are excluded from the sweep, but netObj is
+            // always included — it already passed the region test above (e.g. a guard corpse).
+            ActivateForExistingItems(includeSuspects: false, alwaysInclude: netObj);
             return;
         }
 

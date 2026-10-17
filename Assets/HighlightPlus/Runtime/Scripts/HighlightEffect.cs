@@ -3866,6 +3866,16 @@ namespace HighlightPlus {
                                 }
                                 fxMat.SetInt(ShaderParams.Cull, cullBackFaces ? (int)CullMode.Back : (int)CullMode.Off);
                                 fxMat.SetInt(ShaderParams.OverlayZTest, GetZTestValue(overlayVisibility));
+                                // GCBC: through-wall overlays (no depth test) would otherwise stack once per
+                                // overlapping triangle and saturate to solid colour. Draw at most once per pixel:
+                                // pass only while bit 4 (HP blocker) and bit 64 are clear, then set bit 64.
+                                // Normal visibility keeps HP's original stencil (skip where bit 4 is set).
+                                bool overlayThroughWalls = overlayVisibility != Visibility.Normal;
+                                fxMat.SetInt(ShaderParams.OverlayStencilRef, overlayThroughWalls ? 0 : 4);
+                                fxMat.SetInt(ShaderParams.OverlayStencilReadMask, overlayThroughWalls ? 4 | 64 : 4);
+                                fxMat.SetInt(ShaderParams.OverlayStencilWriteMask, overlayThroughWalls ? 64 : 0);
+                                fxMat.SetInt(ShaderParams.OverlayStencilComp, overlayThroughWalls ? (int)CompareFunction.Equal : (int)CompareFunction.NotEqual);
+                                fxMat.SetInt(ShaderParams.OverlayStencilPass, overlayThroughWalls ? (int)StencilOp.Invert : (int)StencilOp.Keep);
                                 fxMat.SetInt(ShaderParams.OverlayBlendDst, overlayBlendMode == OverlayBlendMode.Additive ? (int)BlendMode.One : (int)BlendMode.OneMinusSrcAlpha);
                                 fxMat.DisableKeyword(ShaderParams.SKW_TEXTURE_TRIPLANAR);
                                 fxMat.DisableKeyword(ShaderParams.SKW_TEXTURE_TRIPLANAR_LOCAL);

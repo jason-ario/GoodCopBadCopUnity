@@ -25,7 +25,10 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         _FoamBrightness ("Foam Brightness",       Range(1, 3))                   = 1.6
 
         // --- Noise Controls ---
+        // Noise is tiled in WORLD space (meters along the decal plane), so it never stretches
+        // with non-uniform or large object scale. Density = Noise Scale cells per Reference Size.
         _NoiseScale     ("Noise Scale",           Range(1, 30))                  = 10.0
+        _NoiseWorldSize ("Noise Reference Size (m)", Range(0.25, 16))            = 4.0
         _NoiseSpeed     ("Noise Speed",           Range(0, 2))                   = 0.25
         _WarpStrength   ("Warp Strength",         Range(0, 0.3))                 = 0.08
 
@@ -63,12 +66,15 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         // Copy values from Resources/Highlight/ObjectivePulse.asset: overlay -> Intensity,
         // overlayColor -> Color, overlayAnimationSpeed -> Speed, overlayMinIntensity -> Floor,
         // overlayBlending -> Uses Paint Color.
+        // X-Ray: a second pass draws the pulse where the graffiti is hidden behind other
+        // geometry (like Highlight Plus "Always On Top"), projected onto the box's mid-plane.
         _PulseColor               ("Pulse Color",               Color)          = (1, 1, 1, 1)
         _PulseIntensity           ("Pulse Intensity (overlay)", Range(0, 1))    = 0.0
-        _PulseTintFromTexture     ("Pulse Uses Paint Color",    Range(0, 1))    = 1.0
+        _PulseTintFromTexture     ("Pulse Uses Paint Color",    Range(0, 1))    = 0.0
         _PulseSpeed               ("Pulse Speed (cycles/sec)",  Range(0.05, 2)) = 0.5
         _PulseMin                 ("Pulse Floor (fraction)",    Range(0, 1))    = 0.2
         _PulseRange               ("Pulse Fade Distance (m)",   Range(2, 80))   = 30.0
+        [ToggleUI] _PulseXRay     ("Pulse Visible Through Walls", Float)        = 0.0
     }
 
     SubShader
@@ -90,6 +96,85 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
             // it ignored / sat in front of the fog.
             "Queue"          = "AlphaTest"
         }
+
+        // Shared by both passes so UnityPerMaterial is identical (SRP Batcher requirement).
+        HLSLINCLUDE
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+
+            TEXTURE2D(_NormalMap);
+            SAMPLER(sampler_NormalMap);
+
+            // Depth texture — always available in URP (Camera > Depth Texture is on by default).
+            #if defined(SHADER_API_GLES)
+                TEXTURE2D(_CameraDepthTexture);
+                SAMPLER(sampler_CameraDepthTexture);
+            #else
+                TEXTURE2D_X_FLOAT(_CameraDepthTexture);
+            #endif
+
+            // Per-material constants  (MPB overrides _ScrubProgress per-instance)
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4  _BaseColor;
+                half4  _FoamColor;
+                half   _ScrubProgress;
+                half   _EdgeWidth;
+                half   _FoamBrightness;
+                half   _NoiseScale;
+                half   _NoiseWorldSize;
+                half   _NoiseSpeed;
+                half   _WarpStrength;
+                half   _NormalScale;
+                half   _Smoothness;
+                half   _Desaturate;
+                half4  _UVGlowColor;
+                half   _UVGlowIntensity;
+                half   _UVGlowEdgeSoftness;
+                half   _UVGlowFalloff;
+                half   _UVOnly;
+                half   _RevealNoiseScale;
+                half   _RevealNoiseSoftness;
+                half   _UVAlphaThreshold;
+                half   _BoxEdgeFade;
+                half   _BoxEdgeFadeY;
+                half4  _PulseColor;
+                half   _PulseIntensity;
+                half   _PulseTintFromTexture;
+                half   _PulseSpeed;
+                half   _PulseMin;
+                half   _PulseRange;
+                half   _PulseXRay;
+            CBUFFER_END
+
+            float SampleSceneEyeDepth(float2 screenUV)
+            {
+                #if defined(SHADER_API_GLES)
+                    float rawDepth = SAMPLE_DEPTH_TEXTURE_LOD(
+                        _CameraDepthTexture, sampler_CameraDepthTexture, screenUV, 0);
+                #else
+                    float rawDepth = LOAD_TEXTURE2D_X(
+                        _CameraDepthTexture, _ScaledScreenParams.xy * screenUV).x;
+                #endif
+                return LinearEyeDepth(rawDepth, _ZBufferParams);
+            }
+
+            // Same triangle wave as Highlight Plus's overlay, on global time, so every pulse
+            // (graffiti, fences, junk) at the same speed stays in phase.
+            float PulseWave()
+            {
+                float time = fmod(_Time.y, 1000.0);
+                return _PulseMin + (1.0 - _PulseMin) * 2.0 * abs(0.5 - frac(time * _PulseSpeed));
+            }
+
+            half PulseDistanceFade(float3 positionWS)
+            {
+                float camDist = distance(GetCameraPositionWS(), positionWS);
+                return 1.0 - smoothstep(_PulseRange * 0.6, _PulseRange, camDist);
+            }
+        ENDHLSL
 
         // Forward Lit Pass
         Pass
@@ -124,56 +209,8 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            // ----------------------------------------------------------------
-            // Resources
-            // ----------------------------------------------------------------
-            TEXTURE2D(_BaseMap);
-            SAMPLER(sampler_BaseMap);
-
-            TEXTURE2D(_NormalMap);
-            SAMPLER(sampler_NormalMap);
-
-            // Depth texture — always available in URP (Camera > Depth Texture is on by default).
-            #if defined(SHADER_API_GLES)
-                TEXTURE2D(_CameraDepthTexture);
-                SAMPLER(sampler_CameraDepthTexture);
-            #else
-                TEXTURE2D_X_FLOAT(_CameraDepthTexture);
-            #endif
-
-            // ----------------------------------------------------------------
-            // Per-material constants  (MPB overrides _ScrubProgress per-instance)
-            // ----------------------------------------------------------------
-            CBUFFER_START(UnityPerMaterial)
-                float4 _BaseMap_ST;
-                half4  _BaseColor;
-                half4  _FoamColor;
-                half   _ScrubProgress;
-                half   _EdgeWidth;
-                half   _FoamBrightness;
-                half   _NoiseScale;
-                half   _NoiseSpeed;
-                half   _WarpStrength;
-                half   _NormalScale;
-                half   _Smoothness;
-                half   _Desaturate;
-                half4  _UVGlowColor;
-                half   _UVGlowIntensity;
-                half   _UVGlowEdgeSoftness;
-                half   _UVGlowFalloff;
-                half   _UVOnly;
-                half   _RevealNoiseScale;
-                half   _RevealNoiseSoftness;
-                half   _UVAlphaThreshold;
-                half   _BoxEdgeFade;
-                half   _BoxEdgeFadeY;
-                half4  _PulseColor;
-                half   _PulseIntensity;
-                half   _PulseTintFromTexture;
-                half   _PulseSpeed;
-                half   _PulseMin;
-                half   _PulseRange;
-            CBUFFER_END
+            // Resources, depth texture and UnityPerMaterial CBUFFER come from the SubShader-level
+            // HLSLINCLUDE above (shared with the X-ray pulse pass for SRP Batcher compatibility).
 
             // UV light cone data — GLOBAL shader properties set by UVLight.PushShaderGlobals.
             // Deliberately uses distinct names from the per-renderer _UVLight* arrays used by
@@ -244,6 +281,18 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 }
                 return v;
             }
+            // World-metric planar noise coordinates: projects a world-space offset onto the
+            // (unit-length) tangent/bitangent of the surface, so the result is in meters and is
+            // unaffected by object scale. originWS seeds a stable per-object offset.
+            float2 WorldPlanarNoiseUV(float3 offsetWS, float3 tangentWS, float3 bitangentWS, float3 originWS)
+            {
+                float2 planarMeters = float2(dot(offsetWS, tangentWS), dot(offsetWS, bitangentWS));
+                float2 seed = frac(sin(float2(dot(originWS, float3(12.9898, 78.233, 37.719)),
+                                              dot(originWS, float3(39.346, 11.135, 83.155)))) * 43758.5453) * 64.0;
+                return planarMeters * (_NoiseScale / max(_NoiseWorldSize, 0.01)) + seed;
+            }
+
+
 
             // ----------------------------------------------------------------
             // UV light cone mask (same cone model as UVReveal.shader)
@@ -336,16 +385,27 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 // XZ maps to the face texture; apply _BaseMap_ST for tiling/offset.
                 float2 uv = (positionOS.xz + float2(0.5, 0.5)) * _BaseMap_ST.xy + _BaseMap_ST.zw;
 
-                // --- Noise dissolve (identical logic to GraffitiScrub.shader) ---
-                float nt = _Time.y * _NoiseSpeed;
+                // --- World-space frame of the projector ---
+                // Box local X/Z are the decal plane's tangent/bitangent, +Y is the projection normal.
+                float3 positionWS  = TransformObjectToWorld(positionOS);
+                float3 originWS    = TransformObjectToWorld(float3(0, 0, 0));
+                float3 tangentWS   = normalize(TransformObjectToWorldDir(float3(1, 0, 0)));
+                float3 bitangentWS = normalize(TransformObjectToWorldDir(float3(0, 0, 1)));
 
-                float2 warpUV = uv * _NoiseScale;
+                // --- Noise dissolve (identical logic to GraffitiScrub.shader) ---
+                // Noise coordinates are in world meters along the decal plane (relative to the
+                // projector origin to keep values small for the sin-hash), so object scale never
+                // stretches the pattern. A per-object seed keeps each decal's pattern unique.
+                float  nt          = _Time.y * _NoiseSpeed;
+                float2 noiseBaseUV = WorldPlanarNoiseUV(positionWS - originWS, tangentWS, bitangentWS, originWS);
+
+                float2 warpUV = noiseBaseUV;
                 float2 warp = float2(
                     MorphFractal(warpUV + float2(1.3, 0.0), nt * 0.65),
                     MorphFractal(warpUV + float2(0.0, 1.7), nt * 0.5)
                 ) * 2.0 - 1.0;
 
-                float2 noiseUV = uv * _NoiseScale + warp * _WarpStrength;
+                float2 noiseUV = noiseBaseUV + warp * _WarpStrength;
                 float  noise   = MorphFractal(noiseUV, nt);
 
                 // --- Base texture ---
@@ -370,12 +430,9 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 // The box's local X/Z axes (which the projected UV is built from) double as
                 // the tangent/bitangent, so a normal map can still perturb this base normal.
                 float3 normalWS   = normalize(TransformObjectToWorldDir(float3(0, 1, 0)));
-                float3 positionWS = TransformObjectToWorld(positionOS);
 
                 half3 normalTS = UnpackNormalScale(
                     SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, uv), _NormalScale);
-                float3 tangentWS   = normalize(TransformObjectToWorldDir(float3(1, 0, 0)));
-                float3 bitangentWS = normalize(TransformObjectToWorldDir(float3(0, 0, 1)));
                 normalWS = normalize(
                     normalTS.x * tangentWS + normalTS.y * bitangentWS + normalTS.z * normalWS);
 
@@ -428,11 +485,8 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 // alpha blend toward the tinted paint albedo. Fades with scrub progress and camera distance.
                 if (_PulseIntensity > 0.0)
                 {
-                    float  time     = fmod(_Time.y, 1000.0);
-                    float  pulse    = _PulseMin + (1.0 - _PulseMin) * 2.0 * abs(0.5 - frac(time * _PulseSpeed));
-
-                    float  camDist  = distance(GetCameraPositionWS(), positionWS);
-                    half   distFade = 1.0 - smoothstep(_PulseRange * 0.6, _PulseRange, camDist);
+                    float  pulse    = PulseWave();
+                    half   distFade = PulseDistanceFade(positionWS);
 
                     // Visual dissolve tops out at ~0.65 (GraffitiInteractable._maxVisualDissolve),
                     // so x1.5 brings the glow to ~0 right as the piece completes.
@@ -481,6 +535,98 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 }
 
                 return half4(finalRGB, alpha);
+            }
+            ENDHLSL
+        }
+
+        // X-Ray Pulse Pass — the discoverability pulse where the graffiti is hidden behind other
+        // geometry (Highlight Plus "Always On Top" equivalent for fences/junk). Where the scene
+        // surface lies inside the box, the main pass already draws the pulse, so this pass
+        // discards there. Elsewhere the view ray is intersected with the box's mid-plane
+        // (local y = 0, the projection plane) and the paint silhouette is drawn only if that
+        // point is behind the visible scene (i.e. occluded). Unlit, no fog, same wave and blend.
+        Pass
+        {
+            Name "GraffitiPulseXRay"
+            Tags { "LightMode" = "SRPDefaultUnlit" }
+
+            Cull   Front
+            ZTest  Always
+            ZWrite Off
+            Blend  SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex   vertXRay
+            #pragma fragment fragXRay
+            #pragma multi_compile_instancing
+
+            struct AttributesXRay
+            {
+                float4 positionOS : POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct VaryingsXRay
+            {
+                float4 positionCS : SV_POSITION;
+                float4 screenUV   : TEXCOORD0;
+                float4 viewRayOS  : TEXCOORD1;
+                float3 camPosOS   : TEXCOORD2;
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            VaryingsXRay vertXRay(AttributesXRay IN)
+            {
+                VaryingsXRay OUT = (VaryingsXRay)0;
+                UNITY_SETUP_INSTANCE_ID(IN);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
+
+                OUT.positionCS = TransformObjectToHClip(IN.positionOS.xyz);
+                OUT.screenUV   = ComputeScreenPos(OUT.positionCS);
+
+                float4   positionVS = mul(UNITY_MATRIX_MV, IN.positionOS);
+                float4x4 viewToOS   = mul(GetWorldToObjectMatrix(), UNITY_MATRIX_I_V);
+                OUT.viewRayOS.xyz   = mul((float3x3)viewToOS, -positionVS.xyz);
+                OUT.viewRayOS.w     = positionVS.z;
+                OUT.camPosOS        = viewToOS._m03_m13_m23;
+                return OUT;
+            }
+
+            half4 fragXRay(VaryingsXRay IN) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+
+                if (_PulseIntensity <= 0.0 || _PulseXRay < 0.5 || _UVOnly > 0.5) discard;
+
+                // Ray scaled so that camPosOS + ray * eyeDepth is the point at that eye depth.
+                float3 ray      = IN.viewRayOS.xyz * rcp(IN.viewRayOS.w);
+                float2 screenUV = IN.screenUV.xy / IN.screenUV.w;
+
+                // Visible surface inside the box -> main pass handles it.
+                float  sceneDepth = SampleSceneEyeDepth(screenUV);
+                float3 sceneOS    = IN.camPosOS + ray * sceneDepth;
+                if (all(abs(sceneOS) <= 0.5)) discard;
+
+                // Intersect the projection plane (local y = 0).
+                if (abs(ray.y) < 1e-5) discard;
+                float planeDepth = -IN.camPosOS.y / ray.y;
+                if (planeDepth <= 0.0) discard;
+
+                // Only where the plane point is hidden behind the visible scene.
+                if (sceneDepth >= planeDepth) discard;
+
+                float3 hitOS = IN.camPosOS + ray * planeDepth;
+                clip(0.5 - abs(hitOS.xz));
+
+                float2 uv       = (hitOS.xz + float2(0.5, 0.5)) * _BaseMap_ST.xy + _BaseMap_ST.zw;
+                half4  texColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv) * _BaseColor;
+
+                float3 hitWS     = TransformObjectToWorld(hitOS);
+                half   paintMask = texColor.a * saturate(1.0 - _ScrubProgress * 1.5);
+                half3  pulseCol  = lerp(_PulseColor.rgb, texColor.rgb * _PulseColor.rgb, _PulseTintFromTexture);
+                half   a         = saturate(_PulseIntensity * PulseWave() * PulseDistanceFade(hitWS) * paintMask);
+
+                return half4(pulseCol, a);
             }
             ENDHLSL
         }

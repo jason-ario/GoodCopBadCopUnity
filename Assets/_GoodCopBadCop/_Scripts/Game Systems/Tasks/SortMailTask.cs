@@ -119,10 +119,10 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private const string GateWaitingMessage = "A shipment is waiting at the gate.";
 
     [Header("Sorting Destination Tutorial")]
-    [Tooltip("Arrows/outlines on the sorting destinations (Mail Cubbies stands, Confiscate bin, Prohibited " +
-             "Goods Sign). Shown locally on every client when the sorting-mail tutorial overlay pops up " +
+    [Tooltip("Arrows/outlines on the sorting destinations (Mail Cubbies stands, Confiscate bin). Shown " +
+             "locally on every client when the sorting-mail tutorial overlay pops up " +
              "(Day_02.ShowMailSortingTutorialLocal -> ShowSortingTutorialCallouts) and hidden for everyone " +
-             "as soon as the replicated sorted count rises (any player sorts a package correctly).")]
+             "as soon as any player drops a package into a cubby or bin, correct or not.")]
     [SerializeField] private TutorialCallout[] _sortingTutorialCallouts;
 
     [Header("Goods Categories")]
@@ -482,8 +482,8 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// <summary>
     /// Local, runs on every client: shows the arrows/outlines on the sorting destinations. Called
     /// by <see cref="Day_02.ShowMailSortingTutorialLocal"/> when the sorting-mail overlay pops up.
-    /// Cleared on every peer by <see cref="OnSortedCountChanged"/> the moment anyone sorts a
-    /// package correctly, or when the delivery ends / the task despawns.
+    /// Cleared on every peer by <see cref="HideSortingTutorialCalloutsClientRpc"/> the moment anyone
+    /// drops a package into a cubby or bin (correct or not), or when the delivery ends / the task despawns.
     /// </summary>
     public void ShowSortingTutorialCallouts()
     {
@@ -503,6 +503,16 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     private void OnSortedCountChanged(int previous, int current)
     {
         if (current > previous) HideSortingTutorialCallouts();
+    }
+
+    /// <summary>
+    /// Broadcast by <see cref="EvaluateSort"/> on every sort attempt (correct or incorrect) so the
+    /// destination call-outs disappear the moment any player drops mail into a cubby or bin.
+    /// </summary>
+    [ClientRpc]
+    private void HideSortingTutorialCalloutsClientRpc()
+    {
+        HideSortingTutorialCallouts();
     }
 
     // ── ISystemicThreat stubs ────────────────────────────────────────────────
@@ -905,6 +915,10 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (!IsServer) return;
         if (package == null || package.IsResolved) return;
+
+        // Any sort attempt — correct or not — means players have found the destinations, so the
+        // tutorial call-outs are dismissed for everyone right away.
+        HideSortingTutorialCalloutsClientRpc();
 
         SuspectData slotResident = binType == MailSortBinType.Delivery
             ? MailCubbyManager.Instance?.ResolveResident(slotResidentPoolIndex)

@@ -61,6 +61,15 @@ public class ReticleController : MonoBehaviour
     private TextMeshProUGUI _useLabel;
     private Image _useKeyImage;
 
+    // Runtime-built "/ [LMB / RT]" pair inside _tapRow, after the Interact icon: shown when the tap
+    // action also fires on Use Item ("[E] / [LMB] Put back" — applying a held item to an E-target).
+    private GameObject _altSeparator;
+    private GameObject _altKeyIcon;
+    private Image _altKeyImage;
+
+    [Tooltip("Text between the Interact key icon and the alternate Use Item icon on the tap row.")]
+    [SerializeField] private string _altKeySeparator = "/";
+
     // Runtime-built text-only "Hold to {verb}" row (clone of _tapRow without the icon).
     private GameObject _holdRow;
     private TextMeshProUGUI _holdLabel;
@@ -104,7 +113,62 @@ public class ReticleController : MonoBehaviour
 
         BuildUseRow();
         BuildHoldRow();
+        BuildAltKeyGroup(); // after the row clones so they don't inherit it
         SetPrompt(false, null);
+    }
+
+    /// <summary>
+    /// Adds a separator label (clone of the hint label) and a second key icon (clone of the Interact
+    /// icon) to <see cref="_tapRow"/>, placed so the row reads "[E] / [LMB] {verb}" with either child
+    /// arrangement of the row's HorizontalLayoutGroup. Hidden until <see cref="SetInteractState"/> asks for it.
+    /// </summary>
+    private void BuildAltKeyGroup()
+    {
+        if (_tapRow == null || _hintLabel == null || _hintKeyIcon == null || _hintKeyImage == null) return;
+        if (_hintLabel.transform.parent != _tapRow.transform || _hintKeyIcon.transform.parent != _tapRow.transform) return;
+
+        Transform row = _tapRow.transform;
+        string imagePath = GetRelativePath(_hintKeyIcon.transform, _hintKeyImage.transform);
+
+        _altSeparator = Instantiate(_hintLabel.gameObject, row);
+        _altSeparator.name = "Alt Key Separator";
+        if (_altSeparator.TryGetComponent(out LocalizedText loc)) loc.SetKey(null);
+        if (_altSeparator.TryGetComponent(out TextMeshProUGUI sepText)) sepText.text = _altKeySeparator;
+
+        _altKeyIcon = Instantiate(_hintKeyIcon, row);
+        _altKeyIcon.name = "Alt Key Icon";
+        Transform image = _hintKeyIcon.transform == _hintKeyImage.transform ? _altKeyIcon.transform : _altKeyIcon.transform.Find(imagePath);
+        _altKeyImage = image != null ? image.GetComponent<Image>() : null;
+
+        // Visual order wanted: Interact icon, separator, alt icon, label.
+        var layout = row.GetComponent<HorizontalOrVerticalLayoutGroup>();
+        bool reversed = layout != null && layout.reverseArrangement;
+        int iconIndex = _hintKeyIcon.transform.GetSiblingIndex();
+        if (reversed)
+        {
+            // Higher sibling index is further left: [... alt, separator, Interact icon].
+            _altKeyIcon.transform.SetSiblingIndex(iconIndex);
+            _altSeparator.transform.SetSiblingIndex(iconIndex + 1);
+        }
+        else
+        {
+            _altSeparator.transform.SetSiblingIndex(iconIndex + 1);
+            _altKeyIcon.transform.SetSiblingIndex(iconIndex + 2);
+        }
+
+        _altSeparator.SetActive(false);
+        _altKeyIcon.SetActive(false);
+    }
+
+    private void SetAltKeyVisible(bool visible)
+    {
+        if (_altKeyIcon == null || _altSeparator == null) return;
+        if (_altSeparator.activeSelf != visible) _altSeparator.SetActive(visible);
+        if (_altKeyIcon.activeSelf != visible)
+        {
+            _altKeyIcon.SetActive(visible);
+            if (visible) RefreshHintIcon();
+        }
     }
 
     /// <summary>
@@ -250,7 +314,8 @@ public class ReticleController : MonoBehaviour
     /// <param name="holdVerb">Secondary hold action: a text-only "Hold to {holdVerb}" row beneath the tap row, or the tap row's label ("[E] Hold to {holdVerb}") when tapping does nothing.</param>
     /// <param name="useItemVerb">The held item's tool action on this target (LMB / RT), shown as its own "[LMB] {verb}" row beneath the tap row. Null hides the row.</param>
     /// <param name="actionVerb">Action name shown next to the Interact key ("Pick up", "Open", "Insert fuse"…).</param>
-    public void SetInteractState(bool state, string text = "", bool showKeyIcon = false, bool showButtonTooltip = true, bool showHint = false, string holdVerb = null, string useItemVerb = null, string actionVerb = null)
+    /// <param name="useItemAlsoTaps">The tap action also fires on Use Item (LMB / RT): the tap row reads "[E] / [LMB] {verb}".</param>
+    public void SetInteractState(bool state, string text = "", bool showKeyIcon = false, bool showButtonTooltip = true, bool showHint = false, string holdVerb = null, string useItemVerb = null, string actionVerb = null, bool useItemAlsoTaps = false)
     {
         canInteract = state;
         _holdOnTapRow = false;
@@ -279,8 +344,9 @@ public class ReticleController : MonoBehaviour
 
         string tapLabel = showHint && !string.IsNullOrEmpty(text) ? text : actionVerb;
 
-        // "[E] {verb}" above "[LMB] {useItemVerb}" above a text-only "Hold to {holdVerb}" row.
+        // "[E] {verb}" (or "[E] / [LMB] {verb}") above "[LMB] {useItemVerb}" above a text-only "Hold to {holdVerb}" row.
         SetPrompt(true, tapLabel, holdVerb, useItemVerb);
+        SetAltKeyVisible(useItemAlsoTaps);
     }
 
     /// <summary>
@@ -392,6 +458,9 @@ public class ReticleController : MonoBehaviour
     {
         bool labelVisible = !string.IsNullOrEmpty(label);
 
+        // Every caller resets the alt "/ [LMB]" pair; SetInteractState re-enables it after this when requested.
+        SetAltKeyVisible(false);
+
         if (_useRow != null)
         {
             bool useVisible = !string.IsNullOrEmpty(useVerb);
@@ -455,7 +524,7 @@ public class ReticleController : MonoBehaviour
         if (_hintKeyImage != null && interactIcon != null)
             _hintKeyImage.sprite = interactIcon;
 
-        if (_useKeyImage != null)
+        if (_useKeyImage != null || _altKeyImage != null)
         {
             Sprite useIcon = _useMouseSprite;
             if (ActiveInputDeviceTracker.IsGamepad)
@@ -465,7 +534,11 @@ public class ReticleController : MonoBehaviour
                     : null;
                 useIcon = bound != null ? bound : _useGamepadSprite;
             }
-            if (useIcon != null) _useKeyImage.sprite = useIcon;
+            if (useIcon != null)
+            {
+                if (_useKeyImage != null) _useKeyImage.sprite = useIcon;
+                if (_altKeyImage != null) _altKeyImage.sprite = useIcon;
+            }
         }
     }
 }

@@ -19,6 +19,7 @@ public class PlayerThirdPersonView : NetworkBehaviour
     private PlayerAnimationController _animController;
     private GameObject _firstPersonArms;
     private Light _playerFillLight;
+    private readonly System.Collections.Generic.List<Renderer> _hiddenRenderers = new System.Collections.Generic.List<Renderer>();
 
     private void Awake()
     {
@@ -66,8 +67,47 @@ public class PlayerThirdPersonView : NetworkBehaviour
         if (_firstPersonArms != null)
             _firstPersonArms.SetActive(false);
 
+        HideHeldItem();
+
         if (_playerFillLight != null)
             _playerFillLight.enabled = false;
+    }
+
+    /// <summary>
+    /// The held world item follows the first-person arm socket via a constraint rather than being
+    /// parented under Player_Arms, so hiding the arms leaves it floating in front of the FaceCamera.
+    /// Disable its renderers (never SetActive — it is a live NetworkObject) plus player-root
+    /// LineRenderers such as the throw arc. Local-only: other players still see the item.
+    /// </summary>
+    private void HideHeldItem()
+    {
+        RestoreHeldItem(); // Defensive: never stack hidden sets on a double Enter.
+
+        PlayerPickupController pickup = GetComponent<PlayerPickupController>();
+        if (pickup != null && pickup.HeldObject != null)
+        {
+            foreach (Renderer r in pickup.HeldObject.GetComponentsInChildren<Renderer>(true))
+                HideRenderer(r);
+        }
+
+        foreach (LineRenderer line in GetComponentsInChildren<LineRenderer>())
+            HideRenderer(line);
+    }
+
+    private void HideRenderer(Renderer r)
+    {
+        if (r == null || !r.enabled || _hiddenRenderers.Contains(r)) return;
+        r.enabled = false;
+        _hiddenRenderers.Add(r);
+    }
+
+    private void RestoreHeldItem()
+    {
+        foreach (Renderer r in _hiddenRenderers)
+            if (r != null)
+                r.enabled = true;
+
+        _hiddenRenderers.Clear();
     }
 
     /// <summary>
@@ -90,7 +130,15 @@ public class PlayerThirdPersonView : NetworkBehaviour
         if (_firstPersonArms != null)
             _firstPersonArms.SetActive(true);
 
+        RestoreHeldItem();
+
         if (_playerFillLight != null)
             _playerFillLight.enabled = true;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        RestoreHeldItem(); // Don't leave a dropped/handed-off item invisible if we despawn mid-view.
+        base.OnNetworkDespawn();
     }
 }

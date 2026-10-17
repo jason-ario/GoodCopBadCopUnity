@@ -14,7 +14,10 @@ Shader "GoodCopBadCop/GraffitiScrub"
         _FoamBrightness ("Foam Brightness",     Range(1, 3))                    = 1.6
 
         // --- Noise Controls ---
+        // Noise is tiled in WORLD space (meters along the surface plane), so it never stretches
+        // with object scale. Density = Noise Scale cells per Reference Size.
         _NoiseScale     ("Noise Scale",         Range(1, 30))                   = 10.0
+        _NoiseWorldSize ("Noise Reference Size (m)", Range(0.25, 16))           = 4.0
         _NoiseSpeed     ("Noise Speed",         Range(0, 2))                    = 0.25
         _WarpStrength   ("Warp Strength",       Range(0, 0.3))                  = 0.08
     }
@@ -66,6 +69,7 @@ Shader "GoodCopBadCop/GraffitiScrub"
                 half   _EdgeWidth;
                 half   _FoamBrightness;
                 half   _NoiseScale;
+                half   _NoiseWorldSize;
                 half   _NoiseSpeed;
                 half   _WarpStrength;
             CBUFFER_END
@@ -137,6 +141,17 @@ Shader "GoodCopBadCop/GraffitiScrub"
                 return v;
             }
 
+            // World-metric planar noise coordinates: projects a world-space offset onto the
+            // (unit-length) tangent/bitangent of the surface, so the result is in meters and is
+            // unaffected by object scale. originWS seeds a stable per-object offset.
+            float2 WorldPlanarNoiseUV(float3 offsetWS, float3 tangentWS, float3 bitangentWS, float3 originWS)
+            {
+                float2 planarMeters = float2(dot(offsetWS, tangentWS), dot(offsetWS, bitangentWS));
+                float2 seed = frac(sin(float2(dot(originWS, float3(12.9898, 78.233, 37.719)),
+                                              dot(originWS, float3(39.346, 11.135, 83.155)))) * 43758.5453) * 64.0;
+                return planarMeters * (_NoiseScale / max(_NoiseWorldSize, 0.01)) + seed;
+            }
+
             // ----------------------------------------------------------------
             // Vertex
             // ----------------------------------------------------------------
@@ -163,14 +178,25 @@ Shader "GoodCopBadCop/GraffitiScrub"
                 float2 uv = IN.uv;
                 float  nt = _Time.y * _NoiseSpeed;
 
+                // --- World-space noise frame ---
+                // Build a tangent basis from the surface normal (graffiti meshes are flat quads)
+                // and tile the noise in world meters relative to the object origin, so object
+                // scale never stretches it.
+                float3 nWS         = normalize(IN.normalWS);
+                float3 refUp       = abs(nWS.y) < 0.999 ? float3(0, 1, 0) : float3(1, 0, 0);
+                float3 tangentWS   = normalize(cross(refUp, nWS));
+                float3 bitangentWS = cross(nWS, tangentWS);
+                float3 originWS    = TransformObjectToWorld(float3(0, 0, 0));
+                float2 noiseBaseUV = WorldPlanarNoiseUV(IN.positionWS - originWS, tangentWS, bitangentWS, originWS);
+
                 // --- Domain warp: warps the noise lookup for more organic chunk shapes ---
-                float2 warpUV = uv * _NoiseScale;
+                float2 warpUV = noiseBaseUV;
                 float2 warp = float2(
                     MorphFractal(warpUV + float2(1.3, 0.0), nt * 0.65),
                     MorphFractal(warpUV + float2(0.0, 1.7), nt * 0.5)
                 ) * 2.0 - 1.0;
 
-                float2 noiseUV = uv * _NoiseScale + warp * _WarpStrength;
+                float2 noiseUV = noiseBaseUV + warp * _WarpStrength;
                 float  noise   = MorphFractal(noiseUV, nt);
 
                 // --- Sample base texture ---

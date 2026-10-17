@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GoodCopBadCop.Input;
 using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
@@ -160,12 +161,22 @@ public abstract class DiegeticViewController : MonoBehaviour
 
         OnOpened();
 
-        // "[LMB / RT] {text}" prompt (lives outside the Player HUD, which is hidden above).
+        // "[LMB / RT] {text}" prompt on the shared ControlHintsOverlay (outside the hidden Player HUD).
         string prompt = ActionPromptText;
         if (!string.IsNullOrEmpty(prompt))
-            DiegeticActionPrompt.Show(prompt, GamepadActionPromptText, GamepadActionPromptSprite,
-                                      ActionPromptPrefix, GamepadActionPromptPrefix);
+        {
+            _actionPromptHint ??= new ControlHint { useAction = true, action = GameAction.UseItem };
+            _actionPromptHint.text = prompt;
+            _actionPromptHint.gamepadText = GamepadActionPromptText;
+            _actionPromptHint.gamepadSprite = GamepadActionPromptSprite;
+            _actionPromptHint.prefix = ActionPromptPrefix;
+            _actionPromptHint.gamepadPrefix = GamepadActionPromptPrefix;
+            ControlHintsOverlay.Show(this, _actionPromptHint);
+        }
     }
+
+    /// <summary>Reused hint for the view's "[LMB / RT] {text}" prompt (Use Item, rebind-aware on both devices).</summary>
+    private ControlHint _actionPromptHint;
 
     /// <summary>
     /// Closes this view and fully restores normal player controls.
@@ -182,7 +193,7 @@ public abstract class DiegeticViewController : MonoBehaviour
         // Give subclass a chance to clean up while Player is still valid.
         OnClosed();
 
-        DiegeticActionPrompt.Hide();
+        ControlHintsOverlay.Hide(this);
 
         if (_viewCamera != null)
         {
@@ -337,7 +348,7 @@ public abstract class DiegeticViewController : MonoBehaviour
     protected virtual bool ForcePlayerLightOn => true;
 
     /// <summary>
-    /// Text shown next to the LMB / RT icon (<see cref="DiegeticActionPrompt"/>) while this view is open,
+    /// Text shown next to the LMB / RT icon (a <see cref="ControlHintsOverlay"/> row) while this view is open,
     /// e.g. "to interact". Return null for look-only views where LMB does nothing.
     /// Read once inside <see cref="Open"/>; the prompt is hidden on <see cref="Close"/>.
     /// </summary>

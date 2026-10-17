@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -101,6 +102,27 @@ public class SoldierMutantResponder : NetworkBehaviour
     private readonly NetworkVariable<bool> _isDisposed = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Server-written "this guard was killed in combat and is now a ragdoll corpse" flag. Every
+    /// peer (late joiners included, via <see cref="OnNetworkSpawn"/>) ragdolls its local copy
+    /// through <see cref="SuspectCharacter.ApplyCorpseRagdoll"/>, which enables the bone colliders
+    /// so any limb can be targeted to bag/burn the body.
+    /// </summary>
+    private readonly NetworkVariable<bool> _isRagdollCorpse = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// True (on every peer) once this guard has been killed by mutants. Its corpse is checkpoint
+    /// gore: <see cref="TakeOutTrashTask"/> counts it even in gore-only sweeps that skip other
+    /// NPC bodies (Day 1 Soldier, Vlad).
+    /// </summary>
+    public bool IsCombatCorpse => _isRagdollCorpse.Value;
+
+    [Header("Corpse")]
+    [Tooltip("Max seconds to wait for the ragdoll to come to rest before the corpse is registered " +
+             "with the cleanup (gore) task.")]
+    [SerializeField] private float _corpseSettleTimeout = 5f;
+
     private NavMeshAgent _agent;
     private SuspectCharacter _suspect;
     private MutantEnemy _selfMutantEnemy;
@@ -131,6 +153,7 @@ public class SoldierMutantResponder : NetworkBehaviour
         base.OnNetworkSpawn();
 
         _isDisposed.OnValueChanged += OnIsDisposedChanged;
+        _isRagdollCorpse.OnValueChanged += OnIsRagdollCorpseChanged;
 
         if (!IsServer)
         {
@@ -140,7 +163,15 @@ public class SoldierMutantResponder : NetworkBehaviour
             // standalone guard already disposed of before this client connected must load in
             // hidden, not reappear until the next time _isDisposed happens to change.
             if (_isDisposed.Value)
+            {
                 gameObject.SetActive(false);
+                return;
+            }
+
+            // Late joiner: a guard that died before this client connected must load as a
+            // lying, targetable ragdoll rather than standing.
+            if (_isRagdollCorpse.Value)
+                ApplyCorpseRagdollLocal();
 
             return;
         }
@@ -164,6 +195,7 @@ public class SoldierMutantResponder : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         _isDisposed.OnValueChanged -= OnIsDisposedChanged;
+        _isRagdollCorpse.OnValueChanged -= OnIsRagdollCorpseChanged;
         StopCombatRoutine();
         base.OnNetworkDespawn();
     }
@@ -173,6 +205,20 @@ public class SoldierMutantResponder : NetworkBehaviour
     {
         if (newValue)
             gameObject.SetActive(false);
+    }
+
+    /// <summary>Ragdolls the local copy on every peer (server included) when the guard dies.</summary>
+    private void OnIsRagdollCorpseChanged(bool previousValue, bool newValue)
+    {
+        if (newValue && !previousValue)
+            ApplyCorpseRagdollLocal();
+    }
+
+    private void ApplyCorpseRagdollLocal()
+    {
+        SuspectCharacter suspect = _suspect != null ? _suspect : GetComponent<SuspectCharacter>();
+        if (suspect != null)
+            suspect.ApplyCorpseRagdoll();
     }
 
     /// <summary>
@@ -220,6 +266,11 @@ public class SoldierMutantResponder : NetworkBehaviour
         }
 
         _suspect.KillAsGuard();
+
+        // Ragdoll on every peer (replicated so late joiners see the body lying down too). This
+        // enables the bone colliders, each of which routes the interact ray to the corpse.
+        _isRagdollCorpse.Value = true;
+
         _suspect.EnableJunkPickup();
 
         // Persist the now-empty slot immediately so a reload can't resurrect this guard,
@@ -229,10 +280,55 @@ public class SoldierMutantResponder : NetworkBehaviour
 
         JunkItem junkItem = _suspect.JunkItem;
         if (junkItem != null)
+        {
             junkItem.OnCollected = HandleCorpseCollected;
+            StartCoroutine(RegisterCorpseAsGoreAfterSettle(junkItem));
+        }
         else
             Debug.LogWarning("[SoldierMutantResponder] No JunkItem on this guard's SuspectCharacter " +
                 "— corpse will not be collectible as trash.", this);
+    }
+
+    /// <summary>
+    /// Server-only. Waits for the ragdoll to come to rest (or <see cref="_corpseSettleTimeout"/>),
+    /// then hands the corpse to <see cref="TakeOutTrashTask.RegisterExternalJunkItem"/> — the same
+    /// path mutant corpses use. That call owns the <see cref="CheckpointCleanupArea"/> test: inside
+    /// the region the body is counted gore (and starts the cleanup task if none is running),
+    /// outside it stays baggable but uncounted.
+    /// </summary>
+    private IEnumerator RegisterCorpseAsGoreAfterSettle(JunkItem junkItem)
+    {
+        // Let the bodies turn dynamic and start falling before testing for rest.
+        yield return new WaitForFixedUpdate();
+        yield return new WaitForFixedUpdate();
+
+        RagdollController ragdoll = GetComponent<RagdollController>();
+        float elapsed = 0f;
+        while (elapsed < _corpseSettleTimeout && ragdoll != null && !IsRagdollAtRest(ragdoll))
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (!IsSpawned || _isDisposed.Value || junkItem == null || !junkItem.CanBeCollected)
+            yield break;
+
+        TakeOutTrashTask.Instance?.RegisterExternalJunkItem(NetworkObject);
+    }
+
+    private static bool IsRagdollAtRest(RagdollController ragdoll)
+    {
+        var bodies = ragdoll.RagdollRigidbodies;
+        if (bodies == null || bodies.Count == 0)
+            return true;
+
+        const float restSpeedSqr = 0.05f * 0.05f;
+        foreach (Rigidbody rb in bodies)
+        {
+            if (rb == null || rb.isKinematic || rb.IsSleeping()) continue;
+            if (rb.linearVelocity.sqrMagnitude > restSpeedSqr) return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -302,12 +398,19 @@ public class SoldierMutantResponder : NetworkBehaviour
     private void ScanForTarget()
     {
         MutantEnemy best = null;
-        float bestDist = _detectionRadius;
+        float bestSqr = _detectionRadius * _detectionRadius;
+        Vector3 origin = transform.position;
 
-        MutantEnemy[] mutants = FindObjectsByType<MutantEnemy>(FindObjectsSortMode.None);
-        foreach (MutantEnemy m in mutants)
+        IReadOnlyList<MutantEnemy> mutants = MutantEnemy.ActiveInstances;
+        for (int i = 0; i < mutants.Count; i++)
         {
+            MutantEnemy m = mutants[i];
             if (m == null || m == _selfMutantEnemy || m.IsDead || !m.IsActive)
+                continue;
+
+            // Cheap range reject before the component lookup below.
+            float sqr = (m.transform.position - origin).sqrMagnitude;
+            if (sqr > bestSqr)
                 continue;
 
             // Mutants currently standing at the booth window are mid-interrogation (a scripted,
@@ -316,12 +419,8 @@ public class SoldierMutantResponder : NetworkBehaviour
             if (mutantSuspect != null && mutantSuspect.IsAtBooth)
                 continue;
 
-            float dist = Vector3.Distance(transform.position, m.transform.position);
-            if (dist <= bestDist)
-            {
-                bestDist = dist;
-                best = m;
-            }
+            bestSqr = sqr;
+            best = m;
         }
 
         _currentTarget = best;

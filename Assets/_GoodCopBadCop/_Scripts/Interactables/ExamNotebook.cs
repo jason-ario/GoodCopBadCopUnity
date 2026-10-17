@@ -148,6 +148,19 @@ public class ExamNotebook : PickableObject
     private float _stickNavTime;
 
     private const float ChecklistStickNavCooldown = 0.25f;
+
+    /// <summary>
+    /// Rows shown on <see cref="ControlHintsOverlay"/> while draw mode is open. The draw-mode inputs are
+    /// hard-coded (ClickDetector LMB; gamepad south / D-pad / left stick in UpdateChecklistControllerNavigation),
+    /// not RebindableInput, so these use fixed controls. Keep them in sync if those inputs change.
+    /// "dpad/vertical" is a display-only entry in InputIconDatabase (D-pad up/down icon).
+    /// </summary>
+    [Header("Draw Mode Control Hints")]
+    [SerializeField] private ControlHint[] _drawModeHints =
+    {
+        new ControlHint { text = "to check / uncheck", mouseButton = 0, gamepadControlPath = "buttonSouth" },
+        new ControlHint { text = "to select", showFor = ControlHintDevice.GamepadOnly, gamepadControlPath = "dpad/vertical" },
+    };
     // ─────────────────────────────────────────────────────────────────────────────
 
     protected override void Awake()
@@ -173,6 +186,9 @@ public class ExamNotebook : PickableObject
     private void OnDestroy()
     {
         UnsubscribeFromCutsceneState();
+
+        // Scene reload / despawn while the page was open: don't leave the control hints up.
+        ControlHintsOverlay.Hide(this);
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
@@ -1031,6 +1047,7 @@ public class ExamNotebook : PickableObject
             UIController.Instance.ClosePlayerUI();
 
         UIController.Instance.ShowBackButton(ExitDrawMode);
+        ControlHintsOverlay.Show(this, _drawModeHints);
     }
 
     void ExitDrawMode()
@@ -1059,6 +1076,7 @@ public class ExamNotebook : PickableObject
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
 
         _isInDrawMode = false;
+        ControlHintsOverlay.Hide(this);
         ClearChecklistControllerSelection();
 
         UIController.Instance.HideCursor();

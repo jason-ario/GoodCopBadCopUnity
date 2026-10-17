@@ -10,10 +10,11 @@ GameObject:
   m_Component:
   - component: {fileID: 5867188750540491823}
   - component: {fileID: 1082067938964719766}
-  - component: {fileID: 838265260578011972}
-  - component: {fileID: 3626138648092881735}
+  - component: {fileID: 4595784258572818741}
+  - component: {fileID: 5976682523596141425}
+  - component: {fileID: 6697564861571894331}
   m_Layer: 0
-  m_Name: Esc
+  m_Name: Key Icon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -28,14 +29,14 @@ RectTransform:
   m_GameObject: {fileID: 4944816299048142445}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.3253, y: 1.3253, z: 1.3253}
+  m_LocalScale: {x: 1.0039942, y: 1.0039942, z: 1.0039942}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2001134237151362241}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -46.25, y: 0}
+  m_AnchoredPosition: {x: -46.25, y: 0.9}
   m_SizeDelta: {x: 42, y: 42}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1082067938964719766
@@ -46,7 +47,7 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4944816299048142445}
   m_CullTransparentMesh: 1
---- !u!114 &838265260578011972
+--- !u!114 &4595784258572818741
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -55,90 +56,28 @@ MonoBehaviour:
   m_GameObject: {fileID: 4944816299048142445}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Esc
-  m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
-  m_sharedMaterial: {fileID: 7971247120015167934, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
-  m_fontSharedMaterials: []
-  m_fontMaterial: {fileID: 0}
-  m_fontMaterials: []
-  m_fontColor32:
-    serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
-  m_enableVertexGradient: 0
-  m_colorMode: 3
-  m_fontColorGradient:
-    topLeft: {r: 1, g: 1, b: 1, a: 1}
-    topRight: {r: 1, g: 1, b: 1, a: 1}
-    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
-    bottomRight: {r: 1, g: 1, b: 1, a: 1}
-  m_fontColorGradientPreset: {fileID: 0}
-  m_spriteAsset: {fileID: 0}
-  m_tintAllSprites: 0
-  m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: -1183493901
-  m_overrideHtmlColors: 0
-  m_faceColor:
-    serializedVersion: 2
-    rgba: 4294967295
-  m_fontSize: 22
-  m_fontSizeBase: 22
-  m_fontWeight: 400
-  m_enableAutoSizing: 1
-  m_fontSizeMin: 17.16
-  m_fontSizeMax: 22
-  m_fontStyle: 16
-  m_HorizontalAlignment: 2
-  m_VerticalAlignment: 4096
-  m_textAlignment: 65535
-  m_characterSpacing: 0
-  m_characterHorizontalScale: 1
-  m_wordSpacing: 0
-  m_lineSpacing: 0
-  m_lineSpacingMax: 0
-  m_paragraphSpacing: 0
-  m_charWidthMaxAdj: 0
-  m_TextWrappingMode: 1
-  m_wordWrappingRatios: 0.4
-  m_overflowMode: 0
-  m_linkedTextComponent: {fileID: 0}
-  parentLinkedComponent: {fileID: 0}
-  m_enableKerning: 0
-  m_ActiveFontFeatures: 6e72656bu
-  m_enableExtraPadding: 0
-  checkPaddingRequired: 0
-  m_isRichText: 1
-  m_EmojiFallbackSupport: 1
-  m_parseCtrlCharacters: 1
-  m_isOrthographic: 1
-  m_isCullingEnabled: 0
-  m_horizontalMapping: 0
-  m_verticalMapping: 0
-  m_uvLineOffset: 0
-  m_geometrySortingOrder: 0
-  m_IsTextObjectScaleStatic: 0
-  m_VertexBufferAutoSizeReduction: 0
-  m_useMaxVisibleDescender: 1
-  m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
-  m_isUsingLegacyAnimationComponent: 0
-  m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
-  m_baseMaterial: {fileID: 0}
-  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &3626138648092881735
+  m_Sprite: {fileID: 21300000, guid: c4cf7919d94a0fd41989ec721b6f87fb, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 1
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!114 &5976682523596141425
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -147,12 +86,28 @@ MonoBehaviour:
   m_GameObject: {fileID: 4944816299048142445}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
+  m_Script: {fileID: 11500000, guid: 8ed22aa6c8401864b8de8a4877c0114e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
-  key: ui.back_button.back_button.esc.text
-  applyLanguageFont: 1
-  fontRole: UI
+  m_EditorClassIdentifier: Assembly-CSharp::GoodCopBadCop.UI.BackButtonKeyIcon
+  _targetImage: {fileID: 4595784258572818741}
+  _iconDatabase: {fileID: 11400000, guid: 81a5fab57da94274cbde4ee36bab25ec, type: 2}
+  _keyboardSprite: {fileID: 21300000, guid: c4cf7919d94a0fd41989ec721b6f87fb, type: 3}
+  _gamepadSprite: {fileID: 21300000, guid: e8264b37145d8ae4da1cc3d2befa57d7, type: 3}
+  _gamepadControlPath: buttonEast
+--- !u!114 &6697564861571894331
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4944816299048142445}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ee00d2cb17e9547bb841a6e8028edc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIWobble
+  wobbleProfile: {fileID: 11400000, guid: af3c17d60d7d5b64f863ad694501593f, type: 2}
+  intensity: 1
 --- !u!1 &6675086999558562455
 GameObject:
   m_ObjectHideFlags: 0
@@ -170,7 +125,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &344320557840484736
 RectTransform:
   m_ObjectHideFlags: 0
@@ -381,6 +336,7 @@ GameObject:
   - component: {fileID: 8173809094516448199}
   - component: {fileID: 2103105993652367377}
   - component: {fileID: 831239217008391770}
+  - component: {fileID: 8863401450867172482}
   m_Layer: 0
   m_Name: Back
   m_TagString: Untagged
@@ -440,7 +396,7 @@ MonoBehaviour:
   m_fontAsset: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
   m_sharedMaterial: {fileID: 7971247120015167934, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
   m_fontSharedMaterials:
-  - {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+  - {fileID: 7971247120015167934, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
   m_fontColor32:
@@ -591,3 +547,19 @@ MonoBehaviour:
   key: ui.back_button.back_button.back.text
   applyLanguageFont: 1
   fontRole: UI
+--- !u!114 &8863401450867172482
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8467875883984680778}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c27507d999965240b21ed05ea2189d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TMPWobbleText
+  profile: {fileID: 11400000, guid: 633322603464f5d448dd18acb3fa60de, type: 2}
+  playOnEnable: 1
+  animateEmphasis: 0
+  emphasisIntensity: 1

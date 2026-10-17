@@ -370,7 +370,8 @@ public class JunkItem : Interactable
 
         if (bag.IsFull) return;
 
-        bag.AddJunk();
+        // Organic remains (gore, body parts, guts, corpses) add a squish on top of the pickup sound.
+        bag.AddJunk(isGore: IsBurnable);
 
         // Despawn BEFORE firing the collection events: TakeOutTrashTask.OnJunkItemCollected
         // prunes its tracked list by checking NetworkObject.IsSpawned, so listeners must see

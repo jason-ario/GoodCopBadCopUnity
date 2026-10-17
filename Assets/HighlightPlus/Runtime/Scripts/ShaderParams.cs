@@ -93,6 +93,13 @@ namespace HighlightPlus {
         public static int OverlayZTest = Shader.PropertyToID("_OverlayZTest");
         public static int OverlayPatternScrolling = Shader.PropertyToID("_OverlayPatternScrolling");
         public static int OverlayPatternData = Shader.PropertyToID("_OverlayPatternData");
+        // GCBC: draw-once stencil for through-wall overlays (see HighlightOverlay.shader).
+        public static int OverlayStencilRef = Shader.PropertyToID("_OverlayStencilRef");
+        public static int OverlayStencilReadMask = Shader.PropertyToID("_OverlayStencilReadMask");
+        public static int OverlayStencilWriteMask = Shader.PropertyToID("_OverlayStencilWriteMask");
+        public static int OverlayStencilComp = Shader.PropertyToID("_OverlayStencilComp");
+        public static int OverlayStencilPass = Shader.PropertyToID("_OverlayStencilPass");
+
         public static int OverlayBlendDst = Shader.PropertyToID("_OverlayBlendDst");
 
         // target uniforms

@@ -12,6 +12,8 @@ public interface IInteractable
 /// <summary>
 /// Marker interface for interactables that act as pickup slots (e.g. InkStamp).
 /// Pressing Interact on one with empty hands calls Interact(), just like a PickableObject.
+/// While holding an item it accepts, Place (RMB / LT release) also puts it back via
+/// InteractWithItem(), like E / LMB (see PlayerInteractionController.TryPlaceIntoTargetSlot).
 /// </summary>
 public interface IPickupSlot { }
 
@@ -24,9 +26,11 @@ public interface IPickupSlot { }
 //   • Hold  → InteractHold(), only when GetHoldInteractVerb() returns a verb. The reticle fills a
 //             ring over PlayerInteractionController.holdInteractDuration and shows "Hold E to <verb>".
 //             For these objects, Interact() fires on release (a tap) instead of on press.
-// LMB / RT always uses the item in hand: InteractWithItem() only for tool-style targets
-// (GetItemTargetKey == UseItem — stamp a folder, draw on paper, light a fire pit, vaccinate),
-// otherwise the item's own use in place (PickableObject.OnStartUse, verb from GetHeldUseVerb()).
+// LMB / RT always uses the item in hand: InteractWithItem() for tool-style targets
+// (GetItemTargetKey == UseItem — stamp a folder, draw on paper, light a fire pit, vaccinate) AND for
+// Interact-key deposit/insert targets (LMB is an alternative to E there — put the stamp back,
+// bag junk, throw away), otherwise the item's own use in place (PickableObject.OnStartUse, verb
+// from GetHeldUseVerb()). UseItem targets stay LMB-only (E does the target's own Interact()).
 // It never triggers Interact(). Inside cursor-driven diegetic views (PC, panels, lockers…) LMB
 // still clicks UI as before.
 
@@ -93,8 +97,26 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// Whether pressing Interact on this object does anything for <paramref name="player"/> right now.
     /// Only drives the reticle's key icon (so it isn't offered when it would do nothing, e.g. a pickup
     /// while the player's hands are full); the press itself is still forwarded to <see cref="Interact"/>.
+    /// Default: true, except for item-only targets (<see cref="AcceptsHeldItems"/> and no
+    /// <see cref="Interact"/> override, e.g. mail bins, post box, dumpster) — those have nothing to do
+    /// on a plain Interact, so only the held-item prompt is shown, and only when the item fits.
+    /// The highlight is unaffected.
     /// </summary>
-    public virtual bool ShowsInteractPrompt(PlayerInteractionController player) => true;
+    public virtual bool ShowsInteractPrompt(PlayerInteractionController player)
+        => !(AcceptsHeldItems && !OverridesInteract(GetType()));
+
+    private static readonly System.Collections.Generic.Dictionary<Type, bool> s_overridesInteract = new();
+
+    /// <summary>Whether <paramref name="type"/> (or a base below <see cref="Interactable"/>) overrides <see cref="Interact"/>. Cached per type.</summary>
+    private static bool OverridesInteract(Type type)
+    {
+        if (s_overridesInteract.TryGetValue(type, out bool overrides)) return overrides;
+
+        System.Reflection.MethodInfo method = type.GetMethod(nameof(Interact), new[] { typeof(PlayerInteractionController) });
+        overrides = method != null && method.DeclaringType != typeof(Interactable);
+        s_overridesInteract[type] = overrides;
+        return overrides;
+    }
     [Tooltip("Action name shown next to the Interact key on the reticle (e.g. \"Open\", \"Talk\"). Leave empty to use the script's default verb.")]
     [SerializeField] protected string interactVerb;
 
@@ -148,6 +170,14 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     [SerializeField, Min(0f)] private float holdHighlightPulseSpeed = 0.6f;
     [Tooltip("Outline opacity at the faintest point of the pulse (1 = no visible pulse). Thickness and color never change.")]
     [SerializeField, Range(0.05f, 1f)] private float holdHighlightPulseMinOpacity = 0.4f;
+    [Tooltip("Overlay-pulse holds (junk) fade with camera distance like the graffiti pulse: full strength " +
+             "up to 60% of this range, smoothly gone at the range. Match GraffitiScrubDecal's Pulse Fade " +
+             "Distance (30). 0 = no distance fade.")]
+    [SerializeField, Min(0f)] private float overlayPulseFadeRange = 30f;
+
+    /// <summary>Last camera position handed in by <see cref="HoldHighlightRangeDriver"/>.</summary>
+    private Vector3 _lastViewerPosition;
+    private bool _hasViewerPosition;
 
     /// <summary>True while the pulse has moved HighlightEffect.outlineOpacity off 1.</summary>
     private bool _pulseApplied;
@@ -397,6 +427,9 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// </summary>
     public void UpdateHoldHighlightRange(Vector3 viewerPosition)
     {
+        _lastViewerPosition = viewerPosition;
+        _hasViewerPosition = true;
+
         bool inRange = IsWithinHoldRange(viewerPosition, _holdInRange);
         if (inRange == _holdInRange) return;
 
@@ -419,9 +452,19 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     {
         if (highlightEffect == null) return;
 
-        if (!IsHoldHighlightActive || holdHighlightPulseSpeed <= 0f || _overlayStyleApplied)
+        if (_overlayStyleApplied)
         {
-            // Overlay style animates itself (HighlightPlus overlayAnimationSpeed); keep the outline steady.
+            // Overlay style animates itself (HighlightPlus overlayAnimationSpeed); keep the outline
+            // steady and only scale the overlay strength by camera distance (HighlightPlus reads
+            // 'overlay' live every frame, so no material refresh is needed).
+            RestorePulseOpacity();
+            HighlightProfile p = ObjectivePulseProfile;
+            if (p != null) highlightEffect.overlay = p.overlay * OverlayDistanceFade();
+            return;
+        }
+
+        if (!IsHoldHighlightActive || holdHighlightPulseSpeed <= 0f)
+        {
             RestorePulseOpacity();
             return;
         }
@@ -438,6 +481,31 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
         highlightEffect.outlineOpacity = 1f;
         _pulseApplied = false;
+    }
+
+    /// <summary>
+    /// 0..1 distance fade for the overlay pulse, same curve as GraffitiScrubDecal's pulse:
+    /// 1 up to 60% of <see cref="overlayPulseFadeRange"/>, smoothstep to 0 at the range.
+    /// </summary>
+    private float OverlayDistanceFade()
+    {
+        if (overlayPulseFadeRange <= 0f) return 1f;
+
+        Vector3 viewer;
+        if (_hasViewerPosition)
+        {
+            viewer = _lastViewerPosition;
+        }
+        else
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return 1f;
+            viewer = cam.transform.position;
+        }
+
+        float d = Vector3.Distance(viewer, transform.position);
+        float t = Mathf.InverseLerp(overlayPulseFadeRange * 0.6f, overlayPulseFadeRange, d);
+        return 1f - t * t * (3f - 2f * t);
     }
 
     private bool ComputeHoldInRange(bool fallback)
@@ -546,7 +614,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
             fx.outline = 0f;
             fx.glow = 0f;
             fx.innerGlow = 0f;
-            fx.overlay = p.overlay;
+            fx.overlay = p.overlay * OverlayDistanceFade();
             fx.overlayColor = p.overlayColor;
             fx.overlayAnimationSpeed = p.overlayAnimationSpeed;
             fx.overlayMinIntensity = p.overlayMinIntensity;
@@ -612,6 +680,23 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         return item != null
             && itemsThatCanInteractWith != null
             && Array.IndexOf(itemsThatCanInteractWith, item.ItemData) >= 0;
+    }
+
+    /// <summary>
+    /// Whether this target takes held items at all (right now). When true and the held item fails
+    /// <see cref="CanInteractWithItem"/>, <see cref="PlayerInteractionController"/> shows a
+    /// "Not compatible" notification instead of silently doing nothing. Defaults to a non-empty
+    /// <see cref="itemsThatCanInteractWith"/>; override alongside a type-based <see cref="CanInteractWithItem"/>.
+    /// </summary>
+    public virtual bool AcceptsHeldItems
+    {
+        get
+        {
+            if (itemsThatCanInteractWith == null) return false;
+            foreach (PickableItemData data in itemsThatCanInteractWith)
+                if (data != null) return true;
+            return false;
+        }
     }
 
     public virtual void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)

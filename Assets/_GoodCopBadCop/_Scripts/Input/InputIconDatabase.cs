@@ -131,6 +131,13 @@ namespace GoodCopBadCop.Input
             return _keyLookup.TryGetValue(key, out Sprite sprite) ? sprite : null;
         }
 
+        /// <summary>Icon for a fixed (non-rebindable) mouse button (0 = left, 1 = right, 2 = middle), or null if none is configured.</summary>
+        public Sprite GetMouseButtonSprite(int button)
+        {
+            EnsureLookups();
+            return _mouseLookup.TryGetValue(button, out Sprite sprite) ? sprite : null;
+        }
+
         /// <summary>Icon for a gamepad control path, or null if none is configured.</summary>
         public Sprite GetGamepadControlSprite(string controlPath)
         {

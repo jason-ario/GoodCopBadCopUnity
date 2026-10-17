@@ -7967,7 +7967,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
   characterSpeed: 4
-  runSpeed: 8
+  runSpeed: 10
   cameraTransform: {fileID: 7342743542733398178}
   mouseSensitivity: 2
   maxLookAngle: 80
@@ -8411,6 +8411,20 @@ MonoBehaviour:
   TransitionStateInfoList:
   - IsCrossFadeExit: 0
     Layer: 1
+    OriginatingState: -1482508007
+    DestinationState: 1854147271
+    TransitionDuration: 0.1
+    TriggerNameHash: 2117863313
+    TransitionIndex: 0
+  - IsCrossFadeExit: 0
+    Layer: 1
+    OriginatingState: -2083090359
+    DestinationState: 234150976
+    TransitionDuration: 0.1
+    TriggerNameHash: 2117863313
+    TransitionIndex: 0
+  - IsCrossFadeExit: 0
+    Layer: 1
     OriginatingState: 364412622
     DestinationState: -1979119938
     TransitionDuration: 0.046509624
@@ -8688,6 +8702,10 @@ MonoBehaviour:
       ParameterType: 9
     - name: Cough
       NameHash: -2116318112
+      Synchronize: 1
+      ParameterType: 9
+    - name: MeleeSwing
+      NameHash: 2117863313
       Synchronize: 1
       ParameterType: 9
   AnimatorParametersExpanded: 0
@@ -10061,6 +10079,7 @@ MonoBehaviour:
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
   _destroyOnCollect: 0
   _kickable: 0
   _burnable: 0

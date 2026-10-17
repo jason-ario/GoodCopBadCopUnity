@@ -38,10 +38,16 @@ public class TrashBag : PickableObject, IAmmoProvider
     [Tooltip("Default sound played on all clients each time a junk item is collected into this bag.")]
     [SerializeField] private AudioClip _useSound;
 
-    [Tooltip("Additional 'splat' sound played alongside _useSound each time a junk item is " +
-             "collected into this bag — the same gore-landing splat used elsewhere (mutant gore " +
-             "bursts, Vlad's dropped torso/head). Leave unassigned to disable.")]
+    [Tooltip("Additional 'squish/splat' sound played alongside _useSound only when the collected " +
+             "junk is organic remains (gore, body parts, guts, corpses — JunkItem.IsBurnable). " +
+             "Ordinary trash plays only _useSound. Leave unassigned to disable.")]
     [SerializeField] private AudioClip _goreSplatSound;
+
+    [Tooltip("Volume of the gore squish relative to the pickup sound.")]
+    [SerializeField, Range(0f, 1f)] private float _goreSplatVolume = 0.85f;
+
+    [Tooltip("Random pitch range for the gore squish so repeated pickups don't sound identical.")]
+    [SerializeField] private Vector2 _goreSplatPitchRange = new Vector2(0.9f, 1.1f);
 
     // ── Networked state ───────────────────────────────────────────────────────
 
@@ -161,13 +167,33 @@ public class TrashBag : PickableObject, IAmmoProvider
     /// <summary>
     /// Increments the junk count by one. SERVER ONLY — call directly from server-side
     /// logic (e.g. from JunkItem's ServerRpc) to avoid a double-hop through another RPC.
+    /// When <paramref name="isGore"/> is true, every peer also hears the gore squish on top of
+    /// the regular pickup sound.
     /// </summary>
-    public void AddJunk()
+    public void AddJunk(bool isGore = false)
     {
         Debug.Assert(IsServer, "[TrashBag] AddJunk must only be called on the server.");
 
-        if (_junkCount.Value < _maxJunkCapacity)
-            _junkCount.Value++;
+        if (_junkCount.Value >= _maxJunkCapacity) return;
+
+        _junkCount.Value++;
+
+        if (isGore && _goreSplatSound != null)
+            PlayGoreSplatRpc();
+    }
+
+    /// <summary>
+    /// Plays the gore squish on every peer. Sent as an RPC rather than read from the count's
+    /// OnValueChanged because the count alone can't say WHAT went into the bag, and a one-shot
+    /// sound shouldn't replay for late joiners or on save restore.
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost)]
+    private void PlayGoreSplatRpc()
+    {
+        if (_goreSplatSound == null || SFXController.Instance == null) return;
+
+        float pitch = UnityEngine.Random.Range(_goreSplatPitchRange.x, _goreSplatPitchRange.y);
+        SFXController.Instance.PlayAtPosition(_goreSplatSound, transform.position, _goreSplatVolume, pitch);
     }
 
     // ── Blend shape ───────────────────────────────────────────────────────────
@@ -193,13 +219,8 @@ public class TrashBag : PickableObject, IAmmoProvider
         UpdateCompassPip();
         DumpsterDepositTutorial.ReportBagState(this);
 
-        if (SFXController.Instance == null) return;
-
-        if (_useSound != null)
+        if (_useSound != null && SFXController.Instance != null)
             SFXController.Instance.PlayAtPosition(_useSound, transform.position);
-
-        if (_goreSplatSound != null)
-            SFXController.Instance.PlayAtPosition(_goreSplatSound, transform.position);
     }
 
     /// <summary>

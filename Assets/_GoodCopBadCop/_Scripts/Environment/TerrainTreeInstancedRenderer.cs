@@ -242,8 +242,11 @@ public class TerrainTreeInstancedRenderer : MonoBehaviour
         _helperTerrain.treeCrossFadeLength = _terrain.treeCrossFadeLength;
         _helperTerrain.treeMaximumFullLODCount = _terrain.treeMaximumFullLODCount;
         _helperTerrain.preserveTreePrototypeLayers = _terrain.preserveTreePrototypeLayers;
+#if UNITY_EDITOR
+        // Editor-only bake settings; they do not exist in Player builds and have no runtime effect.
         _helperTerrain.bakeLightProbesForTrees = _terrain.bakeLightProbesForTrees;
         _helperTerrain.deringLightProbesForTrees = _terrain.deringLightProbesForTrees;
+#endif
         _helperTerrain.treeMotionVectorModeOverride = _terrain.treeMotionVectorModeOverride;
         _helperTerrain.shadowCastingMode = _terrain.shadowCastingMode;
         _helperTerrain.reflectionProbeUsage = _terrain.reflectionProbeUsage;

@@ -236,9 +236,12 @@ public class GlitchController : MonoBehaviour
         }
 
         // World proximity — catches roaming mutants and supplements the booth check.
-        foreach (var suspect in FindObjectsByType<SuspectCharacter>(FindObjectsSortMode.None))
+        // Registry instead of FindObjectsByType: this runs every scan on every peer.
+        var suspects = SuspectCharacter.ActiveInstances;
+        for (int i = 0; i < suspects.Count; i++)
         {
-            if (suspect.InfectionScore < AnomalyController.FULLY_MUTATED_THRESHOLD) continue;
+            SuspectCharacter suspect = suspects[i];
+            if (suspect == null || suspect.InfectionScore < AnomalyController.FULLY_MUTATED_THRESHOLD) continue;
 
             float signal = SignalForDistance(Vector3.Distance(origin.position, suspect.transform.position));
             if (signal > maxSignal) maxSignal = signal;

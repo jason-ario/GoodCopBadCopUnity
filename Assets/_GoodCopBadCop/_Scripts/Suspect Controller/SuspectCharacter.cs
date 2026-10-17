@@ -2294,6 +2294,64 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
+    /// Local only — run it on every peer (driven by replicated state, see
+    /// <c>SoldierMutantResponder._isRagdollCorpse</c>). Turns a dead world NPC into a physics
+    /// ragdoll lying where it fell, instead of a "Die" animation standing inside its upright root
+    /// capsule. Disables the NavMeshAgent, the root body capsule (it stays upright and would block
+    /// the interact ray and shove the bones), look/leg IK, then activates the
+    /// <see cref="RagdollController"/>. Every ragdoll bone collider gets an
+    /// <see cref="InteractableCollider"/> pointing back here, so aiming at any limb targets the
+    /// corpse (bagging / burning), like mutant and player corpses. Returns false (body left as-is)
+    /// when there is no RagdollController.
+    /// </summary>
+    public bool ApplyCorpseRagdoll()
+    {
+        RagdollController ragdoll = GetComponent<RagdollController>();
+        if (ragdoll == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] '{name}' has no RagdollController — corpse left in its death animation.", this);
+            return false;
+        }
+
+        if (_navAgent == null) _navAgent = GetComponent<NavMeshAgent>();
+        if (_navAgent != null) _navAgent.enabled = false;
+
+        if (_bodyCollider == null) _bodyCollider = GetComponent<CapsuleCollider>();
+        if (_bodyCollider != null) _bodyCollider.enabled = false;
+
+        foreach (FLookAnimator look in GetComponentsInChildren<FLookAnimator>(true))
+            look.enabled = false;
+
+        DisableLegsAnimators();
+        ragdoll.ActivateRagdoll();
+        EnsureRagdollInteractableColliders(ragdoll);
+        return true;
+    }
+
+    /// <summary>
+    /// Makes sure every ragdoll bone collider resolves to this character for the interact ray.
+    /// Prefab bones already carry an <see cref="InteractableCollider"/>; this covers instances
+    /// that lost one or have an unassigned target.
+    /// </summary>
+    private void EnsureRagdollInteractableColliders(RagdollController ragdoll)
+    {
+        var colliders = ragdoll.RagdollColliders;
+        if (colliders == null) return;
+
+        foreach (Collider col in colliders)
+        {
+            if (col == null || col.gameObject == gameObject) continue;
+
+            if (!col.TryGetComponent(out InteractableCollider marker))
+                marker = col.gameObject.AddComponent<InteractableCollider>();
+
+            if (marker.Interactable == null)
+                marker.Interactable = this;
+            marker.enabled = true;
+        }
+    }
+
+    /// <summary>
     /// Marks this non-mutant suspect as having fled the booth after absorbing damage past
     /// woundedFleeHealth. Unlike <see cref="KillSuspect"/>, this does not despawn or kill the
     /// suspect record — it survives, but is forced onto the fully-mutated infection threshold so

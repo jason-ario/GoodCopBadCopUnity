@@ -22,8 +22,14 @@ namespace Netcode.Transports.Facepunch
         [Tooltip("The Steam App ID of your game. Technically you're not allowed to use 480, but Valve doesn't do anything about it so it's fine for testing purposes.")]
         [SerializeField] private uint steamAppId = 480;
 
-        /// <summary>The Steam App ID configured on this transport (single source of truth for SteamClient.Init).</summary>
-        public uint SteamAppId => steamAppId;
+        /// <summary>
+        /// Project-wide App ID override (set from GameSettings' build channel before scenes load).
+        /// When non-zero it replaces the serialized <see cref="steamAppId"/> on every transport instance.
+        /// </summary>
+        public static uint AppIdOverride;
+
+        /// <summary>The effective Steam App ID (single source of truth for SteamClient.Init).</summary>
+        public uint SteamAppId => AppIdOverride != 0 ? AppIdOverride : steamAppId;
 
         [Tooltip("The Steam ID of the user targeted when joining as a client.")]
         [SerializeField] public ulong targetSteamId;
@@ -48,7 +54,7 @@ namespace Netcode.Transports.Facepunch
             try
             {
                 if (!SteamClient.IsValid)
-                    SteamClient.Init(steamAppId, false);
+                    SteamClient.Init(SteamAppId, false);
             }
             catch (Exception e)
             {

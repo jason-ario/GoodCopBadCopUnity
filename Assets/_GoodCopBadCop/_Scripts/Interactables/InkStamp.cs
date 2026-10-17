@@ -246,6 +246,17 @@ public class InkStamp : Interactable, IPickupSlot
 
     protected override string DefaultInteractVerb => "Take stamp";
 
+    /// <summary>
+    /// "[E] Take stamp" only when Interact would actually take it: the stamp is in the slot and the
+    /// player's hands are empty. Returning the stamp shows its own "Put back" prompt via
+    /// <see cref="Interactable.CanInteractWithItem"/>; an empty slot otherwise only highlights.
+    /// </summary>
+    public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
+        _isPlaced.Value && player != null && player.HeldObject == null;
+
+    /// <summary>Only an empty slot takes items (the matching stamp); a filled slot never reports "Not compatible".</summary>
+    public override bool AcceptsHeldItems => !_isPlaced.Value;
+
     public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Put back";
 
     public override void Interact(PlayerInteractionController player)

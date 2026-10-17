@@ -11,7 +11,8 @@ Material:
   m_Shader: {fileID: 4800000, guid: 9addf22cef0851847b0b3fac34e59599, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - UNITY_UI_ALPHACLIP
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -29,18 +30,18 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _ChromaticOffset: 0.00046
+    - _ChromaticOffset: 0
     - _ColorMask: 15
-    - _Flicker: 0.2
-    - _JitterAmount: 0.0021
+    - _Flicker: 0.03
+    - _JitterAmount: 0.0019
     - _JitterRows: 120
     - _NoiseAlphaStrength: 0
-    - _NoiseFPS: 11.4
-    - _NoisePixelSize: 1
+    - _NoiseFPS: 12
+    - _NoisePixelSize: 2.04
     - _NoiseStrength: 0
-    - _ScanlineCount: 0
+    - _ScanlineCount: 17
     - _ScanlineSpeed: -20
-    - _ScanlineStrength: 0.15
+    - _ScanlineStrength: 0
     - _SnowAlpha: 0
     - _SnowSoftness: 0.089
     - _Stencil: 0
@@ -51,7 +52,7 @@ Material:
     - _TearChance: 0.12
     - _TearHeight: 0.125
     - _TearOffset: 0.0231
-    - _UseUIAlphaClip: 0
+    - _UseUIAlphaClip: 1
     - _XRMotionVectorsPass: 0
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
