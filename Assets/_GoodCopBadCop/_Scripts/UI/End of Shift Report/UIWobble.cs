@@ -68,9 +68,6 @@ public class UIWobble : MonoBehaviour
         rectTransform.anchoredPosition = originalPosition + new Vector3(offsetX, offsetY, 0) * intensity;
     }
 
-    public TMPWobbleProfile WobbleProfile => wobbleProfile;
-    public float Intensity => intensity;
-
     public void SetWobbleProfile(TMPWobbleProfile profile)
     {
         CacheOriginalPosition();

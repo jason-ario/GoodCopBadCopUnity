@@ -609,8 +609,8 @@ public class PlayerInteractionController : NetworkBehaviour
                     // held item on E (deposit/insert) targets (see TryItemUse).
                     TargetItemUseVerb = canApplyHeldItem ? itemVerb : null;
 
-                    // useItemAlsoTaps: LMB also applies the held item here (see TryItemUse) → "[E] / [LMB] {verb}".
-                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint && !applyOnInteract, holdVerb, useVerb, actionVerb, applyOnInteract);
+                    // Reticle shows "[E] {verb}" only; LMB on E-targets is surfaced by the HUD prompt above.
+                    reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint && !applyOnInteract, holdVerb, useVerb, actionVerb);
                     interactable.Highlight(true);
                     lastInteractable = interactable;
                 }
