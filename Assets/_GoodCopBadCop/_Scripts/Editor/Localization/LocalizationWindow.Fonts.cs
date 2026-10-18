@@ -395,7 +395,8 @@ public partial class LocalizationWindow
             _rolesFoldout = EditorGUILayout.Foldout(_rolesFoldout, "Font roles (shared by all languages)", true);
             if (!_rolesFoldout) return;
             LocUI.Muted_("Assign each project font to a role. A label keeps its own font unless its role has a font for the active language. " +
-                         "A label can force a role with LocalizedText > Font Role. Subtitles default to the Dialogue role.");
+                         "A label can force a role with LocalizedText > Font Role. Subtitles default to the Dialogue role. " +
+                         "Double-click or right-click a role to rename it.");
 
             var roles = _settings.fontRoles;
             int removeRole = -1;
@@ -404,7 +405,13 @@ public partial class LocalizationWindow
                 for (int i = 0; i < roles.Count; i++)
                 {
                     if (roles[i] == null) continue;
+                    if (_renamingRole == i)
+                    {
+                        DrawRoleRenameField(i);
+                        continue;
+                    }
                     LocUI.Pill(roles[i].name + " (" + roles[i].sourceFonts.Count(f => f != null) + ")", LocUI.Violet);
+                    HandleRolePillClick(i, GUILayoutUtility.GetLastRect());
                     if (GUILayout.Button("\u2715", EditorStyles.miniButton, GUILayout.Width(20))) removeRole = i;
                 }
                 GUILayout.FlexibleSpace();
@@ -424,6 +431,7 @@ public partial class LocalizationWindow
                 Undo.RecordObject(_settings, "Remove font role");
                 string removed = roles[removeRole].name;
                 roles.RemoveAt(removeRole);
+                _renamingRole = -1;
                 foreach (var l in _settings.languages) if (l != null) l.roleFonts.RemoveAll(r => r == null || r.role == removed);
                 EditorUtility.SetDirty(_settings);
             }

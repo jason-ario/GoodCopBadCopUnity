@@ -15,9 +15,10 @@ namespace GoodCopBadCop.Effects
         /// </summary>
         Vignette,
         /// <summary>
-        /// Edge glitch after post-processing (see <see cref="GlitchEffectView"/>): warping, band tearing,
-        /// RGB split and a tinted glow around the screen borders. Uses tint, opacity (peak intensity),
-        /// duration, opacity curve and the Glitch settings.
+        /// Tinted vignette + glitch after post-processing (see <see cref="GlitchEffectView"/>): hurt-style colored
+        /// vignette, chromatic aberration and desaturation, plus band tearing, jolts, flicker and static.
+        /// Uses tint, opacity (peak intensity), duration, opacity curve, the vignette/chromatic/saturation
+        /// values, and Glitch Tear/Glow strength (edge width and warp are unused).
         /// </summary>
         Glitch
     }

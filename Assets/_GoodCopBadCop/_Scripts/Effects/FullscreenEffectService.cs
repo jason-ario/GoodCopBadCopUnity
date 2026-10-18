@@ -42,9 +42,7 @@ namespace GoodCopBadCop.Effects
 
                 case EFullscreenEffectMode.Glitch:
                     if (glitchView == null)
-                        glitchView = Object.FindFirstObjectByType<GlitchEffectView>();
-                    if (glitchView == null)
-                        glitchView = GlitchEffectView.CreateDefaultView();
+                        glitchView = GlitchEffectView.GetOrCreate();
 
                     glitchView.Play(settings);
                     break;

@@ -241,7 +241,8 @@ public class TMPWobbleText : MonoBehaviour
         int charCount = textInfo.characterCount;
         float now = Time.unscaledTime;
 
-        float baseTime = baseActive ? Time.time * profile.speed : 0f;
+        // Unscaled so the wobble keeps animating while the game is paused (Time.timeScale = 0).
+        float baseTime = baseActive ? now * profile.speed : 0f;
         float fontSize = tmp.fontSize;
 
         for (int charIndex = 0; charIndex < charCount; charIndex++)
@@ -268,8 +269,8 @@ public class TMPWobbleText : MonoBehaviour
                 float x = Mathf.Sin(baseTime * profile.xFrequencyMultiplier + phaseX) * profile.amountX;
                 float y = Mathf.Cos(baseTime * profile.yFrequencyMultiplier + phaseY) * profile.amountY;
 
-                float noiseX = (Mathf.PerlinNoise(charIndex * 0.173f, Time.time * 0.31f * profile.speed) - 0.5f) * 2f * profile.noiseAmount;
-                float noiseY = (Mathf.PerlinNoise(charIndex * 0.271f, Time.time * 0.47f * profile.speed) - 0.5f) * 2f * profile.noiseAmount;
+                float noiseX = (Mathf.PerlinNoise(charIndex * 0.173f, now * 0.31f * profile.speed) - 0.5f) * 2f * profile.noiseAmount;
+                float noiseY = (Mathf.PerlinNoise(charIndex * 0.271f, now * 0.47f * profile.speed) - 0.5f) * 2f * profile.noiseAmount;
 
                 offset += new Vector3(x + noiseX, y + noiseY, 0f);
             }

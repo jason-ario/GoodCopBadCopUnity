@@ -62,6 +62,30 @@ public class GeigerCounterUI : MonoBehaviour
     [Tooltip("Normalised radiation (0-1) above which the gauge starts shaking.")]
     [SerializeField] [Range(0f, 1f)] private float shakeActivateThreshold = 0.75f;
 
+    [Header("Status Light")]
+    [Tooltip("Bulb Image above the gauge, tinted by the overall/accumulated radiation level.")]
+    [SerializeField] private Image statusLightImage;
+    [Tooltip("Normalised radiation (0-1) at which the light turns yellow and blinks slowly.")]
+    [SerializeField] [Range(0f, 1f)] private float lightWarningThreshold = 0.5f;
+    [Tooltip("Normalised radiation (0-1) at which the light turns red and blinks fast. " +
+             "Matches PlayerRadiation's damage threshold by default.")]
+    [SerializeField] [Range(0f, 1f)] private float lightDangerThreshold = 0.75f;
+    [SerializeField] private Color lightColorSafe    = new Color(0.00f, 0.45f, 0.16f);  // dark green
+    [SerializeField] private Color lightColorWarning = new Color(0.68f, 0.52f, 0.00f);  // dark amber-yellow
+    [SerializeField] private Color lightColorDanger  = new Color(0.60f, 0.05f, 0.03f);  // dark red
+    [Tooltip("Seconds per full pulse (bright → dim → bright) while in the safe band.")]
+    [SerializeField] private float lightSafePulsePeriod = 3f;
+    [Tooltip("Brightness multiplier at the dimmest point of the safe (green) pulse. Close to 1 = subtle.")]
+    [SerializeField] [Range(0f, 1f)] private float lightSafeDimBrightness = 0.8f;
+    [Tooltip("Seconds per full pulse (bright → dim → bright) while in the warning band.")]
+    [SerializeField] private float lightWarningBlinkPeriod = 2f;
+    [Tooltip("Seconds per full pulse (bright → dim → bright) while in the danger band.")]
+    [SerializeField] private float lightDangerBlinkPeriod = 1f;
+    [Tooltip("Brightness multiplier at the dimmest point of the warning/danger pulse.")]
+    [SerializeField] [Range(0f, 1f)] private float lightOffBrightness = 0.5f;
+
+    private float _normalizedRadiation;
+
     private PlayerRadiation _playerRadiation;
     private PlayerInstance _subscribedInstance;
     private float _targetAngle;
@@ -113,6 +137,11 @@ public class GeigerCounterUI : MonoBehaviour
         if (radiationValueText != null)
             radiationValueText.text = string.Format(valueFormat, normalized * maxRadiation) + valueSuffix;
 
+        // Steady (non-blinking) bulb colour for the band.
+        _normalizedRadiation = normalized;
+        if (statusLightImage != null)
+            statusLightImage.color = GetLightColor(normalized, out _, out _);
+
         // No damage effects on a printed copy.
         if (crackedGlassImage != null) crackedGlassImage.gameObject.SetActive(false);
         if (shakeWobble != null) shakeWobble.enabled = false;
@@ -157,6 +186,7 @@ public class GeigerCounterUI : MonoBehaviour
         DecayExposureRate();
         AnimateNeedle();
         AnimateCrackOverlay();
+        AnimateStatusLight();
     }
 
     private void OnDisable()
@@ -262,6 +292,8 @@ public class GeigerCounterUI : MonoBehaviour
         if (radiationValueText != null)
             radiationValueText.text = string.Format(valueFormat, current) + valueSuffix;
 
+        _normalizedRadiation = normalized;
+
         // ── Crack overlay and shake – both scale with the overall/accumulated radiation ────
         _crackProgressTarget = Mathf.Clamp01(Mathf.InverseLerp(crackStartThreshold, 1f, normalized));
 
@@ -323,5 +355,54 @@ public class GeigerCounterUI : MonoBehaviour
             Time.deltaTime * crackSmoothSpeed);
 
         _crackMaterialInstance.SetFloat(CrackProgressId, _crackProgressCurrent);
+    }
+
+    // ── Status light ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the bulb colour for a normalised radiation level, plus the pulse period and the
+    /// dimmest brightness for its band: green = safe, yellow = warning, red = danger.
+    /// </summary>
+    private Color GetLightColor(float normalized, out float pulsePeriod, out float dimBrightness)
+    {
+        if (normalized >= lightDangerThreshold)
+        {
+            pulsePeriod   = lightDangerBlinkPeriod;
+            dimBrightness = lightOffBrightness;
+            return lightColorDanger;
+        }
+
+        if (normalized >= lightWarningThreshold)
+        {
+            pulsePeriod   = lightWarningBlinkPeriod;
+            dimBrightness = lightOffBrightness;
+            return lightColorWarning;
+        }
+
+        pulsePeriod   = lightSafePulsePeriod;
+        dimBrightness = lightSafeDimBrightness;
+        return lightColorSafe;
+    }
+
+    /// <summary>
+    /// Tints the bulb by radiation band and pulses it continuously: the brightness fades from full
+    /// down to the band's dim level over the first half of the period and back up over the second,
+    /// so it is always fading rather than holding on or off.
+    /// </summary>
+    private void AnimateStatusLight()
+    {
+        if (statusLightImage == null) return;
+
+        Color color = GetLightColor(_normalizedRadiation, out float period, out float dim);
+
+        if (period > 0f)
+        {
+            // Plain cosine: 1 at the start of the period, 0 halfway, 1 again at the end.
+            float on = 0.5f + 0.5f * Mathf.Cos(Time.time / period * 2f * Mathf.PI);
+            float brightness = Mathf.Lerp(dim, 1f, on);
+            color = new Color(color.r * brightness, color.g * brightness, color.b * brightness, color.a);
+        }
+
+        statusLightImage.color = color;
     }
 }

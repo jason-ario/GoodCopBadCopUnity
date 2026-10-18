@@ -70,6 +70,15 @@ public class ReticleController : MonoBehaviour
     [Tooltip("Text between the Interact key icon and the alternate Use Item icon on the tap row.")]
     [SerializeField] private string _altKeySeparator = "/";
 
+    [Tooltip("Horizontal padding (each side) of the separator label. Replaces the hint label's own TMPWidthFitter padding so the separator sits close to both icons.")]
+    [SerializeField] private float _altKeySeparatorPadding = 2f;
+
+    [Tooltip("Horizontal padding (each side) of the tap row's action label while the alternate Use Item icon is shown, so the label sits right after that icon. The label's authored padding is restored otherwise.")]
+    [SerializeField] private float _altKeyLabelPadding = 2f;
+
+    private TMPWidthFitter _hintLabelFitter;
+    private float _hintLabelDefaultPadding;
+
     // Runtime-built text-only "Hold to {verb}" row (clone of _tapRow without the icon).
     private GameObject _holdRow;
     private TextMeshProUGUI _holdLabel;
@@ -134,11 +143,24 @@ public class ReticleController : MonoBehaviour
         _altSeparator.name = "Alt Key Separator";
         if (_altSeparator.TryGetComponent(out LocalizedText loc)) loc.SetKey(null);
         if (_altSeparator.TryGetComponent(out TextMeshProUGUI sepText)) sepText.text = _altKeySeparator;
+        if (_altSeparator.TryGetComponent(out TMPWidthFitter sepFitter)) sepFitter.SetHorizontalPadding(_altKeySeparatorPadding);
 
         _altKeyIcon = Instantiate(_hintKeyIcon, row);
         _altKeyIcon.name = "Alt Key Icon";
         Transform image = _hintKeyIcon.transform == _hintKeyImage.transform ? _altKeyIcon.transform : _altKeyIcon.transform.Find(imagePath);
         _altKeyImage = image != null ? image.GetComponent<Image>() : null;
+
+        // Same UIWobble profile/intensity as the Interact icon (own random phase).
+        UIWobble sourceWobble = _hintKeyImage.GetComponent<UIWobble>();
+        if (sourceWobble == null) sourceWobble = _hintKeyIcon.GetComponentInChildren<UIWobble>(true);
+        if (sourceWobble != null && _altKeyImage != null)
+        {
+            UIWobble altWobble = _altKeyImage.GetComponent<UIWobble>();
+            if (altWobble == null) altWobble = _altKeyImage.gameObject.AddComponent<UIWobble>();
+            altWobble.enabled = true;
+            altWobble.SetWobbleProfile(sourceWobble.WobbleProfile);
+            altWobble.SetIntensity(sourceWobble.Intensity);
+        }
 
         // Visual order wanted: Interact icon, separator, alt icon, label.
         var layout = row.GetComponent<HorizontalOrVerticalLayoutGroup>();
@@ -158,6 +180,9 @@ public class ReticleController : MonoBehaviour
 
         _altSeparator.SetActive(false);
         _altKeyIcon.SetActive(false);
+
+        _hintLabelFitter = _hintLabel.GetComponent<TMPWidthFitter>();
+        if (_hintLabelFitter != null) _hintLabelDefaultPadding = _hintLabelFitter.HorizontalPadding;
     }
 
     private void SetAltKeyVisible(bool visible)
@@ -168,6 +193,14 @@ public class ReticleController : MonoBehaviour
         {
             _altKeyIcon.SetActive(visible);
             if (visible) RefreshHintIcon();
+        }
+
+        // No gap between the alt icon and the action label; authored padding otherwise.
+        if (_hintLabelFitter != null)
+        {
+            float padding = visible ? _altKeyLabelPadding : _hintLabelDefaultPadding;
+            if (!Mathf.Approximately(_hintLabelFitter.HorizontalPadding, padding))
+                _hintLabelFitter.SetHorizontalPadding(padding);
         }
     }
 
@@ -345,8 +378,7 @@ public class ReticleController : MonoBehaviour
         string tapLabel = showHint && !string.IsNullOrEmpty(text) ? text : actionVerb;
 
         // "[E] {verb}" (or "[E] / [LMB] {verb}") above "[LMB] {useItemVerb}" above a text-only "Hold to {holdVerb}" row.
-        SetPrompt(true, tapLabel, holdVerb, useItemVerb);
-        SetAltKeyVisible(useItemAlsoTaps);
+        SetPrompt(true, tapLabel, holdVerb, useItemVerb, useItemAlsoTaps);
     }
 
     /// <summary>
@@ -454,12 +486,12 @@ public class ReticleController : MonoBehaviour
     /// "[LMB] {useVerb}" row (null/empty useVerb hides it) and the "Hold to {holdVerb}" row
     /// (null/empty holdVerb hides it).
     /// </summary>
-    private void SetPrompt(bool keyIconVisible, string label, string holdVerb = null, string useVerb = null)
+    private void SetPrompt(bool keyIconVisible, string label, string holdVerb = null, string useVerb = null, bool altKeyVisible = false)
     {
         bool labelVisible = !string.IsNullOrEmpty(label);
 
-        // Every caller resets the alt "/ [LMB]" pair; SetInteractState re-enables it after this when requested.
-        SetAltKeyVisible(false);
+        // "/ [LMB]" pair on the tap row — only when the tap action also fires on Use Item.
+        SetAltKeyVisible(altKeyVisible && keyIconVisible);
 
         if (_useRow != null)
         {
