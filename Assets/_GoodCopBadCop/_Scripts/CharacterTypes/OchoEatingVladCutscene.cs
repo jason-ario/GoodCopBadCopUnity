@@ -272,6 +272,44 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         Debug.Log("[OchoEatingVladCutscene] Armed — watching for player proximity.", this);
     }
 
+    /// <summary>
+    /// SERVER ONLY. Puts the cutscene in its finished state without playing it or spawning Vlad's
+    /// pieces. Used when Day 3 resumes from its Dusk checkpoint: the roof scene is a start-of-day
+    /// event that has already happened, and its dropped pieces are not part of the snapshot, so
+    /// re-arming it would put bodies back that the players already cleaned up. Also stops later
+    /// <see cref="TriggerTask"/> calls this session.
+    /// </summary>
+    public void MarkAlreadyPlayedForResume()
+    {
+        if (!IsServer) return;
+
+        if (_monitorRoutine != null)
+        {
+            StopCoroutine(_monitorRoutine);
+            _monitorRoutine = null;
+        }
+
+        DespawnNetworkedVladPieces();
+        _triggered = true;
+        _networkPhase.Value = NetworkCutscenePhase.Escaping;
+        HideOchoForResumeClientRpc();
+
+        Debug.Log("[OchoEatingVladCutscene] Dusk resume: marked as already played (Ocho hidden, no Vlad pieces).", this);
+    }
+
+    [ClientRpc]
+    private void HideOchoForResumeClientRpc()
+    {
+        if (_audioSource != null)
+        {
+            _audioSource.loop = false;
+            _audioSource.Stop();
+        }
+
+        LocalSetLooking(false);
+        DeactivateOcho();
+    }
+
     /// <summary>Resets the cutscene so it can be re-armed (debug/testing only). SERVER ONLY.</summary>
     public void DebugReset()
     {

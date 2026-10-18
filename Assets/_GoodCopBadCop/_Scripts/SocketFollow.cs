@@ -26,6 +26,13 @@ public class SocketFollow : MonoBehaviour
     public Vector3 RotationOffset => _rotationOffset;
 
     /// <summary>
+    /// Local-only, purely visual offset (world units, along this object's own axes after the
+    /// follow rotation is applied). Used e.g. by <see cref="FolderExamPageSifter"/> to lift a
+    /// hovered exam page above its neighbours. Never networked; reset whenever the target changes.
+    /// </summary>
+    public Vector3 VisualLocalOffset { get; set; }
+
+    /// <summary>
     /// Sets the source transform to follow at runtime.
     /// Clears any local-offset override set via <see cref="SetTargetWithLocalOffset"/>.
     /// </summary>
@@ -33,6 +40,7 @@ public class SocketFollow : MonoBehaviour
     {
         _source = target;
         _useLocalRotationOverride = false;
+        VisualLocalOffset = Vector3.zero;
     }
 
     /// <summary>
@@ -50,6 +58,7 @@ public class SocketFollow : MonoBehaviour
         _localPositionOverride    = localPosition;
         _localRotationOverride    = localRotation;
         _useLocalRotationOverride = true;
+        VisualLocalOffset         = Vector3.zero;
     }
 
     private void LateUpdate()
@@ -73,5 +82,8 @@ public class SocketFollow : MonoBehaviour
             if (_followRotation)
                 transform.rotation = _source.rotation * Quaternion.Euler(_rotationOffset);
         }
+
+        if (VisualLocalOffset != Vector3.zero)
+            transform.position += transform.rotation * VisualLocalOffset;
     }
 }

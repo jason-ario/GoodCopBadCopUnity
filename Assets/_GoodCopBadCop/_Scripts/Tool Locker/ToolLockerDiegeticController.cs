@@ -277,6 +277,13 @@ public class ToolLockerDiegeticController : DiegeticViewController
                 return;
             }
 
+            if (!customAction.CanExecute(pickup, out string blockedMessage))
+            {
+                if (!string.IsNullOrEmpty(blockedMessage))
+                    UIController.Instance.ShowShopNotification(blockedMessage);
+                return;
+            }
+
             if (!HasEnoughMoney(item.Price)) return;
 
             customAction.Execute(pickup, item.Price);

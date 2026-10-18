@@ -6,9 +6,9 @@ public class TrashCan : Interactable
     private const string DocumentationCategory = "Documentation";
     private const string DocumentationTutorialIncompleteMessage =
         "Can't throw away yet";
-    private const string SupplyBoxNotEmptyMessage = "Empty the box first";
-    private const string FolderNotEmptyMessage = "Empty the folder first";
-    private const string SuspectStillAtWindowMessage = "Deliver a verdict first";
+    private static string SupplyBoxNotEmptyMessage => Loc.T("Empty the box first");
+    private static string FolderNotEmptyMessage => Loc.T("Empty the folder first");
+    private static string SuspectStillAtWindowMessage => Loc.T("Deliver a verdict first");
     private const string ConfirmDiscardMessage = "Are you sure you want to throw this away?";
 
     [SerializeField] AudioSource audioSource;

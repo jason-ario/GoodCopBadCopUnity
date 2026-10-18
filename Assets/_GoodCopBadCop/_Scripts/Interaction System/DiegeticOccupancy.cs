@@ -9,7 +9,7 @@ using UnityEngine;
 /// </summary>
 public class DiegeticOccupancy : NetworkBehaviour
 {
-    private const string BusyMessage = "Interaction is busy";
+    private static string BusyMessage => Loc.T("Interaction is busy");
     private const ulong NoOccupant = ulong.MaxValue;
 
     private readonly NetworkVariable<ulong> _occupantClientId = new NetworkVariable<ulong>(

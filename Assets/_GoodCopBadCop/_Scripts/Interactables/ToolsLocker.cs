@@ -65,18 +65,31 @@ public class ToolsLocker : Interactable, ILockable
     /// <inheritdoc/>
     public bool IsLocked => _isLocked.Value;
 
+    /// <summary>
+    /// Server-only: an Unlock()/Lock() request that arrived before this locker spawned. The padlock
+    /// is a separate in-scene NetworkObject and NGO does not guarantee spawn order, so on a reloaded
+    /// Day 3+ save the padlock can auto-unlock (and despawn) before this locker is spawned — when
+    /// IsServer is still false. Applied in OnNetworkSpawn so that unlock is never lost.
+    /// </summary>
+    private bool? _pendingLockedState;
+
     /// <summary>Locks the locker. Must be called on the server.</summary>
-    public void Lock()
-    {
-        if (!IsServer) return;
-        _isLocked.Value = true;
-    }
+    public void Lock() => SetLockedServer(true);
 
     /// <summary>Unlocks the locker so players can open it. Must be called on the server.</summary>
-    public void Unlock()
+    public void Unlock() => SetLockedServer(false);
+
+    private void SetLockedServer(bool locked)
     {
-        if (!IsServer) return;
-        _isLocked.Value = false;
+        if (IsSpawned)
+        {
+            if (IsServer) _isLocked.Value = locked;
+            return;
+        }
+
+        var netManager = NetworkManager.Singleton;
+        if (netManager != null && netManager.IsServer)
+            _pendingLockedState = locked;
     }
     /// <summary>Unlocks the locker and its physical padlock for debug free-play sessions.</summary>
     public void DebugForceUnlock()
@@ -97,6 +110,21 @@ public class ToolsLocker : Interactable, ILockable
     {
         isOpen.OnValueChanged += OnIsOpenChanged;
         _isLocked.OnValueChanged += OnIsLockedChanged;
+
+        if (IsServer)
+        {
+            // Apply any lock request that arrived before this locker spawned (see _pendingLockedState).
+            if (_pendingLockedState.HasValue)
+            {
+                _isLocked.Value = _pendingLockedState.Value;
+                _pendingLockedState = null;
+            }
+
+            // Spawn-order safety net: if the padlock already resolved as unlocked (e.g. Day 3+
+            // auto-unlock on a reloaded save, then despawned), mirror it here.
+            if (_isLocked.Value && _lockController != null && !_lockController.IsLocked)
+                _isLocked.Value = false;
+        }
 
         // Snap decor to the current replicated state for late-joining clients.
         ApplyDecorImmediate(isOpen.Value);

@@ -1317,6 +1317,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         TriggerSpeakerAnimationServer(speakerNetId, chosen.animationTrigger);
 
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse, chosen.playLaughSfx));
+
+        if (!string.IsNullOrWhiteSpace(chosen.npcFollowUp))
+            yield return StartCoroutine(SayAndWait(speaker, chosen.npcFollowUp));
     }
 
     // -------------------------------------------------------------------------

@@ -135,6 +135,9 @@ public class HeldItemZoomView : DiegeticViewController
     /// <summary>True while zoom mode is open on this client.</summary>
     public bool IsZoomed => IsActive;
 
+    /// <summary>The zoomable currently being inspected, or null when zoom is closed.</summary>
+    public HeldItemZoomable CurrentTarget => IsActive ? _target : null;
+
     protected override bool HidePlayerArms => _target != null && _target.HidePlayerArms;
 
     // Zoom is a camera move only — it must not change scene lighting.

@@ -652,6 +652,7 @@ public class ShiftManager : NetworkBehaviour
         GlobalHostVariables.Instance?.SetMoney(state.Cash);
         PickableObjectRegistry.Instance?.RestoreAll(state.Pickables);
         PickableObjectRegistry.Instance?.RestoreBackpackContents(state.Pickables);
+        PickableObjectRegistry.Instance?.RestoreSupplyBoxContents(state.Pickables);
         RestorePlayerInventoryAtRecoveryDropPoint(state.PlayerInventoryItemIds);
         AmmoReserveSaveStore.RestoreAll(state.AmmoReserves);
 
@@ -663,6 +664,7 @@ public class ShiftManager : NetworkBehaviour
         FenceRepairTask.Instance?.RestoreSaveState(state.FenceRepair);
         CleanBoothMessTask.Instance?.RestoreSaveState(state.BoothMess);
         duskDay1?.RestoreDuskStateAfterTasks();
+        TakeOutTrashTask.Instance?.CompleteIfNothingLeftAfterRestore();
         RestorePendingDailyTaskFallbacks(state);
         RestoreOutstandingFollowTrailFallback(state);
 

@@ -316,7 +316,7 @@ public class JunkItem : Interactable
         TryCollectInto(heldItem as TrashBag);
     }
 
-    private const string BagFullMessage = "<color=red>Trash is full</color>";
+    private static string BagFullMessage => "<color=red>" + Loc.T("Trash is full") + "</color>";
     private const float  BagFullNotifyCooldown = 1f;
 
     /// <summary>Shared across all junk items so spamming E/LMB on several items doesn't stack toasts.</summary>

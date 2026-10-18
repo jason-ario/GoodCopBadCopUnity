@@ -100,6 +100,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
     private bool _isUnderwater;
 
+    /// <summary>True while underwater swim physics are active (Jump swims upward).</summary>
+    public bool IsUnderwater => _isUnderwater;
+
     [Header("Jump Settings")]
     [SerializeField] private float jumpForce = 10f;
     [SerializeField] private AudioClip jumpSound;

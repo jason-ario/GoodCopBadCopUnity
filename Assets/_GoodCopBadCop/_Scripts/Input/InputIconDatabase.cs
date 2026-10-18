@@ -102,6 +102,11 @@ namespace GoodCopBadCop.Input
                 if (_mouseLookup.TryGetValue(button, out Sprite sprite) && sprite != null) return sprite;
             }
 
+            // Actions with a fixed, non-rebindable mouse control (UseItem = LMB) have no key/mouse binding slot.
+            int fixedButton = RebindableInput.GetFixedMouseButton(action);
+            if (fixedButton >= 0 && _mouseLookup.TryGetValue(fixedButton, out Sprite fixedSprite) && fixedSprite != null)
+                return fixedSprite;
+
             return fallbackSprite;
         }
 

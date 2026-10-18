@@ -376,8 +376,22 @@ public class Day_03 : DayBase, IDailyTask
         // it from re-arming. DebugReset() clears that flag first so every DayActivated() call
         // re-arms the cutscene fresh, matching the "drop leftover handles before arming
         // everything fresh" contract already followed by the other Day 3 tasks above.
-        OchoEatingVladCutscene.Instance?.DebugReset();
-        OchoEatingVladCutscene.Instance?.TriggerTask();
+        //
+        // A Dusk resume skips it: the roof scene already played that morning, and Vlad's dropped
+        // torso/head aren't in the snapshot (TakeOutTrashTask only saves its own spawned items),
+        // so re-arming here put Vlad's body back even after players had bagged it.
+        bool resumingAtDusk = restoringWorkday
+            && SaveDataManager.Instance != null
+            && SaveDataManager.Instance.IsResumingAtDusk(DayNumber);
+        if (resumingAtDusk)
+        {
+            OchoEatingVladCutscene.Instance?.MarkAlreadyPlayedForResume();
+        }
+        else
+        {
+            OchoEatingVladCutscene.Instance?.DebugReset();
+            OchoEatingVladCutscene.Instance?.TriggerTask();
+        }
 
         // Skip the Day 3 mail delivery entirely -- no delivery, no crate, no "Sort the Mail"
         // task. The mechanic is already established on Day 2; Day 3 is already carrying the

@@ -836,10 +836,10 @@ public class LobbyManager : MonoBehaviour
         inviteRequestId++;
     }
 
-    private const string InviteOverlayUnavailableMessage =
-        "Steam overlay unavailable - share the lobby code from the pause menu";
-    private const string InviteLobbyFailedMessage = "Couldn't open Steam invites";
-    private const string InviteSteamNotRunningMessage = "Steam invites unavailable - Steam isn't running";
+    private static string InviteOverlayUnavailableMessage =>
+        Loc.T("Steam overlay unavailable - share the lobby code from the pause menu");
+    private static string InviteLobbyFailedMessage => Loc.T("Couldn't open Steam invites");
+    private static string InviteSteamNotRunningMessage => Loc.T("Steam invites unavailable - Steam isn't running");
 
     /// <param name="failureMessage">When set, shows it as an error toast (in-game invite panel only)
     /// so the player knows why nothing opened.</param>

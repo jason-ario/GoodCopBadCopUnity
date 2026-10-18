@@ -367,6 +367,73 @@ public class SupplyBox : PickableObject
             UnlockItemsServerRpc();
     }
 
+    // ── Save / Load ───────────────────────────────────────────────────────────
+
+    /// <summary>Saves whether the lid is open (BooleanState[0]). Contents record their own slot.</summary>
+    protected override void CaptureMutableSaveData(PickableObjectSaveData data)
+    {
+        data.BooleanState = new[] { isOpen };
+    }
+
+    /// <summary>
+    /// Server-only. A restored box is a finished delivery: carryable, interactable, and with the
+    /// lid as it was saved. Runs before <see cref="PickableObjectRegistry.RestoreSupplyBoxContents"/>
+    /// re-slots the contents, which reads <see cref="isOpen"/> to decide their lock state.
+    /// </summary>
+    protected override void RestoreMutableSaveData(PickableObjectSaveData data)
+    {
+        bool open = data.BooleanState != null && data.BooleanState.Length > 0 && data.BooleanState[0];
+
+        // Set on the server immediately; the ClientRpc below may not have run on the host yet.
+        isOpen = open;
+        SetCanPickUpNetworked(true);
+        UnlockInteractableNetworked();
+        RestoreDeliveredStateClientRpc(open);
+    }
+
+    /// <summary>Applies a restored box's finished-delivery state on every peer without open/close sounds.</summary>
+    [ClientRpc]
+    private void RestoreDeliveredStateClientRpc(bool open)
+    {
+        isOpen = open;
+        if (contents != null)
+            contents.SetActive(open);
+        if (_animator != null)
+            _animator.SetBool(BoxOpenHash, open);
+        SetInteractable(true);
+        canPickUp = true;
+        UpdateInteractText();
+    }
+
+    /// <summary>
+    /// Server-only. Puts a restored item back into this box's contents slot, using the same
+    /// replicated containment + slot attachment as a fresh delivery. Contents stay locked while
+    /// the lid is closed. Returns false if the slot can't be found.
+    /// </summary>
+    public bool RestoreContainedItemServer(PickableObject item, string contentsPath)
+    {
+        if (!IsServer || item == null || !item.IsSpawned || item == this) return false;
+
+        Transform slot = string.IsNullOrEmpty(contentsPath) ? transform : transform.Find(contentsPath);
+        if (slot == null)
+        {
+            Debug.LogWarning($"[SupplyBox] Restore: slot '{contentsPath}' not found on {name}; leaving {item.name} loose.", this);
+            return false;
+        }
+
+        var boxRef = new NetworkObjectReference(NetworkObject);
+        item.SetSupplyBoxContainedNetworked(boxRef, contentsPath);
+        item.PlaceInSlotFromServer(boxRef, contentsPath, slot.position, slot.rotation);
+
+        if (isOpen)
+            item.UnlockInteractableNetworked();
+        else
+            item.LockInteractableNetworked();
+
+        RegisterItem(item);
+        return true;
+    }
+
     // ── Guidebook ─────────────────────────────────────────────────────────────
 
     /// <summary>

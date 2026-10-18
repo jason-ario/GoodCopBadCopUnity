@@ -125,15 +125,25 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
             return;
         }
 
-        _activeBoxNetObj.Spawn(destroyWithScene: true);
         _activeBox = instance.GetComponent<SupplyBox>();
 
         if (_activeBox == null)
         {
             Debug.LogError("[SupplyBoxDeliveryController] Supply box prefab is missing a SupplyBox component.", this);
+            Destroy(instance);
+            _activeBoxNetObj = null;
             return;
         }
 
+        // The box needs its own durable save identity (before Spawn) so a Dusk reload can
+        // re-create it and put its unclaimed contents back inside.
+        PickableItemData boxItemData = ResolveItemData(_supplyBoxPrefab, _activeBox);
+        if (boxItemData != null)
+            _activeBox.AssignRuntimeItemIdentity(boxItemData);
+        else
+            Debug.LogWarning($"[SupplyBoxDeliveryController] Supply box prefab '{_supplyBoxPrefab.name}' has no ItemDatabase entry — the box will not survive save/load.", this);
+
+        _activeBoxNetObj.Spawn(destroyWithScene: true);
         _activeBox.LockInteractableNetworked();
         _activeBox.SetCanPickUpNetworked(false);
         _activeBox.ResetForDeliveryClientRpc();
@@ -165,6 +175,19 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
             }
 
             PickableObject pickable = instance.GetComponent<PickableObject>();
+
+            // Must happen before Spawn (OnNetworkSpawn registers the item under its SaveId).
+            // Without a runtime identity every delivered copy shares a "Name(Clone)" hierarchy id
+            // and has no ItemDatabase source, so checkpoints never respawn it on load.
+            if (pickable != null)
+            {
+                PickableItemData itemData = ResolveItemData(prefab, pickable);
+                if (itemData != null)
+                    pickable.AssignRuntimeItemIdentity(itemData);
+                else
+                    Debug.LogWarning($"[SupplyBoxDeliveryController] Item prefab '{prefab.name}' has no ItemDatabase entry — it will not survive save/load.", this);
+            }
+
             // Apply this before NGO spawns the object so its contents cannot impart a physics
             // impulse to the box during the spawn/parenting frame. The NetworkVariables carry
             // the same state — including which box slot the item is attached to — to every
@@ -223,45 +246,54 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
     // ── Cleanup ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Removes yesterday's box and only the items still sitting in it. Items a player has taken
-    /// out (claiming an item clears its replicated supply-box containment flag in
-    /// PickableObject.OnHoldingClientChanged) now belong to the world and must never be
-    /// despawned here — previously every delivered item was despawned, including ones in
-    /// players' hands, a few seconds into the next day.
+    /// Removes every earlier delivered box and only the items still sitting in them. Items a
+    /// player has taken out (claiming an item clears its replicated supply-box containment flag
+    /// in PickableObject.OnHoldingClientChanged) belong to the world and are never despawned.
+    /// Scans all spawned boxes rather than just <see cref="_activeBox"/>, because a box restored
+    /// from a checkpoint is re-created by PickableObjectRegistry and never tracked here.
+    /// Scene-placed boxes are left alone.
     /// </summary>
     private void DespawnPreviousDelivery()
     {
-        int despawned = 0, kept = 0;
-        foreach (NetworkObject item in _spawnedItems)
-        {
-            if (item == null || !item.IsSpawned) continue;
-
-            PickableObject pickable = item.GetComponent<PickableObject>();
-            bool stillInBox = pickable != null && pickable.IsContainedInSupplyBox && !pickable.IsHeld;
-
-            if (stillInBox)
-            {
-                item.Despawn();
-                despawned++;
-            }
-            else
-            {
-                kept++;
-            }
-        }
         _spawnedItems.Clear();
-
-        if (despawned > 0 || kept > 0)
-            Debug.Log($"[SupplyBoxDeliveryController] Previous delivery cleanup: despawned {despawned} unclaimed item(s), kept {kept} item(s) taken by players.", this);
-
         if (_activeBox != null)
             _activeBox.ClearRegisteredItems();
-
-        if (_activeBoxNetObj != null && _activeBoxNetObj.IsSpawned)
-            _activeBoxNetObj.Despawn();
-
         _activeBoxNetObj = null;
         _activeBox = null;
+
+        NetworkManager nm = NetworkManager;
+        if (nm == null || nm.SpawnManager == null) return;
+
+        // Collect first: despawning mutates SpawnedObjectsList.
+        var boxes = new List<NetworkObject>();
+        foreach (NetworkObject netObj in nm.SpawnManager.SpawnedObjectsList)
+        {
+            if (netObj != null && netObj.IsSceneObject != true && netObj.TryGetComponent(out SupplyBox _))
+                boxes.Add(netObj);
+        }
+        if (boxes.Count == 0) return;
+
+        var unclaimedItems = new List<NetworkObject>();
+        foreach (NetworkObject netObj in nm.SpawnManager.SpawnedObjectsList)
+        {
+            if (netObj == null || !netObj.TryGetComponent(out PickableObject item) || item.IsHeld) continue;
+            foreach (NetworkObject box in boxes)
+            {
+                if (netObj != box && item.IsContainedInSupplyBoxOf(box))
+                {
+                    unclaimedItems.Add(netObj);
+                    break;
+                }
+            }
+        }
+
+        foreach (NetworkObject item in unclaimedItems)
+            if (item.IsSpawned) item.Despawn();
+
+        foreach (NetworkObject box in boxes)
+            if (box.IsSpawned) box.Despawn();
+
+        Debug.Log($"[SupplyBoxDeliveryController] Previous delivery cleanup: despawned {boxes.Count} box(es) and {unclaimedItems.Count} unclaimed item(s).", this);
     }
 
     // ── Finalize ──────────────────────────────────────────────────────────────
@@ -281,6 +313,27 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Finds the <see cref="ItemDatabase"/> entry for a delivered prefab: the pickable's own
+    /// itemData when it is registered in the database, otherwise the entry whose PickUpPrefab is
+    /// this prefab. Returns null when the item can't be re-instantiated on load.
+    /// </summary>
+    private static PickableItemData ResolveItemData(GameObject prefab, PickableObject pickable)
+    {
+        ItemDatabase db = ItemDatabase.Instance;
+        if (db == null || db.allItems == null) return null;
+
+        PickableItemData own = pickable.ItemData;
+        if (own != null && db.GetItemIndex(own) >= 0) return own;
+
+        foreach (PickableItemData item in db.allItems)
+        {
+            if (item != null && item.PickUpPrefab == prefab)
+                return item;
+        }
+        return null;
+    }
 
     /// <summary>
     /// Builds a slash-separated relative path from <paramref name="root"/> down to

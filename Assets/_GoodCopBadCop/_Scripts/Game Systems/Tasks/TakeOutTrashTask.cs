@@ -281,6 +281,13 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         foreach (WorldObjectPlacementSaveData placement in state.BloodDecals ?? Array.Empty<WorldObjectPlacementSaveData>())
             SpawnSavedBloodDecal(placement);
 
+        // The saved total also counted externally registered junk (mutant gore, Day 3's dropped
+        // Vlad pieces) that has no placement and is not rebuilt, so it could never be credited and
+        // the objective would stall short of its total. Count only what was actually restored;
+        // day-specific scene junk is re-added by AdoptPreExistingJunkAfterRestore.
+        if (_taskActive)
+            _totalCount.Value = _depositedCount.Value + _spawnedItems.Count;
+
         UpdateThreatLevel();
         _isActive.Value = state.IsActive;
         if (_taskActive)
@@ -317,6 +324,20 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         Debug.Log($"[TakeOutTrashTask] Adopted {_countedExistingItems.Count} pre-existing junk item(s) after restore — " +
                   $"total {_totalCount.Value} (saved {savedTotal}), deposited {_depositedCount.Value}.");
+    }
+
+    /// <summary>
+    /// Server-only. Call once every restore step (including <see cref="AdoptPreExistingJunkAfterRestore"/>)
+    /// has run. If the restored run has nothing left to collect — e.g. its only outstanding items
+    /// were unpersisted external junk — completes it instead of leaving an "N/N" row active.
+    /// </summary>
+    public void CompleteIfNothingLeftAfterRestore()
+    {
+        if (!IsServer || !_taskActive) return;
+        if (_spawnedItems.Count > 0 || _countedExistingItems.Count > 0) return;
+        if (_depositedCount.Value < _totalCount.Value) return;
+
+        CompleteTask();
     }
 
     private static WorldObjectPlacementSaveData[] CapturePlacements(

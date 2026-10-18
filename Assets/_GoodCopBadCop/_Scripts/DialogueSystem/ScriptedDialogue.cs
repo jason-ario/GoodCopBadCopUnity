@@ -34,6 +34,11 @@ public class ScriptedDialogueChoice
     [TextArea(2, 6)]
     public string npcResponse;
 
+    [Tooltip("Optional second NPC line played after the response as its own subtitle (the player " +
+             "advances again). Use it to split a long response. Leave empty for none.")]
+    [TextArea(2, 6)]
+    public string npcFollowUp;
+
     [Tooltip("Optional Animator trigger fired on the NPC at the start of the response line. " +
              "Leave empty for no animation.")]
     public string animationTrigger;

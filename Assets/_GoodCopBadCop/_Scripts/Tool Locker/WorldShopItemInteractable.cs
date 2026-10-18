@@ -173,6 +173,12 @@ public class WorldShopItemInteractable : Interactable
                 UIController.Instance.ShowShopNotification(HoldingObjectMessage);
                 return;
             }
+            if (!customAction.CanExecute(pickup, out string blockedMessage))
+            {
+                if (!string.IsNullOrEmpty(blockedMessage))
+                    UIController.Instance.ShowShopNotification(blockedMessage);
+                return;
+            }
             if (!HasEnoughMoney()) return;
             customAction.Execute(pickup, _shopItem.Price);
         }

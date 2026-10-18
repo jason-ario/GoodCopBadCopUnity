@@ -24,6 +24,11 @@ public class PickableObjectSaveData
     public string RuntimeItemName;
     public int RuntimeItemIndex = -1;
 
+    // Supply box slot this item was still sitting in (SaveId of the box + contents path). Empty
+    // when the item was loose. Re-applied by PickableObjectRegistry.RestoreSupplyBoxContents.
+    public string SupplyBoxId;
+    public string SupplyBoxSlotPath;
+
     // Optional, type-specific state. Values are only interpreted by the matching pickable type.
     public bool HasResourceAmount;
     public float ResourceAmount;

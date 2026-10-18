@@ -72,9 +72,9 @@ public class ElectricPanelController : Interactable
              "plays its own negative cue, so this is just an extra dead-panel 'thunk'.")]
     [SerializeField] private AudioClip _deadPanelSound;
 
-    [Tooltip("Error notification shown when a player tries the panel during a grid outage. The panel " +
-             "does not open, so players never solve a puzzle that can't restore power.")]
-    [SerializeField] private string _deadPanelMessage = "No current reaching the panel. The fault is at the power station.";
+    /// <summary>Error notification shown when a player tries the panel during a grid outage. The panel
+    /// does not open, so players never solve a puzzle that can't restore power. Localized code string.</summary>
+    private static string DeadPanelMessage => Loc.T("No current reaching the panel. The fault is at the power station.");
 
     [Tooltip("Reticle verb shown on the panel during a grid outage (instead of 'Open').")]
     [SerializeField] private string _deadPanelInteractVerb = "Inspect";
@@ -192,8 +192,7 @@ public class ElectricPanelController : Interactable
         if (_audioSource != null && _deadPanelSound != null)
             _audioSource.PlayOneShot(_deadPanelSound);
 
-        if (!string.IsNullOrEmpty(_deadPanelMessage))
-            UIController.Instance?.ShowErrorNotification(_deadPanelMessage);
+        UIController.Instance?.ShowErrorNotification(DeadPanelMessage);
 
         NotifyDeadPanelUsedServerRpc();
     }

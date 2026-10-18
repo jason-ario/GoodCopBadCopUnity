@@ -160,8 +160,15 @@ public class LockController : Interactable
     /// </summary>
     public void ForceUnlock()
     {
+        // Padlock already resolved as unlocked (possibly despawned): still re-assert the target's
+        // unlock, since the original Unlock() can be dropped if the target spawned after this padlock.
+        if (!IsLocked)
+        {
+            ReassertTargetUnlocked();
+            return;
+        }
+
         if (!IsServer || !IsSpawned) return;
-        if (!IsLocked) return;
 
         if (!string.IsNullOrEmpty(_lockId) && SaveDataManager.Instance != null)
             SaveDataManager.Instance.SaveUnlockedLock(_lockId);
@@ -179,8 +186,16 @@ public class LockController : Interactable
     /// </summary>
     public bool TryAutoUnlockForDay(int day)
     {
-        if (!IsServer || !IsSpawned) return false;
         if (_autoUnlockOnDay <= 0 || day < _autoUnlockOnDay) return false;
+
+        if (!IsLocked)
+        {
+            // Already unlocked/despawned — make sure the target agrees (see ForceUnlock).
+            ReassertTargetUnlocked();
+            return false;
+        }
+
+        if (!IsServer || !IsSpawned) return false;
         if (!_isLocked.Value) return false;
 
         if (!string.IsNullOrEmpty(_lockId) && SaveDataManager.Instance != null)
@@ -229,6 +244,19 @@ public class LockController : Interactable
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only, idempotent: pushes the unlocked state to the target ILockable. Uses the
+    /// NetworkManager singleton rather than this behaviour's IsServer, which is unreliable once
+    /// the padlock has been despawned.
+    /// </summary>
+    private void ReassertTargetUnlocked()
+    {
+        var netManager = Unity.Netcode.NetworkManager.Singleton;
+        if (netManager == null || !netManager.IsServer) return;
+        if (_lockable != null && _lockable.IsLocked)
+            _lockable.Unlock();
+    }
 
     /// <summary>
     /// Server-only: called on spawn to check whether this lock was already unlocked in a previous

@@ -604,6 +604,16 @@ public class PickableObject : Interactable
             RuntimeItemIndex = _runtimeItemIndex
         };
 
+        // Remember the supply box slot so a load can put the item back inside its box. The
+        // restore pass (ApplySaveData) detaches it first, so this is the only record of it.
+        if (_isContainedInSupplyBox.Value && !IsHeld &&
+            _supplyBoxSlotOwner.Value.TryGet(out NetworkObject boxNetObj) &&
+            boxNetObj.TryGetComponent(out PickableObject boxPickable))
+        {
+            data.SupplyBoxId = boxPickable.SaveId;
+            data.SupplyBoxSlotPath = _supplyBoxSlotPath.Value.ToString();
+        }
+
         InternalBattery battery = GetComponent<InternalBattery>();
         if (battery != null)
         {

@@ -84,7 +84,7 @@ public class PlayerInteractionController : NetworkBehaviour
 
     private bool AppliesHeldItemOnInteract(Interactable target) => AppliesHeldItemOn(target, HeldItemTargetKey.Interact);
 
-    private const string IncompatibleItemMessage = "Not compatible";
+    private static string IncompatibleItemMessage => Loc.T("Not compatible");
     private const float IncompatibleItemCooldown = 1f;
     private float _nextIncompatibleItemMessageTime;
 

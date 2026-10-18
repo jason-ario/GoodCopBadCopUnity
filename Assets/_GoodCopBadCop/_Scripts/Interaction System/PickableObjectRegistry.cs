@@ -160,6 +160,46 @@ public class PickableObjectRegistry : MonoBehaviour
 
 
     /// <summary>
+    /// Server-only. Puts items that were saved inside a supply box back into that box's slot.
+    /// Must run after <see cref="RestoreAll"/>: that pass restores the box's open state and
+    /// detaches every item, so re-slotting before it would be undone.
+    /// </summary>
+    public void RestoreSupplyBoxContents(PickableObjectSaveData[] data)
+    {
+        if (data == null) return;
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer) return;
+
+        int restored = 0;
+        foreach (PickableObjectSaveData entry in data)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry.Id) || string.IsNullOrEmpty(entry.SupplyBoxId))
+                continue;
+            if (entry.HasExistenceState && !entry.Exists) continue;
+            if (!TryGetPickable(entry.Id, out PickableObject item)) continue;
+
+            if (!TryGetPickable(entry.SupplyBoxId, out PickableObject boxPickable) || boxPickable is not SupplyBox box)
+            {
+                Debug.LogWarning($"[PickableObjectRegistry] '{entry.Id}' was saved inside supply box '{entry.SupplyBoxId}', which wasn't restored — leaving it loose.", item);
+                continue;
+            }
+
+            try
+            {
+                if (box.RestoreContainedItemServer(item, entry.SupplyBoxSlotPath))
+                    restored++;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[PickableObjectRegistry] Failed to restore '{entry.Id}' into supply box '{entry.SupplyBoxId}': {e}", item);
+            }
+        }
+
+        if (restored > 0)
+            Debug.Log($"[PickableObjectRegistry] Restored {restored} item(s) into their supply box.");
+    }
+
+    /// <summary>
     /// Restores every registered pickable that has a matching saved entry to its saved
     /// position/rotation. Entries for pickables no longer present in the scene are ignored.
     /// Actual transform writes only happen server-side — see <see cref="PickableObject.ApplySaveData"/>.

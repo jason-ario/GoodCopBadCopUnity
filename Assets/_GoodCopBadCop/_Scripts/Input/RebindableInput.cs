@@ -81,6 +81,19 @@ namespace GoodCopBadCop.Input
             { GameAction.PreviousSlot, "Scroll Down" },
         };
 
+        /// <summary>
+        /// Fixed (non-rebindable) mouse button per action, used for icon lookups of actions in
+        /// <see cref="FixedKeyboardLabels"/> that are read straight from the mouse (e.g. UseItem = LMB).
+        /// </summary>
+        private static readonly Dictionary<GameAction, int> FixedMouseButtons = new()
+        {
+            { GameAction.UseItem, 0 }, // LMB
+        };
+
+        /// <summary>Fixed mouse button for an action whose keyboard/mouse control isn't rebindable, or -1.</summary>
+        public static int GetFixedMouseButton(GameAction action) =>
+            FixedMouseButtons.TryGetValue(action, out int button) ? button : -1;
+
         /// <summary>Default gamepad control path per action. Empty = unbound by default.</summary>
         private static readonly Dictionary<GameAction, string> DefaultGamepadControls = new()
         {

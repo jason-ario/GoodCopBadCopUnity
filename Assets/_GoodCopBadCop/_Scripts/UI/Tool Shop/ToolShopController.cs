@@ -183,6 +183,13 @@ public class ToolShopController : MonoBehaviour
                 return;
             }
 
+            if (!customAction.CanExecute(pickup, out string blockedMessage))
+            {
+                if (!string.IsNullOrEmpty(blockedMessage))
+                    UIController.Instance.ShowShopNotification(blockedMessage);
+                return;
+            }
+
             if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value < _selectedShopItem.Price)
             {
                 UIController.Instance.ShowShopNotification("Not enough coupons!");

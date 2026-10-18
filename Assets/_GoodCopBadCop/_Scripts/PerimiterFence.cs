@@ -423,11 +423,9 @@ public class PerimiterFence : NetworkBehaviour
     /// this prefab has no <see cref="HighlightEffect"/> component.
     ///
     /// Called after every damage-state change (this segment breaking or getting repaired) and by
-    /// <see cref="FenceRepairTask"/> whenever its active state flips, so:
-    ///   - a segment broken between a mutant breach and the repair task actually being triggered
-    ///     stays dark, matching the compass pip's "only glow while the task is live" rule, and
-    ///   - every currently-broken tracked segment lights up the instant the task starts, and goes
-    ///     dark the instant it's repaired or the task completes.
+    /// <see cref="FenceRepairTask"/> whenever its active state flips. The glow follows
+    /// <see cref="IsBroken"/> alone, regardless of whether the repair task is active: a segment broken by a
+    /// mutant breach glows right away and goes dark the instant it's repaired.
     ///
     /// Independent of the compass pip (<see cref="CompassMarkerRegistry"/>/<see cref="CompassController"/>)
     /// — <see cref="FenceRepairTask.ShowRepairHighlights"/> only gates this in-world glow.
@@ -436,10 +434,9 @@ public class PerimiterFence : NetworkBehaviour
     {
         if (_highlightEffect == null) return;
 
-        bool taskActive = FenceRepairTask.Instance != null && FenceRepairTask.Instance.IsActive;
         bool highlightsEnabled = FenceRepairTask.Instance == null || FenceRepairTask.Instance.ShowRepairHighlights;
 
-        _highlightEffect.highlighted = IsBroken && taskActive && highlightsEnabled;
+        _highlightEffect.highlighted = IsBroken && highlightsEnabled;
     }
 
     // ── Breach pass-through ────────────────────────────────────────────────────

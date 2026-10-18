@@ -530,7 +530,7 @@ public class PlayerPickupController : NetworkBehaviour
         if (HeldObject == null) return true;
         if (_playerInventory != null && _playerInventory.TryFreeHandForPickup()) return true;
 
-        UIController.Instance?.ShowErrorNotification("Inventory full");
+        UIController.Instance?.ShowErrorNotification(Loc.T("Inventory full"));
         return false;
     }
 
@@ -713,6 +713,52 @@ public class PlayerPickupController : NetworkBehaviour
         }
 
         StampInkManager.Instance.AddInk((StampContainer.StampType)stampTypeIndex, amount);
+    }
+
+    /// <summary>
+    /// Initiates a shop purchase that adds ammo straight to this player's <see cref="PlayerAmmoReserve"/>
+    /// instead of spawning an <see cref="AmmoPickup"/>. The server refuses (without charging) when the
+    /// reserve is already full.
+    /// </summary>
+    public void PurchaseAmmo(AmmoType ammoType, int amount, int price)
+    {
+        if (!IsOwner || amount <= 0) return;
+        PurchaseAmmoServerRpc(ammoType, amount, price);
+    }
+
+    [ServerRpc]
+    private void PurchaseAmmoServerRpc(AmmoType ammoType, int amount, int price, ServerRpcParams rpcParams = default)
+    {
+        if (GlobalHostVariables.Instance == null)
+        {
+            Debug.LogError("PurchaseAmmoServerRpc: GlobalHostVariables not found.");
+            return;
+        }
+
+        PlayerAmmoReserve reserve = GetComponent<PlayerAmmoReserve>();
+        if (reserve == null)
+        {
+            Debug.LogError("PurchaseAmmoServerRpc: PlayerAmmoReserve not found on player.");
+            return;
+        }
+
+        // Check space before charging so a full reserve never costs coupons.
+        if (reserve.GetFreeSpace(ammoType) <= 0)
+        {
+            reserve.NotifyFull(ammoType);
+            return;
+        }
+
+        if (!GlobalHostVariables.Instance.SubtractMoney(price))
+        {
+            PurchaseFailedClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+            });
+            return;
+        }
+
+        reserve.Add(ammoType, amount);
     }
 
     public void PickUpObject(PickableObject pickableObject)

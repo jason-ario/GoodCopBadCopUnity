@@ -12,6 +12,8 @@ using Application = UnityEngine.Application;
 // own script order.
 public class FolderController : PickableObject
 {
+    private static string AlreadyStampedMessage => Loc.T("Already stamped");
+
     private NetworkVariable<bool> isOpen = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isStamped = new NetworkVariable<bool>(false);
     private NetworkVariable<StampContainer.StampType> _syncedStampType = new NetworkVariable<StampContainer.StampType>(
@@ -261,6 +263,11 @@ public class FolderController : PickableObject
         // (and the player's "HoldingFolderOpen" pose) still say open. Keep the state instead.
         if (anim != null)
             anim.keepAnimatorStateOnDisable = true;
+
+        // Local-only hover-to-front for filed exam pages while zoomed on this folder. Added here
+        // so every folder gets it without prefab wiring; add it to the prefab to tune values.
+        if (!TryGetComponent(out FolderExamPageSifter _))
+            gameObject.AddComponent<FolderExamPageSifter>();
     }
 
     public override void OnNetworkSpawn()
@@ -578,9 +585,11 @@ public class FolderController : PickableObject
                 StartUseStampServerRpc(clientId, inkStamp.StampType);
             }
         }
-        else
+        else if (IsStampItem(heldItem))
         {
-            Debug.Log("Already Stamped");
+            // Folder already carries a verdict — tell the player instead of silently doing nothing.
+            Debug.Log("[FolderController] Stamp blocked: folder already stamped.");
+            UIController.Instance?.ShowErrorNotification(AlreadyStampedMessage);
         }
 
         if (heldItem.ItemData.name is "ID card" or "Application" or "Behavior Exam Page" or "Mutation Exam Page" or "Documentation Exam Page" or "Supernatural Exam Page" or "Biological Exam Page" or "Vitals Exam Page" )
@@ -690,6 +699,19 @@ public class FolderController : PickableObject
     {
         Debug.Log($"[FolderController] StartUseStampServerRpc: isStamping={isStamping} isOpen={isOpen.Value} NetworkObjectId={NetworkObjectId}");
         if (isStamping) { Debug.LogWarning("[FolderController] Stamp blocked: already stamping."); return; }
+
+        // Authoritative re-check: a client with stale isStamped state (e.g. two players stamping
+        // at once) must not re-stamp the folder or consume ink.
+        if (isStamped.Value)
+        {
+            Debug.LogWarning("[FolderController] Stamp blocked: folder already stamped (authoritative check).");
+            AlreadyStampedClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+            });
+            return;
+        }
+
         if (!IsFaceUp()) { Debug.LogWarning("[FolderController] Stamp blocked: folder is not facing upward (authoritative check)."); return; }
 
         if (stampType == StampContainer.StampType.Quarantine && IsQuarantineFull())
@@ -754,6 +776,12 @@ public class FolderController : PickableObject
     private void QuarantineFullClientRpc(ClientRpcParams clientRpcParams = default)
     {
         UIController.Instance?.ShowShopNotification("<color=red>5/5 quarantine slots full!</color>");
+    }
+
+    [ClientRpc]
+    private void AlreadyStampedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        UIController.Instance?.ShowErrorNotification(AlreadyStampedMessage);
     }
 
     [ClientRpc]

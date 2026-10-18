@@ -19,6 +19,17 @@ public abstract class ShopPurchaseAction : ScriptableObject
     public virtual bool CloseShopOnPurchase => true;
 
     /// <summary>
+    /// Client-side pre-check run before the money check and <see cref="Execute"/>.
+    /// Return <c>false</c> with a <paramref name="blockedMessage"/> to refuse the purchase
+    /// (e.g. ammo reserve already full). Defaults to always allowed.
+    /// </summary>
+    public virtual bool CanExecute(PlayerPickupController pickup, out string blockedMessage)
+    {
+        blockedMessage = null;
+        return true;
+    }
+
+    /// <summary>
     /// Executes the purchase action on the purchasing client.
     /// Implementations are responsible for routing server-side work via ServerRpcs on <paramref name="pickup"/>.
     /// </summary>
