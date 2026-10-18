@@ -170,12 +170,19 @@ public class FolderExamPageSifter : MonoBehaviour
     }
 
     /// <summary>
-    /// Ray vs the page box's mid-plane rectangle (thin axis flattened). Distances along the ray
-    /// order overlapping pages by stack height, so the nearest hit is the visible / lifted page.
+    /// Ray vs the page box's mid-plane rectangle (thin axis flattened), tested at the page's
+    /// ORIGINAL slot position (the visual lift is cancelled out). Distances along the ray order
+    /// overlapping pages by their natural stack height, so a lifted page never blocks a page that
+    /// sits above it in the normal stack.
     /// </summary>
     private static bool TryHitPageRect(PageState state, Ray ray, out float distance)
     {
         distance = 0f;
+
+        // Shifting the ray by +lift is equivalent to moving the page back down by -lift.
+        Vector3 worldLift = state.Follow.transform.rotation * state.Follow.VisualLocalOffset;
+        ray = new Ray(ray.origin + worldLift, ray.direction);
+
         Transform t = state.Box.transform;
         Vector3 size = state.Box.size;
         int thin = ThinAxisIndex(size);
