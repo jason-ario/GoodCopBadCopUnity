@@ -349,10 +349,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
     /// that occur outside the interrogation booth (e.g. Vlad out-back sequence).
     /// <paramref name="cameraVerticalOffset"/> tunes the dolly-in framing height per character —
     /// see <see cref="PlayerMovementController.ZoomCameraForDialogue"/>.
-    /// <paramref name="aimDropBelowTarget"/> (&gt;= 0) overrides how far below the target the camera
-    /// aims; negative keeps the player's default chest framing.
+    /// <paramref name="aimDropBelowTarget"/> (any non-NaN value) overrides how far below the target the camera
+    /// aims; NaN keeps the player's default chest framing.
     /// </summary>
-    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null, float cameraVerticalOffset = 0f, float aimDropBelowTarget = -1f)
+    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null, float cameraVerticalOffset = 0f, float aimDropBelowTarget = float.NaN)
     {
         if (IsInDialogueMode)
         {

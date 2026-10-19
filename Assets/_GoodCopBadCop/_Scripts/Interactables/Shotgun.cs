@@ -47,6 +47,15 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     public float BulletRange => _bulletRange;
 
     [Header("Shotgun — Audio")]
+    [Tooltip("Blast sound played on every client when a shell is fired.")]
+    [SerializeField] private AudioClip _shootSound;
+
+    [Tooltip("Volume of the blast sound.")]
+    [SerializeField] [Range(0f, 1f)] private float _shootSoundVolume = 1f;
+
+    [Tooltip("Pitch of the blast sound. Below 1 gives a heavier, boomier report.")]
+    [SerializeField] [Range(0.5f, 1.5f)] private float _shootSoundPitch = 0.8f;
+
     [Tooltip("Dry-fire click played locally when the shotgun is empty.")]
     [SerializeField] private AudioClip _emptySound;
 
@@ -133,6 +142,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
         shootVFX.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         shootVFX.Play();
+        PlayShootSound();
         playerPickupController.PlayerAnimationController.SetAnimTrigger("Shoot");
         _cinemachineImpulseSource.GenerateImpulse();
         StartCoroutine(LightOnOff());
@@ -403,6 +413,17 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
         _roundsRemaining.Value--;
 
+        // Blast sound for everyone except the shooter (who already played it in OnStartUse).
+        List<ulong> soundTargets = new List<ulong>();
+        foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
+            if (id != shooterClientId) soundTargets.Add(id);
+
+        if (soundTargets.Count > 0)
+            PlayShootSoundClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = soundTargets }
+            });
+
         if (mutantRefs != null && mutantPellets != null)
         {
             int count = Mathf.Min(mutantRefs.Length, mutantPellets.Length);
@@ -505,6 +526,20 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                     Send = new ClientRpcSendParams { TargetClientIds = propTargets }
                 });
         }
+    }
+
+    /// <summary>Plays the shotgun blast at the gun's position.</summary>
+    private void PlayShootSound()
+    {
+        if (_shootSound != null)
+            SFXController.Instance.PlayAtPosition(_shootSound, transform.position, _shootSoundVolume, _shootSoundPitch);
+    }
+
+    /// <summary>Plays the blast sound on non-shooting clients once the server accepts the shot.</summary>
+    [ClientRpc]
+    private void PlayShootSoundClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        PlayShootSound();
     }
 
     /// <summary>Replays cosmetic <see cref="HittableProp"/> reactions on non-shooting clients.</summary>

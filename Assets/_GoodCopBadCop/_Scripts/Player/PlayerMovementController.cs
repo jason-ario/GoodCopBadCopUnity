@@ -867,10 +867,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     /// multiple times; only the first call caches the pre-dialogue pose. <paramref name="verticalOffset"/>
     /// raises (positive) or lowers (negative) the camera per character height. Call
     /// <see cref="ResetCameraZoomForDialogue"/> on exit to smoothly blend back to the cached pose.
-    /// <paramref name="aimDropOverride"/> (&gt;= 0) replaces <see cref="dialogueAimDropBelowHead"/>
+    /// <paramref name="aimDropOverride"/> (any non-NaN value, negative = above) replaces <see cref="dialogueAimDropBelowHead"/>
     /// for this conversation (e.g. 0 to aim straight at a tall speaker's head).
     /// </summary>
-    public void ZoomCameraForDialogue(Transform target, float overrideDistance = -1f, float verticalOffset = 0f, float aimDropOverride = -1f)
+    public void ZoomCameraForDialogue(Transform target, float overrideDistance = -1f, float verticalOffset = 0f, float aimDropOverride = float.NaN)
     {
         if (cameraTransform == null || target == null) return;
 
@@ -945,7 +945,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
 
         // --- Camera rotation: aim at the chest (below the head) from the final dolly position,
         // which softens the upward pitch and frames more of the character.
-        Vector3 aimPos = headPos + Vector3.down * (aimDropOverride >= 0f ? aimDropOverride : dialogueAimDropBelowHead);
+        Vector3 aimPos = headPos + Vector3.down * (!float.IsNaN(aimDropOverride) ? aimDropOverride : dialogueAimDropBelowHead);
         Vector3 lookDir = aimPos - worldTargetPos;
         Quaternion endWorldCamRot = lookDir.sqrMagnitude > 0.0001f
             ? Quaternion.LookRotation(lookDir.normalized, Vector3.up)

@@ -132,6 +132,57 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
             UnityEditor.EditorUtility.SetDirty(terrainCollider);
         }
     }
+
+    /// <summary>
+    /// Editor only. Spawns a temporary (DontSave) proxy collider for every tree whose trunk lies
+    /// inside <paramref name="worldBounds"/> (XZ), so a NavMesh bake can carve the trunks. With
+    /// "Enable Tree Colliders" off, the bake otherwise treats every tree as walkable ground.
+    /// The caller must DestroyImmediate the returned root right after the bake collects sources.
+    /// </summary>
+    public GameObject CreateBakeColliders(Bounds worldBounds)
+    {
+        _terrain = GetComponent<Terrain>();
+        TerrainData data = _terrain.terrainData;
+        if (data == null) return null;
+
+        BuildTemplates(data);
+        BuildTrees(data);
+
+        var rootGo = new GameObject("Tree NavMesh Bake Colliders (temp)") { hideFlags = HideFlags.DontSave };
+        rootGo.transform.SetParent(transform, false);
+
+        Transform previousContainer = _container;
+        _container = rootGo.transform;
+        try
+        {
+            for (int i = 0; i < _trees.Length; i++)
+            {
+                Vector3 p = _trees[i].position;
+                if (p.x < worldBounds.min.x || p.x > worldBounds.max.x ||
+                    p.z < worldBounds.min.z || p.z > worldBounds.max.z)
+                {
+                    continue;
+                }
+
+                TreeEntry tree = _trees[i];
+                PrototypeTemplate template = _templates[tree.prototypeIndex];
+                Transform proxy = CreateProxy(template);
+                if (proxy == null) continue;
+
+                proxy.gameObject.hideFlags = HideFlags.DontSave;
+                proxy.SetPositionAndRotation(tree.position, Quaternion.Euler(0f, tree.rotationDegrees, 0f));
+                proxy.localScale = Vector3.Scale(template.rootScale,
+                    new Vector3(tree.widthScale, tree.heightScale, tree.widthScale));
+                proxy.gameObject.SetActive(true);
+            }
+        }
+        finally
+        {
+            _container = previousContainer;
+        }
+
+        return rootGo;
+    }
 #endif
 
     private void OnDestroy()
@@ -461,7 +512,8 @@ public class TerrainTreeColliderStreamer : MonoBehaviour
         Collider copy = CopyCollider(template.source, colliderGo);
         if (copy == null)
         {
-            Destroy(rootGo);
+            if (Application.isPlaying) Destroy(rootGo);
+            else DestroyImmediate(rootGo);
             return null;
         }
 

@@ -1502,8 +1502,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         DialogueCameraFraming framing = DialogueCameraFraming.FindActive(speakerRoot);
         if (framing != null)
         {
+            Transform aim = framing.ResolveAimTarget();
+            Debug.Log($"[ScriptedDialogueRunner] Using DialogueCameraFraming on '{framing.name}' — aim point {aim?.position} " +
+                      $"(drop {framing.AimDropBelowTarget}, camera offset {framing.CameraVerticalOffset}).", framing);
             DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(
-                framing.LookTarget, framing.CameraVerticalOffset, framing.AimDropBelowTarget);
+                aim, framing.CameraVerticalOffset, framing.AimDropBelowTarget);
             return;
         }
 
