@@ -173,6 +173,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private bool _joinByInteractionOnly;
     private bool _allowParticipantExit;
 
+    // Per-sequence: every participant uses the world-dialogue camera (player-camera dolly-in on the
+    // speaker, as SuspectWorldDialogue does for scene NPCs) even if they count as inside the booth,
+    // instead of the booth suspect cam. For scene-placed NPCs who aren't booth suspects (the postman).
+    private bool _useWorldDialogueCamera;
+
     // Per-sequence proximity radius. Forced outside conversations (lockOutsidePlayers) seed and
     // late-join strictly by distance so an out-of-range co-op partner is never pulled in; they
     // join once they walk within _activeJoinRadius (callers pass their trigger radius here).
@@ -195,6 +200,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // leave the player free (unlocked megaphone, unlocked outside players), so their exit knows
     // it doesn't own the lock and must not tear down a world conversation started meanwhile.
     private bool _clientEnteredDialogueLock;
+
+    // Local: the current sequence asked for the world-dialogue camera (see _useWorldDialogueCamera).
+    private bool _clientWorldCameraMode;
+
+    /// <summary>Local: this player should take the outside/world-dialogue path (dolly-in camera,
+    /// outside lock and exit) — either they're outside, or the sequence forces the world camera.</summary>
+    private bool LocalUsesWorldDialoguePath =>
+        PlayerInstance.Instance != null && (PlayerInstance.Instance.IsOutsideLocal || _clientWorldCameraMode);
 
     // Server-only: tracks whether any coroutine is currently inside a SayAndWait gate.
     // Used by AdvanceScriptedLineServerRpc to reject stale advances.
@@ -318,12 +331,17 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// only players within that radius are locked in at the start; others join (and are
     /// locked) when they walk into range.
     /// </para>
+    /// <para>
+    /// <paramref name="useWorldDialogueCamera"/> makes every participant use the world-dialogue
+    /// camera (player-camera dolly-in on the speaker, like <see cref="SuspectWorldDialogue"/> for scene
+    /// NPCs) even when they count as inside, instead of the booth suspect cam.
+    /// </para>
     /// </summary>
     public void PlayDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
         Action onComplete = null, bool deferExit = false, bool lockOutsidePlayers = false,
         ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
         bool allowParticipantExit = false, bool hideNonParticipantUI = true,
-        float participantRadius = -1f)
+        float participantRadius = -1f, bool useWorldDialogueCamera = false)
     {
         if (!IsServer) return;
 
@@ -345,7 +363,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             joinByInteractionOnly,
             allowParticipantExit,
             hideNonParticipantUI,
-            participantRadius));
+            participantRadius,
+            useWorldDialogueCamera));
     }
 
     /// <summary>
@@ -383,6 +402,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _joinByInteractionOnly = false;
         _allowParticipantExit = false;
         _activeJoinRadius = -1f;
+        _useWorldDialogueCamera = false;
         HideInWorldSubtitleClientRpc(speakerNetId);
         SetActiveDialogueSpeakerClientRpc(0);
         ExitScriptedModeClientRpc(false, exitRecipients);
@@ -507,7 +527,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         bool pressedLeave = Input.GetKeyDown(KeyCode.Q)
                              || Input.GetButtonDown("Back")
                              || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false);
-        if (pressedLeave && PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
+        if (pressedLeave && LocalUsesWorldDialoguePath)
         {
             LeaveScriptedDialogueServerRpc();
             return;
@@ -591,10 +611,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Action onComplete, bool deferExit = false, bool lockOutsidePlayers = false,
         ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
         bool allowParticipantExit = false, bool hideNonParticipantUI = true,
-        float participantRadius = -1f)
+        float participantRadius = -1f, bool useWorldDialogueCamera = false)
     {
         ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
         _activeJoinRadius = participantRadius;
+        _useWorldDialogueCamera = useWorldDialogueCamera;
 
         Debug.Log($"[ScriptedDialogueRunner] RunDialogue — IsSpawned={IsSpawned}, IsServer={IsServer}, speakerNetId={speakerNetId}, deferExit={deferExit}");
 
@@ -624,7 +645,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Only engaged participants lose their HUD (EnterScriptedModeClientRpc is participant-
         // targeted and closes it). Non-participants — including out-of-range players who may be
         // overhearing — keep their HUD and controls intact.
-        EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers, _allowParticipantExit, BuildParticipantRpcParams());
+        EnterScriptedModeClientRpc(speakerNetId, lockOutsidePlayers, _allowParticipantExit, _useWorldDialogueCamera, BuildParticipantRpcParams());
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)
@@ -669,6 +690,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             _joinByInteractionOnly = false;
             _allowParticipantExit = false;
             _activeJoinRadius = -1f;
+            _useWorldDialogueCamera = false;
             HideInWorldSubtitleClientRpc(speakerNetId);
             SetActiveDialogueSpeakerClientRpc(0);
             ExitScriptedModeClientRpc(lockOutsidePlayers, exitRecipients);
@@ -911,7 +933,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // caching the speaker ID — per-speaker keys (empty / SuspectCam / SuspectFaceCam) can't
         // resolve without it, and the joiner never received the participant-targeted
         // EnterScriptedModeClientRpc that normally sets it.
-        LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, _allowParticipantExit, _currentCameraKey ?? string.Empty, singleClientRpc);
+        LateJoinClientRpc(speakerNetId, _awaitingScriptedInput, _allowParticipantExit, _currentCameraKey ?? string.Empty, _useWorldDialogueCamera, singleClientRpc);
 
         // A player who joins while a response choice is open must receive the current panel,
         // not wait until the next choice node to participate.
@@ -1008,10 +1030,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        if (PlayerInstance.Instance.IsOutsideLocal)
+        if (LocalUsesWorldDialoguePath)
             DialogueChoiceSystem.Instance?.ExitScriptedDialogueModeOutside();
         else
             DialogueChoiceSystem.Instance?.ExitScriptedDialogueMode();
+        _clientWorldCameraMode = false;
 
         // ExitScriptedDialogueMode clears the dialogue flag that ShowPlayerUI guards against.
         // Restoring the HUD before that exit can leave it hidden after a player leaves early.
@@ -1104,10 +1127,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </summary>
     [ClientRpc]
     private void LateJoinClientRpc(ulong speakerNetId, bool isWaitingForInput, bool canLeave,
-        string cameraKey, ClientRpcParams rpcParams = default)
+        string cameraKey, bool worldCamera = false, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = true;
         _clientIsWaitingForInput = isWaitingForInput;
+        _clientWorldCameraMode = worldCamera;
 
         // Proximity/late join is a forced conversation — cancel any open gameplay Yes/No popup.
         UIController.Instance?.CancelGameplayConfirmation();
@@ -1146,7 +1170,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // outside player activates SuspectController.SetSuspectCamActive(true) and disables the
         // interaction controller, leaving the cam and interaction lock permanently stuck because
         // ExitScriptedModeClientRpc only calls ExitScriptedDialogueMode for inside players.
-        if (PlayerInstance.Instance.IsOutsideLocal)
+        if (LocalUsesWorldDialoguePath)
             EnterOutsideDialogueFacingSpeaker(lookTarget);
         else
             DialogueChoiceSystem.Instance?.EnterScriptedDialogueMode(lookTarget);
@@ -1388,9 +1412,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     [ClientRpc]
     private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false,
-        bool canLeave = false, ClientRpcParams rpcParams = default)
+        bool canLeave = false, bool worldCamera = false, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = true;
+        _clientWorldCameraMode = worldCamera;
 
         // A forced conversation cancels any open gameplay Yes/No popup (e.g. trash-can discard)
         // before anything else. Some branches below (outside player, no lock) never reach
@@ -1448,11 +1473,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         if (canLeave)
             UIController.Instance?.ShowBackButton(() => LeaveScriptedDialogueServerRpc());
 
-        if (PlayerInstance.Instance.IsOutsideLocal)
+        if (LocalUsesWorldDialoguePath)
         {
             // Outside players get movement-locked when explicitly requested, but never get the
             // booth suspect-cam activated — camera cuts are handled by SetActiveOverrideCamClientRpc.
-            if (lockOutsidePlayers)
+            // A world-camera sequence always locks its participants this way.
+            if (lockOutsidePlayers || _clientWorldCameraMode)
             {
                 EnterOutsideDialogueFacingSpeaker(lookTarget);
                 _clientEnteredDialogueLock = true;
@@ -1471,6 +1497,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private static void EnterOutsideDialogueFacingSpeaker(Transform speakerRoot)
     {
         if (DialogueChoiceSystem.Instance == null) return;
+
+        // A per-speaker framing override (e.g. a tall mutated form) wins while its form is showing.
+        DialogueCameraFraming framing = DialogueCameraFraming.FindActive(speakerRoot);
+        if (framing != null)
+        {
+            DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(
+                framing.LookTarget, framing.CameraVerticalOffset, framing.AimDropBelowTarget);
+            return;
+        }
+
         SuspectWorldDialogue worldDialogue = speakerRoot != null ? speakerRoot.GetComponentInChildren<SuspectWorldDialogue>(true) : null;
         DialogueChoiceSystem.Instance.EnterScriptedDialogueModeOutside(
             ResolveSpeakerHead(speakerRoot, worldDialogue),
@@ -1516,6 +1552,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         {
             DeactivateOverrideCam();
             _clientSpeakerNetId = 0;
+            _clientWorldCameraMode = false;
             return;
         }
         _clientEnteredDialogueLock = false;
@@ -1536,16 +1573,17 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // ShowPlayerUI() guards against revealing the HUD while that flag is still true, so
         // calling it first (as before) left the guard blocking the restore for outside players
         // whose IsInDialogueMode wasn't cleared until after ShowPlayerUI() had already bailed.
-        if (PlayerInstance.Instance == null || PlayerInstance.Instance.IsOutsideLocal)
+        if (PlayerInstance.Instance == null || LocalUsesWorldDialoguePath)
         {
-            // Always call ExitScriptedDialogueModeOutside for outside players — covers both the
-            // explicit lockOutsidePlayers path AND the late-join path where LateJoinClientRpc
+            // Always call ExitScriptedDialogueModeOutside for outside (or world-camera) players —
+            // covers the explicit lockOutsidePlayers path AND the late-join path where LateJoinClientRpc
             // called EnterScriptedDialogueModeOutside without lockOutsidePlayers being set.
             // ExitScriptedDialogueModeOutside is idempotent (bails if not in mode), so calling
             // it when the player was never locked is a safe no-op.
-            if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
+            if (LocalUsesWorldDialoguePath)
                 DialogueChoiceSystem.Instance?.ExitScriptedDialogueModeOutside();
 
+            _clientWorldCameraMode = false;
             UIController.Instance?.ShowPlayerUI();
             _clientSpeakerNetId = 0;
             return;

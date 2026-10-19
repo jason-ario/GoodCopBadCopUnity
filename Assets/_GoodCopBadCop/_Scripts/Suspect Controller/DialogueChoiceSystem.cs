@@ -349,8 +349,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
     /// that occur outside the interrogation booth (e.g. Vlad out-back sequence).
     /// <paramref name="cameraVerticalOffset"/> tunes the dolly-in framing height per character —
     /// see <see cref="PlayerMovementController.ZoomCameraForDialogue"/>.
+    /// <paramref name="aimDropBelowTarget"/> (&gt;= 0) overrides how far below the target the camera
+    /// aims; negative keeps the player's default chest framing.
     /// </summary>
-    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null, float cameraVerticalOffset = 0f)
+    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null, float cameraVerticalOffset = 0f, float aimDropBelowTarget = -1f)
     {
         if (IsInDialogueMode)
         {
@@ -388,7 +390,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         {
             // Single blend: yaw body toward the target, dolly in, and aim the camera at the head.
             // (Don't also call LookAtTarget — its tweens would be killed/fight this blend.)
-            player.GetComponent<PlayerMovementController>()?.ZoomCameraForDialogue(lookTarget, verticalOffset: cameraVerticalOffset);
+            player.GetComponent<PlayerMovementController>()?.ZoomCameraForDialogue(lookTarget, verticalOffset: cameraVerticalOffset, aimDropOverride: aimDropBelowTarget);
         }
 
         HidePlayerBody();

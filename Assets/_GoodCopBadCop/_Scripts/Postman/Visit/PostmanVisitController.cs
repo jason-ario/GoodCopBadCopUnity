@@ -449,7 +449,10 @@ namespace GoodCopBadCop.Postman
                 initialParticipantClientId: talkerClientId,
                 joinByInteractionOnly: true,
                 allowParticipantExit: true,
-                hideNonParticipantUI: false);
+                hideNonParticipantUI: false,
+                // He's a scene NPC, not a booth suspect: always use the world-dialogue camera,
+                // even when the talker counts as inside (he stands near the booth).
+                useWorldDialogueCamera: true);
         }
 
         // ── Mutation (server) ────────────────────────────────────────────────────
