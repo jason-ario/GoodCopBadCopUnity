@@ -356,23 +356,70 @@ public class SuspectCharacter : Interactable
 
         // Remap the FLookAnimator bone chain to the mutant skeleton so look-at tracking
         // follows the mutant head instead of the now-disabled civilian bones.
-        RemapLookAnimatorToMutantSkeleton();
+        RemapLookAnimatorToSkeleton(_mutatedVersion);
     }
 
     /// <summary>
-    /// Builds a name-keyed lookup of every Transform inside <see cref="_mutatedVersion"/>,
+    /// Local, run on every peer. Shows one child of <see cref="_baseVersion"/> (by sibling index,
+    /// clamped) and hides the others, for characters whose civilian look changes over time
+    /// (e.g. the postman's per-day models). Re-targets <see cref="animator"/>, the behaviour
+    /// animation adapter and the look-at bones to the shown model, and leaves only the
+    /// <see cref="Unity.Netcode.Components.NetworkAnimator"/> driving that model's Animator enabled.
+    /// Each variant needs its own Animator (and, beyond the one on the root, its own NetworkAnimator).
+    /// No-op once the full-mutant form is showing.
+    /// </summary>
+    public void ShowBaseVariantLocal(int index)
+    {
+        if (_baseVersion == null || _baseVersion.transform.childCount == 0) return;
+        if (_mutatedVersion != null && _mutatedVersion.activeSelf) return;
+
+        Transform container = _baseVersion.transform;
+        index = Mathf.Clamp(index, 0, container.childCount - 1);
+        GameObject selected = container.GetChild(index).gameObject;
+
+        for (int i = 0; i < container.childCount; i++)
+            container.GetChild(i).gameObject.SetActive(i == index);
+
+        Animator variantAnim = selected.GetComponentInChildren<Animator>(true);
+        if (variantAnim == null)
+        {
+            Debug.LogWarning($"[SuspectCharacter] '{name}' base variant '{selected.name}' has no Animator.", this);
+            return;
+        }
+
+        animator = variantAnim;
+        animator.enabled = !_visualsHidden;
+        GetComponent<GoodCopBadCop.SuspectBehaviorAnimation.SuspectBehaviorAnimationAdapter>()?.UpdateAnimatorReference(variantAnim);
+
+        _baseNetworkAnimator ??= GetComponent<Unity.Netcode.Components.NetworkAnimator>();
+        if (_baseNetworkAnimator != null)
+            _baseNetworkAnimator.enabled = _baseNetworkAnimator.Animator == variantAnim;
+        foreach (var na in _baseVersion.GetComponentsInChildren<Unity.Netcode.Components.NetworkAnimator>(true))
+            na.enabled = na.Animator == variantAnim;
+
+        RemapLookAnimatorToSkeleton(selected);
+    }
+
+    /// <summary>
+    /// Server-only. Turns damage immunity on or off at runtime — e.g. a protected world NPC who
+    /// becomes a fightable mutant.
+    /// </summary>
+    public void SetImmuneToDamage(bool immune) => isImmuneToDamage = immune;
+
+    /// <summary>
+    /// Builds a name-keyed lookup of every Transform inside <paramref name="skeletonRoot"/>,
     /// then replaces each <see cref="FLookAnimator.LookBones"/> Transform reference and
-    /// <see cref="FLookAnimator.LeadBone"/> with the matching mutant bone.
+    /// <see cref="FLookAnimator.LeadBone"/> with the matching bone (same Mixamo bone name).
     /// Finally calls <see cref="FLookAnimator.InitializeBaseVariables"/> so all internal
     /// rotation correction data is recalculated for the new skeleton.
     /// </summary>
-    private void RemapLookAnimatorToMutantSkeleton()
+    private void RemapLookAnimatorToSkeleton(GameObject skeletonRoot)
     {
-        if (lookAnimator == null || _mutatedVersion == null) return;
+        if (lookAnimator == null || skeletonRoot == null) return;
 
-        // Index every bone in the mutant hierarchy by name for O(1) matching.
+        // Index every bone in the target hierarchy by name for O(1) matching.
         var mutantBones = new Dictionary<string, Transform>();
-        foreach (Transform t in _mutatedVersion.GetComponentsInChildren<Transform>(true))
+        foreach (Transform t in skeletonRoot.GetComponentsInChildren<Transform>(true))
         {
             if (!mutantBones.ContainsKey(t.name))
                 mutantBones[t.name] = t;
@@ -1871,6 +1918,11 @@ public class SuspectCharacter : Interactable
     /// </summary>
     private void OpenWorldDialogue()
     {
+        // A component can take over the talk interaction entirely (e.g. the postman's daily
+        // scripted conversation — see ISuspectTalkOverride).
+        if (TryGetComponent(out ISuspectTalkOverride talkOverride) && talkOverride.TryHandleTalk(this))
+            return;
+
         if (worldDialogue != null)
             worldDialogue.BeginConversation();
     }
@@ -2022,6 +2074,17 @@ public class SuspectCharacter : Interactable
         if (IsServer) return; // already applied above
         SetVisualsHidden(false);
     }
+
+    /// <summary>
+    /// Local-only hide/show of the same renderers, colliders, Animator and NavMeshAgent that
+    /// <see cref="_hiddenUntilRevealed"/> controls, for recurring scene-placed NPCs that come and
+    /// go (e.g. <c>GoodCopBadCop.Postman.PostmanVisitController</c>). The caller is responsible
+    /// for running it on every peer, typically from a replicated NetworkVariable.
+    /// </summary>
+    public void SetVisualsHiddenLocal(bool hidden) => SetVisualsHidden(hidden);
+
+    /// <summary>True while this character's visuals are hidden (see <see cref="SetVisualsHiddenLocal"/>).</summary>
+    public bool AreVisualsHidden => _visualsHidden;
 
     /// <summary>
     /// Server-only. Rebuilds a body whose death was purely scripted presentation and therefore

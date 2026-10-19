@@ -72,6 +72,10 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 
 		[ToggleOff(_RECEIVE_SHADOWS_OFF)] _ReceiveShadowsOff ("Receive Shadows", Float) = 1
 
+		[TCP2HeaderHelp(Dither Fade)]
+		_DitherFade ("Dither Fade (1 = opaque)", Range(0,1)) = 1
+		[TCP2Separator]
+
 		// Avoid compile error if the properties are ending with a drawer
 		[HideInInspector] __dummy__ ("unused", Float) = 0
 	}
@@ -143,6 +147,7 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			float4 _VeinMap_ST;
 			float _VeinEdgeSoftness;
 			float _VeinFalloff;
+			half _DitherFade;
 			//================================
 			// Injected Code for 'Variables/Inside CBuffer'
 			//================================
@@ -171,6 +176,26 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			float3 p3 = frac(p.xyx * float3(443.897, 441.423, 437.195));
 			p3 += dot(p3, p3.yzx + 19.19);
 			return frac((p3.xx+p3.yz)*p3.zy);
+		}
+
+		// Screen-door (ordered dither) fade, driven by _DitherFade (1 = opaque, 0 = invisible).
+		// Keeps the material opaque (depth, shadows, outline all stay correct) — every pass
+		// clips the same pixel pattern. Pass the fragment's SV_POSITION.xy (pixel coordinates).
+		float DitherBayer2(float2 a)
+		{
+			a = floor(a);
+			return frac(a.x * 0.5 + a.y * a.y * 0.75);
+		}
+
+		float DitherBayer4(float2 a)
+		{
+			return DitherBayer2(0.5 * a) * 0.25 + DitherBayer2(a);
+		}
+
+		void ApplyDitherFade(float2 pixelPos)
+		{
+			if (_DitherFade < 0.999)
+				clip(_DitherFade - DitherBayer4(pixelPos) - 0.001);
 		}
 		
 		// Built-in renderer (CG) to SRP (HLSL) bindings
@@ -321,6 +346,8 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 		{
 			UNITY_SETUP_INSTANCE_ID(input);
 			UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+			ApplyDitherFade(input.vertex.xy);
 
 			// Shader Properties Sampling
 			float4 __outlineColor = ( float4(1,1,1,1) );
@@ -475,6 +502,8 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 			{
 				UNITY_SETUP_INSTANCE_ID(input);
 				UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+				ApplyDitherFade(input.positionCS.xy);
 
 				float3 positionWS = input.worldPosAndFog.xyz;
 				float3 normalWS = normalize(input.normal);
@@ -902,6 +931,8 @@ Shader "Toony Colors Pro 2/User/Character Shader"
 				#if defined(DEPTH_ONLY_PASS)
 					UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 				#endif
+
+				ApplyDitherFade(input.positionCS.xy);
 
 				// Shader Properties Sampling
 				float4 __albedo = ( TCP2_TEX2D_SAMPLE(_BaseMap, _BaseMap, input.pack0.xy).rgba );

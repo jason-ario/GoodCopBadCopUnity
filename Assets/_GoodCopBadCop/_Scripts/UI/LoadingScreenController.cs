@@ -30,9 +30,61 @@ public class LoadingScreenController : MonoBehaviour
     [Tooltip("Share of the loading bar given to the shader warmup when there is warmup work to do.")]
     [SerializeField, Range(0f, 1f)] private float warmupProgressWeight = 0.4f;
 
+    [Header("Load Speed")]
+    [Tooltip("Lets the async load use far more main-thread time per frame (High = ~50 ms vs ~4 ms default). Restored when this screen is destroyed.")]
+    [SerializeField] private bool boostLoadingPriority = true;
+
+    [Tooltip("Per-frame milliseconds for uploading textures/meshes to the GPU while loading.")]
+    [SerializeField, Range(1, 33)] private int loadingAsyncUploadTimeSlice = 8;
+
+    [Tooltip("Async upload ring buffer size (MB) while loading. Larger = fewer stalls on big textures.")]
+    [SerializeField, Range(2, 2047)] private int loadingAsyncUploadBufferSize = 128;
+
+    private ThreadPriority _previousLoadingPriority;
+    private int _previousUploadTimeSlice;
+    private int _previousUploadBufferSize;
+    private bool _boostApplied;
+
     private void Start()
     {
+        ApplyLoadBoost();
         StartCoroutine(LoadSceneRoutine());
+    }
+
+    private void OnDestroy()
+    {
+        // Runs while the target scene replaces this one, so activation still benefits from the boost.
+        RestoreLoadBoost();
+    }
+
+    private void ApplyLoadBoost()
+    {
+        if (!boostLoadingPriority || _boostApplied)
+        {
+            return;
+        }
+
+        _previousLoadingPriority = Application.backgroundLoadingPriority;
+        _previousUploadTimeSlice = QualitySettings.asyncUploadTimeSlice;
+        _previousUploadBufferSize = QualitySettings.asyncUploadBufferSize;
+
+        Application.backgroundLoadingPriority = ThreadPriority.High;
+        QualitySettings.asyncUploadTimeSlice = Mathf.Max(_previousUploadTimeSlice, loadingAsyncUploadTimeSlice);
+        QualitySettings.asyncUploadBufferSize = Mathf.Max(_previousUploadBufferSize, loadingAsyncUploadBufferSize);
+        _boostApplied = true;
+    }
+
+    private void RestoreLoadBoost()
+    {
+        if (!_boostApplied)
+        {
+            return;
+        }
+
+        Application.backgroundLoadingPriority = _previousLoadingPriority;
+        QualitySettings.asyncUploadTimeSlice = _previousUploadTimeSlice;
+        QualitySettings.asyncUploadBufferSize = _previousUploadBufferSize;
+        _boostApplied = false;
     }
 
     private IEnumerator LoadSceneRoutine()

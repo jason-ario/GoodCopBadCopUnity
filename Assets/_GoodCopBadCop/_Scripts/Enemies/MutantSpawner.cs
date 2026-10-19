@@ -429,15 +429,29 @@ public class MutantSpawner : NetworkBehaviour
     {
         Quaternion spawnRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
-        // Roll for a legacy mutant — a resident who previously escaped a full-mutant encounter —
-        // before falling back to the normal random mutantPrefabs pool.
+        // Roll for a legacy mutant — a resident who previously escaped a full-mutant encounter, or a
+        // recurring NPC who turned during the story (NpcMutantPool, e.g. the postman) — before
+        // falling back to the normal random mutantPrefabs pool. Each eligible character has an
+        // equal share of the roll.
         SuspectRecord legacyRecord = null;
-        if (spawnLegacyMutants && SuspectRunRecords.Instance != null && Random.value < legacyMutantChance)
-            legacyRecord = SuspectRunRecords.Instance.GetRandomLegacyMutantRecord();
+        string npcMutantId = null;
+        GameObject npcMutantPrefab = null;
+        if (spawnLegacyMutants && Random.value < legacyMutantChance)
+        {
+            int suspectCandidates = SuspectRunRecords.Instance != null ? SuspectRunRecords.Instance.LegacyMutantCandidateCount : 0;
+            int npcCandidates = NpcMutantPool.EligibleCount;
 
-        GameObject prefab = legacyRecord != null
-            ? legacyRecord.SuspectData.CharacterPrefab.gameObject
-            : mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
+            if (npcCandidates > 0 && Random.Range(0, suspectCandidates + npcCandidates) < npcCandidates)
+                NpcMutantPool.TryGetRandomEligible(out npcMutantId, out npcMutantPrefab);
+            else if (suspectCandidates > 0)
+                legacyRecord = SuspectRunRecords.Instance.GetRandomLegacyMutantRecord();
+        }
+
+        GameObject prefab = npcMutantPrefab != null
+            ? npcMutantPrefab
+            : legacyRecord != null
+                ? legacyRecord.SuspectData.CharacterPrefab.gameObject
+                : mutantPrefabs[Random.Range(0, mutantPrefabs.Length)];
 
         if (!TryFindSpawnPoint(transform.position, prefab, useLocalBox: true, out Vector3 spawnPosition))
         {
@@ -456,7 +470,9 @@ public class MutantSpawner : NetworkBehaviour
             return false;
         }
 
-        SuspectCharacter legacyCharacter = legacyRecord != null ? instance.GetComponent<SuspectCharacter>() : null;
+        SuspectCharacter legacyCharacter = legacyRecord != null || npcMutantPrefab != null
+            ? instance.GetComponent<SuspectCharacter>()
+            : null;
 
         if (legacyCharacter == null)
         {
@@ -482,7 +498,15 @@ public class MutantSpawner : NetworkBehaviour
             // ambient reintroductions of a legacy mutant now start non-aggroed like any other
             // ambient spawn.
             legacyCharacter.ActivateAsLegacyMutant(forceAggro ? aggroTarget : null);
-            Debug.Log($"[MutantSpawner] Spawned legacy mutant '{legacyRecord.SuspectData.name}'.", this);
+            if (npcMutantId != null)
+            {
+                NpcMutantPool.TrackInstance(npcMutantId, legacyCharacter);
+                Debug.Log($"[MutantSpawner] Spawned NPC mutant '{npcMutantId}'.", this);
+            }
+            else
+            {
+                Debug.Log($"[MutantSpawner] Spawned legacy mutant '{legacyRecord.SuspectData.name}'.", this);
+            }
         }
 
         return true;

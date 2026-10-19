@@ -1071,7 +1071,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1733597266
+  GlobalObjectIdHash: 1100751124
   InScenePlacedSourceGlobalObjectIdHash: 1640259171
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -1109,6 +1109,7 @@ MonoBehaviour:
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
   suspectData: {fileID: 0}
   InfectionScore: 0
   lookAnimator: {fileID: 253971976340002767}
@@ -1861,6 +1862,7 @@ MonoBehaviour:
   suspectData: {fileID: 0}
   lookTarget: {fileID: 5330771091470271895}
   _worldAdvanceTimeoutSeconds: 1.5
+  _logWorldGate: 1
 --- !u!114 &5215549252601529994
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1883,6 +1885,7 @@ MonoBehaviour:
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
   _destroyOnCollect: 1
   _kickable: 1
   _burnable: 0
@@ -2118,6 +2121,12 @@ MonoBehaviour:
   fleeInsteadOfDie: 1
   fleeSpeed: 12
   fleeDespawnTimeout: 8
+  fleeBreakoutDoorRadius: 8
+  fleeStuckSeconds: 0.75
+  fleeStuckMinDistance: 1
+  fleeStuckGateSearchRadius: 25
+  fleeThroughGateCommitSeconds: 2.5
+  fleeThroughGateExitDistance: 6
   _ignoreFriendlyFireDamage: 0
   _autoInitialiseOnSpawn: 1
   _fullMutantHealthMultiplier: 2

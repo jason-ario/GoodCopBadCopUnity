@@ -4,7 +4,9 @@ using UnityEngine;
 
 /// <summary>
 /// Server-authoritative manager that spawns a fresh networked <see cref="Newspaper"/> at
-/// <see cref="_spawnPoint"/> every time <see cref="ShiftManager.OnDayStart"/> fires.
+/// <see cref="_spawnPoint"/> once per day: when the postman drops it in the mailbox
+/// (<see cref="DeliverTodaysNewspaperServer"/>, default) or, with <see cref="_deliveredByPostman"/>
+/// off, every time <see cref="ShiftManager.OnDayStart"/> fires.
 /// Any newspaper instance spawned on a previous day is despawned first, so at most one
 /// daily newspaper exists in the scene at a time.
 ///
@@ -28,6 +30,21 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
              "newspaper is waiting to be picked up. Shown right after spawn, hidden as soon as " +
              "a player picks the newspaper up. Assign the scene's 'Tutorial Arrow - Mailbox'.")]
     [SerializeField] private Transform _pickupTutorialArrow;
+
+    [Header("Delivery")]
+    [Tooltip("When true, OnDayStart only clears the previous day's newspaper. Today's paper is " +
+             "spawned when the postman drops it in the mailbox (PostmanVisitController calls " +
+             "DeliverTodaysNewspaperServer). Turn off to spawn it at day start as before.")]
+    [SerializeField] private bool _deliveredByPostman = true;
+
+    [Tooltip("Last day the postman delivers (he turns into a mutant on this day). On later days " +
+             "the paper spawns at day start again. 0 = he always delivers.")]
+    [SerializeField, Min(0)] private int _lastPostmanDeliveryDay = 4;
+
+    private bool PostmanDeliversToday =>
+        _deliveredByPostman &&
+        (_lastPostmanDeliveryDay <= 0 || ShiftManager.Instance == null ||
+         ShiftManager.Instance.CurrentDay <= _lastPostmanDeliveryDay);
 
     // The newspaper spawned for the current day, if any, so it can be despawned next day.
     private NetworkObject _activeNewspaper;
@@ -90,7 +107,27 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
     /// </summary>
     private void OnDayStart()
     {
+        DespawnPreviousNewspaper();
+
+        if (PostmanDeliversToday)
+        {
+            Debug.Log("[DailyNewspaperSpawnManager] OnDayStart received — previous newspaper cleared; today's arrives with the postman.", this);
+            return;
+        }
+
         Debug.Log("[DailyNewspaperSpawnManager] OnDayStart received — despawning previous newspaper and spawning today's.", this);
+        SpawnDailyNewspaper();
+    }
+
+    /// <summary>
+    /// Server-only. Spawns today's newspaper in the mailbox right now (despawning any previous
+    /// one first). Called by <c>GoodCopBadCop.Postman.PostmanVisitController</c> at the moment
+    /// the postman drops the paper in, when <see cref="_deliveredByPostman"/> is enabled.
+    /// </summary>
+    public void DeliverTodaysNewspaperServer()
+    {
+        if (!IsServer) return;
+
         DespawnPreviousNewspaper();
         SpawnDailyNewspaper();
     }

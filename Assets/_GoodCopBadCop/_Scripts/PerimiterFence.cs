@@ -233,6 +233,13 @@ public class PerimiterFence : NetworkBehaviour
             // Visibility is driven solely through 'highlighted' (see RefreshRepairHighlight).
             _highlightEffect.enabled = true;
             _highlightEffect.highlighted = false;
+
+            // The shared ObjectivePulse profile renders its overlay AlwaysOnTop (junk pickups rely
+            // on that to be findable). Broken fences don't need to be seen through walls, so
+            // override per-instance. Enabling above guarantees OnEnable -> Init -> profile.Load
+            // has already run, so this override is not clobbered by profileSync.
+            _highlightEffect.overlayVisibility = HighlightPlus.Visibility.Normal;
+            _highlightEffect.seeThrough = SeeThroughMode.Never;
         }
     }
 

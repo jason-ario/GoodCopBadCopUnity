@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: GiviDay2Dialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 0
+  nodes:
+  - type: 0
+    npcLine: Morning, Officer. Forgive the [[infected:cough]]. Dust from the lower road.
+    animationTrigger: FakeCough
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []
+  - type: 1
+    npcLine: Your paper's in the box. The front page says everything is fine.
+    animationTrigger: Talk1
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Is it?
+      npcResponse: The front page always says that. You learn to read the back.
+      npcFollowUp: 
+      animationTrigger: TalkShrug
+      playLaughSfx: 0
+    - playerChoiceText: You look pale.
+      npcResponse: Postmen are always pale. We live under satchels and bad weather.
+      npcFollowUp: 
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+  - type: 1
+    npcLine: I used to write, you know. Now I carry other people's stories.
+    animationTrigger: Talk2
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: What happened to yours?
+      npcResponse: They burned. Twenty years of pages, gone in one afternoon.
+      npcFollowUp: 
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+    - playerChoiceText: Why did you stop?
+      npcResponse: Every story needs an ending. I didn't like where mine was going.
+      npcFollowUp: 
+      animationTrigger: TalkShrug
+      playLaughSfx: 0
+  - type: 0
+    npcLine: Keep your water clean, Officer. Clean things are rare now.
+    animationTrigger: FakeCough
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

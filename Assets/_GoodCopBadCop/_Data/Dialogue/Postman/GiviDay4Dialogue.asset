@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: GiviDay4Dialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 0
+  nodes:
+  - type: 0
+    npcLine: The final dispatch, Officer. I think it's the last one.
+    animationTrigger: FakeCough
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []
+  - type: 1
+    npcLine: My eyes are going. The fog keeps telling me to pull the wires down.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Don't listen to it.
+      npcResponse: I'm trying. It speaks in my voice now. That's the trouble.
+      npcFollowUp: 
+      animationTrigger: Talk1
+      playLaughSfx: 0
+    - playerChoiceText: Can you still walk?
+      npcResponse: Walk, yes. The route is the only thing I still remember.
+      npcFollowUp: 
+      animationTrigger: TalkShrug
+      playLaughSfx: 0
+  - type: 1
+    npcLine: There's a story in my satchel. I finished it last night.
+    animationTrigger: Talk2
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Who's it for?
+      npcResponse: The officer at the gate. You'll know if it's any good.
+      npcFollowUp: 
+      animationTrigger: Talk3
+      playLaughSfx: 0
+    - playerChoiceText: What's it about?
+      npcResponse: A man who carried the news until he forgot his own name.
+      npcFollowUp: 
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+  - type: 0
+    npcLine: If I come back wrong, Officer, remember the postman. Not the rest.
+    animationTrigger: Talk3
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

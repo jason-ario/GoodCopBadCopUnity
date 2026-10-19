@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: GiviDay3Dialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 0
+  nodes:
+  - type: 0
+    npcLine: Officer. I saw what was left of Vlad on my route.
+    animationTrigger: TalkLookAway
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []
+  - type: 1
+    npcLine: I need to tell someone before my head goes foggy. You'll do.
+    animationTrigger: Talk1
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Tell me what?
+      npcResponse: After the blast, I didn't stay in my cellar. I went outside.
+      npcFollowUp: 
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+    - playerChoiceText: Why me?
+      npcResponse: You listen, Officer. Everyone else at this gate just signs.
+      npcFollowUp: 
+      animationTrigger: Talk3
+      playLaughSfx: 0
+  - type: 1
+    npcLine: My pages were burning in the yard. I chased them [[whisper:into the green]].
+    animationTrigger: Talk2
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Are you sick?
+      npcResponse: I cough blood into a clean handkerchief every morning. Then I deliver.
+      npcFollowUp: 
+      animationTrigger: FakeCough
+      playLaughSfx: 0
+    - playerChoiceText: Who else knows?
+      npcResponse: Nobody. I told the soldiers I hid for days. They wrote it down.
+      npcFollowUp: 
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+  - type: 0
+    npcLine: Don't report me yet. Let me finish the route first.
+    animationTrigger: Talk3
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []

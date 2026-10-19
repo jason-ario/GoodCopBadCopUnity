@@ -430,6 +430,18 @@ public class SuspectRunRecords : MonoBehaviour
         }
     }
 
+    /// <summary>Number of suspects currently eligible for a legacy-mutant world spawn.</summary>
+    public int LegacyMutantCandidateCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (SuspectRecord record in records)
+                if (IsEligibleLegacyMutant(record)) count++;
+            return count;
+        }
+    }
+
     /// <summary>
     /// Returns a random eligible legacy mutant record, or null if none are available.
     /// Eligible records have <see cref="SuspectRecord.isLegacyMutant"/> set, are not killed, have

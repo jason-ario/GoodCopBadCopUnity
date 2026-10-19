@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4ba6a512adabf4b8a74985cb2f4d14, type: 3}
+  m_Name: GiviDay1Dialogue
+  m_EditorClassIdentifier: Assembly-CSharp::ScriptedDialogue
+  isForced: 0
+  nodes:
+  - type: 0
+    npcLine: A new face at the gate. Givi Jashi, postman. I bring the news.
+    animationTrigger: TalkSlightSurprise
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []
+  - type: 1
+    npcLine: Your paper's in the box. Mostly Party bulletins and bread prices.
+    animationTrigger: Talk1
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Any real news?
+      npcResponse: Real news doesn't get past the censor. I deliver what's left.
+      npcFollowUp: 
+      animationTrigger: TalkShrug
+      playLaughSfx: 0
+    - playerChoiceText: Who still reads it?
+      npcResponse: Fewer every week. Still, someone should know what day it is.
+      npcFollowUp: 
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+  - type: 1
+    npcLine: I walk the whole valley. Every door, every name.
+    animationTrigger: Talk2
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Even through the smog?
+      npcResponse: The smog doesn't read addresses. I do. We get along.
+      npcFollowUp: 
+      animationTrigger: ShortLaugh
+      playLaughSfx: 0
+    - playerChoiceText: So you know everyone?
+      npcResponse: I know their mail. That's knowing them better than they'd like.
+      npcFollowUp: 
+      animationTrigger: TalkSarcasticNod
+      playLaughSfx: 0
+  - type: 0
+    npcLine: Same time tomorrow, Officer. The mail doesn't wait, and neither do I.
+    animationTrigger: FakeCough
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices: []
