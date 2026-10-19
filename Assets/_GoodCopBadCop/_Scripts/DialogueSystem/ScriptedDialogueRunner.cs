@@ -1668,6 +1668,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             _activeOverrideCam = null;
         }
 
+        // World-camera sequences (e.g. Givi) stay on the player-camera dolly-in: never cut to the
+        // speaker's per-character SuspectCam / SuspectFaceCam, whether by default or by key.
+        // Explicit registry keys below still apply.
+        if (_clientWorldCameraMode &&
+            (string.IsNullOrEmpty(key) || key == "SuspectCam" || key == "SuspectFaceCam" || key == "suspect face"))
+            return;
+
         // Empty trigger: default to the speaker's SuspectCam so dialogue nodes without an
         // explicit cameraTrigger still cut to the character rather than showing nothing.
         if (string.IsNullOrEmpty(key))
