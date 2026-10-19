@@ -371,7 +371,16 @@ public class SuspectCharacter : Interactable
     public void ShowBaseVariantLocal(int index)
     {
         if (_baseVersion == null || _baseVersion.transform.childCount == 0) return;
-        if (_mutatedVersion != null && _mutatedVersion.activeSelf) return;
+
+        // Coming back from ShowMutatedVisualsLocal (e.g. a debug day jump): restore the civilian form.
+        if (_mutatedVersion != null && _mutatedVersion.activeSelf)
+        {
+            if (_isMutant) return; // a real full mutant never reverts
+            _mutatedVersion.SetActive(false);
+            _baseVersion.SetActive(true);
+            _mutantNetworkAnimator ??= _mutatedVersion.GetComponentInChildren<Unity.Netcode.Components.NetworkAnimator>(true);
+            if (_mutantNetworkAnimator != null) _mutantNetworkAnimator.enabled = false;
+        }
 
         Transform container = _baseVersion.transform;
         index = Mathf.Clamp(index, 0, container.childCount - 1);
@@ -398,6 +407,24 @@ public class SuspectCharacter : Interactable
             na.enabled = na.Animator == variantAnim;
 
         RemapLookAnimatorToSkeleton(selected);
+    }
+
+    /// <summary>
+    /// Local, run on every peer. Shows the Mutated Version (and retargets the animator, look bones
+    /// and NetworkAnimator to it) WITHOUT any mutant behaviour — the character keeps acting as a
+    /// normal NPC. For characters who look fully mutated before they turn hostile (e.g. the postman
+    /// on his last day). <see cref="ActivateAsLegacyMutant"/> / <see cref="ActivateFullMutantForm"/>
+    /// still do the real handoff later.
+    /// </summary>
+    public void ShowMutatedVisualsLocal()
+    {
+        if (_mutatedVersion == null) return;
+
+        if (_baseVersion != null) _baseVersion.SetActive(false);
+        _mutatedVersion.SetActive(true);
+        AssignMutatedAnimator();
+
+        if (animator != null) animator.enabled = !_visualsHidden;
     }
 
     /// <summary>

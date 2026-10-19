@@ -46,6 +46,7 @@ namespace GoodCopBadCop.Postman
     ///
     /// Look: each day shows one child of the character's "Base Version" (Day 1 = first child, Day 2 =
     /// second, ...; later days keep the last one), replicated through <see cref="_modelVariant"/>.
+    /// On <see cref="_mutateDay"/> he shows the Mutated Version all day while still behaving normally.
     ///
     /// Mutation: on <see cref="_mutateDay"/>, finishing his conversation turns him into a full mutant
     /// (<see cref="SuspectCharacter.ActivateAsLegacyMutant"/>) that hunts the player who talked to him,
@@ -162,7 +163,7 @@ namespace GoodCopBadCop.Postman
             _visible.OnValueChanged += HandleVisibleChanged;
             ApplyVisibilityInstant(_visible.Value);
             _modelVariant.OnValueChanged += HandleModelVariantChanged;
-            _character.ShowBaseVariantLocal(_modelVariant.Value);
+            ApplyModelVariant(_modelVariant.Value);
 
             if (!IsServer) return;
 
@@ -214,7 +215,11 @@ namespace GoodCopBadCop.Postman
         private bool IsRetired =>
             _state == PostmanVisitState.Mutant || CurrentDay > _mutateDay || NpcMutantPool.HasTurned(_mutantPoolId);
 
-        private static int ModelVariantForDay(int day) => Mathf.Max(0, day - 1);
+        // _modelVariant value meaning "show the Mutated Version".
+        private const int MutatedVariant = -1;
+
+        // Base Version child for the day (Day 1 = 0, ...); from the mutation day on he looks fully mutated.
+        private int ModelVariantForDay(int day) => day >= _mutateDay ? MutatedVariant : Mathf.Max(0, day - 1);
 
         private void HandleDayStart()
         {
@@ -438,6 +443,9 @@ namespace GoodCopBadCop.Postman
                     if (CurrentDay == _mutateDay)
                         StartCoroutine(TurnIntoMutantRoutine(talkerClientId));
                 },
+                // He's always talked to outside: lock the talker in (cursor for choices, camera on
+                // him). With joinByInteractionOnly only interacting players are ever pulled in.
+                lockOutsidePlayers: true,
                 initialParticipantClientId: talkerClientId,
                 joinByInteractionOnly: true,
                 allowParticipantExit: true,
@@ -497,7 +505,13 @@ namespace GoodCopBadCop.Postman
             return bestBelow ?? _dayDialogues[0];
         }
 
-        private void HandleModelVariantChanged(int previous, int current) => _character.ShowBaseVariantLocal(current);
+        private void HandleModelVariantChanged(int previous, int current) => ApplyModelVariant(current);
+
+        private void ApplyModelVariant(int variant)
+        {
+            if (variant == MutatedVariant) _character.ShowMutatedVisualsLocal();
+            else _character.ShowBaseVariantLocal(variant);
+        }
 
         private void HandleVisibleChanged(bool previous, bool current)
         {
