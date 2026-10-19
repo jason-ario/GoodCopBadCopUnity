@@ -868,9 +868,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     /// raises (positive) or lowers (negative) the camera per character height. Call
     /// <see cref="ResetCameraZoomForDialogue"/> on exit to smoothly blend back to the cached pose.
     /// <paramref name="aimDropOverride"/> (any non-NaN value, negative = above) replaces <see cref="dialogueAimDropBelowHead"/>
-    /// for this conversation (e.g. 0 to aim straight at a tall speaker's head).
+    /// for this conversation (e.g. 0 to aim straight at a tall speaker's head). <paramref name="allowBackOff"/>
+    /// lets the camera step back (not just in) to reach the standoff.
     /// </summary>
-    public void ZoomCameraForDialogue(Transform target, float overrideDistance = -1f, float verticalOffset = 0f, float aimDropOverride = float.NaN)
+    public void ZoomCameraForDialogue(Transform target, float overrideDistance = -1f, float verticalOffset = 0f, float aimDropOverride = float.NaN, bool allowBackOff = false)
     {
         if (cameraTransform == null || target == null) return;
 
@@ -913,12 +914,22 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         }
         direction.Normalize();
 
-        // Dolly to a fixed standoff from the target; if already closer, don't move at all.
+        // Dolly to a fixed standoff from the target; if already closer, don't move at all —
+        // unless allowBackOff, in which case step back out to the standoff (softens the upward
+        // pitch on tall speakers), clamped by obstructions behind the camera.
         float standoff = overrideDistance > 0f ? overrideDistance : dialogueZoomDistance;
         float distance = Mathf.Max(0f, horizontalDist - standoff);
 
         if (distance > 0f && Physics.Raycast(camPos, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
             distance = Mathf.Max(0f, hit.distance - dialogueZoomClearance);
+
+        if (allowBackOff && horizontalDist < standoff)
+        {
+            float backOff = standoff - horizontalDist;
+            if (Physics.Raycast(camPos, -direction, out RaycastHit backHit, backOff + dialogueZoomClearance, ~0, QueryTriggerInteraction.Ignore))
+                backOff = Mathf.Max(0f, backHit.distance - dialogueZoomClearance);
+            distance = -backOff;
+        }
 
         // Vertical offset re-frames the shot per character height.
         Vector3 worldTargetPos = camPos + direction * distance + Vector3.up * verticalOffset;

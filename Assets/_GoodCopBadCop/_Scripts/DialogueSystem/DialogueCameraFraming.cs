@@ -27,10 +27,16 @@ public class DialogueCameraFraming : MonoBehaviour
     [Tooltip("Raises (positive) or lowers (negative) the camera itself, in meters.")]
     [SerializeField] private float _cameraVerticalOffset = 0f;
 
+    [Tooltip("Horizontal camera distance from the speaker, in meters. When > 0 the camera also steps " +
+             "back to reach it if the player is standing closer, which flattens the upward angle on " +
+             "tall speakers. <= 0 uses the player's default dialogue distance (dolly-in only).")]
+    [SerializeField] private float _standoffDistance = -1f;
+
     private Transform _aimPoint;
 
     public float AimDropBelowTarget => _aimDropBelowTarget;
     public float CameraVerticalOffset => _cameraVerticalOffset;
+    public float StandoffDistance => _standoffDistance;
 
     /// <summary>True while this override's form is showing and it can produce an aim point.</summary>
     public bool IsActive => isActiveAndEnabled &&

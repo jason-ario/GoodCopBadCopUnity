@@ -5,10 +5,10 @@ using UnityEngine.UI;
 /// <summary>
 /// Drives the main menu logo's burn-in and random glitch bursts.
 ///
-/// The burn is state-driven rather than tied to a single Start() coroutine: the Home Screen is
-/// deactivated whenever the player switches menus (and briefly during menu setup on load), which
-/// kills any running coroutine. Every OnEnable re-applies the current burn value and resumes an
-/// unfinished burn, so the logo can never be left stuck at "fully burned" (invisible).
+/// The burn restarts from fully burned (invisible) every time the logo is enabled, i.e. every
+/// time the Home Screen opens. The Home Screen is deactivated whenever the player switches menus
+/// (and briefly during menu setup on load), which kills any running coroutine; because each
+/// OnEnable starts a fresh run, an interrupted burn can never leave the logo stuck invisible.
 ///
 /// Writes go to a runtime copy of <see cref="_logoMaterial"/> so the shared asset is never
 /// modified (previously an interrupted burn left the asset saved at _BurnProgress = 1).
@@ -34,9 +34,6 @@ public class LogoMaterialController : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float _glitchIntensity = 0.5f;
 
     private Material _runtimeMaterial;
-    private float _burnElapsed;   // Time spent in the burn (excluding the delay).
-    private float _delayElapsed;
-    private bool _burnComplete;
 
     private void Awake()
     {
@@ -56,12 +53,10 @@ public class LogoMaterialController : MonoBehaviour
         if (_runtimeMaterial == null)
             return;
 
-        // Re-apply the current state immediately so there's never a stale frame, then resume
-        // the burn if a menu switch interrupted it.
-        ApplyBurn();
-        if (!_burnComplete)
-            StartCoroutine(AnimateBurnProgress());
-
+        // Every time the home screen opens, restart the burn from fully burned (invisible).
+        // Each activation owns a fresh run, so a menu switch that kills the coroutine mid-burn
+        // can't leave the logo stuck invisible.
+        StartCoroutine(AnimateBurnProgress());
         StartCoroutine(GlitchLoop());
     }
 
@@ -79,39 +74,31 @@ public class LogoMaterialController : MonoBehaviour
             Destroy(_runtimeMaterial);
     }
 
-    private float CurrentBurnValue()
-    {
-        if (_burnComplete)
-            return _targetBurnProgress;
-
-        float t = _duration > 0f ? Mathf.Clamp01(_burnElapsed / _duration) : 1f;
-        return Mathf.Lerp(1f, _targetBurnProgress, t);
-    }
-
-    private void ApplyBurn() => _runtimeMaterial.SetFloat(BurnProgressId, CurrentBurnValue());
-
     /// <summary>
-    /// Waits out the remaining delay, then animates _BurnProgress from 1 to the target value,
-    /// resuming from wherever a previous run was interrupted. Unscaled time, so a leftover
-    /// Time.timeScale of 0 can't stall it.
+    /// Sets _BurnProgress to 1 (invisible), waits for the configured delay, then animates it to
+    /// the target value. Unscaled time, so a leftover Time.timeScale of 0 can't stall it.
     /// </summary>
     private IEnumerator AnimateBurnProgress()
     {
-        while (_delayElapsed < _delay)
+        _runtimeMaterial.SetFloat(BurnProgressId, 1f);
+
+        float delayElapsed = 0f;
+        while (delayElapsed < _delay)
         {
-            _delayElapsed += Time.unscaledDeltaTime;
+            delayElapsed += Time.unscaledDeltaTime;
             yield return null;
         }
 
-        while (_burnElapsed < _duration)
+        float elapsed = 0f;
+        while (elapsed < _duration)
         {
-            _burnElapsed += Time.unscaledDeltaTime;
-            ApplyBurn();
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / _duration);
+            _runtimeMaterial.SetFloat(BurnProgressId, Mathf.Lerp(1f, _targetBurnProgress, t));
             yield return null;
         }
 
-        _burnComplete = true;
-        ApplyBurn();
+        _runtimeMaterial.SetFloat(BurnProgressId, _targetBurnProgress);
 
         if (_burnSound != null && SFXController.Instance != null)
             SFXController.Instance.Play(_burnSound);

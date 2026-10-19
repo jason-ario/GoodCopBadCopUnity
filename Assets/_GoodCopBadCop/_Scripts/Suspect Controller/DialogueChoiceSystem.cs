@@ -352,7 +352,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
     /// <paramref name="aimDropBelowTarget"/> (any non-NaN value) overrides how far below the target the camera
     /// aims; NaN keeps the player's default chest framing.
     /// </summary>
-    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null, float cameraVerticalOffset = 0f, float aimDropBelowTarget = float.NaN)
+    public void EnterScriptedDialogueModeOutside(Transform lookTarget = null, float cameraVerticalOffset = 0f, float aimDropBelowTarget = float.NaN, float standoffDistance = -1f)
     {
         if (IsInDialogueMode)
         {
@@ -390,7 +390,10 @@ public class DialogueChoiceSystem : NetworkBehaviour
         {
             // Single blend: yaw body toward the target, dolly in, and aim the camera at the head.
             // (Don't also call LookAtTarget — its tweens would be killed/fight this blend.)
-            player.GetComponent<PlayerMovementController>()?.ZoomCameraForDialogue(lookTarget, verticalOffset: cameraVerticalOffset, aimDropOverride: aimDropBelowTarget);
+            // standoffDistance > 0 (per-speaker framing) also lets the camera step back to reach it.
+            player.GetComponent<PlayerMovementController>()?.ZoomCameraForDialogue(lookTarget,
+                overrideDistance: standoffDistance, verticalOffset: cameraVerticalOffset,
+                aimDropOverride: aimDropBelowTarget, allowBackOff: standoffDistance > 0f);
         }
 
         HidePlayerBody();
