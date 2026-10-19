@@ -73,6 +73,15 @@ public class PlayerCameraController : MonoBehaviour
     private bool _nearClipPlaneCached;
     private Tween _nearClipPlaneTween;
 
+    /// <summary>Current state set by <see cref="SetRunningEffectsEnabled"/>.</summary>
+    public bool RunningEffectsEnabled => runningEffectsEnabled;
+
+    /// <summary>Current state set by <see cref="SetHeadBobEnabled"/>.</summary>
+    public bool HeadBobEnabled => _headBobEnabled;
+
+    /// <summary>Current state set by <see cref="SetCameraShakeEnabled"/>.</summary>
+    public bool CameraShakeEnabled => _cameraShakeEnabled;
+
     private void OnDisable()
     {
         StopSway();

@@ -904,6 +904,9 @@ AnimatorStateTransition:
   - m_ConditionMode: 1
     m_ConditionEvent: Vomit
     m_EventTreshold: 0
+  - m_ConditionMode: 2
+    m_ConditionEvent: Death
+    m_EventTreshold: 0
   m_DstStateMachine: {fileID: 0}
   m_DstState: {fileID: -8564253198131657433}
   m_Solo: 0
@@ -1063,6 +1066,9 @@ AnimatorStateTransition:
   - m_ConditionMode: 1
     m_ConditionEvent: Hit
     m_EventTreshold: 0
+  - m_ConditionMode: 2
+    m_ConditionEvent: Death
+    m_EventTreshold: 0
   m_DstStateMachine: {fileID: 0}
   m_DstState: {fileID: -5196512760022045306}
   m_Solo: 0
@@ -1112,6 +1118,9 @@ AnimatorStateTransition:
   m_Conditions:
   - m_ConditionMode: 1
     m_ConditionEvent: BangOnShutters
+    m_EventTreshold: 0
+  - m_ConditionMode: 2
+    m_ConditionEvent: Death
     m_EventTreshold: 0
   m_DstStateMachine: {fileID: 0}
   m_DstState: {fileID: 3910590886982656627}
@@ -1445,6 +1454,9 @@ AnimatorStateTransition:
   m_Conditions:
   - m_ConditionMode: 1
     m_ConditionEvent: climbing
+    m_EventTreshold: 0
+  - m_ConditionMode: 2
+    m_ConditionEvent: Death
     m_EventTreshold: 0
   m_DstStateMachine: {fileID: 0}
   m_DstState: {fileID: -7001170811015849070}
@@ -3080,13 +3092,13 @@ AnimatorStateMachine:
     m_Position: {x: 80, y: 370, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -8350037966798532947}
-    m_Position: {x: 320, y: 250, z: 0}
+    m_Position: {x: 310, y: 280, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 6319306574883459257}
     m_Position: {x: 450, y: 410, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -5705625345894379130}
-    m_Position: {x: 560, y: 490, z: 0}
+    m_Position: {x: 640, y: 510, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -6348017396272503000}
     m_Position: {x: 480, y: 340, z: 0}

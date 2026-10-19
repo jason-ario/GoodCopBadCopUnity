@@ -103,8 +103,15 @@ public class GameSettings : ScriptableObject
 
     [Header("Debug Console")]
     [Tooltip("When disabled, all debug console hotkeys and overlays (DebugConsole hotkeys, CheatConsoleUI [F12], " +
-             "AnomalyDebugUI [`], VFXDebugConsoleUI [F11]) are ignored — no need to manually deactivate the Debug Console GameObject.")]
+             "AnomalyDebugUI [`]) are ignored — no need to manually deactivate the Debug Console GameObject. " +
+             "Does not affect the Trailer Console [F11], which has its own flag.")]
     [SerializeField] private bool _debugConsoleEnabled = true;
+
+    [Header("Trailer Console")]
+    [Tooltip("When enabled, F11 opens the Trailer Console (hide HUD, free camera with bookmarks/dolly, time scale, " +
+             "environment preset lock). Independent of Debug Console so a trailer build can disable gameplay cheats " +
+             "but keep this. Works in release builds too — turn it off before public builds.")]
+    [SerializeField] private bool _trailerConsoleEnabled = true;
 
     [Header("Inventory")]
     [Tooltip("When enabled, the player's hotbar has 3 slots instead of 2 (key 3 selects the third slot) and a " +
@@ -121,6 +128,19 @@ public class GameSettings : ScriptableObject
 
     /// <summary>Number of hotbar slots implied by <see cref="ThreeInventorySlots"/> (2 or 3).</summary>
     public int InventorySlotCount => _threeInventorySlots ? 3 : 2;
+
+    [Header("Localization")]
+    [Tooltip("When enabled, Settings > Gameplay > Language offers \"Pseudolocalization\" (accented, expanded, [bracketed] " +
+             "text that follows Unity's pseudo-localization guidelines) in every build type. When disabled, the option is " +
+             "hidden and a saved pseudolocalization choice falls back to the default language.")]
+    [SerializeField] private bool _pseudoLocalizationEnabled = true;
+
+    /// <summary>Whether the "Pseudolocalization" language is selectable (Settings menu, cheat console, saved preference).</summary>
+    public bool PseudoLocalizationEnabled
+    {
+        get => _pseudoLocalizationEnabled;
+        set => _pseudoLocalizationEnabled = value;
+    }
 
     [Header("Survey")]
     [Tooltip("When enabled, the playtest survey opens in the default browser when the application exits.")]
@@ -188,5 +208,12 @@ public class GameSettings : ScriptableObject
     {
         get => _debugConsoleEnabled;
         set => _debugConsoleEnabled = value;
+    }
+
+    /// <summary>Whether the F11 Trailer Console responds to input. Independent of <see cref="DebugConsoleEnabled"/>.</summary>
+    public bool TrailerConsoleEnabled
+    {
+        get => _trailerConsoleEnabled;
+        set => _trailerConsoleEnabled = value;
     }
 }

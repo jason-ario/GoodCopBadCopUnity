@@ -24,17 +24,60 @@ namespace GoodCopBadCop.EnvironmentSystem
         /// tooling previews.
         /// </summary>
         void ForceSuspectProgress(int suspectsProcessed, int totalSuspects);
+
+        /// <summary>
+        /// True while the Trailer Console has locked the look. Scheduled changes (day start via
+        /// <see cref="ApplyDay"/>, dusk switch via <see cref="SetSuspectProgress"/>) still update
+        /// day/progress/night-preset bookkeeping but no longer change the active preset or rain.
+        /// </summary>
+        bool IsPresetLocked { get; }
+
+        /// <summary>
+        /// Locks/unlocks scheduled preset changes. On unlock, the scheduled preset and rain for the
+        /// current day (and the night preset if dusk was reached) are re-applied.
+        /// </summary>
+        void SetPresetLocked(bool locked);
+
+        /// <summary>Sets rain directly. Ignores <see cref="IsPresetLocked"/>.</summary>
+        void SetRainEnabled(bool enabled);
     }
 
     public sealed class EnvironmentService : IEnvironmentService
     {
         private readonly EnvironmentSchedule schedule;
         private readonly EnvironmentModel model;
+        private bool presetLocked;
 
         public EnvironmentService(EnvironmentSchedule schedule, EnvironmentModel model)
         {
             this.schedule = schedule;
             this.model = model;
+        }
+
+        public bool IsPresetLocked => presetLocked;
+
+        public void SetPresetLocked(bool locked)
+        {
+            if (presetLocked == locked) return;
+            presetLocked = locked;
+            if (locked) return;
+
+            // Restore the scheduled look for the current day.
+            int day = Mathf.Max(1, model.CurrentDayMutable.Value);
+            EnvironmentPreset preset = schedule != null ? schedule.GetPresetForDay(day) : null;
+            if (preset != null)
+            {
+                model.SelectPreset(preset);
+                model.SelectRainEnabled(schedule.GetRainEnabledForDay(day));
+            }
+
+            if (model.DayNightProgressMutable.Value >= 1f && model.CurrentNightPresetMutable.Value != null)
+                model.SelectPreset(model.CurrentNightPresetMutable.Value);
+        }
+
+        public void SetRainEnabled(bool enabled)
+        {
+            model.SelectRainEnabled(enabled);
         }
 
         public void ApplyDay(int day)
@@ -57,8 +100,11 @@ namespace GoodCopBadCop.EnvironmentSystem
                 return;
             }
 
-            model.SelectPreset(preset);
-            model.SelectRainEnabled(schedule.GetRainEnabledForDay(safeDay));
+            if (!presetLocked)
+            {
+                model.SelectPreset(preset);
+                model.SelectRainEnabled(schedule.GetRainEnabledForDay(safeDay));
+            }
             model.SelectNightPreset(schedule.GetNightPresetForDay(safeDay));
         }
 
@@ -116,7 +162,7 @@ namespace GoodCopBadCop.EnvironmentSystem
         /// </summary>
         private void ApplyNightIfDuskReached(float progress)
         {
-            if (progress < 1f)
+            if (progress < 1f || presetLocked)
             {
                 return;
             }

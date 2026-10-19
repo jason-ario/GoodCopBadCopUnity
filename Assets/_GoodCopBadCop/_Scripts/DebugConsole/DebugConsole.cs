@@ -239,8 +239,8 @@ public class DebugConsole : MonoBehaviour
             SpawnDebugAggroedMutant();
         }
 
-        // F11 is owned by VFXDebugConsoleUI. The soldier mocking debug event used to share it,
-        // which silently queued the Soldier into the lineup whenever the VFX overlay was opened.
+        // F11 is owned by TrailerConsoleUI (gated by GameSettings.TrailerConsoleEnabled, not
+        // DebugConsoleEnabled). Do not bind gameplay debug actions to F11.
 
         // M — make the next eligible civilian suspect use the full-mutant booth flow.
         if (Input.GetKeyDown(KeyCode.M))

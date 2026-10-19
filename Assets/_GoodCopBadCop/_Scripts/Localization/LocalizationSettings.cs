@@ -132,13 +132,41 @@ public class LocalizationSettings : ScriptableObject
         new FontRole { name = "Dialogue" }
     };
 
-    /// <summary>Role whose source fonts include <paramref name="sourceFont"/>, or null when unassigned.</summary>
+    /// <summary>Role whose source fonts explicitly include <paramref name="sourceFont"/> (Fonts tab), or null when unassigned.</summary>
     public string RoleOf(TMP_FontAsset sourceFont)
     {
         if (sourceFont == null || fontRoles == null) return null;
         foreach (var r in fontRoles)
             if (r != null && r.sourceFonts != null && r.sourceFonts.Contains(sourceFont)) return r.name;
         return null;
+    }
+
+    /// <summary>
+    /// Runtime role lookup: the explicit <see cref="RoleOf"/>, else the role that font fills for the default language
+    /// (for example SovietStyle SDF is the English "UI" font). Null when the font maps to no role.
+    /// </summary>
+    public string EffectiveRoleOf(TMP_FontAsset sourceFont)
+    {
+        string explicitRole = RoleOf(sourceFont);
+        if (explicitRole != null || sourceFont == null) return explicitRole;
+
+        var source = Find(defaultLanguage) ?? Find(LocalizationTable.SourceLanguage);
+        if (source?.roleFonts != null)
+            foreach (var rf in source.roleFonts)
+                if (rf != null && rf.font == sourceFont && HasRole(rf.role)) return rf.role;
+        return null;
+    }
+
+    /// <summary>
+    /// Font for a label with no <see cref="LocalizedText"/>: its role's font for <paramref name="lang"/> when the font
+    /// maps to a role, otherwise the label's own font (the global TMP fallbacks still cover missing glyphs).
+    /// </summary>
+    public TMP_FontAsset ResolveUntaggedFont(LocalizationLanguage lang, TMP_FontAsset sourceFont)
+    {
+        if (lang == null || sourceFont == null) return sourceFont;
+        string role = EffectiveRoleOf(sourceFont);
+        var rf = role != null ? lang.FontForRole(role) : null;
+        return rf != null ? rf : sourceFont;
     }
 
     public bool HasRole(string role)
@@ -157,7 +185,7 @@ public class LocalizationSettings : ScriptableObject
     public TMP_FontAsset ResolveFont(LocalizationLanguage lang, TMP_FontAsset sourceFont, string roleOverride = null)
     {
         if (lang == null) return sourceFont;
-        string role = !string.IsNullOrEmpty(roleOverride) ? roleOverride : RoleOf(sourceFont);
+        string role = !string.IsNullOrEmpty(roleOverride) ? roleOverride : EffectiveRoleOf(sourceFont);
         if (!string.IsNullOrEmpty(role))
         {
             var rf = lang.FontForRole(role);
@@ -171,7 +199,18 @@ public class LocalizationSettings : ScriptableObject
     {
         var s = Instance;
         if (s == null) return sourceFont;
-        return s.ResolveFont(s.Find(Loc.CurrentLanguage), sourceFont, roleOverride);
+        return s.ResolveFont(s.FontLanguage(Loc.CurrentLanguage), sourceFont, roleOverride);
+    }
+
+    /// <summary>
+    /// Language whose fonts are shown for <paramref name="code"/>. Pseudolocales have no entry of their own and use the
+    /// default language's fonts, so pseudolocalized text looks exactly like the source build apart from the characters.
+    /// </summary>
+    public LocalizationLanguage FontLanguage(string code)
+    {
+        var lang = Find(code);
+        if (lang == null && PseudoLocalizer.IsPseudo(code)) lang = Find(defaultLanguage) ?? Find(LocalizationTable.SourceLanguage);
+        return lang;
     }
 
     private static LocalizationSettings _instance;

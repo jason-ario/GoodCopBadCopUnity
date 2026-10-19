@@ -25,9 +25,12 @@ public class LocalizedText : MonoBehaviour
     public string fontRole = "";
 
     private TMP_Text _text;
-    private TMP_FontAsset _originalFont;
+    private readonly LocalizedFontSwap _fontSwap = new LocalizedFontSwap();
     private float _originalSize, _originalMax, _originalMin;
     private bool _captured;
+
+    /// <summary>The label's authored font (before any language font swap).</summary>
+    public TMP_FontAsset OriginalFont => _fontSwap.OriginalFont;
 
     public TMP_Text Text
     {
@@ -58,34 +61,37 @@ public class LocalizedText : MonoBehaviour
     public void Refresh()
     {
         var t = Text;
-        if (t == null || string.IsNullOrEmpty(key)) return;
+        if (t == null) return;
 
         if (!_captured)
         {
-            _originalFont = t.font;
+            _fontSwap.Capture(t);
             _originalSize = t.fontSize;
             _originalMax = t.fontSizeMax;
             _originalMin = t.fontSizeMin;
             _captured = true;
         }
 
-        // Missing keys leave the authored text untouched.
-        if (Loc.TryGet(key, out string value))
+        // Missing keys (or no runtime table) leave the current text untouched; LocalizationTextRuntime still
+        // pseudolocalizes / reverse-translates it at render time, so the label follows the language either way.
+        if (!string.IsNullOrEmpty(key) && Loc.TryGet(key, out string value))
             t.text = value;
 
         if (applyLanguageFont) ApplyFont(t);
+        // Re-run TMP's parse so the render-time localization sees the new language even when the text didn't change.
+        t.havePropertiesChanged = true;
     }
 
     private void ApplyFont(TMP_Text t)
     {
         var settings = LocalizationSettings.Instance;
-        var lang = settings != null ? settings.Find(Loc.CurrentLanguage) : null;
+        var lang = settings != null ? settings.FontLanguage(Loc.CurrentLanguage) : null;
 
-        TMP_FontAsset font = _originalFont;
+        TMP_FontAsset font = _fontSwap.OriginalFont;
         float scale = 1f;
         if (lang != null)
         {
-            font = settings.ResolveFont(lang, _originalFont, fontRole);
+            font = settings.ResolveFont(lang, _fontSwap.OriginalFont, fontRole);
             if (lang.sizeScale > 0f) scale = lang.sizeScale;
 
             if (Application.isPlaying && font != null && lang.fallbackFonts != null)
@@ -94,7 +100,7 @@ public class LocalizedText : MonoBehaviour
                         font.fallbackFontAssetTable.Add(fb);
         }
 
-        if (font != null && t.font != font) t.font = font;
+        _fontSwap.Apply(t, font);
         t.fontSize = _originalSize * scale;
         if (t.enableAutoSizing)
         {

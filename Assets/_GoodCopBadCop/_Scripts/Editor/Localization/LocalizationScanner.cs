@@ -271,13 +271,13 @@ public static class LocalizationScanner
         }
     }
 
-    // ---- Code strings: English literals wrapped in Loc.T("...") ----
+    // ---- Code strings: English literals wrapped in Loc.T("...") or marked with Loc.N("...") ----
 
     private static readonly System.Text.RegularExpressions.Regex CodeCall = new System.Text.RegularExpressions.Regex(
-        @"\bLoc\.T\(\s*(?:@""(?<v>(?:[^""]|"""")*)""|""(?<r>(?:[^""\\\n]|\\.)*)"")");
+        @"\bLoc\.[TN]\(\s*(?:@""(?<v>(?:[^""]|"""")*)""|""(?<r>(?:[^""\\\n]|\\.)*)"")");
 
     /// <summary>
-    /// Finds <c>Loc.T("...")</c> literals in game scripts. Keys derive from the text (LocKeys.ForCode), so one entry
+    /// Finds <c>Loc.T("...")</c> and <c>Loc.N("...")</c> literals in game scripts. Keys derive from the text (LocKeys.ForCode), so one entry
     /// covers every call site with the same English. Interpolated or concatenated arguments are not picked up.
     /// </summary>
     private static void ScanCode(LocalizationTable table, List<ScanItem> items)
@@ -289,7 +289,7 @@ public static class LocalizationScanner
             if (!path.EndsWith(".cs") || path.Contains("/Editor/") || path.Contains("/Localization/")) continue;
             string src;
             try { src = File.ReadAllText(path); } catch (IOException) { continue; }
-            if (!src.Contains("Loc.T(")) continue;
+            if (!src.Contains("Loc.T(") && !src.Contains("Loc.N(")) continue;
 
             string file = Path.GetFileNameWithoutExtension(path);
             foreach (System.Text.RegularExpressions.Match m in CodeCall.Matches(src))

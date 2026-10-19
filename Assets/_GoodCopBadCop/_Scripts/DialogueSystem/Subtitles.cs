@@ -81,7 +81,7 @@ public class Subtitles : MonoBehaviour
         if (tmp == null || tmp.font == null) return;
 
         var settings = LocalizationSettings.Instance;
-        string role = settings != null ? settings.RoleOf(tmp.font) : null;
+        string role = settings != null ? settings.EffectiveRoleOf(tmp.font) : null;
         if (role == null && settings != null && settings.HasRole(DialogueFontRole)) role = DialogueFontRole;
         var localized = LocalizationSettings.Localize(tmp.font, role);
         if (localized != null && localized != tmp.font) tmp.font = localized;
@@ -139,6 +139,68 @@ public class Subtitles : MonoBehaviour
             nameTag.gameObject.SetActive(false);
 
         if (Application.isPlaying) ApplyLanguageFont();
+    }
+
+    // -------------------------------------------------------------------------
+    // Trailer Console hide flag
+    // -------------------------------------------------------------------------
+
+    /// <summary>True while the Trailer Console hides all subtitle instances.</summary>
+    public static bool TrailerHidden { get; private set; }
+
+    /// <summary>Raised when <see cref="TrailerHidden"/> changes.</summary>
+    public static event System.Action<bool> TrailerHiddenChanged;
+
+    private CanvasGroup _trailerCanvasGroup;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetTrailerStatics()
+    {
+        TrailerHidden = false;
+        TrailerHiddenChanged = null;
+    }
+
+    /// <summary>
+    /// Hides/shows every subtitle (current and future instances) for trailer capture. Each subtitle
+    /// is a fresh prefab instance, so new instances read <see cref="TrailerHidden"/> on enable.
+    /// </summary>
+    public static void SetTrailerHidden(bool hidden)
+    {
+        if (TrailerHidden == hidden) return;
+        TrailerHidden = hidden;
+        TrailerHiddenChanged?.Invoke(hidden);
+    }
+
+    private void OnEnable()
+    {
+        TrailerHiddenChanged += ApplyTrailerHidden;
+        ApplyTrailerHidden(TrailerHidden);
+    }
+
+    private void OnDisable()
+    {
+        TrailerHiddenChanged -= ApplyTrailerHidden;
+    }
+
+    private void ApplyTrailerHidden(bool hidden)
+    {
+        if (!Application.isPlaying) return;
+
+        if (_trailerCanvasGroup == null)
+        {
+            // Only add a group when actually hiding; an existing one is reused either way.
+            _trailerCanvasGroup = GetComponent<CanvasGroup>();
+            if (_trailerCanvasGroup == null)
+            {
+                if (!hidden) return;
+                _trailerCanvasGroup = gameObject.AddComponent<CanvasGroup>();
+            }
+        }
+
+        // OverhearSubtitleGate owns this group's alpha every frame (and honors TrailerHidden).
+        if (!hidden && TryGetComponent(out OverhearSubtitleGate _)) return;
+
+        _trailerCanvasGroup.alpha = hidden ? 0f : 1f;
     }
 
     /// <summary>

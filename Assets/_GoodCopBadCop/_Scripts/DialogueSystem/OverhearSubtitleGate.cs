@@ -45,6 +45,7 @@ public class OverhearSubtitleGate : MonoBehaviour
                            ? OverhearRange.CanLocalPlayerSee(_source)
                            : OverhearRange.IsLocalPlayerWithin(_source));
 
-        _canvasGroup.alpha = visible ? 1f : 0f;
+        // The Trailer Console's subtitle hide shares this CanvasGroup, so honor it here too.
+        _canvasGroup.alpha = visible && !Subtitles.TrailerHidden ? 1f : 0f;
     }
 }

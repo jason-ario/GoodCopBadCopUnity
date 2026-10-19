@@ -85,6 +85,28 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 return this;
             }
 
+            /// <summary>Options are shown as-is (device names, language names) instead of being localized.</summary>
+            public bool VerbatimOptions { get; private set; }
+            private bool localizeFirstOption;
+
+            public Setting WithVerbatimOptions(bool localizeFirstOption = false)
+            {
+                VerbatimOptions = true;
+                this.localizeFirstOption = localizeFirstOption;
+                return this;
+            }
+
+            /// <summary>Label and options are English literals marked with Loc.N; they are translated here at display time.</summary>
+            public string DisplayLabel => Loc.T(Label);
+
+            public string OptionText(int index)
+            {
+                index = Mathf.Clamp(index, 0, Options.Length - 1);
+                string option = Options[index];
+                bool verbatim = VerbatimOptions && !(localizeFirstOption && index == 0);
+                return verbatim ? Loc.Verbatim(option) : Loc.T(option);
+            }
+
             public void ResetToDefault()
             {
                 Index = defaultIndex;
@@ -109,7 +131,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             public string DisplayValue =>
                 Control == Control.Slider ? Value.ToString("0") :
                 Control == Control.Rebind ? RebindableInput.GetDisplayName(RebindAction) :
-                Options[Mathf.Clamp(Index, 0, Options.Length - 1)];
+                OptionText(Index);
         }
 
         private sealed class Row
@@ -132,66 +154,76 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private static readonly Setting[] Gameplay =
         {
-            new Setting("Camera Shake", "camera_shake", "Off", "On").WithDefaultIndex(1),
-            new Setting("Head Bob", "head_bob", "Off", "On").WithDefaultIndex(1),
-            new Setting("Running Effects", "running_effects", "Off", "On").WithDefaultIndex(1),
-            new Setting("Text Wobble", "text_wobble", "Off", "On").WithDefaultIndex(1)
+            // Options/codes are filled from LocalizationSettings by PopulateLanguageOptions. Language names are verbatim.
+            new Setting(Loc.N("Language"), "language", "English").WithVerbatimOptions(),
+            new Setting(Loc.N("Camera Shake"), "camera_shake", Loc.N("Off"), Loc.N("On")).WithDefaultIndex(1),
+            new Setting(Loc.N("Head Bob"), "head_bob", Loc.N("Off"), Loc.N("On")).WithDefaultIndex(1),
+            new Setting(Loc.N("Running Effects"), "running_effects", Loc.N("Off"), Loc.N("On")).WithDefaultIndex(1),
+            new Setting(Loc.N("Text Wobble"), "text_wobble", Loc.N("Off"), Loc.N("On")).WithDefaultIndex(1)
         };
 
         private static readonly Setting[] Graphics =
         {
-            new Setting("Display Mode", "display_mode", "Borderless", "Fullscreen", "Windowed"),
-            new Setting("Resolution", "resolution", "1920 x 1080", "1600 x 900", "1280 x 720"),
-            new Setting("VSync", "vsync", "Off", "On"),
-            new Setting("FPS Limit", "fps_limit", "Unlimited", "30", "60", "120", "144"),
-            new Setting("Quality Preset", "quality", "Low", "Medium", "High", "Ultra").WithDefaultIndex(3),
+            new Setting(Loc.N("Display Mode"), "display_mode", Loc.N("Borderless"), Loc.N("Fullscreen"), Loc.N("Windowed")),
+            new Setting(Loc.N("Resolution"), "resolution", "1920 x 1080", "1600 x 900", "1280 x 720"),
+            new Setting(Loc.N("VSync"), "vsync", Loc.N("Off"), Loc.N("On")),
+            new Setting(Loc.N("FPS Limit"), "fps_limit", Loc.N("Unlimited"), "30", "60", "120", "144"),
+            new Setting(Loc.N("Quality Preset"), "quality", Loc.N("Low"), Loc.N("Medium"), Loc.N("High"), Loc.N("Ultra")).WithDefaultIndex(3),
             // Option order must match ERenderScale.
-            new Setting("Render Scale", "render_scale", "50%", "67%", "75%", "85%", "100%").WithDefaultIndex(4),
-            new Setting("Brightness", "brightness", 50f),
-            new Setting("Film Grain", "film_grain", "Off", "On")
+            new Setting(Loc.N("Render Scale"), "render_scale", "50%", "67%", "75%", "85%", "100%").WithDefaultIndex(4),
+            new Setting(Loc.N("Brightness"), "brightness", 50f),
+            new Setting(Loc.N("Film Grain"), "film_grain", Loc.N("Off"), Loc.N("On"))
         };
 
         private static readonly Setting[] Audio =
         {
-            new Setting("Master Volume", "master_volume", 80f),
-            new Setting("Music Volume", "music_volume", 70f),
-            new Setting("SFX Volume", "sfx_volume", 80f),
-            new Setting("Voice Volume", "voice_volume", 80f),
-            new Setting("Voice Chat", "voice_chat_enabled", "Off", "On"),
-            new Setting("Voice Input", "voice_input", "Voice Activation", "Push To Talk", "Open Mic"),
-            new Setting("Microphone Muted", "microphone_muted", "Off", "On"),
-            new Setting("Voice Deafened", "voice_deafened", "Off", "On"),
+            new Setting(Loc.N("Master Volume"), "master_volume", 80f),
+            new Setting(Loc.N("Music Volume"), "music_volume", 70f),
+            new Setting(Loc.N("SFX Volume"), "sfx_volume", 80f),
+            new Setting(Loc.N("Voice Volume"), "voice_volume", 80f),
+            new Setting(Loc.N("Voice Chat"), "voice_chat_enabled", Loc.N("Off"), Loc.N("On")),
+            new Setting(Loc.N("Voice Input"), "voice_input", Loc.N("Voice Activation"), Loc.N("Push To Talk"), Loc.N("Open Mic")),
+            new Setting(Loc.N("Microphone Muted"), "microphone_muted", Loc.N("Off"), Loc.N("On")),
+            new Setting(Loc.N("Voice Deafened"), "voice_deafened", Loc.N("Off"), Loc.N("On")),
             // Voice is lobby-wide, so there is no proximity range row.
-            new Setting("Microphone", "microphone", "Default")
+            // Device names are verbatim; option 0 ("Default") is still localized (see OptionText).
+            new Setting(Loc.N("Microphone"), "microphone", Loc.N("Default")).WithVerbatimOptions(localizeFirstOption: true)
         };
 
         private static readonly Setting[] Controls =
         {
-            new Setting("Mouse Sensitivity", "mouse_sensitivity", 50f).WithRange(1f, 100f),
-            new Setting("Invert Y (Mouse)", "invert_y", "Off", "On"),
-            new Setting("Controller Sensitivity", "controller_sensitivity", 50f).WithRange(1f, 100f),
-            new Setting("Invert Y (Controller)", "controller_invert_y", "Off", "On"),
-            new Setting("Crouch Mode", "crouch_mode", "Hold", "Toggle"),
-            new Setting("Sprint Mode", "sprint_mode", "Hold", "Toggle"),
-            new Setting("Use Item", "use_item", GameAction.UseItem),
-            new Setting("Interact", "interact", GameAction.Interact),
-            new Setting("Jump", "jump", GameAction.Jump),
-            new Setting("Sprint", "sprint", GameAction.Sprint),
-            new Setting("Crouch", "crouch_key", GameAction.Crouch),
-            new Setting("Place Object", "place_object", GameAction.PlaceObject),
-            new Setting("Throw Object", "throw_object", GameAction.ThrowObject),
-            new Setting("Reload", "reload_key", GameAction.Reload),
-            new Setting("Zoom Item", "zoom_item", GameAction.ZoomHeldItem),
-            new Setting("Next Slot", "next_slot", GameAction.NextSlot),
-            new Setting("Previous Slot", "previous_slot", GameAction.PreviousSlot),
-            new Setting("Toggle Mask", "toggle_mask", GameAction.ToggleMask),
-            new Setting("Open Emotes", "open_emotes", GameAction.OpenEmotes),
-            new Setting("Push To Talk", "push_to_talk", GameAction.PushToTalk)
+            new Setting(Loc.N("Mouse Sensitivity"), "mouse_sensitivity", 50f).WithRange(1f, 100f),
+            new Setting(Loc.N("Invert Y (Mouse)"), "invert_y", Loc.N("Off"), Loc.N("On")),
+            new Setting(Loc.N("Controller Sensitivity"), "controller_sensitivity", 50f).WithRange(1f, 100f),
+            new Setting(Loc.N("Invert Y (Controller)"), "controller_invert_y", Loc.N("Off"), Loc.N("On")),
+            new Setting(Loc.N("Crouch Mode"), "crouch_mode", Loc.N("Hold"), Loc.N("Toggle")),
+            new Setting(Loc.N("Sprint Mode"), "sprint_mode", Loc.N("Hold"), Loc.N("Toggle")),
+            new Setting(Loc.N("Use Item"), "use_item", GameAction.UseItem),
+            new Setting(Loc.N("Interact"), "interact", GameAction.Interact),
+            new Setting(Loc.N("Jump"), "jump", GameAction.Jump),
+            new Setting(Loc.N("Sprint"), "sprint", GameAction.Sprint),
+            new Setting(Loc.N("Crouch"), "crouch_key", GameAction.Crouch),
+            new Setting(Loc.N("Place Object"), "place_object", GameAction.PlaceObject),
+            new Setting(Loc.N("Throw Object"), "throw_object", GameAction.ThrowObject),
+            new Setting(Loc.N("Reload"), "reload_key", GameAction.Reload),
+            new Setting(Loc.N("Zoom Item"), "zoom_item", GameAction.ZoomHeldItem),
+            new Setting(Loc.N("Next Slot"), "next_slot", GameAction.NextSlot),
+            new Setting(Loc.N("Previous Slot"), "previous_slot", GameAction.PreviousSlot),
+            new Setting(Loc.N("Toggle Mask"), "toggle_mask", GameAction.ToggleMask),
+            new Setting(Loc.N("Open Emotes"), "open_emotes", GameAction.OpenEmotes),
+            new Setting(Loc.N("Push To Talk"), "push_to_talk", GameAction.PushToTalk)
         };
 
         private static Setting FindSetting(Setting[] settings, string key) => Array.Find(settings, s => s.Key == key);
 
         private static Setting MicrophoneSetting => Array.Find(Audio, s => s.Key == "microphone");
+
+        private static Setting LanguageSetting => Array.Find(Gameplay, s => s.Key == "language");
+
+        // Language codes parallel to LanguageSetting.Options. The dev-only text pseudolocales (pseudo-latincyr, pseudo-cjk)
+        // stay in the cheat console; "Pseudolocalization" (PseudoLocalizer.SettingsMenuCode) is listed when GameSettings
+        // enables it. Configured languages without translations act as font-only previews (see Loc.IsFontPreview).
+        private static readonly List<string> languageCodes = new List<string>();
 
         // One pooled row per setting in the longest tab; rows past the pool size would never be shown.
         private static int RowPoolSize =>
@@ -312,11 +344,15 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             isCloseRequested = false;
             OnGamepadNavigationEnabled();
+            Loc.LanguageChanged -= OnLanguageChanged;
+            Loc.LanguageChanged += OnLanguageChanged;
 
             if (isInitialized)
             {
                 // Pick up microphones plugged in/removed since the menu was last opened.
                 PopulateMicrophoneOptions();
+                // The language may have been changed elsewhere (cheat console) since the menu was last opened.
+                PopulateLanguageOptions();
                 tabSelected.OnNext(ToSettingsMenuTab(activeTab));
             }
         }
@@ -475,6 +511,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private void OnDisable()
         {
+            Loc.LanguageChanged -= OnLanguageChanged;
             CancelRebind();
             CancelGamepadRebind();
             OnGamepadNavigationDisabled();
@@ -489,6 +526,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             ActiveInputDeviceTracker.EnsureSubscribed();
             CacheHierarchy();
             PopulateMicrophoneOptions();
+            PopulateLanguageOptions();
             BindTabs();
             BindFooter();
             SelectTab(Tab.Gameplay);
@@ -518,6 +556,32 @@ namespace GoodCopBadCop.UI.SettingsMenu
             // Keep the current selection if the device is still present (the list may have reordered).
             int selectedIndex = selected != null ? Array.IndexOf(options, selected) : -1;
             microphone.Index = selectedIndex >= 0 ? selectedIndex : 0;
+        }
+
+        private static void PopulateLanguageOptions()
+        {
+            Setting language = LanguageSetting;
+            if (language == null) return;
+
+            // Drops a saved "Pseudolocalization" choice if GameSettings.PseudoLocalizationEnabled was turned off.
+            Loc.RevalidateLanguage();
+
+            languageCodes.Clear();
+            var names = new List<string>();
+            foreach (string code in Loc.AvailableLanguages())
+            {
+                // AvailableLanguages only returns the Settings-menu pseudolocale when GameSettings enables it.
+                if (PseudoLocalizer.IsPseudo(code) && code != PseudoLocalizer.SettingsMenuCode) continue;
+                languageCodes.Add(code);
+                names.Add(Loc.DisplayName(code));
+            }
+            if (languageCodes.Count == 0) return;
+
+            language.SetOptions(names.ToArray());
+            var settings = LocalizationSettings.Instance;
+            string defaultCode = settings != null && !string.IsNullOrEmpty(settings.defaultLanguage) ? settings.defaultLanguage : Loc.SourceLanguage;
+            language.WithDefaultIndex(Mathf.Max(0, languageCodes.IndexOf(defaultCode)));
+            language.Index = Mathf.Max(0, languageCodes.IndexOf(Loc.CurrentLanguage));
         }
 
         private void CacheHierarchy()
@@ -835,7 +899,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             activeSettings = GetSettings(tab);
             if (sectionTitle != null)
             {
-                sectionTitle.text = tab.ToString();
+                sectionTitle.text = TabTitle(tab);
             }
 
             for (int i = 0; i < tabLabels.Count; i++)
@@ -893,7 +957,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             bool rebind = setting.Control == Control.Rebind;
             bool keyboardRebindable = rebind && RebindableInput.IsKeyboardRebindable(setting.RebindAction);
 
-            row.Label.text = setting.Label;
+            row.Label.text = setting.DisplayLabel;
             row.Value.text = index == _awaitingRebindIndex ? KeyRebindPrompt : setting.DisplayValue;
             EnsureRowVisuals(row, slider);
             BindGamepadCell(row, index, setting);
@@ -997,6 +1061,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "film_grain":
                 case "voice_proximity_range":
                 case "microphone":
+                case "language":
                     return true;
                 default:
                     return false;
@@ -1223,7 +1288,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 label.alignment = TextAlignmentOptions.MidlineLeft;
                 label.color = i == setting.Index ? Color.white : new Color(.75f, .77f, .75f, 1f);
                 label.raycastTarget = false;
-                label.text = setting.Options[i];
+                label.text = setting.OptionText(i);
 
                 dropdownOptionImages.Add(optionImage);
                 dropdownOptionLabels.Add(label);
@@ -1347,6 +1412,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case "microphone":
                     voiceChatMicrophoneNameChanged.OnNext(setting.Index == 0 ? string.Empty : setting.Options[setting.Index]);
                     break;
+                // Localization is client-side and static (Loc persists settings.language itself), so it bypasses the settings model.
+                case "language":
+                    if (setting.Index >= 0 && setting.Index < languageCodes.Count) Loc.SetLanguage(languageCodes[setting.Index]);
+                    break;
             }
         }
         private void Save()
@@ -1360,11 +1429,30 @@ namespace GoodCopBadCop.UI.SettingsMenu
         {
             if (confirmationDialog == null) return;
             confirmationDialog.Show(
-                "Restore Defaults",
-                $"Reset all {activeTab} settings to their default values?",
-                "Restore",
-                "Cancel",
+                Loc.T("Restore Defaults"),
+                Loc.T("Reset all {0} settings to their default values?", TabTitle(activeTab)),
+                Loc.T("Restore"),
+                Loc.T("Cancel"),
                 RestoreActiveTabDefaults);
+        }
+
+        private static readonly string[] TabTitles = { Loc.N("Gameplay"), Loc.N("Graphics"), Loc.N("Audio"), Loc.N("Controls") };
+
+        private static string TabTitle(Tab tab) => Loc.T(TabTitles[(int)tab]);
+
+        // Rebinds every visible row, the section title and the save label in the new language (and new fonts' metrics).
+        private void OnLanguageChanged()
+        {
+            if (!isInitialized || activeSettings == null) return;
+            CloseDropdown();
+            // The language may have been changed outside this row (cheat console); keep the row's value in sync.
+            Setting language = LanguageSetting;
+            int languageIndex = languageCodes.IndexOf(Loc.CurrentLanguage);
+            if (language != null && languageIndex >= 0) language.Index = languageIndex;
+            if (sectionTitle != null) sectionTitle.text = TabTitle(activeTab);
+            for (int i = 0; i < rows.Count && i < activeSettings.Length; i++) BindRow(i);
+            if (saveText != null) saveText.text = Loc.T("Save");
+            if (rowsRoot != null) LayoutRebuilder.MarkLayoutForRebuild(rowsRoot);
         }
 
         // Only the tab the player is viewing is reset; other tabs keep their configured values.
@@ -1403,9 +1491,9 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 yield break;
             }
 
-            saveText.text = "Saved";
+            saveText.text = Loc.T("Saved");
             yield return new WaitForSecondsRealtime(.75f);
-            saveText.text = "Save";
+            saveText.text = Loc.T("Save");
         }
 
         private static Setting[] GetSettings(Tab tab)

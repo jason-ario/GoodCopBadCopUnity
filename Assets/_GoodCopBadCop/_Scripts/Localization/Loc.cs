@@ -79,11 +79,19 @@ public static class Loc
 
     public static event Action LanguageChanged;
 
+    /// <summary>
+    /// Zero-width space (TMP renders it with no width) prefixed to pseudolocalized and verbatim strings. Render-time
+    /// localization (<see cref="LocalizeRendered"/>) leaves any text containing it alone, so nothing is processed twice.
+    /// </summary>
+    public const string Marker = "\u200B";
+
     private static LocalizationTable _table;
     private static string _language;
     private static bool _initialized;
     private static readonly HashSet<string> Warned = new HashSet<string>();
     private static readonly Dictionary<string, string> PseudoCache = new Dictionary<string, string>();
+    private static readonly Dictionary<string, string> RenderCache = new Dictionary<string, string>();
+    private const int RenderCacheLimit = 4096;
     private static Dictionary<string, List<LocEntry>> _sourceIndex;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -95,8 +103,44 @@ public static class Loc
         _sourceIndex = null;
         Warned.Clear();
         PseudoCache.Clear();
+        RenderCache.Clear();
         LocalizationSettings.ClearCache();
         LanguageChanged = null;
+    }
+
+    /// <summary>
+    /// Marks an English literal for the Localization window's code scan without translating it (like gettext's N_).
+    /// Use for static definitions that are translated later at display time with <see cref="T(string)"/>.
+    /// </summary>
+    public static string N(string english) { return english; }
+
+    /// <summary>Text that must be shown exactly as given (device names, language names); render-time localization skips it.</summary>
+    public static string Verbatim(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.StartsWith(Marker, StringComparison.Ordinal)) return text;
+        return Marker + text;
+    }
+
+    /// <summary>
+    /// Render-time localization applied to every TMP text by <c>LocalizationTextRuntime</c> (an ITextPreprocessor), so
+    /// text set from code or left untouched by a missing key still follows the language. English and font-only previews
+    /// return the text unchanged, pseudolocales pseudolocalize it, and real languages reverse-look-up the English source.
+    /// Text containing <see cref="Marker"/> (already localized or verbatim) is returned unchanged.
+    /// </summary>
+    public static string LocalizeRendered(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+        Init();
+        if (_language == SourceLanguage || text.IndexOf(Marker, StringComparison.Ordinal) >= 0) return text;
+
+        bool pseudo = IsPseudoAvailable(_language);
+        if (!pseudo && !_table.languages.Contains(_language)) return text; // font-only preview
+
+        if (RenderCache.TryGetValue(text, out string cached)) return cached;
+        string result = pseudo ? PseudoOf(text) : TranslateSource(text);
+        if (RenderCache.Count >= RenderCacheLimit) RenderCache.Clear();
+        RenderCache[text] = result;
+        return result;
     }
 
     public static LocalizationTable Table { get { Init(); return _table; } }
@@ -115,12 +159,33 @@ public static class Loc
         }
     }
 
+    /// <summary>
+    /// Whether a pseudolocale may be selected. The Settings-menu pseudolocale (<see cref="PseudoLocalizer.SettingsMenuCode"/>)
+    /// follows <c>GameSettings.PseudoLocalizationEnabled</c> in every build; the other pseudolocales are Editor/dev only.
+    /// </summary>
+    public static bool IsPseudoAvailable(string code)
+    {
+        if (!PseudoLocalizer.IsPseudo(code)) return false;
+        if (code == PseudoLocalizer.SettingsMenuCode) return GameSettings.Instance.PseudoLocalizationEnabled;
+        return PseudoAvailable;
+    }
+
+    /// <summary>Falls back to the default language when the current one stopped being selectable (pseudolocalization disabled).</summary>
+    public static void RevalidateLanguage()
+    {
+        Init();
+        if (IsValid(_language)) return;
+        var settings = LocalizationSettings.Instance;
+        string fallback = settings != null && !string.IsNullOrEmpty(settings.defaultLanguage) ? settings.defaultLanguage : SourceLanguage;
+        SetLanguage(IsValid(fallback) ? fallback : SourceLanguage);
+    }
+
     public static CultureInfo Culture
     {
         get
         {
             Init();
-            if (PseudoLocalizer.IsPseudo(_language)) return CultureInfo.InvariantCulture;
+            if (PseudoLocalizer.IsPseudo(_language) || IsFontPreview(_language)) return CultureInfo.InvariantCulture;
             try { return new CultureInfo(_language); }
             catch (CultureNotFoundException) { return CultureInfo.InvariantCulture; }
         }
@@ -135,8 +200,7 @@ public static class Loc
         var settings = LocalizationSettings.Instance;
         if (settings != null)
             foreach (var l in settings.languages) if (l != null && !list.Contains(l.code)) list.Add(l.code);
-        if (PseudoAvailable)
-            foreach (var code in PseudoLocalizer.Codes) if (!list.Contains(code)) list.Add(code);
+        foreach (var code in PseudoLocalizer.Codes) if (IsPseudoAvailable(code) && !list.Contains(code)) list.Add(code);
         return list;
     }
 
@@ -159,16 +223,43 @@ public static class Loc
     {
         if (string.IsNullOrEmpty(code)) return false;
         if (code == SourceLanguage) return true;
-        if (PseudoLocalizer.IsPseudo(code)) return PseudoAvailable;
-        return _table.languages.Contains(code);
+        if (PseudoLocalizer.IsPseudo(code)) return IsPseudoAvailable(code);
+        if (_table.languages.Contains(code)) return true;
+        var settings = LocalizationSettings.Instance;
+        return settings != null && settings.Find(code) != null;
+    }
+
+    /// <summary>
+    /// True for a language configured in <see cref="LocalizationSettings"/> that has no translation column yet.
+    /// It shows English text with that language's fonts (a font-only pseudolocale), without missing-text warnings.
+    /// </summary>
+    public static bool IsFontPreview(string code)
+    {
+        Init();
+        return !string.IsNullOrEmpty(code) && code != SourceLanguage && !PseudoLocalizer.IsPseudo(code)
+               && !_table.languages.Contains(code);
+    }
+
+    /// <summary>Display name from LocalizationSettings (for example "Русский"), the pseudolocale's name, or the code itself.</summary>
+    public static string DisplayName(string code)
+    {
+        var pseudo = PseudoLocalizer.Get(code);
+        if (pseudo != null) return pseudo.DisplayName;
+        var lang = LocalizationSettings.Instance != null ? LocalizationSettings.Instance.Find(code) : null;
+        return lang != null && !string.IsNullOrEmpty(lang.displayName) ? lang.displayName : code;
     }
 
     private static void LoadTable()
     {
         var asset = Resources.Load<TextAsset>(ResourcePath);
         _table = asset != null ? LocalizationTable.FromRuntimeCsv(asset.text) : new LocalizationTable();
+        if (asset == null)
+            WarnOnce("no-table", "[Loc] No runtime table at Resources/" + ResourcePath + ".txt (Tools/Localization > Build runtime table). " +
+                                 "LocalizedText keys can't resolve, so labels keep their authored text; pseudolocalization and " +
+                                 "language fonts still apply at render time.");
         _sourceIndex = null;
         PseudoCache.Clear();
+        RenderCache.Clear();
     }
 
     /// <summary>Reloads the generated table (used by the editor tool after a build).</summary>
@@ -192,6 +283,7 @@ public static class Loc
         if (code == _language) return;
 
         _language = code;
+        RenderCache.Clear();
         try
         {
             PlayerPrefsPersistentPropertyStorage.Shared.Save(LanguageKey, code);
@@ -232,7 +324,8 @@ public static class Loc
         if (string.IsNullOrEmpty(key)) return false;
         if (!_table.TryGet(key, out var entry))
         {
-            WarnOnce("missing:" + key, "[Loc] Missing key '" + key + "'.");
+            // With no runtime table at all, LoadTable already logged one warning; don't add one per label.
+            if (_table.entries.Count > 0) WarnOnce("missing:" + key, "[Loc] Missing key '" + key + "'.");
             return false;
         }
         text = Resolve(entry, true);
@@ -243,6 +336,9 @@ public static class Loc
     {
         if (_language == SourceLanguage) return entry.source;
 
+        // Font-only pseudolocale: no column for this language yet, so keep English and let the font swap show.
+        if (!_table.languages.Contains(_language) && !PseudoLocalizer.IsPseudo(_language)) return entry.source;
+
         if (PseudoLocalizer.IsPseudo(_language))
         {
             string cacheKey = _language + "\u0001" + entry.key;
@@ -250,7 +346,7 @@ public static class Loc
             {
                 var settings = LocalizationSettings.Instance;
                 float expansion = settings != null ? settings.pseudoExpansion : 0.4f;
-                pseudo = PseudoLocalizer.Generate(_language, entry.source, entry.key, expansion);
+                pseudo = Marker + PseudoLocalizer.Generate(_language, entry.source, entry.key, expansion);
                 PseudoCache[cacheKey] = pseudo;
             }
             return pseudo;
@@ -273,7 +369,7 @@ public static class Loc
         if (owner == null || string.IsNullOrEmpty(english) || _language == SourceLanguage) return english;
         if (_table.TryGet(LocKeys.ForAsset(owner, propertyPath), out var entry))
             return Resolve(entry, false);
-        return PseudoLocalizer.IsPseudo(_language) && PseudoAvailable ? PseudoOf(english) : english;
+        return IsPseudoAvailable(_language) ? PseudoOf(english) : english;
     }
 
     private static readonly Dictionary<string, string> CodeKeyCache = new Dictionary<string, string>();
@@ -289,7 +385,7 @@ public static class Loc
         if (string.IsNullOrEmpty(english) || _language == SourceLanguage) return english;
         if (!CodeKeyCache.TryGetValue(english, out string key)) CodeKeyCache[english] = key = LocKeys.ForCode(english);
         if (_table.TryGet(key, out var entry)) return Resolve(entry, false);
-        return PseudoLocalizer.IsPseudo(_language) && PseudoAvailable ? PseudoOf(english) : english;
+        return IsPseudoAvailable(_language) ? PseudoOf(english) : english;
     }
 
     /// <summary>Like <see cref="T(string)"/>, then string.Format with the current culture: <c>Loc.T("Day {0}", day)</c>.</summary>
@@ -328,14 +424,14 @@ public static class Loc
         if (_sourceIndex.TryGetValue(english, out var matches) && matches.Count > 0)
             return Resolve(matches[0], false);
 
-        return PseudoLocalizer.IsPseudo(_language) && PseudoAvailable ? PseudoOf(english) : english;
+        return IsPseudoAvailable(_language) ? PseudoOf(english) : english;
     }
 
     private static string PseudoOf(string english)
     {
         var settings = LocalizationSettings.Instance;
         float expansion = settings != null ? settings.pseudoExpansion : 0.4f;
-        return PseudoLocalizer.Generate(_language, english, english, expansion);
+        return Marker + PseudoLocalizer.Generate(_language, english, english, expansion);
     }
 
     private static void WarnOnce(string id, string message)

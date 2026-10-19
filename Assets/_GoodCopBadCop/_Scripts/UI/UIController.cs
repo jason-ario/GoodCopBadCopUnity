@@ -501,6 +501,41 @@ public class UIController : MonoBehaviour
         if (restore)
             ShowPlayerUI();
     }
+    // ── Trailer Console HUD suppression ──────────────────────────────────────
+
+    private bool _trailerHudHidden;
+    private CanvasGroup _trailerHudCanvasGroup;
+
+    /// <summary>True while the Trailer Console is holding the HUD invisible.</summary>
+    public bool IsTrailerHudHidden => _trailerHudHidden;
+
+    /// <summary>
+    /// Hides/shows the HUD for trailer capture via a <see cref="CanvasGroup"/> on <c>playerUI</c>
+    /// (alpha 0, no raycasts). Deliberately independent of <c>playerUI.SetActive</c> so the many
+    /// <see cref="ShowPlayerUI"/> / pause restore paths cannot undo it. Idempotent.
+    /// </summary>
+    public void SetTrailerHudHidden(bool hidden)
+    {
+        if (playerUI == null)
+        {
+            Debug.LogWarning("[UIController] SetTrailerHudHidden: playerUI is not assigned.");
+            return;
+        }
+
+        if (_trailerHudCanvasGroup == null)
+        {
+            _trailerHudCanvasGroup = playerUI.GetComponent<CanvasGroup>();
+            if (_trailerHudCanvasGroup == null)
+                _trailerHudCanvasGroup = playerUI.AddComponent<CanvasGroup>();
+        }
+
+        _trailerHudHidden = hidden;
+        _trailerHudCanvasGroup.alpha          = hidden ? 0f : 1f;
+        _trailerHudCanvasGroup.blocksRaycasts = !hidden;
+        _trailerHudCanvasGroup.interactable   = !hidden;
+    }
+
+
     
     public void ShowPlayerUI()
     {

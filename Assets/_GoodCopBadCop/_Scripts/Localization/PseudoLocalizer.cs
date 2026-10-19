@@ -120,10 +120,14 @@ public interface IPseudoLocale
 /// <summary>Registry of pluggable pseudolocales. Register new ones (for example Georgian) with <see cref="Register"/>.</summary>
 public static class PseudoLocalizer
 {
+    /// <summary>Player-facing pseudolocale shown in Settings > Language, gated by <c>GameSettings.PseudoLocalizationEnabled</c>.</summary>
+    public const string SettingsMenuCode = UnityStylePseudoLocale.LocaleCode;
+
     private static readonly Dictionary<string, IPseudoLocale> Locales = new Dictionary<string, IPseudoLocale>();
 
     static PseudoLocalizer()
     {
+        Register(new UnityStylePseudoLocale());
         Register(new LatinCyrillicPseudoLocale());
         Register(new CjkPseudoLocale());
     }
@@ -149,6 +153,128 @@ public static class PseudoLocalizer
     public static int Extra(int visible, float expansion)
     {
         return (int)Math.Ceiling(Math.Round(visible * (double)expansion, 6));
+    }
+}
+
+/// <summary>
+/// Pseudolocale following Unity Localization's pseudo-localization guidelines, applied in Unity's default order:
+/// Preserve Tags (rich text, placeholders, input glyphs, numbers via <see cref="PseudoTokenizer"/>), Accenter
+/// (Unity's accent map), Expander (Unity's length-based growth table, padding at the end) and Encapsulator ("[" / "]").
+/// Example: "Go to the booth." becomes "[Ĝö ţö ţĥé ƀööţĥ·" + 16 padding characters + "]". Padding is deterministic per key so text does
+/// not flicker on refresh, and skips characters that are markup or format syntax here (&lt; &gt; { } [ ] \ * _ ~ | ` % #).
+/// The <c>expansion</c> argument is ignored; growth comes from the length table.
+/// </summary>
+public sealed class UnityStylePseudoLocale : IPseudoLocale
+{
+    public const string LocaleCode = "pseudo";
+    public string Code { get { return LocaleCode; } }
+    public string DisplayName { get { return "Pseudolocalization"; } }
+
+    private const string Start = "[";
+    private const string End = "]";
+
+    private static readonly Dictionary<char, char> Accents = new Dictionary<char, char>
+    {
+        {'a', 'å'}, {'b', 'ƀ'}, {'c', 'ç'}, {'d', 'ð'}, {'e', 'é'}, {'f', 'ƒ'}, {'g', 'ĝ'}, {'h', 'ĥ'}, {'i', 'î'},
+        {'j', 'ĵ'}, {'k', 'ķ'}, {'l', 'ļ'}, {'m', 'ɱ'}, {'n', 'ñ'}, {'o', 'ö'}, {'p', 'þ'}, {'q', 'ǫ'}, {'r', 'ŕ'},
+        {'s', 'š'}, {'t', 'ţ'}, {'u', 'û'}, {'v', 'ṽ'}, {'w', 'ŵ'}, {'x', 'ẋ'}, {'y', 'ý'}, {'z', 'ž'},
+        {'A', 'Å'}, {'B', 'Ɓ'}, {'C', 'Ç'}, {'D', 'Ð'}, {'E', 'É'}, {'F', 'Ƒ'}, {'G', 'Ĝ'}, {'H', 'Ĥ'}, {'I', 'Î'},
+        {'J', 'Ĵ'}, {'K', 'Ķ'}, {'L', 'Ļ'}, {'M', 'Ṁ'}, {'N', 'Ñ'}, {'O', 'Ö'}, {'P', 'Þ'}, {'Q', 'Ǫ'}, {'R', 'Ŕ'},
+        {'S', 'Š'}, {'T', 'Ţ'}, {'U', 'Û'}, {'V', 'Ṽ'}, {'W', 'Ŵ'}, {'X', 'Ẋ'}, {'Y', 'Ý'}, {'Z', 'Ž'},
+        {'.', '·'}, {'!', '¡'}, {'?', '¿'}
+    };
+
+    // Unity Expander defaults: (max source length exclusive, growth). 70+ characters grow by 30 percent.
+    private static readonly (int maxLength, float growth)[] ExpansionRules =
+    {
+        (10, 2f), (20, 1f), (30, 0.8f), (50, 0.6f), (70, 0.7f), (int.MaxValue, 0.3f)
+    };
+
+    // Standard US keyboard letters/digits/symbols, minus characters that are rich text, format or subtitle markup syntax.
+    private const string Padding =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$^&()-=+;:',./?\"";
+
+    public string ApprovedCharacters
+    {
+        get
+        {
+            var sb = new StringBuilder(Start + End + Padding);
+            foreach (var kv in Accents) sb.Append(kv.Value);
+            return sb.ToString();
+        }
+    }
+
+    public static int ExtraFor(int visible)
+    {
+        foreach (var rule in ExpansionRules)
+            if (visible < rule.maxLength) return PseudoLocalizer.Extra(visible, rule.growth);
+        return 0;
+    }
+
+    public string Generate(string source, string key, float expansion)
+    {
+        if (string.IsNullOrEmpty(source)) return source;
+        var segs = PseudoTokenizer.Tokenize(source);
+        if (!PseudoTokenizer.HasLocalizableLetters(segs)) return source;
+
+        var sb = new StringBuilder(source.Length * 2 + 2);
+        sb.Append(Start);
+        foreach (var seg in segs)
+        {
+            if (seg.IsProtected) { sb.Append(seg.text); continue; }
+            foreach (char c in seg.text) sb.Append(Accents.TryGetValue(c, out var a) ? a : c);
+        }
+
+        int extra = ExtraFor(PseudoTokenizer.VisibleLength(segs));
+        uint h = 2166136261;
+        foreach (char c in key ?? source) { h ^= c; h *= 16777619; }
+        for (int i = 0; i < extra; i++)
+        {
+            h ^= h << 13; h ^= h >> 17; h ^= h << 5;
+            sb.Append(Padding[(int)(h % (uint)Padding.Length)]);
+        }
+
+        sb.Append(End);
+        return sb.ToString();
+    }
+
+    public List<string> Verify(string source, string output, string key, float expansion)
+    {
+        var issues = new List<string>();
+        if (string.IsNullOrEmpty(source)) return issues;
+
+        var segs = PseudoTokenizer.Tokenize(source);
+        if (!PseudoTokenizer.HasLocalizableLetters(segs))
+        {
+            if (output != source) issues.Add("Protected-only string was modified.");
+            return issues;
+        }
+        if (output == null || !output.StartsWith(Start) || !output.EndsWith(End))
+        {
+            issues.Add("Missing [ ] encapsulation.");
+            return issues;
+        }
+
+        int total = 0;
+        foreach (var s in segs) total += s.text.Length;
+        int extra = ExtraFor(PseudoTokenizer.VisibleLength(segs));
+        string inner = output.Substring(Start.Length, output.Length - Start.Length - End.Length);
+        if (inner.Length != total + extra)
+        {
+            issues.Add("Expected " + extra + " padding characters.");
+            return issues;
+        }
+
+        int pos = 0;
+        foreach (var s in segs)
+        {
+            string o = inner.Substring(pos, s.text.Length);
+            pos += s.text.Length;
+            if (s.IsProtected && o != s.text) issues.Add("Protected content altered: '" + s.text + "'.");
+        }
+        for (int i = pos; i < inner.Length; i++)
+            if (Padding.IndexOf(inner[i]) < 0) { issues.Add("Unapproved padding '" + inner[i] + "'."); break; }
+        return issues;
     }
 }
 
