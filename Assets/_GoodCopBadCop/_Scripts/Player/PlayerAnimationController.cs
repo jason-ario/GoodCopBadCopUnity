@@ -319,6 +319,12 @@ public class PlayerAnimationController : NetworkBehaviour
     private Transform _leftForeArmBone;
     private Transform _leftHandBone;
 
+    // First-person (camera) left arm chain, read from the cam left-arm TwoBoneIKConstraint so
+    // it does not depend on the arms avatar being humanoid.
+    private Transform _camLeftUpperArmBone;
+    private Transform _camLeftForeArmBone;
+    private Transform _camLeftHandBone;
+
     private Coroutine rightRigOnOffCoroutine;
     private Coroutine leftRigOnOffCoroutine;
 
@@ -330,6 +336,16 @@ public class PlayerAnimationController : NetworkBehaviour
         _playerMovementController = GetComponent<PlayerMovementController>();
         _playerPickupController   = GetComponent<PlayerPickupController>();
         _playerHealth             = GetComponent<PlayerHealth>();
+
+        TwoBoneIKConstraint camLeftIK = camLeftArmRig != null
+            ? camLeftArmRig.GetComponentInChildren<TwoBoneIKConstraint>(true)
+            : null;
+        if (camLeftIK != null)
+        {
+            _camLeftUpperArmBone = camLeftIK.data.root;
+            _camLeftForeArmBone  = camLeftIK.data.mid;
+            _camLeftHandBone     = camLeftIK.data.tip;
+        }
     }
     
 
@@ -470,6 +486,22 @@ public class PlayerAnimationController : NetworkBehaviour
             SolveTwoBoneIK(
                 _leftUpperArmBone, _leftForeArmBone, _leftHandBone,
                 LeftArmIKTarget.position, leftElbowHintOwner, leftArmRig.weight);
+        }
+
+        // First-person arms: same one-frame lag. A held item's left-hand target (e.g. the
+        // shotgun's "Left IK") rides on the world item, which follows the cam right-hand slot
+        // via a ParentConstraint. Constraints evaluate after Animation Rigging, so the target
+        // Update() fed to the cam rig is last frame's pose and the hand trails the gun while
+        // moving/looking. By LateUpdate the constraint has run, so re-solve toward the
+        // up-to-date target (position + rotation, matching the rig's zero-offset setup).
+        if (CamLeftArmRigIKTarget != null && camLeftArmRig != null && camLeftArmRig.weight > 0.01f
+            && _camLeftUpperArmBone != null && _camLeftForeArmBone != null && _camLeftHandBone != null)
+        {
+            SolveTwoBoneIK(
+                _camLeftUpperArmBone, _camLeftForeArmBone, _camLeftHandBone,
+                CamLeftArmRigIKTarget.position, _camLeftForeArmBone.position, camLeftArmRig.weight);
+            _camLeftHandBone.rotation = Quaternion.Slerp(
+                _camLeftHandBone.rotation, CamLeftArmRigIKTarget.rotation, camLeftArmRig.weight);
         }
     }
 
@@ -873,6 +905,19 @@ public class PlayerAnimationController : NetworkBehaviour
             _leftUpperArmBone.rotation =
                 Quaternion.AngleAxis(armPitch * armHoldPitchWeight, transform.right)
                 * _leftUpperArmBone.rotation;
+        }
+
+        // Two-handed held items (e.g. shotgun): LeftArmIKTarget sits on the body copy of the
+        // item under the right hand, which the pitch/lean/arm-swing above has just moved. The
+        // rig solved against Update()'s stale copy, so re-solve the left hand onto the final
+        // grip pose every frame (not only while leaning) so it doesn't trail the gun.
+        if (leftIKActive && LeftArmIKTarget != null
+            && _leftUpperArmBone != null && _leftForeArmBone != null && _leftHandBone != null)
+        {
+            SolveTwoBoneIK(_leftUpperArmBone, _leftForeArmBone, _leftHandBone,
+                           LeftArmIKTarget.position, leftElbowHint, leftArmRig.weight);
+            _leftHandBone.rotation = Quaternion.Slerp(
+                _leftHandBone.rotation, LeftArmIKTarget.rotation, leftArmRig.weight);
         }
 
         // Snap the held world object to the body arm target now that all bone manipulation
