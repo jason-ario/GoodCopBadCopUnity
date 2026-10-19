@@ -1010,6 +1010,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _clientIsWaitingForInput = false;
 
         DeactivateOverrideCam();
+        RestoreSpeakerLook();
 
         // Same ownership rule as ExitScriptedModeClientRpc: never tear down a world
         // conversation's dialogue lock that this sequence didn't put the player into.
@@ -1175,6 +1176,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         else
             DialogueChoiceSystem.Instance?.EnterScriptedDialogueMode(lookTarget);
         _clientEnteredDialogueLock = true;
+
+        if (_clientWorldCameraMode)
+            BeginSpeakerLookAtLocalCamera(lookTarget);
 
         Debug.Log($"[ScriptedDialogueRunner] LateJoinClientRpc — client {NetworkManager.Singleton.LocalClientId} " +
                   $"entered dialogue mode via proximity (outside={PlayerInstance.Instance.IsOutsideLocal}), " +
@@ -1483,6 +1487,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
                 EnterOutsideDialogueFacingSpeaker(lookTarget);
                 _clientEnteredDialogueLock = true;
             }
+
+            // World-camera sequences behave like a world-character conversation: the speaker's
+            // head tracks this client's rendering camera (see SuspectWorldDialogue.StartConversation).
+            if (_clientWorldCameraMode)
+                BeginSpeakerLookAtLocalCamera(lookTarget);
             return;
         }
 
@@ -1516,6 +1525,55 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             worldDialogue != null ? worldDialogue.DialogueCameraVerticalOffset : 0f);
     }
 
+    // Local: the speaker FLookAnimator retargeted at this client's camera by a world-camera
+    // sequence, and what it followed before, so ExitScriptedModeClientRpc can hand it back.
+    private static FIMSpace.FLook.FLookAnimator _speakerLookAnimator;
+    private static Transform _speakerPreviousLookTarget;
+    private static Transform _speakerAssignedLookTarget;
+
+    /// <summary>
+    /// Points the speaker's <see cref="FIMSpace.FLook.FLookAnimator"/> at the local rendering
+    /// camera (Camera.main, i.e. the CinemachineBrain output), mirroring
+    /// <see cref="SuspectWorldDialogue"/>'s conversation look. Local-only: each client sees the
+    /// speaker look at its own camera. Restored by <see cref="RestoreSpeakerLook"/>.
+    /// </summary>
+    private static void BeginSpeakerLookAtLocalCamera(Transform speakerRoot)
+    {
+        if (speakerRoot == null) return;
+
+        SuspectCharacter character = speakerRoot.GetComponent<SuspectCharacter>();
+        FIMSpace.FLook.FLookAnimator look = character != null ? character.lookAnimator : null;
+        if (look == null) look = speakerRoot.GetComponentInChildren<FIMSpace.FLook.FLookAnimator>();
+        if (look == null) return;
+
+        Camera mainCamera = Camera.main;
+        Transform cameraTarget = mainCamera != null ? mainCamera.transform
+            : (PlayerInstance.Instance != null ? PlayerInstance.Instance.CameraTransform : null);
+        if (cameraTarget == null) return;
+
+        // Only capture the "before" target once — a late-join catch-up must not record the camera.
+        if (_speakerLookAnimator != look)
+        {
+            RestoreSpeakerLook();
+            _speakerLookAnimator = look;
+            _speakerPreviousLookTarget = look.ObjectToFollow;
+        }
+        look.ObjectToFollow = cameraTarget;
+        _speakerAssignedLookTarget = cameraTarget;
+    }
+
+    /// <summary>Hands the speaker's look target back to whatever it followed before the sequence.</summary>
+    private static void RestoreSpeakerLook()
+    {
+        // Only hand back if nothing else (e.g. MutantEnemy's chase look) has retargeted it since.
+        if (_speakerLookAnimator != null && _speakerLookAnimator.ObjectToFollow == _speakerAssignedLookTarget)
+            _speakerLookAnimator.ObjectToFollow = _speakerPreviousLookTarget;
+
+        _speakerLookAnimator = null;
+        _speakerPreviousLookTarget = null;
+        _speakerAssignedLookTarget = null;
+    }
+
     /// <summary>Head bone of the speaker: SuspectWorldDialogue's look target, then the active
     /// humanoid Animator's head bone (handles mutated swaps), then the root as a last resort.</summary>
     private static Transform ResolveSpeakerHead(Transform speakerRoot, SuspectWorldDialogue worldDialogue)
@@ -1545,6 +1603,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void ExitScriptedModeClientRpc(bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
     {
         IsScriptedModeActive = false;
+        RestoreSpeakerLook();
 
         // This sequence never locked the local player (e.g. an unlocked megaphone sequence) and
         // they've since started a world conversation — that conversation owns the dialogue lock,
