@@ -13,8 +13,8 @@ using UnityEngine.UI;
 /// </summary>
 public class BossHealthBarUI : MonoBehaviour
 {
-    private const float BarWidth = 720f;
-    private const float BarHeight = 22f;
+    private const float BarWidth = 900f;
+    private const float BarHeight = 10f;
     private const float TopMargin = 48f;
     private const float FadeSpeed = 3f;
     private const float HideDelayAfterDeath = 1.5f;
@@ -86,31 +86,30 @@ public class BossHealthBarUI : MonoBehaviour
         root.sizeDelta = new Vector2(BarWidth, BarHeight);
         root.anchoredPosition = new Vector2(0f, -TopMargin - 30f);
 
-        RectTransform border = CreateImage("Border", root, new Color(0f, 0f, 0f, 0.85f));
-        Stretch(border, -3f);
+        // Souls-style: thin black track, deep crimson fill, dark blood-red damage trail. No light frame.
+        RectTransform background = CreateImage("Background", root, new Color(0f, 0f, 0f, 0.9f));
+        Stretch(background, -1f);
 
-        RectTransform background = CreateImage("Background", root, new Color(0.12f, 0.02f, 0.02f, 0.9f));
-        Stretch(background, 0f);
-
-        _trail = CreateImage("Trail", root, new Color(0.95f, 0.85f, 0.75f, 0.9f));
+        _trail = CreateImage("Trail", root, new Color(0.3f, 0.02f, 0.02f, 1f));
         Stretch(_trail, 0f);
 
-        _fill = CreateImage("Fill", root, new Color(0.7f, 0.05f, 0.05f, 1f));
+        _fill = CreateImage("Fill", root, new Color(0.55f, 0.03f, 0.03f, 1f));
         Stretch(_fill, 0f);
 
         RectTransform labelRect = CreateRect("Name", root);
         labelRect.anchorMin = new Vector2(0f, 1f);
         labelRect.anchorMax = new Vector2(1f, 1f);
         labelRect.pivot = new Vector2(0.5f, 0f);
-        labelRect.sizeDelta = new Vector2(0f, 36f);
-        labelRect.anchoredPosition = new Vector2(0f, 4f);
+        labelRect.sizeDelta = new Vector2(0f, 28f);
+        labelRect.anchoredPosition = new Vector2(0f, 6f);
 
         _label = labelRect.gameObject.AddComponent<TextMeshProUGUI>();
-        _label.alignment = TextAlignmentOptions.Center;
-        _label.fontSize = 28f;
-        _label.fontStyle = FontStyles.Bold | FontStyles.UpperCase;
-        _label.characterSpacing = 8f;
-        _label.color = new Color(0.95f, 0.9f, 0.85f, 1f);
+        _label.alignment = TextAlignmentOptions.BottomLeft;
+        _label.fontSize = 22f;
+        _label.fontStyle = FontStyles.Normal;
+        _label.characterSpacing = 2f;
+        _label.color = new Color(0.82f, 0.8f, 0.76f, 1f);
+        _label.outlineWidth = 0f;
         _label.raycastTarget = false;
         _label.text = string.Empty;
     }
