@@ -293,6 +293,14 @@ public class PlayerInteractionController : NetworkBehaviour
             CancelHoldInteract();
             return;
         }
+
+        // Brief lockout after a dialogue hands control back, so presses spammed through the
+        // exit can't start a held-item use or interaction while the arms are being restored.
+        if (DialogueChoiceSystem.IsPostDialogueInputBlocked)
+        {
+            CancelHoldInteract();
+            return;
+        }
         
         if (RmbUp)
         {
@@ -1295,9 +1303,22 @@ public class PlayerInteractionController : NetworkBehaviour
         // collider than the one currently highlighted whenever two interactables (e.g. a pickup
         // resting on top of a piece of furniture) sit at near-equal ray distances.
         if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > CurrentInteractReach)
+        {
+            // TEMP DIAGNOSTIC (Day 1 exam notebook not re-pickable) — remove once fixed.
+            Debug.Log($"[PickupDiag] Interact pressed: no hit in reach (hit={(hit.collider != null ? hit.collider.name : "none")}, dist={hit.distance:0.00}, reach={CurrentInteractReach:0.00})");
             return;
+        }
 
         Interactable interactable = ResolveTargetInteractable(hit.collider);
+
+        // TEMP DIAGNOSTIC (Day 1 exam notebook not re-pickable) — remove once fixed.
+        if (interactable == null || !interactable.IsInteractable || IsControlledByOtherPlayer(interactable) ||
+            (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable))
+        {
+            Debug.Log($"[PickupDiag] Interact pressed: hit collider '{hit.collider.name}' (go='{hit.collider.gameObject.name}', layer={LayerMask.LayerToName(hit.collider.gameObject.layer)}, trig={hit.collider.isTrigger}, dist={hit.distance:0.00}) " +
+                      $"→ interactable={(interactable != null ? interactable.name + "/" + interactable.GetType().Name : "null")} " +
+                      $"isInteractable={(interactable != null && interactable.IsInteractable)} otherPlayer={IsControlledByOtherPlayer(interactable)} onlyAllowed={(onlyAllowedInteractable != null ? onlyAllowedInteractable.name : "none")}");
+        }
 
         if (IsControlledByOtherPlayer(interactable)) return;
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;

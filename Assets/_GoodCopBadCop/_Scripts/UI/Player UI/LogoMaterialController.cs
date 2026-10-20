@@ -26,6 +26,8 @@ public class LogoMaterialController : MonoBehaviour
     [SerializeField] private AudioClip _burnSound;
 
     [Header("Glitch")]
+    [Tooltip("When off, the logo never glitches (no shader glitch, no glitch audio). Used by the Loading screen.")]
+    [SerializeField] private bool _enableGlitch = true;
     [SerializeField] private AudioSource _glitchAudioSource;
     [SerializeField] private float _glitchIntervalMin = 3f;
     [SerializeField] private float _glitchIntervalMax = 8f;
@@ -57,7 +59,8 @@ public class LogoMaterialController : MonoBehaviour
         // Each activation owns a fresh run, so a menu switch that kills the coroutine mid-burn
         // can't leave the logo stuck invisible.
         StartCoroutine(AnimateBurnProgress());
-        StartCoroutine(GlitchLoop());
+        if (_enableGlitch)
+            StartCoroutine(GlitchLoop());
     }
 
     private void OnDisable()

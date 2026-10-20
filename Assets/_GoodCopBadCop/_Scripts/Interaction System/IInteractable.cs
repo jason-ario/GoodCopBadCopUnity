@@ -75,6 +75,12 @@ public enum HighlightHold
     /// hold, it renders with the object's authored highlight. Never set this manually — go through the arrow.
     /// </summary>
     TutorialArrow = 1 << 3,
+
+    /// <summary>
+    /// Held on the <see cref="PostBox"/> while today's newspaper is waiting in it; released the
+    /// moment a player takes the paper out (see <see cref="PostBox.PlaceNewspaperServer"/>).
+    /// </summary>
+    MailboxNewspaper = 1 << 4,
 }
 
 [RequireComponent(typeof(HighlightEffect))]
@@ -174,6 +180,11 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
              "up to 60% of this range, smoothly gone at the range. Match GraffitiScrubDecal's Pulse Fade " +
              "Distance (30). 0 = no distance fade.")]
     [SerializeField, Min(0f)] private float overlayPulseFadeRange = 30f;
+    [Tooltip("Overlay-pulse holds (junk) fade OUT as the camera gets close, so the object reads clearly " +
+             "up close: fully gone within this many meters. 0 = never hide up close. Match fences/graffiti.")]
+    [SerializeField, Min(0f)] private float overlayPulseNearHide = ObjectivePulseFade.DefaultNearHide;
+    [Tooltip("Meters beyond Overlay Pulse Near Hide over which the pulse fades back to full strength.")]
+    [SerializeField, Min(0.01f)] private float overlayPulseNearFadeWidth = ObjectivePulseFade.DefaultNearFadeWidth;
 
     /// <summary>Last camera position handed in by <see cref="HoldHighlightRangeDriver"/>.</summary>
     private Vector3 _lastViewerPosition;
@@ -485,11 +496,12 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
 
     /// <summary>
     /// 0..1 distance fade for the overlay pulse, same curve as GraffitiScrubDecal's pulse:
+    /// fades in from <see cref="overlayPulseNearHide"/> (gone up close), full in the middle, then
     /// 1 up to 60% of <see cref="overlayPulseFadeRange"/>, smoothstep to 0 at the range.
     /// </summary>
     private float OverlayDistanceFade()
     {
-        if (overlayPulseFadeRange <= 0f) return 1f;
+        if (overlayPulseFadeRange <= 0f && overlayPulseNearHide <= 0f) return 1f;
 
         Vector3 viewer;
         if (_hasViewerPosition)
@@ -504,8 +516,11 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         }
 
         float d = Vector3.Distance(viewer, transform.position);
+        float near = ObjectivePulseFade.Near(d, overlayPulseNearHide, overlayPulseNearFadeWidth);
+        if (overlayPulseFadeRange <= 0f) return near;
+
         float t = Mathf.InverseLerp(overlayPulseFadeRange * 0.6f, overlayPulseFadeRange, d);
-        return 1f - t * t * (3f - 2f * t);
+        return near * (1f - t * t * (3f - 2f * t));
     }
 
     private bool ComputeHoldInRange(bool fallback)

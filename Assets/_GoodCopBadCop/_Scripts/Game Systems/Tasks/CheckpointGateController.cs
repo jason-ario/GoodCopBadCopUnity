@@ -39,6 +39,9 @@ public class CheckpointGateController : NetworkBehaviour
 
     private Coroutine _autoCloseCoroutine;
 
+    // Local, per-peer: skip the close SFX for the next close (set by the day-change reset).
+    private bool _suppressNextCloseSfx;
+
     private readonly NetworkVariable<bool> _isOpen = new NetworkVariable<bool>(
         false,
         NetworkVariableReadPermission.Everyone,
@@ -67,6 +70,7 @@ public class CheckpointGateController : NetworkBehaviour
         base.OnNetworkSpawn();
 
         _isOpen.OnValueChanged += OnIsOpenChanged;
+        CampaignManager.OnDayChanged += OnDayChanged;
         ApplyVisual(_isOpen.Value);
     }
 
@@ -74,6 +78,21 @@ public class CheckpointGateController : NetworkBehaviour
     {
         base.OnNetworkDespawn();
         _isOpen.OnValueChanged -= OnIsOpenChanged;
+        CampaignManager.OnDayChanged -= OnDayChanged;
+    }
+
+    /// <summary>
+    /// Closes the gate at the start of every new day without the close SFX. OnDayChanged fires
+    /// on every peer, so each peer arms its own one-shot SFX suppression (only if the gate is
+    /// still open locally, so a close that already replicated can't leave a stale flag behind).
+    /// </summary>
+    private void OnDayChanged(int day)
+    {
+        if (_isOpen.Value)
+            _suppressNextCloseSfx = true;
+
+        if (IsServer)
+            CloseOnServer();
     }
 
     /// <summary>
@@ -142,12 +161,16 @@ public class CheckpointGateController : NetworkBehaviour
 
         if (newValue)
         {
+            _suppressNextCloseSfx = false;
             PlayOpenSfx();
             OnGateOpened?.Invoke();
         }
         else
         {
-            PlayCloseSfx();
+            if (_suppressNextCloseSfx)
+                _suppressNextCloseSfx = false;
+            else
+                PlayCloseSfx();
             OnGateClosed?.Invoke();
         }
     }

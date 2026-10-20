@@ -31,6 +31,22 @@ public class DialogueChoiceSystem : NetworkBehaviour
     /// </summary>
     public static bool IsInDialogueMode { get; private set; }
 
+    /// <summary>
+    /// Seconds after a dialogue hands control back during which held-item use, world interaction,
+    /// placing, throwing, hotbar swaps and zoom are ignored. Spamming LMB through the exit could
+    /// otherwise start a use (e.g. opening the exam notebook) while the arms are still being
+    /// restored, latching the item's "using" state with a mismatched animation.
+    /// </summary>
+    public const float PostDialogueInputBlockDuration = 1f;
+
+    private static float _postDialogueInputBlockUntil = -1f;
+
+    /// <summary>True for <see cref="PostDialogueInputBlockDuration"/> seconds after a dialogue exit restored player control.</summary>
+    public static bool IsPostDialogueInputBlocked => Time.unscaledTime < _postDialogueInputBlockUntil;
+
+    private static void StartPostDialogueInputBlock() =>
+        _postDialogueInputBlockUntil = Time.unscaledTime + PostDialogueInputBlockDuration;
+
     [SerializeField] private DialogueChoice[] dialogueChoices;
     [SerializeField] private GameObject dialogueChoiceContainer;
     [SerializeField] private Subtitles subtitlesPrefab;
@@ -97,6 +113,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         // Static state survives between Editor Play Mode sessions — reset explicitly so a
         // session that ended mid-dialogue does not leave the guard permanently engaged.
         IsInDialogueMode = false;
+        _postDialogueInputBlockUntil = -1f;
     }
 
 
@@ -219,6 +236,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
         // A dialogue exit input can otherwise be processed again as a suspect interaction
         // when player control is restored later in this same frame.
         BlockCurrentDialogueSuspectInteraction();
+        StartPostDialogueInputBlock();
 
         UIController.Instance.HideCursor();
 
@@ -412,6 +430,7 @@ public class DialogueChoiceSystem : NetworkBehaviour
 
         // Outside scripted sequences may belong to a suspect who is not the booth's current one.
         BlockCurrentDialogueSuspectInteraction(fallbackToCurrentSuspect: false);
+        StartPostDialogueInputBlock();
 
         IsInDialogueMode = false;
         PlayerInstance.Instance?.SetIsInCutscene(false);

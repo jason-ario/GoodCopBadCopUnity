@@ -88,6 +88,9 @@ public static class CheatConsoleActions
         cheats.Add(("Force Next Civilian Suspect — Full Mutant (M)", () =>
             DebugConsole.Instance.EnsureGameStartedThen(DebugConsole.Instance.ForceNextSuspectFullMutant)));
 
+        cheats.Add(("Force Next Suspect — Giorgi Phantom (Jumpscare)", () =>
+            DebugConsole.Instance.EnsureGameStartedThen(() => GiorgiPhantomVisitController.Instance?.DebugForceNextVisit())));
+
         cheats.Add(("Force Nona as Next Suspect", () =>
             DebugConsole.Instance.EnsureGameStartedThen(DebugConsole.Instance.ForceNonaNext)));
 

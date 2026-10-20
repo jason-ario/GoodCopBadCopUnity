@@ -301,6 +301,7 @@ public class PlayerPickupController : NetworkBehaviour
         }
 
         if(CanPickUpAndPlace == false) return;
+        if (DialogueChoiceSystem.IsPostDialogueInputBlocked) return;
 
         if (HeldObject != null)
         {
@@ -397,6 +398,8 @@ public class PlayerPickupController : NetworkBehaviour
         // and fail to start the item's use coroutine on the inactive object.
         if (!HeldObject.gameObject.activeInHierarchy) return;
         if (PickUpCooldownComplete == false) return;
+        // Post-dialogue lockout (see DialogueChoiceSystem.IsPostDialogueInputBlocked).
+        if (DialogueChoiceSystem.IsPostDialogueInputBlocked) return;
 
         // Failsafe: an item whose NetworkObject ownership drifted away from us (ownership race
         // with another player's rejected grab, host migration, forced release) can no longer

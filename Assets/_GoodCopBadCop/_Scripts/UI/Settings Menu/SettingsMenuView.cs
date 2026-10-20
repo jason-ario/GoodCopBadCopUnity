@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GoodCopBadCop.Settings;
 using TMPro;
 using R3;
 using UnityEngine.EventSystems;
@@ -185,7 +186,11 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private static readonly string[] OffOnOptions = { "Off", "On" };
         private static readonly string[] HoldToggleOptions = { "Hold", "Toggle" };
         private static readonly string[] DisplayModeOptions = { "Fullscreen", "Borderless", "Windowed" };
-        private static readonly string[] ResolutionOptions = { "1920 x 1080", "1600 x 900", "1280 x 720" };
+        // Order must match EScreenResolution.
+        private static readonly string[] ResolutionOptions =
+        {
+            "3840 x 2160", "3200 x 1800", "2560 x 1440", "1920 x 1080", "1600 x 900", "1280 x 720"
+        };
         private static readonly string[] FpsLimitOptions = { "Unlimited", "30", "60", "120", "144" };
         private static readonly string[] VoiceChatInputModeOptions = { "Voice Activation", "Push To Talk", "Open Mic" };
 
@@ -225,6 +230,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             SettingsMenuControlDefinition.Dropdown(
                 "Resolution",
                 ResolutionOptions,
+                defaultOptionIndex: (int)EScreenResolution.R1920x1080,
                 option: ESettingsMenuControlOption.Resolution),
             SettingsMenuControlDefinition.Dropdown(
                 "VSync",

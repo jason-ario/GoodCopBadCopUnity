@@ -100,6 +100,13 @@ public class PerimiterFence : NetworkBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float _repairPunchElasticity = 0.6f;
 
+    [Header("Repair Highlight Near Fade")]
+    [Tooltip("The broken-fence pulse fades OUT as the camera gets close so the damage reads clearly: " +
+             "fully gone within this many meters of the fence (nearest point on its collider). 0 = never hide.")]
+    [SerializeField, Min(0f)] private float _pulseNearHide = ObjectivePulseFade.DefaultNearHide;
+    [Tooltip("Meters beyond Pulse Near Hide over which the pulse fades back to full strength.")]
+    [SerializeField, Min(0.01f)] private float _pulseNearFadeWidth = ObjectivePulseFade.DefaultNearFadeWidth;
+
 
     // ── Networked state ────────────────────────────────────────────────────────
 
@@ -133,6 +140,9 @@ public class PerimiterFence : NetworkBehaviour
     /// component simply never glows.
     /// </summary>
     private HighlightEffect _highlightEffect;
+
+    /// <summary>Overlay strength loaded from the shared profile; scaled by the near fade each frame.</summary>
+    private float _baseOverlay;
 
     /// <summary>
     /// Value delivered by <see cref="SyncStateClientRpc"/>. Only consulted while
@@ -228,18 +238,24 @@ public class PerimiterFence : NetworkBehaviour
         _highlightEffect = GetComponent<HighlightEffect>();
         if (_highlightEffect != null)
         {
+            // The shared ObjectivePulse profile renders its overlay AlwaysOnTop (junk pickups rely
+            // on that to be findable). Broken fences don't need to be seen through walls, so
+            // override per-instance. HighlightEffect sits after this component, so its OnEnable
+            // (Init -> profile.Load when profileSync is on) can run AFTER this Awake and would
+            // clobber the override. Turn sync off, pull the shared tuning once ourselves, then
+            // override — the fence still follows ObjectivePulse for colour/intensity/speed.
+            _highlightEffect.profileSync = false;
+            _highlightEffect.ProfileReload();
+            _baseOverlay = _highlightEffect.overlay;
+            _highlightEffect.overlayVisibility = HighlightPlus.Visibility.Normal;
+            _highlightEffect.seeThrough = SeeThroughMode.Never;
+
             // Force enabled so Start()/SetupMaterial() always run — a prefab saved with the
             // component disabled would otherwise silently never render on first activation.
             // Visibility is driven solely through 'highlighted' (see RefreshRepairHighlight).
             _highlightEffect.enabled = true;
             _highlightEffect.highlighted = false;
-
-            // The shared ObjectivePulse profile renders its overlay AlwaysOnTop (junk pickups rely
-            // on that to be findable). Broken fences don't need to be seen through walls, so
-            // override per-instance. Enabling above guarantees OnEnable -> Init -> profile.Load
-            // has already run, so this override is not clobbered by profileSync.
-            _highlightEffect.overlayVisibility = HighlightPlus.Visibility.Normal;
-            _highlightEffect.seeThrough = SeeThroughMode.Never;
+            _highlightEffect.UpdateMaterialProperties();
         }
     }
 
@@ -444,6 +460,45 @@ public class PerimiterFence : NetworkBehaviour
         bool highlightsEnabled = FenceRepairTask.Instance == null || FenceRepairTask.Instance.ShowRepairHighlights;
 
         _highlightEffect.highlighted = IsBroken && highlightsEnabled;
+        if (_highlightEffect.highlighted) ApplyPulseNearFade();
+    }
+
+    /// <summary>
+    /// Local, visual only: scales the pulse overlay by camera distance so it fades out up close
+    /// (see <see cref="ObjectivePulseFade"/>). Only does work while this segment is highlighted.
+    /// </summary>
+    private void LateUpdate()
+    {
+        if (_highlightEffect != null && _highlightEffect.highlighted)
+            ApplyPulseNearFade();
+    }
+
+    private void ApplyPulseNearFade()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        float d = Vector3.Distance(cam.transform.position, ClosestPointOnFence(cam.transform.position));
+        // HighlightPlus reads 'overlay' live every frame, so no material refresh is needed.
+        _highlightEffect.overlay = _baseOverlay * ObjectivePulseFade.Near(d, _pulseNearHide, _pulseNearFadeWidth);
+    }
+
+    /// <summary>
+    /// Nearest point on the segment's box (works even while the collider is disabled), so a long
+    /// panel fades by how close you are to it, not to its pivot.
+    /// </summary>
+    private Vector3 ClosestPointOnFence(Vector3 worldPoint)
+    {
+        if (_boxCollider == null) return transform.position;
+
+        Transform t = _boxCollider.transform;
+        Vector3 local = t.InverseTransformPoint(worldPoint) - _boxCollider.center;
+        Vector3 half = _boxCollider.size * 0.5f;
+        local = new Vector3(
+            Mathf.Clamp(local.x, -half.x, half.x),
+            Mathf.Clamp(local.y, -half.y, half.y),
+            Mathf.Clamp(local.z, -half.z, half.z));
+        return t.TransformPoint(local + _boxCollider.center);
     }
 
     // ── Breach pass-through ────────────────────────────────────────────────────

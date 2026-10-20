@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 0
   nodes:
   - type: 0
-    npcLine: Officer. I saw what was left of Vlad on my route.
+    npcLine: Officer. I saw what was left of Vlad this morning. I didn't stop.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,25 +23,7 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: I need to tell someone before my head goes foggy. You'll do.
-    animationTrigger: Talk1
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices:
-    - playerChoiceText: Tell me what?
-      npcResponse: After the blast, I didn't stay in my cellar. I went outside.
-      npcFollowUp: 
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
-    - playerChoiceText: Why me?
-      npcResponse: You listen, Officer. Everyone else at this gate just signs.
-      npcFollowUp: 
-      animationTrigger: Talk3
-      playLaughSfx: 0
-  - type: 1
-    npcLine: My pages were burning in the yard. I chased them [[whisper:into the green]].
+    npcLine: After the blast, I chased my burning pages [[whisper:into the green]]. It was warm.
     animationTrigger: Talk2
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -49,17 +31,35 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: Are you sick?
-      npcResponse: I cough blood into a clean handkerchief every morning. Then I deliver.
+      npcResponse: I cough blood every morning. Then I put on my cap and deliver.
       npcFollowUp: 
       animationTrigger: FakeCough
       playLaughSfx: 0
     - playerChoiceText: Who else knows?
-      npcResponse: Nobody. I told the soldiers I hid for days. They wrote it down.
+      npcResponse: Nobody. I told the soldiers I hid in the cellar. They stamped it.
       npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
+  - type: 1
+    npcLine: Last night I woke up on my route, satchel on. I don't remember leaving.
+    animationTrigger: Talk3
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: Where were you?
+      npcResponse: At the pylons on the ridge. Listening to the wires hum.
+      npcFollowUp: 
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+    - playerChoiceText: Is it getting worse?
+      npcResponse: Every morning there's a little less of me.
+      npcFollowUp: 
+      animationTrigger: TalkShrug
+      playLaughSfx: 0
   - type: 0
-    npcLine: Don't report me yet. Let me finish the route first.
+    npcLine: Don't report me yet, Officer. Let me finish the route.
     animationTrigger: Talk3
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}

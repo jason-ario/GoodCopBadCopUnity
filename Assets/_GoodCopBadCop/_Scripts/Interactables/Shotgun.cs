@@ -27,6 +27,10 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     [SerializeField] private GameObject muzzleFlashLight;
     [SerializeField] private float lightOnTime = .2f;
 
+    [Tooltip("Cosmetic tracer spawned per pellet, from the muzzle to where that pellet's hitscan ended. " +
+             "Requires a BulletVisual component (ideally with Linger Trail On Stop enabled).")]
+    [SerializeField] private GameObject _pelletTrailPrefab;
+
     [Header("Shotgun — Combat")]
     [Tooltip("Damage dealt to a fellow player per pellet that connects.")]
     [SerializeField] private float _playerPelletDamage = 8f;
@@ -45,6 +49,9 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
     /// <summary>Hitscan range in metres. Read by the reticle to show the enemy-in-range color.</summary>
     public float BulletRange => _bulletRange;
+
+    [Tooltip("Blocks the next shot until the arms finish the shoot animation (state tag GunShoot).")]
+    [SerializeField] private GunFireGate _fireGate = new();
 
     [Header("Shotgun — Audio")]
     [Tooltip("Blast sound played on every client when a shell is fired.")]
@@ -133,6 +140,10 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     {
         base.OnStartUse();
 
+        PlayerAnimationController anim = playerPickupController != null ? playerPickupController.PlayerAnimationController : null;
+        if (!_fireGate.CanFire(anim))
+            return;
+
         if (_roundsRemaining.Value <= 0)
         {
             if (_emptySound != null)
@@ -140,10 +151,12 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             return;
         }
 
+        _fireGate.RegisterShot();
+
         shootVFX.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         shootVFX.Play();
         PlayShootSound();
-        playerPickupController.PlayerAnimationController.SetAnimTrigger("Shoot");
+        if (anim != null) anim.SetAnimTrigger("Shoot");
         _cinemachineImpulseSource.GenerateImpulse();
         StartCoroutine(LightOnOff());
         var movement = playerPickupController.GetComponent<PlayerMovementController>();
@@ -164,7 +177,9 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 out NetworkObjectReference[] mutantRefs, out int[] mutantPellets, out Vector3[] mutantPelletPoints,
                 out NetworkObjectReference[] playerRefs, out int[] playerPellets,
                 out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
-                out bool hitGlass, out Vector3[] propPoints);
+                out bool hitGlass, out Vector3[] propPoints, out Vector3[] pelletEndPoints);
+
+            SpawnPelletTrails(pelletEndPoints);
 
             // Cosmetic prop reactions (wobble / shatter) play instantly for the shooter; the server
             // relays them to everyone else.
@@ -172,7 +187,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 HittableProp.TryHitAt(point, cam.transform.forward);
 
             FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, mutantPelletPoints, playerRefs, playerPellets,
-                suspectRefs, suspectPoints, hitGlass, propPoints);
+                suspectRefs, suspectPoints, hitGlass, propPoints, pelletEndPoints);
         }
     }
 
@@ -188,19 +203,23 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         out NetworkObjectReference[] mutantRefs, out int[] mutantPellets, out Vector3[] mutantPelletPoints,
         out NetworkObjectReference[] playerRefs, out int[] playerPellets,
         out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
-        out bool hitGlass, out Vector3[] propPoints)
+        out bool hitGlass, out Vector3[] propPoints, out Vector3[] pelletEndPoints)
     {
         Dictionary<NetworkObject, List<Vector3>> mutantHits = new();
         Dictionary<NetworkObject, int> playerHits = new();
         Dictionary<NetworkObject, Vector3> suspectHits = new();
         Dictionary<HittableProp, Vector3> propHits = new();
         hitGlass = false;
+        pelletEndPoints = new Vector3[_pelletCount];
 
         ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
 
         for (int i = 0; i < _pelletCount; i++)
         {
             Vector3 pelletDirection = RandomConeDirection(rayDirection, _spreadAngle);
+
+            // Where this pellet's tracer ends: full range unless a blocking hit below shortens it.
+            pelletEndPoints[i] = rayOrigin + pelletDirection * _bulletRange;
 
             // Uses RaycastAll (sorted by distance) instead of a plain Raycast so trigger colliders
             // can be inspected without letting them silently block the pellet. A resurrected
@@ -229,6 +248,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 MutantEnemy enemy = hit.collider.GetComponentInParent<MutantEnemy>();
                 if (enemy != null && enemy.CanBeDamagedByPlayers)
                 {
+                    pelletEndPoints[i] = hit.point;
                     if (enemy.NetworkObject != null)
                     {
                         if (!mutantHits.TryGetValue(enemy.NetworkObject, out List<Vector3> points))
@@ -249,6 +269,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 SuspectCharacter suspect = hit.collider.GetComponentInParent<SuspectCharacter>();
                 if (suspect != null && !suspect.IsDead && suspect.NetworkObject != null)
                 {
+                    pelletEndPoints[i] = hit.point;
                     if (!suspectHits.ContainsKey(suspect.NetworkObject))
                         suspectHits[suspect.NetworkObject] = hit.point;
                     break;
@@ -263,6 +284,9 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 // Fences and gates are open mesh — pellets pass through them, matching melee weapons.
                 if (CombatHitUtility.IsBulletPassthrough(hit.collider))
                     continue;
+
+                // Every remaining branch stops the pellet here.
+                pelletEndPoints[i] = hit.point;
 
                 Transform root = hit.collider.transform.root;
                 if (root.CompareTag("Player"))
@@ -349,6 +373,28 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         }
     }
 
+    /// <summary>
+    /// Spawns one cosmetic tracer per pellet from this shotgun's muzzle to the given end points.
+    /// Purely visual: the tracer's own path only decides where its impact puff appears.
+    /// </summary>
+    private void SpawnPelletTrails(Vector3[] endPoints)
+    {
+        if (_pelletTrailPrefab == null || endPoints == null) return;
+
+        Vector3 muzzlePos = shootVFX != null ? shootVFX.transform.position : transform.position;
+        int count = Mathf.Min(endPoints.Length, _pelletCount);
+        for (int i = 0; i < count; i++)
+        {
+            Vector3 toEnd = endPoints[i] - muzzlePos;
+            float distance = toEnd.magnitude;
+            if (distance < 0.05f) continue;
+
+            BulletVisual trail = Instantiate(_pelletTrailPrefab).GetComponent<BulletVisual>();
+            if (trail != null)
+                trail.Initialize(muzzlePos, toEnd, distance);
+        }
+    }
+
     public void ShootFX()
     {
         shootVFX.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -397,7 +443,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         NetworkObjectReference[] mutantRefs, int[] mutantPellets, Vector3[] mutantPelletPoints,
         NetworkObjectReference[] playerRefs, int[] playerPellets,
         NetworkObjectReference[] suspectRefs, Vector3[] suspectPoints,
-        bool hitGlass, Vector3[] propPoints, ServerRpcParams rpcParams = default)
+        bool hitGlass, Vector3[] propPoints, Vector3[] pelletEndPoints, ServerRpcParams rpcParams = default)
     {
         ulong shooterClientId = rpcParams.Receive.SenderClientId;
 
@@ -413,13 +459,19 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
         _roundsRemaining.Value--;
 
-        // Blast sound for everyone except the shooter (who already played it in OnStartUse).
+        // Blast sound + pellet tracers for everyone except the shooter (who already played them in
+        // OnStartUse). Clamp to the pellet count so a bad report can't spam tracers.
+        if (pelletEndPoints == null)
+            pelletEndPoints = System.Array.Empty<Vector3>();
+        else if (pelletEndPoints.Length > _pelletCount)
+            System.Array.Resize(ref pelletEndPoints, _pelletCount);
+
         List<ulong> soundTargets = new List<ulong>();
         foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
             if (id != shooterClientId) soundTargets.Add(id);
 
         if (soundTargets.Count > 0)
-            PlayShootSoundClientRpc(new ClientRpcParams
+            PlayShootSoundClientRpc(pelletEndPoints, new ClientRpcParams
             {
                 Send = new ClientRpcSendParams { TargetClientIds = soundTargets }
             });
@@ -535,11 +587,15 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             SFXController.Instance.PlayAtPosition(_shootSound, transform.position, _shootSoundVolume, _shootSoundPitch);
     }
 
-    /// <summary>Plays the blast sound on non-shooting clients once the server accepts the shot.</summary>
+    /// <summary>
+    /// Plays the blast sound and the pellet tracers (toward the shooter's resolved end points) on
+    /// non-shooting clients once the server accepts the shot.
+    /// </summary>
     [ClientRpc]
-    private void PlayShootSoundClientRpc(ClientRpcParams clientRpcParams = default)
+    private void PlayShootSoundClientRpc(Vector3[] pelletEndPoints, ClientRpcParams clientRpcParams = default)
     {
         PlayShootSound();
+        SpawnPelletTrails(pelletEndPoints);
     }
 
     /// <summary>Replays cosmetic <see cref="HittableProp"/> reactions on non-shooting clients.</summary>

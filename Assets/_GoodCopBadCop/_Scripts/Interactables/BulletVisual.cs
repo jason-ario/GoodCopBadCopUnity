@@ -31,8 +31,18 @@ public class BulletVisual : MonoBehaviour
     [Tooltip("Layers the bullet checks for impact. Defaults to Everything.")]
     [SerializeField] private LayerMask _impactLayers = ~0;
 
+    [Header("Stop Behaviour")]
+    [Tooltip("When the bullet stops (impact or max distance), freeze it and let the trail fade out " +
+             "over TrailRenderer.time instead of destroying it instantly. Use for short-range tracers " +
+             "(shotgun pellets) that would otherwise only be visible for a frame or two.")]
+    [SerializeField] private bool _lingerTrailOnStop;
+
+    [Tooltip("Optional child renderers (e.g. the bullet body mesh) hidden when the bullet stops and lingers.")]
+    [SerializeField] private Renderer[] _hideOnStop;
+
     private Vector3 _direction;
     private bool _initialized;
+    private float _remainingDistance = float.PositiveInfinity;
 
     /// <summary>
     /// Call immediately after instantiation to set the bullet in motion.
@@ -40,10 +50,22 @@ public class BulletVisual : MonoBehaviour
     /// <param name="spawnPosition">World-space muzzle position.</param>
     /// <param name="direction">World-space travel direction (does not need to be normalised).</param>
     public void Initialize(Vector3 spawnPosition, Vector3 direction)
+        => Initialize(spawnPosition, direction, float.PositiveInfinity);
+
+    /// <summary>
+    /// Sets the bullet in motion and stops it after <paramref name="maxDistance"/> metres, even if
+    /// nothing was hit (used to end shotgun pellet tracers where their hitscan ended).
+    /// </summary>
+    public void Initialize(Vector3 spawnPosition, Vector3 direction, float maxDistance)
     {
         transform.position = spawnPosition;
         _direction = direction.normalized;
         transform.forward = _direction;
+        _remainingDistance = maxDistance > 0f ? maxDistance : float.PositiveInfinity;
+
+        // Clear the trail so it doesn't streak from the prefab's parked position to the muzzle.
+        GetComponent<TrailRenderer>().Clear();
+
         _initialized = true;
         Destroy(gameObject, _lifetime);
     }
@@ -52,18 +74,42 @@ public class BulletVisual : MonoBehaviour
     {
         if (!_initialized) return;
 
-        float stepDistance = _speed * Time.deltaTime;
+        float stepDistance = Mathf.Min(_speed * Time.deltaTime, _remainingDistance);
 
         // Check for surfaces in the path before moving so we don't pass through thin geometry.
         // Perimeter fences are skipped so the tracer matches the hitscan, which passes through them.
         if (TryFindImpact(stepDistance, out RaycastHit hit))
         {
+            transform.position = hit.point;
             SpawnImpact(hit.point, hit.normal);
-            Destroy(gameObject);
+            Stop();
             return;
         }
 
         transform.position += _direction * stepDistance;
+        _remainingDistance -= stepDistance;
+
+        if (_remainingDistance <= 0f)
+            Stop();
+    }
+
+    private void Stop()
+    {
+        if (!_lingerTrailOnStop)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        _initialized = false;
+        if (_hideOnStop != null)
+        {
+            foreach (Renderer r in _hideOnStop)
+                if (r != null) r.enabled = false;
+        }
+
+        // The trail keeps rendering its existing points and fades them over its own time.
+        Destroy(gameObject, GetComponent<TrailRenderer>().time);
     }
 
     private readonly RaycastHit[] _stepHits = new RaycastHit[8];

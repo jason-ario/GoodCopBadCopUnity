@@ -1071,7 +1071,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1100751124
+  GlobalObjectIdHash: 1640259171
   InScenePlacedSourceGlobalObjectIdHash: 1640259171
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -1494,6 +1494,10 @@ MonoBehaviour:
       NameHash: -1318316133
       Synchronize: 1
       ParameterType: 9
+    - name: RunningHuman
+      NameHash: -600691554
+      Synchronize: 1
+      ParameterType: 4
   AnimatorParametersExpanded: 0
 --- !u!114 &1701216653970133219
 MonoBehaviour:
@@ -2049,9 +2053,10 @@ MonoBehaviour:
   lookAnimator: {fileID: 0}
   lookAtRange: 12
   attackHitbox: {fileID: 5154884761875428213}
-  attackHitDelay: 0.4
+  attackHitDelay: 1
   useSecondAttackAnimation: 0
   secondAttackStateName: Mutant Attack 2
+  secondAttackHitDelay: 0.4
   enableHitAnimation: 0
   hitTriggerName: Hit
   doorDetectionRadius: 3

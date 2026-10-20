@@ -637,6 +637,7 @@ public class DialogueManager : NetworkBehaviour
             // directly — an un-gated broadcast that clears the world line for EVERY client
             // instantly, so one player could skip lines for both without waiting for the timer.
             if (!ScriptedDialogueRunner.IsScriptedModeActive && !SuspectWorldDialogue.IsLocalPlayerInConversation &&
+                !ScriptedDialogueRunner.IsUnskippableRevealActive &&
                 _waitingSubtitle != null && IsAdvanceInputPressed())
             {
                 if (!_waitingSubtitle.IsPromptActive)

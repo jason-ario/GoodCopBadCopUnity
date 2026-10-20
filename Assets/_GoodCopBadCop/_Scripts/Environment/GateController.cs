@@ -73,6 +73,7 @@ public class GateController : Interactable, IMutantPassable, ILockable
         _gateOpen.OnValueChanged  += OnGateStateChanged;
         _openedIn.OnValueChanged  += OnOpenDirectionChanged;
         _isLocked.OnValueChanged  += OnIsLockedChanged;
+        CampaignManager.OnDayChanged += OnDayChanged;
 
         // In-scene NetworkObjects spawn in no guaranteed order. If the padlock spawned first, its
         // Lock()/Unlock() call on this gate was a no-op (IsServer is false until this behaviour
@@ -141,6 +142,32 @@ public class GateController : Interactable, IMutantPassable, ILockable
         _gateOpen.OnValueChanged  -= OnGateStateChanged;
         _openedIn.OnValueChanged  -= OnOpenDirectionChanged;
         _isLocked.OnValueChanged  -= OnIsLockedChanged;
+        CampaignManager.OnDayChanged -= OnDayChanged;
+    }
+
+    /// <summary>Closes the gate at the start of every new day without the close SFX.</summary>
+    private void OnDayChanged(int day)
+    {
+        if (!IsServer) return;
+        ResetSilently();
+    }
+
+    /// <summary>
+    /// Resets the gate to its closed state on all clients without playing the close sound.
+    /// Lock state is untouched. Must be called on the server.
+    /// </summary>
+    public void ResetSilently()
+    {
+        if (!IsServer) return;
+        _gateOpen.Value = false;
+        _openedIn.Value = false;
+        SilentCloseVisualsClientRpc();
+    }
+
+    [ClientRpc]
+    private void SilentCloseVisualsClientRpc()
+    {
+        ApplyGateVisuals(false, false);
     }
 
     // ── ILockable ─────────────────────────────────────────────────────────────

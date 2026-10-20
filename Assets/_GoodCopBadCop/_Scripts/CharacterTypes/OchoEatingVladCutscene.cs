@@ -169,6 +169,68 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     [Min(0f)]
     [SerializeField] private float _pieceSettleTimeout = 5f;
 
+    // ── Inspector — Mouth Gore (eating VFX) ──────────────────────────────────
+
+    [Header("Mouth Gore (while eating)")]
+    [Tooltip("Point the gore pours from (Ocho's mouth/jaw). If empty, falls back to the Look " +
+             "Animator's head reference, then to the first child of Ocho named like " +
+             "jaw/mouth/head, then to the deepest 'Neck' bone.")]
+    [SerializeField] private Transform _mouthAnchor;
+
+    [Tooltip("Offset from the mouth anchor, in Ocho-root space (x = right, y = up, z = forward).")]
+    [SerializeField] private Vector3 _mouthOffset = new Vector3(0f, -0.1f, 0.25f);
+
+    [Tooltip("How much the pour leans forward from straight down (0 = straight down, 1 = 45°).")]
+    [Range(0f, 2f)]
+    [SerializeField] private float _mouthGoreForwardLean = 0.35f;
+
+    [Tooltip("Extra rotation applied to every mouth effect after it is aimed (use if a prefab's " +
+             "emission axis isn't +Z).")]
+    [SerializeField] private Vector3 _mouthGoreRotationOffset = Vector3.zero;
+
+    [Tooltip("Looping effects that follow the mouth for the entire eating phase (blood stream, " +
+             "gibs). Every child ParticleSystem is forced to loop and simulate in world space so " +
+             "the gore falls away from the head instead of sticking to it.")]
+    [SerializeField] private GameObject[] _mouthGoreLoopPrefabs;
+
+    [Tooltip("One-shot gushes spawned at random intervals while eating.")]
+    [SerializeField] private GameObject[] _mouthGoreBurstPrefabs;
+
+    [Tooltip("Random delay range (seconds) between one-shot gushes while eating.")]
+    [SerializeField] private Vector2 _mouthGoreBurstInterval = new Vector2(1.2f, 3f);
+
+    [Tooltip("Seconds before a one-shot gush is destroyed.")]
+    [Min(0.1f)]
+    [SerializeField] private float _mouthGoreBurstLifetime = 4f;
+
+    [Tooltip("Spawn a few gushes at once when Ocho stops eating to look at the player.")]
+    [SerializeField] private bool _mouthGoreBurstOnStop = true;
+
+    [Tooltip("How many gushes to spawn at once when he stops eating.")]
+    [Min(0)]
+    [SerializeField] private int _mouthGoreStopBurstCount = 2;
+
+    [Tooltip("Seconds the looping effects keep living after emission stops, so falling blood " +
+             "finishes instead of vanishing.")]
+    [Min(0f)]
+    [SerializeField] private float _mouthGoreFadeOutTime = 4f;
+
+    [Tooltip("Random delay range (seconds) between blood decals dripped onto the ground under " +
+             "his mouth (reuses Piece Landing decal prefabs + ground layer). x <= 0 disables.")]
+    [SerializeField] private Vector2 _mouthDripDecalInterval = new Vector2(0.6f, 1.5f);
+
+    [Tooltip("Max drip decals alive at once; the oldest one is removed past this.")]
+    [Min(0)]
+    [SerializeField] private int _mouthDripDecalMax = 14;
+
+    [Tooltip("Horizontal scatter radius (meters) for drip decals around the point under the mouth.")]
+    [Min(0f)]
+    [SerializeField] private float _mouthDripScatter = 0.6f;
+
+    [Tooltip("Seconds before a drip decal is destroyed. 0 = only removed by the max-count cap.")]
+    [Min(0f)]
+    [SerializeField] private float _mouthDripDecalLifetime = 90f;
+
     // ── Inspector — Jump Sequence ─────────────────────────────────────────────
 
     [Header("Jump Sequence")]
@@ -209,6 +271,12 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     private ParentConstraint[] _spawnedPieceConstraints;
     private Rigidbody[] _spawnedPieceRigidbodies;
 
+    // Local-only cosmetic mouth gore (every client runs its own copy).
+    private readonly List<GameObject> _activeMouthLoopFx = new();
+    private readonly Queue<GameObject> _mouthDripDecals = new();
+    private Coroutine _mouthGoreRoutine;
+    private Transform _resolvedMouthAnchor;
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -246,6 +314,20 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        StopMouthGore(immediate: true);
+    }
+
+    private void LateUpdate()
+    {
+        if (_activeMouthLoopFx.Count == 0) return;
+        if (!TryGetMouthPose(out Vector3 pos, out Quaternion rot)) return;
+
+        for (int i = _activeMouthLoopFx.Count - 1; i >= 0; i--)
+        {
+            GameObject fx = _activeMouthLoopFx[i];
+            if (fx == null) { _activeMouthLoopFx.RemoveAt(i); continue; }
+            fx.transform.SetPositionAndRotation(pos, rot);
+        }
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
@@ -306,6 +388,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
             _audioSource.Stop();
         }
 
+        StopMouthGore(immediate: true);
         LocalSetLooking(false);
         DeactivateOcho();
     }
@@ -323,6 +406,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
 
         _triggered = false;
         _networkPhase.Value = NetworkCutscenePhase.Dormant;
+        StopMouthGoreClientRpc();
         LocalSetLooking(false);
         DespawnNetworkedVladPieces();
 
@@ -412,19 +496,20 @@ public class OchoEatingVladCutscene : NetworkBehaviour
 
             case NetworkCutscenePhase.Looking:
                 LocalActivateOcho();
-                LocalPlayStopAndLook();
+                LocalPlayStopAndLook(playGoreBurst: false);
                 LocalSetLooking(true);
                 break;
 
             case NetworkCutscenePhase.Dropped:
                 LocalActivateOcho();
-                LocalPlayStopAndLook();
+                LocalPlayStopAndLook(playGoreBurst: false);
                 if (_ochoAnimator != null && !string.IsNullOrEmpty(_idleTrigger))
                     _ochoAnimator.SetTrigger(_idleTrigger);
                 break;
 
             case NetworkCutscenePhase.Dormant:
             case NetworkCutscenePhase.Escaping:
+                StopMouthGore(immediate: true);
                 LocalSetLooking(false);
                 DeactivateOcho();
                 break;
@@ -445,6 +530,9 @@ public class OchoEatingVladCutscene : NetworkBehaviour
 
     [ClientRpc]
     private void PlayJumpSequenceAndVanishClientRpc() => LocalPlayJumpSequenceAndVanish();
+
+    [ClientRpc]
+    private void StopMouthGoreClientRpc() => StopMouthGore(immediate: true);
 
     /// <summary>
     /// Runs on every client right after the server spawns a networked piece double.
@@ -487,14 +575,25 @@ public class OchoEatingVladCutscene : NetworkBehaviour
 
     private void LocalPlayEatingLoop()
     {
+        StartMouthGore();
+
         if (_audioSource == null || _eatingLoopClip == null) return;
         _audioSource.loop = true;
         _audioSource.clip = _eatingLoopClip;
         _audioSource.Play();
     }
 
-    private void LocalPlayStopAndLook()
+    private void LocalPlayStopAndLook() => LocalPlayStopAndLook(playGoreBurst: true);
+
+    private void LocalPlayStopAndLook(bool playGoreBurst)
     {
+        StopMouthGore(immediate: false);
+        if (playGoreBurst && _mouthGoreBurstOnStop)
+        {
+            for (int i = 0; i < _mouthGoreStopBurstCount; i++)
+                SpawnMouthGoreBurst();
+        }
+
         if (_audioSource != null)
         {
             _audioSource.loop = false;
@@ -558,6 +657,280 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         if (_ochoGameObjectToDeactivate != null)
             _ochoGameObjectToDeactivate.SetActive(false);
     }
+
+    // ── Mouth Gore (local cosmetic VFX while eating) ─────────────────────────
+
+    /// <summary>
+    /// Local, every client: starts the looping blood/gib effects at Ocho's mouth, plus the
+    /// random gushes and ground drip decals. Purely cosmetic — nothing here is networked; each
+    /// client is driven by the existing eating-loop RPC / late-join phase. Idempotent.
+    /// </summary>
+    private void StartMouthGore()
+    {
+        StopMouthGoreEffects(immediate: true);
+        if (!isActiveAndEnabled) return;
+        if (!TryGetMouthPose(out Vector3 pos, out Quaternion rot)) return;
+
+        if (_mouthGoreLoopPrefabs != null)
+        {
+            foreach (GameObject prefab in _mouthGoreLoopPrefabs)
+            {
+                if (prefab == null) continue;
+                GameObject fx = Instantiate(prefab, pos, rot);
+                fx.name = $"{prefab.name} (Ocho Mouth Gore)";
+                ConfigureAndPlayLoopingFx(fx);
+                _activeMouthLoopFx.Add(fx);
+            }
+        }
+
+        _mouthGoreRoutine = StartCoroutine(MouthGoreRoutine());
+    }
+
+    /// <summary>
+    /// Stops the mouth gore. Non-immediate: emission stops and the already-falling blood finishes
+    /// (drip decals stay on the ground). Immediate: everything, decals included, is removed.
+    /// </summary>
+    private void StopMouthGore(bool immediate)
+    {
+        StopMouthGoreEffects(immediate);
+
+        if (!immediate) return;
+        while (_mouthDripDecals.Count > 0)
+        {
+            GameObject decal = _mouthDripDecals.Dequeue();
+            if (decal != null) Destroy(decal);
+        }
+    }
+
+    private void StopMouthGoreEffects(bool immediate)
+    {
+        if (_mouthGoreRoutine != null)
+        {
+            StopCoroutine(_mouthGoreRoutine);
+            _mouthGoreRoutine = null;
+        }
+
+        foreach (GameObject fx in _activeMouthLoopFx)
+        {
+            if (fx == null) continue;
+
+            if (immediate)
+            {
+                Destroy(fx);
+                continue;
+            }
+
+            foreach (ParticleSystem ps in GetRootParticleSystems(fx))
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            Destroy(fx, _mouthGoreFadeOutTime);
+        }
+        _activeMouthLoopFx.Clear();
+    }
+
+    private IEnumerator MouthGoreRoutine()
+    {
+        bool burstsEnabled = _mouthGoreBurstPrefabs != null && _mouthGoreBurstPrefabs.Length > 0;
+        bool dripsEnabled = _mouthDripDecalInterval.x > 0f && _mouthDripDecalMax > 0
+                            && _pieceLandingDecalPrefabs != null && _pieceLandingDecalPrefabs.Length > 0;
+
+        float nextBurst = RandomRange(_mouthGoreBurstInterval) * 0.5f;
+        float nextDrip = RandomRange(_mouthDripDecalInterval) * 0.5f;
+
+        while (true)
+        {
+            float dt = Time.deltaTime;
+
+            if (burstsEnabled && (nextBurst -= dt) <= 0f)
+            {
+                SpawnMouthGoreBurst();
+                nextBurst = RandomRange(_mouthGoreBurstInterval);
+            }
+
+            if (dripsEnabled && (nextDrip -= dt) <= 0f)
+            {
+                SpawnMouthDripDecal();
+                nextDrip = RandomRange(_mouthDripDecalInterval);
+            }
+
+            yield return null;
+        }
+    }
+
+    private void SpawnMouthGoreBurst()
+    {
+        if (_mouthGoreBurstPrefabs == null || _mouthGoreBurstPrefabs.Length == 0) return;
+        if (!TryGetMouthPose(out Vector3 pos, out Quaternion rot)) return;
+
+        GameObject prefab = _mouthGoreBurstPrefabs[UnityEngine.Random.Range(0, _mouthGoreBurstPrefabs.Length)];
+        if (prefab == null) return;
+
+        GameObject fx = Instantiate(prefab, pos, rot);
+        foreach (ParticleSystem ps in GetRootParticleSystems(fx))
+            ps.Play(true);
+        Destroy(fx, _mouthGoreBurstLifetime);
+    }
+
+    private void SpawnMouthDripDecal()
+    {
+        if (!TryGetMouthPose(out Vector3 mouthPos, out _)) return;
+
+        Vector2 scatter = UnityEngine.Random.insideUnitCircle * _mouthDripScatter;
+        Vector3 origin = mouthPos + new Vector3(scatter.x, 0f, scatter.y);
+        if (!TryRaycastGroundIgnoringOcho(origin, out RaycastHit hit)) return;
+
+        GameObject prefab = _pieceLandingDecalPrefabs[UnityEngine.Random.Range(0, _pieceLandingDecalPrefabs.Length)];
+        if (prefab == null) return;
+
+        // Identity rotation matches HandlePieceLanded (see its TODO on GetGroundDecalRotation).
+        GameObject decal = Instantiate(prefab, hit.point, Quaternion.identity);
+        if (_mouthDripDecalLifetime > 0f)
+            Destroy(decal, _mouthDripDecalLifetime);
+
+        _mouthDripDecals.Enqueue(decal);
+        while (_mouthDripDecals.Count > _mouthDripDecalMax)
+        {
+            GameObject oldest = _mouthDripDecals.Dequeue();
+            if (oldest != null) Destroy(oldest);
+        }
+    }
+
+    private static readonly RaycastHit[] s_groundHits = new RaycastHit[8];
+
+    private bool TryRaycastGroundIgnoringOcho(Vector3 origin, out RaycastHit result)
+    {
+        result = default;
+        int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_groundHits, 10f,
+            _pieceGroundLayer, QueryTriggerInteraction.Ignore);
+
+        float best = float.MaxValue;
+        for (int i = 0; i < count; i++)
+        {
+            RaycastHit h = s_groundHits[i];
+            if (h.distance >= best || IsOchoOrHeldPiece(h.transform)) continue;
+            best = h.distance;
+            result = h;
+        }
+        return best < float.MaxValue;
+    }
+
+    private bool IsOchoOrHeldPiece(Transform t)
+    {
+        if (_ochoRoot != null && t.IsChildOf(_ochoRoot)) return true;
+        if (_vladPieceRoots != null)
+        {
+            foreach (Transform piece in _vladPieceRoots)
+                if (piece != null && t.IsChildOf(piece)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>World pose for mouth effects: at the mouth anchor, aimed down with a forward lean.</summary>
+    private bool TryGetMouthPose(out Vector3 position, out Quaternion rotation)
+    {
+        Transform anchor = ResolveMouthAnchor();
+        if (anchor == null)
+        {
+            position = default;
+            rotation = Quaternion.identity;
+            return false;
+        }
+
+        Transform basis = _ochoRoot != null ? _ochoRoot : anchor;
+        position = anchor.position + basis.rotation * _mouthOffset;
+
+        Vector3 forward = basis.forward;
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+
+        Vector3 dir = (Vector3.down + forward * _mouthGoreForwardLean).normalized;
+        rotation = Quaternion.LookRotation(dir, forward) * Quaternion.Euler(_mouthGoreRotationOffset);
+        return true;
+    }
+
+    private Transform ResolveMouthAnchor()
+    {
+        if (_mouthAnchor != null) return _mouthAnchor;
+        if (_resolvedMouthAnchor != null) return _resolvedMouthAnchor;
+
+        if (_lookAnimator != null)
+            _resolvedMouthAnchor = _lookAnimator.GetHeadReference();
+
+        if (_resolvedMouthAnchor == null && _ochoRoot != null)
+        {
+            Transform jaw = null, head = null, neck = null;
+            foreach (Transform t in _ochoRoot.GetComponentsInChildren<Transform>(true))
+            {
+                string n = t.name.ToLowerInvariant();
+                if (n.Contains("ik")) continue;
+                if (jaw == null && (n.Contains("jaw") || n.Contains("mouth"))) jaw = t;
+                else if (head == null && n.Contains("head")) head = t;
+                else if (n.Contains("neck")) neck = t; // keep the deepest neck bone
+            }
+            _resolvedMouthAnchor = jaw != null ? jaw : head != null ? head : neck;
+        }
+
+        return _resolvedMouthAnchor;
+    }
+
+    /// <summary>
+    /// Forces every non-sub-emitter system in a looping mouth effect to loop and simulate in
+    /// world space (so the blood falls away from the moving head), then plays it.
+    /// </summary>
+    private static void ConfigureAndPlayLoopingFx(GameObject fx)
+    {
+        ParticleSystem[] all = fx.GetComponentsInChildren<ParticleSystem>(true);
+        HashSet<ParticleSystem> subEmitters = CollectSubEmitters(all);
+
+        foreach (ParticleSystem ps in all)
+        {
+            ps.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
+            if (subEmitters.Contains(ps)) continue;
+
+            ParticleSystem.MainModule main = ps.main;
+            main.loop = true;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+        }
+
+        foreach (ParticleSystem ps in GetRootParticleSystems(fx))
+            ps.Play(true);
+    }
+
+    private static HashSet<ParticleSystem> CollectSubEmitters(ParticleSystem[] systems)
+    {
+        var set = new HashSet<ParticleSystem>();
+        foreach (ParticleSystem ps in systems)
+        {
+            ParticleSystem.SubEmittersModule sub = ps.subEmitters;
+            if (!sub.enabled) continue;
+            for (int i = 0; i < sub.subEmittersCount; i++)
+            {
+                ParticleSystem s = sub.GetSubEmitterSystem(i);
+                if (s != null) set.Add(s);
+            }
+        }
+        return set;
+    }
+
+    /// <summary>Top-most ParticleSystems in <paramref name="fx"/> (Play/Stop with children from these).</summary>
+    private static List<ParticleSystem> GetRootParticleSystems(GameObject fx)
+    {
+        var roots = new List<ParticleSystem>();
+        foreach (ParticleSystem ps in fx.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            Transform p = ps.transform.parent;
+            bool hasSystemParent = false;
+            while (p != null && p != fx.transform.parent)
+            {
+                if (p.GetComponent<ParticleSystem>() != null) { hasSystemParent = true; break; }
+                p = p.parent;
+            }
+            if (!hasSystemParent) roots.Add(ps);
+        }
+        return roots;
+    }
+
+    private static float RandomRange(Vector2 range) =>
+        UnityEngine.Random.Range(Mathf.Max(0.05f, range.x), Mathf.Max(0.05f, Mathf.Max(range.x, range.y)));
 
     // ── Look Animator ────────────────────────────────────────────────────────
 

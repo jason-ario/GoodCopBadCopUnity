@@ -168,10 +168,11 @@ public class Day_01 : DayBase
              "to clock out on the Time Card Machine before heading to the bunker.")]
     [SerializeField] private string _taskClockOutText = "Clock out for the day";
 
-    [Tooltip("ShopItem.Name of the Documentation Exam pile — used to make it free during the tutorial.")]
+    [Tooltip("ShopItem.Name of the Documentation Exam pile — used for the synced/persisted unlock.")]
     [SerializeField] private string _documentationExamItemName = "Documentation Exam";
 
-    [Tooltip("The Documentation Exam shop item — locked until the documentation tutorial begins.")]
+    [Tooltip("The Documentation Exam shop item — locked until the documentation tutorial begins, " +
+             "and free for the single tutorial claim.")]
     [SerializeField] private ShopItem _documentationExamShopItem;
 
     [Tooltip("Number of documentation anomalies to force-activate on the random quarantine tutorial suspect (index 2) for the Day 1 tutorial. Matches the '2 symptoms = Quarantine' threshold.")]
@@ -631,6 +632,10 @@ public class Day_01 : DayBase
         if (CleanGraffitiTask.Instance != null) CleanGraffitiTask.Instance.HasCustomTutorialRow = true;
         if (FenceRepairTask.Instance != null) FenceRepairTask.Instance.HasCustomTutorialRow = true;
 
+        // Same for the breach: Day 1 shows its own "Repel the mutants (x/y)" HUD row, so the
+        // registry-driven RepelMutantsTask must only appear on the Task Page / guidebook today.
+        RepelMutantsTask.HasCustomTutorialRow = true;
+
         // Reset the clock-in tutorial arrow to hidden — OnDayStarted shows it once the
         // Day number pop-up plays.
         ShowClockInArrow(false);
@@ -759,6 +764,9 @@ public class Day_01 : DayBase
     {
         base.DayDeactivated();
         DocumentationExamTutorialComplete = true;
+
+        // Never let the tutorial freebie price leak into later days (e.g. tutorial skipped mid-step).
+        ClearDocumentationExamFreePrice();
 
         // Restore notebooks so Day 2+ can manage them normally.
         _mutationNotebook?.SetVisible(true);
@@ -897,6 +905,7 @@ public class Day_01 : DayBase
         if (TakeOutTrashTask.Instance != null) TakeOutTrashTask.Instance.HasCustomTutorialRow = false;
         if (CleanGraffitiTask.Instance != null) CleanGraffitiTask.Instance.HasCustomTutorialRow = false;
         if (FenceRepairTask.Instance != null) FenceRepairTask.Instance.HasCustomTutorialRow = false;
+        RepelMutantsTask.HasCustomTutorialRow = false;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -906,6 +915,17 @@ public class Day_01 : DayBase
         StopAllCoroutines();
 
         Debug.Log("[Day_01] DayDeactivated.");
+    }
+
+    /// <summary>
+    /// Local, idempotent: restores the Documentation Exam pile's configured price after the
+    /// tutorial freebie (see <see cref="OnQuarantineTutorialStartedSync"/>).
+    /// </summary>
+    private void ClearDocumentationExamFreePrice()
+    {
+        if (_documentationExamShopItem == null) return;
+        _documentationExamShopItem.ClearPriceOverride();
+        ToolShopController.Instance?.RefreshPriceForItem(_documentationExamShopItem);
     }
 
     private void OnDestroy()
@@ -1002,6 +1022,7 @@ public class Day_01 : DayBase
         if (TakeOutTrashTask.Instance != null) TakeOutTrashTask.Instance.HasCustomTutorialRow = false;
         if (CleanGraffitiTask.Instance != null) CleanGraffitiTask.Instance.HasCustomTutorialRow = false;
         if (FenceRepairTask.Instance != null) FenceRepairTask.Instance.HasCustomTutorialRow = false;
+        RepelMutantsTask.HasCustomTutorialRow = false;
 
         HandOffPoint.ClearPendingVerdict();
 
@@ -1463,7 +1484,7 @@ public class Day_01 : DayBase
     /// <summary>
     /// Server-only coroutine. Plays the documentation tutorial megaphone dialogue sequences:
     ///   — Part 1: two lines explaining the paperwork discrepancy (clickable subtitles).
-    ///   — Makes the documentation exam free and waits for the player to pick it up.
+    ///   — Waits for the player to pick up the (already free) documentation exam.
     ///   — Part 2: four follow-up lines explaining documentation anomalies.
     /// Both parts are played through <see cref="ScriptedDialogueRunner.PlayMegaphoneDialogue"/>
     /// so the player clicks to advance each line exactly as with character dialogue.
@@ -1471,7 +1492,6 @@ public class Day_01 : DayBase
     private IEnumerator QuarantineDocumentationBarkRoutine()
     {
         var runner = ScriptedDialogueRunner.Instance;
-        var mgr = MegaphoneDialogueManager.Instance;
         if (runner == null) yield break;
 
         // ── Part 1: 2 intro lines ─────────────────────────────────────────────
@@ -1486,16 +1506,10 @@ public class Day_01 : DayBase
             Debug.LogWarning("[Day_01] _quarantineMegaphonePart1 is not assigned — skipping first megaphone sequence.");
         }
 
-        // Make the documentation exam free for this pass only.
-        if (mgr != null)
-            mgr.SetShopItemPriceOverrideSynced(_documentationExamItemName, 0);
-
-        // Wait for the player to pick up the exam (flag set on all clients via ExamNotebook.OnPickedUp).
+        // The documentation exam is already free (OnQuarantineTutorialStartedSync) and its price is
+        // restored by OnExamPickedUpSync on every client. Wait for the player to pick up the exam
+        // (flag set on all clients via ExamNotebook.OnPickedUp).
         yield return new WaitUntil(() => ExamNotebook.AnyExamNotebookPickedUp);
-
-        // Restore the price now that the freebie has been claimed.
-        if (mgr != null)
-            mgr.ClearShopItemPriceOverrideSynced(_documentationExamItemName);
 
         yield return new WaitForSeconds(0.5f);
 
@@ -1589,8 +1603,20 @@ public class Day_01 : DayBase
         // Clean up any remaining quarantine document pickup subscriptions on all clients.
         UnsubscribeQuarantineDocumentPickupEvents();
 
-        // Unlock the documentation exam shop item now that the player is guided to use it.
+        // Unlock the documentation exam shop item now that the player is guided to use it, and
+        // make it free for this tutorial claim. Applied straight to the serialized pile on every
+        // client (this handler runs everywhere) — the buyer's local ShopItem.Price is what gets
+        // charged, so a name-based lookup that misses this exact instance would charge full price.
         _documentationExamShopItem?.SetAvailable(true);
+        if (_documentationExamShopItem != null)
+        {
+            _documentationExamShopItem.SetPriceOverride(0);
+            ToolShopController.Instance?.RefreshPriceForItem(_documentationExamShopItem);
+        }
+        else
+        {
+            Debug.LogWarning("[Day_01] _documentationExamShopItem is not assigned — the tutorial documentation exam will not be free.");
+        }
 
         _taskGetChecklist = TutorialObjectiveList.Instance?.AddObjective(_taskGetChecklistText);
         if (TutorialMarkerManager.Instance != null && _markerDocumentationExam != null)
@@ -1615,6 +1641,9 @@ public class Day_01 : DayBase
     {
         TutorialTaskSync.OnExamNotebookPickedUpAllClients -= OnExamPickedUpSync;
         ExamNotebook.OnAnyExamNotebookPickedUp -= OnQuarantineExamPickedUpLocal;
+
+        // The tutorial freebie has been claimed — restore the configured price everywhere.
+        ClearDocumentationExamFreePrice();
 
         if (_taskGetChecklist != null)
         {

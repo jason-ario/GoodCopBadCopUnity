@@ -174,7 +174,36 @@ public class DumpsterInteractable : CollectableContainer
 
     // ── Interact-based deposit (holding a TrashBag) ──────────────────────────
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Throw in";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item)
+        => item is TrashBag ? "Throw in" : "Throw away";
+
+    // ── General discard (reuses the booth TrashCan's rules) ──────────────────
+
+    /// <summary>
+    /// Trash bags come from <c>itemsThatCanInteractWith</c>; every other item is accepted if a
+    /// <see cref="TrashCan"/> in the scene would accept it (empty supply boxes, folders, etc.).
+    /// </summary>
+    public override bool CanInteractWithItem(PickableObject item)
+    {
+        if (item == null) return false;
+        if (item is TrashBag) return base.CanInteractWithItem(item);
+        return base.CanInteractWithItem(item) || TrashCan.IsAcceptedByAnyTrashCan(item);
+    }
+
+    /// <summary>Always takes held items (bags, plus anything the trash can takes).</summary>
+    public override bool AcceptsHeldItems => true;
+
+    /// <summary>
+    /// Non-bag items go through the trash can's discard flow (rules + confirmation popup).
+    /// They don't count toward the dumpster's fill/trash task — only bags do.
+    /// </summary>
+    private void DiscardNonBagItem(PlayerInteractionController player, PickableObject item)
+    {
+        base.InteractWithItem(player, item);
+
+        TrashCan.RequestThrowAway(player, item, this,
+            () => PlayLandSoundServerRpc(GetDepositWorldPosition()));
+    }
 
     /// <summary>
     /// Called by <see cref="PlayerInteractionController"/> on the local client when the player
@@ -186,7 +215,13 @@ public class DumpsterInteractable : CollectableContainer
     /// </summary>
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
-        if (item is not TrashBag bag || bag.IsDeposited) return;
+        if (item is not TrashBag bag)
+        {
+            DiscardNonBagItem(playerInteractionController, item);
+            return;
+        }
+
+        if (bag.IsDeposited) return;
 
         base.InteractWithItem(playerInteractionController, item);
 

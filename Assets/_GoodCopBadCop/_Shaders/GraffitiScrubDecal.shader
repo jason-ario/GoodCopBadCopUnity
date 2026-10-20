@@ -74,6 +74,10 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
         _PulseSpeed               ("Pulse Speed (cycles/sec)",  Range(0.05, 2)) = 0.5
         _PulseMin                 ("Pulse Floor (fraction)",    Range(0, 1))    = 0.2
         _PulseRange               ("Pulse Fade Distance (m)",   Range(2, 80))   = 30.0
+        // Near hide: within this distance the pulse is fully off so the art can be admired;
+        // it fades back in over Near Fade Width metres beyond it. 0 = never hide up close.
+        _PulseNearHide            ("Pulse Hidden Within (m)",   Range(0, 20))   = 0.0
+        _PulseNearFade            ("Pulse Near Fade Width (m)", Range(0.1, 10)) = 3.0
         [ToggleUI] _PulseXRay     ("Pulse Visible Through Walls", Float)        = 0.0
     }
 
@@ -147,6 +151,8 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
                 half   _PulseMin;
                 half   _PulseRange;
                 half   _PulseXRay;
+                half   _PulseNearHide;
+                half   _PulseNearFade;
             CBUFFER_END
 
             float SampleSceneEyeDepth(float2 screenUV)
@@ -172,7 +178,11 @@ Shader "GoodCopBadCop/GraffitiScrubDecal"
             half PulseDistanceFade(float3 positionWS)
             {
                 float camDist = distance(GetCameraPositionWS(), positionWS);
-                return 1.0 - smoothstep(_PulseRange * 0.6, _PulseRange, camDist);
+                half farFade  = 1.0 - smoothstep(_PulseRange * 0.6, _PulseRange, camDist);
+                half nearFade = _PulseNearHide > 0.0
+                    ? smoothstep(_PulseNearHide, _PulseNearHide + _PulseNearFade, camDist)
+                    : 1.0;
+                return farFade * nearFade;
             }
         ENDHLSL
 

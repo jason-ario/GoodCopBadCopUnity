@@ -83,6 +83,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("Y offset above the terrain surface applied to every spawned blood splatter.")]
     [SerializeField] private float _endBloodSplatterGroundOffset = 0.02f;
 
+    [Tooltip("Random footprint scale multiplier (X/Z only; projection depth Y untouched) applied to each " +
+             "end-of-trail splatter. The prefab is shared with the trash/clean-blood tasks, so the size " +
+             "boost lives here instead of on the prefab. Replicated via the NetworkObject spawn payload.")]
+    [SerializeField] private Vector2 _endBloodSplatterScaleRange = new Vector2(2.5f, 4f);
+
     [Tooltip("When off (default), end-of-trail splatters ignore the UV flashlight and stay plain red, " +
              "so they read as ordinary blood rather than the UV-only trail blood.")]
     [SerializeField] private bool _endSplattersGlowUnderUV = false;
@@ -1269,6 +1274,13 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
             Quaternion rot   = Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f);
 
             GameObject splatter = Instantiate(prefab, position, rot);
+
+            // Enlarge the footprint before Spawn() so the scale rides the spawn payload to every peer.
+            float minScale = Mathf.Max(0.01f, Mathf.Min(_endBloodSplatterScaleRange.x, _endBloodSplatterScaleRange.y));
+            float maxScale = Mathf.Max(minScale, Mathf.Max(_endBloodSplatterScaleRange.x, _endBloodSplatterScaleRange.y));
+            float s = UnityEngine.Random.Range(minScale, maxScale);
+            Vector3 baseScale = splatter.transform.localScale;
+            splatter.transform.localScale = new Vector3(baseScale.x * s, baseScale.y, baseScale.z * s);
 
             if (!splatter.TryGetComponent(out NetworkObject netObj))
             {

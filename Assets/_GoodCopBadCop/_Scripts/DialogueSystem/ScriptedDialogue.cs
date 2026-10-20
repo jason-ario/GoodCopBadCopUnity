@@ -86,6 +86,11 @@ public class ScriptedDialogueNode
              "when this line starts. Requires laugh clips to be assigned on the speaker.")]
     public bool playLaughSfx;
 
+    [Tooltip("If true, input cannot fast-complete this line's typewriter reveal. Players can only " +
+             "advance once the full text has been revealed. Use for lines whose animation must land " +
+             "(e.g. a glass smash) before the conversation moves on.")]
+    public bool unskippable;
+
     [Tooltip("Player choices. Required when Type is Choice. Exactly two entries expected.")]
     public ScriptedDialogueChoice[] choices;
 }

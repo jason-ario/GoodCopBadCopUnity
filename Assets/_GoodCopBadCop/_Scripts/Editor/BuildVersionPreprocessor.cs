@@ -6,10 +6,14 @@ using UnityEngine;
 /// <summary>
 /// Before each player build: increments the last number of PlayerSettings.bundleVersion
 /// (when GameSettings.AutoIncrementVersionOnBuild is on) and logs the build channel / Steam App ID.
+/// The bumped version is persisted after the build finishes: calling AssetDatabase.SaveAssets() during
+/// preprocess saves every dirty asset (e.g. dynamic TMP font atlases) and triggers an infinite import loop.
 /// </summary>
-public class BuildVersionPreprocessor : IPreprocessBuildWithReport
+public class BuildVersionPreprocessor : IPreprocessBuildWithReport, IPostprocessBuildWithReport
 {
     public int callbackOrder => -1000;
+
+    private static bool _versionChanged;
 
     public void OnPreprocessBuild(BuildReport report)
     {
@@ -19,12 +23,22 @@ public class BuildVersionPreprocessor : IPreprocessBuildWithReport
         {
             string previous = PlayerSettings.bundleVersion;
             PlayerSettings.bundleVersion = IncrementPatch(previous);
-            AssetDatabase.SaveAssets();
+            _versionChanged = true;
             Debug.Log($"[BuildVersion] Version {previous} -> {PlayerSettings.bundleVersion}");
         }
 
         Debug.Log($"[BuildVersion] Building {settings.Channel} (Steam AppId {settings.SteamAppId}), " +
                   $"version {PlayerSettings.bundleVersion}");
+    }
+
+    public void OnPostprocessBuild(BuildReport report)
+    {
+        if (!_versionChanged)
+            return;
+
+        _versionChanged = false;
+        // Defer past the build pipeline so saving never re-enters the import loop.
+        EditorApplication.delayCall += AssetDatabase.SaveAssets;
     }
 
     private static string IncrementPatch(string version)

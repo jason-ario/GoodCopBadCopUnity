@@ -260,6 +260,7 @@ public class HeldItemZoomView : DiegeticViewController
         if (IsAnyViewActive) return false;
         if (UIController.Instance == null || UIController.Instance.IsPaused) return false;
         if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsInCutscene) return false;
+        if (DialogueChoiceSystem.IsPostDialogueInputBlocked) return false;
         // The default gamepad toggle (D-pad down) also navigates dialogue choices, popups and other
         // modal UI, all of which disable player control — never open zoom from those.
         if (PlayerInstance.Instance != null && !PlayerInstance.Instance.CanControl) return false;

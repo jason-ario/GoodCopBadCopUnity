@@ -38,10 +38,10 @@ namespace GoodCopBadCop.Postman
     /// rotation → plays "Give" and drops today's newspaper in the mailbox
     /// (<see cref="DailyNewspaperSpawnManager.DeliverTodaysNewspaperServer"/>) → turns toward
     /// <see cref="_finalPos"/> → walks there → turns to its rotation → waits. Talking to him plays today's scripted conversation
-    /// (<see cref="PostmanDayDialogue.conversation"/>, via <see cref="ScriptedDialogueRunner"/>); once
-    /// it has been finished, talking again plays the short <see cref="PostmanDayDialogue.farewell"/>.
-    /// Once he has waited <see cref="_stayDuration"/> seconds AND today's conversation is finished, he
-    /// walks back to the spawn point and fades out.
+    /// (<see cref="PostmanDayDialogue.conversation"/>, via <see cref="ScriptedDialogueRunner"/>). As soon
+    /// as it has been finished he walks back to the spawn point and fades out. He can still be talked
+    /// to on the way: he stops, says the short <see cref="PostmanDayDialogue.farewell"/>, and resumes
+    /// walking when the dialogue ends.
     /// Every new day (<see cref="ShiftManager.OnDayStart"/>) resets him to hidden.
     ///
     /// Look: each day shows one child of the character's "Base Version" (Day 1 = first child, Day 2 =
@@ -80,16 +80,24 @@ namespace GoodCopBadCop.Postman
         [Tooltip("On this day he arrives when the last suspect is processed instead of at day start.")]
         [SerializeField] private int _endOfShiftArrivalDay = 1;
 
-        [Tooltip("Seconds he waits at the final position before he may leave. He only leaves once a " +
-                 "player has also finished today's conversation with him.")]
-        [SerializeField] private float _stayDuration = 300f;
-
         [Header("Presentation")]
         [SerializeField] private float _fadeInDuration = 1.5f;
         [SerializeField] private float _fadeOutDuration = 1.5f;
 
         [Tooltip("Turn speed (degrees per second) for the in-place rotations between route legs.")]
         [SerializeField] private float _turnSpeed = 240f;
+
+        [Tooltip("Walk speed (units per second) for the leg from the spawn point to the mailbox. " +
+                 "<= 0 uses SuspectCharacter's normal walk speed. Keep below its run threshold (2.5).")]
+        [SerializeField] private float _mailboxWalkSpeed = 2f;
+
+        [Header("Breach")]
+        [Tooltip("If a mutant breach starts while he's out, he runs back to the spawn point at this " +
+                 "speed (units per second, Running animation) and leaves for the day.")]
+        [SerializeField] private float _breachFleeSpeed = 4f;
+
+        [Tooltip("Turn speed (degrees per second) for the quick turn before he runs off.")]
+        [SerializeField] private float _breachFleeTurnSpeed = 720f;
 
         [SerializeField] private string _giveTrigger = "Give";
 
@@ -136,6 +144,10 @@ namespace GoodCopBadCop.Postman
         private bool _visitedToday;
         private bool _conversationDoneToday;
         private bool _dialogueRunning;
+        private bool _fleePending;
+        private bool _fleeing;
+        private Transform _talker;
+        private bool _newspaperDeliveredToday;
         private int _visitGeneration;
         private Coroutine _visitRoutine;
         private bool _subscribed;
@@ -192,6 +204,7 @@ namespace GoodCopBadCop.Postman
 
             ShiftManager.Instance.OnDayStart += HandleDayStart;
             ShiftManager.OnLastSuspectProcessed += HandleLastSuspectProcessed;
+            MutantBreachManager.OnBreachStartedAllClients += HandleBreachStarted;
             _subscribed = true;
 
             _modelVariant.Value = ModelVariantForDay(CurrentDay);
@@ -205,6 +218,7 @@ namespace GoodCopBadCop.Postman
             if (ShiftManager.Instance != null)
                 ShiftManager.Instance.OnDayStart -= HandleDayStart;
             ShiftManager.OnLastSuspectProcessed -= HandleLastSuspectProcessed;
+            MutantBreachManager.OnBreachStartedAllClients -= HandleBreachStarted;
         }
 
         // ── Schedule (server) ────────────────────────────────────────────────────
@@ -282,6 +296,11 @@ namespace GoodCopBadCop.Postman
             _visitGeneration++;
             _visitedToday = false;
             _conversationDoneToday = false;
+            _fleePending = false;
+            _fleeing = false;
+            _dialogueRunning = false;
+            _talker = null;
+            _newspaperDeliveredToday = false;
             _state = PostmanVisitState.Hidden;
             _visible.Value = false;
             _modelVariant.Value = ModelVariantForDay(CurrentDay);
@@ -297,6 +316,10 @@ namespace GoodCopBadCop.Postman
             _state = PostmanVisitState.Arriving;
             _character.SetInteractionLockedServer(true);
 
+            // Don't walk into a breach that's already running — arrive once it's cleared.
+            while (IsBreachRunning)
+                yield return null;
+
             ShowArrivalNotificationClientRpc();
 
             // Place him while still hidden, then give NetworkTransform a moment to settle on
@@ -307,15 +330,12 @@ namespace GoodCopBadCop.Postman
             _visible.Value = true;
             yield return new WaitForSeconds(_fadeInDuration);
 
-            yield return WalkTo(_placingMailPos.position);
+            yield return WalkTo(_placingMailPos.position, _mailboxWalkSpeed);
             yield return TurnTo(_placingMailPos.rotation);
 
             _character.FireAnimatorTrigger(_giveTrigger);
             yield return new WaitForSeconds(_giveDropDelay);
-            if (_newspaperManager != null)
-                _newspaperManager.DeliverTodaysNewspaperServer();
-            else
-                Debug.LogWarning("[PostmanVisitController] No DailyNewspaperSpawnManager assigned — no newspaper delivered.", this);
+            DeliverNewspaperOnce();
             yield return new WaitForSeconds(_giveRecoverTime);
 
             yield return TurnTo(LookRotationTowards(_finalPos.position));
@@ -325,23 +345,53 @@ namespace GoodCopBadCop.Postman
             _state = PostmanVisitState.Waiting;
             _character.SetInteractionLockedServer(false);
 
-            float waited = 0f;
-            while (waited < _stayDuration || !_conversationDoneToday || _dialogueRunning)
-            {
-                waited += Time.deltaTime;
+            // He sets off the moment today's conversation is finished. On the mutation day,
+            // finishing it hands him to TurnIntoMutantRoutine instead, which stops this routine.
+            while (!_conversationDoneToday || _dialogueRunning)
                 yield return null;
+            if (_state == PostmanVisitState.Mutant) yield break;
+
+            yield return LeaveRoutine();
+        }
+
+        /// <summary>
+        /// Walks back to the spawn point and fades out. Interaction stays open on the way: talking
+        /// to him stops him (<see cref="RequestTalkServerRpc"/> plays the farewell), he turns to
+        /// the talker, and he carries on walking once the dialogue ends.
+        /// </summary>
+        private IEnumerator LeaveRoutine()
+        {
+            _state = PostmanVisitState.Leaving;
+            _character.SetInteractionLockedServer(false);
+
+            while (true)
+            {
+                // Stopped for a talk: face whoever is talking to him until they're done.
+                while (_dialogueRunning)
+                {
+                    if (_talker != null)
+                        RotateTowardsStep(LookRotationTowards(_talker.position), _turnSpeed);
+                    yield return null;
+                }
+
+                yield return TurnTo(LookRotationTowards(_spawnPos.position), -1f, stopForTalk: true);
+                if (_dialogueRunning) continue;
+
+                bool arrived = false;
+                _character.SetLocomotionState(true);
+                _character.NavigateTo(_spawnPos.position, () => arrived = true);
+                while (!arrived && !_dialogueRunning)
+                    yield return null;
+
+                if (arrived)
+                {
+                    _character.SetLocomotionState(false);
+                    break;
+                }
+                // Otherwise a talk started: RequestTalkServerRpc already halted him — loop to wait it out.
             }
 
-            _state = PostmanVisitState.Leaving;
             _character.SetInteractionLockedServer(true);
-
-            // Someone may have started talking on the frame he locked — let them finish.
-            while (_dialogueRunning)
-                yield return null;
-
-            yield return TurnTo(LookRotationTowards(_spawnPos.position));
-            yield return WalkTo(_spawnPos.position);
-
             _visible.Value = false;
             yield return new WaitForSeconds(_fadeOutDuration);
 
@@ -349,27 +399,45 @@ namespace GoodCopBadCop.Postman
             _visitRoutine = null;
         }
 
-        private IEnumerator WalkTo(Vector3 destination)
+        /// <summary>Server-only. Halts him where he stands (mid-walk-off) so he can talk.</summary>
+        private void StopWalkingForTalk()
+        {
+            _character.StopNavigation();
+            _character.SetLocomotionState(false);
+            if (_character.NavAgent != null && _character.NavAgent.enabled && _character.NavAgent.isOnNavMesh)
+                _character.NavAgent.velocity = Vector3.zero;
+        }
+
+        private IEnumerator WalkTo(Vector3 destination, float speedOverride = -1f, bool run = false)
         {
             bool arrived = false;
-            _character.SetLocomotionState(true);
-            _character.NavigateTo(destination, () => arrived = true);
+            // Givi is never a full mutant while on his route, so runs use the human run state.
+            _character.SetLocomotionState(true, run, humanRun: run);
+            _character.NavigateTo(destination, () => arrived = true, speedOverride);
             yield return new WaitUntil(() => arrived);
             _character.SetLocomotionState(false);
         }
 
-        private IEnumerator TurnTo(Quaternion target)
+        private IEnumerator TurnTo(Quaternion target, float turnSpeed = -1f, bool stopForTalk = false)
         {
+            if (turnSpeed <= 0f) turnSpeed = _turnSpeed;
             Vector3 euler = target.eulerAngles;
             Quaternion flatTarget = Quaternion.Euler(0f, euler.y, 0f);
 
             while (Quaternion.Angle(transform.rotation, flatTarget) > 0.5f)
             {
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, flatTarget, _turnSpeed * Time.deltaTime);
+                if (stopForTalk && _dialogueRunning) yield break;
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, flatTarget, turnSpeed * Time.deltaTime);
                 yield return null;
             }
 
             transform.rotation = flatTarget;
+        }
+
+        private void RotateTowardsStep(Quaternion target, float turnSpeed)
+        {
+            Quaternion flatTarget = Quaternion.Euler(0f, target.eulerAngles.y, 0f);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, flatTarget, turnSpeed * Time.deltaTime);
         }
 
         private Quaternion LookRotationTowards(Vector3 point)
@@ -414,7 +482,8 @@ namespace GoodCopBadCop.Postman
         [ServerRpc(RequireOwnership = false)]
         private void RequestTalkServerRpc(ServerRpcParams rpcParams = default)
         {
-            if (_state != PostmanVisitState.Waiting || _dialogueRunning) return;
+            bool walkingOff = _state == PostmanVisitState.Leaving && !_fleeing;
+            if ((_state != PostmanVisitState.Waiting && !walkingOff) || _dialogueRunning) return;
 
             ScriptedDialogueRunner runner = ScriptedDialogueRunner.Instance;
             if (runner == null || runner.IsServerSequenceActive) return;
@@ -422,13 +491,18 @@ namespace GoodCopBadCop.Postman
             PostmanDayDialogue set = GetDialogueForDay(CurrentDay);
             if (set == null) return;
 
-            bool isConversation = !_conversationDoneToday;
+            // On the way out the conversation is always done, so he only has his farewell line.
+            bool isConversation = !_conversationDoneToday && !walkingOff;
             ScriptedDialogue dialogue = isConversation ? set.conversation : set.farewell;
             if (dialogue == null || dialogue.nodes == null || dialogue.nodes.Length == 0) return;
 
             int generation = _visitGeneration;
             ulong talkerClientId = rpcParams.Receive.SenderClientId;
+            _talker = GetPlayerTransform(talkerClientId);
             _dialogueRunning = true;
+
+            // Halt before the talker's camera frames him; LeaveRoutine resumes the walk afterwards.
+            if (walkingOff) StopWalkingForTalk();
 
             runner.PlayDialogue(
                 _character,
@@ -437,11 +511,18 @@ namespace GoodCopBadCop.Postman
                 {
                     if (generation != _visitGeneration) return; // a new day started mid-talk
                     _dialogueRunning = false;
-                    if (!isConversation) return;
+                    if (isConversation)
+                    {
+                        _conversationDoneToday = true;
+                        if (CurrentDay == _mutateDay)
+                        {
+                            StartCoroutine(TurnIntoMutantRoutine(talkerClientId));
+                            return;
+                        }
+                    }
 
-                    _conversationDoneToday = true;
-                    if (CurrentDay == _mutateDay)
-                        StartCoroutine(TurnIntoMutantRoutine(talkerClientId));
+                    // A breach started mid-talk — run off now that the talker is released.
+                    if (_fleePending) StartBreachFlee();
                 },
                 // He's always talked to outside: lock the talker in (cursor for choices, camera on
                 // him). With joinByInteractionOnly only interacting players are ever pulled in.
@@ -452,7 +533,85 @@ namespace GoodCopBadCop.Postman
                 hideNonParticipantUI: false,
                 // He's a scene NPC, not a booth suspect: always use the world-dialogue camera,
                 // even when the talker counts as inside (he stands near the booth).
-                useWorldDialogueCamera: true);
+                useWorldDialogueCamera: true,
+                // Everyone backed out before the end: the talk doesn't count, so the next
+                // interaction starts this same dialogue again from the first line.
+                onAbandoned: () =>
+                {
+                    if (generation != _visitGeneration) return;
+                    _dialogueRunning = false;
+                    if (_fleePending) StartBreachFlee();
+                });
+        }
+
+        // ── Breach (server) ──────────────────────────────────────────────────────
+
+        private static bool IsBreachRunning =>
+            MutantBreachManager.Instance != null && MutantBreachManager.Instance.IsBreachRunning;
+
+        /// <summary>
+        /// Fires on every peer; only the server reacts. If he's out on his visit (arriving, at the
+        /// mailbox, waiting or walking off) he runs back to the spawn point and leaves for the day.
+        /// A conversation in progress is allowed to finish first (players in dialogue are protected
+        /// from mutants), with interaction locked so nobody starts a new one.
+        /// </summary>
+        private void HandleBreachStarted()
+        {
+            if (!IsServer) return;
+            if (_state == PostmanVisitState.Hidden || _state == PostmanVisitState.Mutant) return;
+            if (!_visible.Value) return; // still waiting to appear — VisitSequence holds until the breach clears
+
+            _character.SetInteractionLockedServer(true);
+
+            if (_dialogueRunning)
+            {
+                _fleePending = true;
+                return;
+            }
+
+            StartBreachFlee();
+        }
+
+        private void StartBreachFlee()
+        {
+            _fleePending = false;
+            if (_state == PostmanVisitState.Hidden || _state == PostmanVisitState.Mutant) return;
+
+            // Interrupted before the drop: the paper still lands in the box so the day isn't left without it.
+            DeliverNewspaperOnce();
+
+            if (_visitRoutine != null) StopCoroutine(_visitRoutine);
+            _visitRoutine = StartCoroutine(BreachFleeSequence());
+        }
+
+        private void DeliverNewspaperOnce()
+        {
+            if (_newspaperDeliveredToday) return;
+            _newspaperDeliveredToday = true;
+
+            if (_newspaperManager != null)
+                _newspaperManager.DeliverTodaysNewspaperServer();
+            else
+                Debug.LogWarning("[PostmanVisitController] No DailyNewspaperSpawnManager assigned — no newspaper delivered.", this);
+        }
+
+        private IEnumerator BreachFleeSequence()
+        {
+            _state = PostmanVisitState.Leaving;
+            _fleeing = true;
+            _character.SetInteractionLockedServer(true);
+            _character.StopNavigation();
+            _character.SetLocomotionState(false);
+            Debug.Log("[PostmanVisitController] Breach started — Givi is running away.", this);
+
+            yield return TurnTo(LookRotationTowards(_spawnPos.position), _breachFleeTurnSpeed);
+            yield return WalkTo(_spawnPos.position, _breachFleeSpeed, run: true);
+
+            _visible.Value = false;
+            yield return new WaitForSeconds(_fadeOutDuration);
+
+            _state = PostmanVisitState.Hidden;
+            _visitRoutine = null;
         }
 
         // ── Mutation (server) ────────────────────────────────────────────────────

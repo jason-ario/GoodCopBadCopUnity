@@ -880,6 +880,37 @@ public class ExamNotebook : PickableObject
         SetPagesActive(!IsInSupplyBox());
     }
 
+    // TEMP DIAGNOSTIC (Day 1 exam notebook not re-pickable in IL2CPP build) — remove once fixed.
+    protected override void OnHeldStateChanged(bool isHeld)
+    {
+        base.OnHeldStateChanged(isHeld);
+        if (!isHeld && isActiveAndEnabled)
+            StartCoroutine(LogDropDiagnostics());
+    }
+
+    private IEnumerator LogDropDiagnostics()
+    {
+        // Let OnUnequip / placement / any late RPCs settle first.
+        yield return new WaitForSeconds(1f);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"[PickupDiag] Notebook '{name}' (id={NetworkObjectId}) 1s after release: {DescribeInteractState()}");
+        sb.Append($" | currentPage={currentPage} rippedMask={_rippedPageMask.Value} pages:");
+        if (pages != null)
+        {
+            for (int i = 0; i < pages.Length; i++)
+            {
+                ExamPage p = pages[i];
+                if (p == null) { sb.Append($" [{i}]null"); continue; }
+                sb.Append($" [{i}]ripped={p.isRippedOut} active={p.gameObject.activeInHierarchy} cols=");
+                foreach (Collider c in p.GetComponentsInChildren<Collider>(true))
+                    if (c.enabled && c.gameObject.activeInHierarchy)
+                        sb.Append($"{c.name}(trig={c.isTrigger},layer={LayerMask.LayerToName(c.gameObject.layer)}),");
+            }
+        }
+        Debug.Log(sb.ToString());
+    }
+
     public override void OnStowed()
     {
         base.OnStowed();

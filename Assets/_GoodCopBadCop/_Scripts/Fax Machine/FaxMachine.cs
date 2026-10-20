@@ -37,7 +37,8 @@ public class FaxMachine : NetworkBehaviour
         if (IsServer)
         {
             ShiftManager.Instance.OnNightPhaseBegin += SpawnNewspaper;
-            ShiftManager.Instance.OnDayStart += SpawnDailyFax;
+            // The daily fax arrives once the team clocks in, not at day start.
+            TimecardMachine.OnClockInServer += SpawnDailyFax;
         }
     }
 
@@ -46,8 +47,9 @@ public class FaxMachine : NetworkBehaviour
         base.OnNetworkDespawn();
         if (IsServer)
         {
-            ShiftManager.Instance.OnNightPhaseBegin -= SpawnNewspaper;
-            ShiftManager.Instance.OnDayStart -= SpawnDailyFax;
+            if (ShiftManager.Instance != null)
+                ShiftManager.Instance.OnNightPhaseBegin -= SpawnNewspaper;
+            TimecardMachine.OnClockInServer -= SpawnDailyFax;
         }
 
         if (_activeFaxPickable != null)
@@ -64,8 +66,14 @@ public class FaxMachine : NetworkBehaviour
         StartCoroutine(WaitAndSpawnNewspaper());
     }
 
+    /// <summary>
+    /// Server-only. Fired by <see cref="TimecardMachine.OnClockInServer"/> the moment a clock-in
+    /// punch is accepted (only possible during PreShift, once per day).
+    /// </summary>
     private void SpawnDailyFax()
     {
+        if (this == null || !IsServer || ShiftManager.Instance == null) return;
+
         if (ShiftManager.Instance.CurrentDay <= 1)
         {
             Debug.Log("[FaxMachine] Day 1 — skipping daily fax spawn.");

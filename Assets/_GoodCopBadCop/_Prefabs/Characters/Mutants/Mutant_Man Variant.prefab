@@ -1551,7 +1551,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1951861783744858543, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: _Editor_OnValidateTrigger
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1951861783744858543, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: Legs.Array.data[0].BoneEnd
@@ -2014,6 +2014,8 @@ MonoBehaviour:
   - {fileID: 5030230779486806422}
   forceToApplyOnActivate: {x: 0, y: 0, z: 0}
   activateOnAwake: 0
+  maxDepenetrationVelocity: 1
+  continuousCollisionOnActivate: 1
   headTransform: {fileID: 0}
   bodyArmsMesh: {fileID: 0}
   firstPersonArms: {fileID: 0}

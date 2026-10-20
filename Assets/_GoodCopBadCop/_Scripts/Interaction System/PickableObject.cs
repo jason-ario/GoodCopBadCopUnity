@@ -162,10 +162,43 @@ public class PickableObject : Interactable
     /// GameObject in sync. Without this, only the owner's local <c>SetActive(false)</c> call
     /// took effect, leaving the item visibly floating at the stow point for other players.
     /// </summary>
-    private NetworkVariable<bool> _isStowed = new NetworkVariable<bool>(
-        false,
+    /// <remarks>
+    /// Carries the requester and its request sequence alongside the flag so the requesting peer can
+    /// tell the echo of its LATEST request apart from echoes of earlier ones (rapid hotbar toggling
+    /// produces stowed=true/false/true echoes). Server-forced writes use
+    /// <see cref="StowState.ServerForced"/> and are applied by every peer.
+    /// </remarks>
+    private NetworkVariable<StowState> _isStowed = new NetworkVariable<StowState>(
+        StowState.Forced(false),
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
+
+    /// <summary>Replicated stowed flag plus the request that produced it.</summary>
+    public struct StowState : INetworkSerializable, System.IEquatable<StowState>
+    {
+        /// <summary>Requester id used for server-forced changes (death drop, restore, release).</summary>
+        public const ulong ServerForced = ulong.MaxValue;
+
+        public bool  Stowed;
+        public ulong RequesterClientId;
+        public uint  RequestSeq;
+
+        public static StowState Forced(bool stowed) =>
+            new StowState { Stowed = stowed, RequesterClientId = ServerForced, RequestSeq = 0 };
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref Stowed);
+            serializer.SerializeValue(ref RequesterClientId);
+            serializer.SerializeValue(ref RequestSeq);
+        }
+
+        public bool Equals(StowState other) =>
+            Stowed == other.Stowed && RequesterClientId == other.RequesterClientId && RequestSeq == other.RequestSeq;
+
+        public override bool Equals(object obj) => obj is StowState other && Equals(other);
+        public override int GetHashCode() => System.HashCode.Combine(Stowed, RequesterClientId, RequestSeq);
+    }
 
     /// <summary>
     /// True while the holder has this item hidden in hand because their guidebook is open.
@@ -258,7 +291,7 @@ public class PickableObject : Interactable
         ApplyHeldHighlightSuppression(IsHeld);
 
         // Late-joining clients need to inherit the current stowed / guidebook-hidden visibility too.
-        gameObject.SetActive(!_isStowed.Value && !_isHiddenForGuidebook.Value);
+        gameObject.SetActive(!_isStowed.Value.Stowed && !_isHiddenForGuidebook.Value);
         if (_isHiddenForGuidebook.Value)
             OnHiddenForGuidebookNetworked(true);
 
@@ -306,25 +339,23 @@ public class PickableObject : Interactable
     /// Applies the server-authoritative stowed state to this instance's GameObject on every
     /// client, keeping remote players' view of the object in sync with the owner's.
     /// </summary>
-    private void OnIsStowedChanged(bool previousValue, bool newValue)
+    private void OnIsStowedChanged(StowState previousState, StowState newState)
     {
-        // The requesting peer already applied its stow/unstow locally. A replicated value that
-        // disagrees with its most recent request is a stale echo of an earlier request (fast
-        // hotbar toggling, or a slot swap followed by a quick placement) — applying it would
-        // hide an item that's back in hand, or re-show a stowed one, which PlayerInventory
-        // then treats as "released to the world" and silently drops from its slot.
-        if (_pendingStowIntent.HasValue)
+        // The requesting peer already applied its stow/unstow locally. Any echo of one of its
+        // requests other than the LATEST is stale (fast hotbar toggling sends true/false/true,
+        // or a slot swap followed by a quick placement) — applying it would hide an item that's
+        // back in hand, or re-show a stowed one, which PlayerInventory then treats as "released
+        // to the world" and drops from its slot; the final echo then hid it again, deleting the
+        // item for good. The old single-intent filter cleared itself on the first matching echo
+        // and let the next stale one through. Server-forced writes are always applied.
+        NetworkManager nm = NetworkManager;
+        if (nm != null && newState.RequesterClientId == nm.LocalClientId && newState.RequestSeq != _localStowRequestSeq)
         {
-            if (newValue == _pendingStowIntent.Value || Time.unscaledTime > _pendingStowIntentExpiry)
-            {
-                _pendingStowIntent = null;
-            }
-            else
-            {
-                Debug.LogWarning($"[PickableObject] Ignored stale stowed={newValue} echo on '{name}' (latest local request: stowed={_pendingStowIntent.Value}).", this);
-                return;
-            }
+            Debug.LogWarning($"[PickableObject] Ignored stale stowed={newState.Stowed} echo on '{name}' (request #{newState.RequestSeq}, latest local request #{_localStowRequestSeq}).", this);
+            return;
         }
+
+        bool newValue = newState.Stowed;
 
         // Deactivating kills any coroutine mid-flight on every peer, so drop the busy latches
         // here as well as in the owner's stow path — otherwise the item comes back "busy".
@@ -458,22 +489,25 @@ public class PickableObject : Interactable
     /// </summary>
     public void RequestSetStowedNetworked(bool stowed)
     {
-        // Remember the latest local intent so OnIsStowedChanged can ignore out-of-date echoes.
-        // Expires so a coalesced (never-echoed) request can't block later server-forced changes
-        // such as a death drop or disconnect rescue.
-        _pendingStowIntent = stowed;
-        _pendingStowIntentExpiry = Time.unscaledTime + StowIntentTimeout;
-        SetStowedServerRpc(stowed);
+        // Number every request so OnIsStowedChanged only honours the echo of the latest one.
+        // Server-forced changes (death drop, disconnect rescue, restore) carry no requester and
+        // are never filtered, so nothing needs to expire.
+        _localStowRequestSeq++;
+        SetStowedServerRpc(stowed, _localStowRequestSeq);
     }
 
-    private const float StowIntentTimeout = 3f;
-    private bool? _pendingStowIntent;
-    private float _pendingStowIntentExpiry;
+    /// <summary>Local, per-peer counter of this peer's stow/unstow requests for this item.</summary>
+    private uint _localStowRequestSeq;
 
     [ServerRpc(RequireOwnership = false)]
-    private void SetStowedServerRpc(bool stowed)
+    private void SetStowedServerRpc(bool stowed, uint requestSeq, ServerRpcParams rpcParams = default)
     {
-        _isStowed.Value = stowed;
+        _isStowed.Value = new StowState
+        {
+            Stowed            = stowed,
+            RequesterClientId = rpcParams.Receive.SenderClientId,
+            RequestSeq        = requestSeq
+        };
     }
 
     /// <summary>
@@ -514,7 +548,7 @@ public class PickableObject : Interactable
         if (nm != null && _holdingClientId.Value == nm.LocalClientId) return;
 
         if (newValue) ForceClearUseState();
-        gameObject.SetActive(!newValue && !_isStowed.Value);
+        gameObject.SetActive(!newValue && !_isStowed.Value.Stowed);
         OnHiddenForGuidebookNetworked(newValue);
     }
 
@@ -661,9 +695,8 @@ public class PickableObject : Interactable
             return;
         }
 
-        _pendingStowIntent = null;
-        if (_isStowed.Value)
-            _isStowed.Value = false;
+        if (_isStowed.Value.Stowed)
+            _isStowed.Value = StowState.Forced(false);
         ClearHiddenForGuidebookServer();
         gameObject.SetActive(true);
         RemoveParent();
@@ -1024,8 +1057,7 @@ public class PickableObject : Interactable
         }
 
         // Clear the hidden state first so the object is visible/active again on every client.
-        _pendingStowIntent = null;
-        if (_isStowed.Value) _isStowed.Value = false;
+        if (_isStowed.Value.Stowed) _isStowed.Value = StowState.Forced(false);
         ClearHiddenForGuidebookServer();
         gameObject.SetActive(true);
 
@@ -1073,8 +1105,7 @@ public class PickableObject : Interactable
             return;
         }
 
-        _pendingStowIntent = null;
-        if (_isStowed.Value) _isStowed.Value = false;
+        if (_isStowed.Value.Stowed) _isStowed.Value = StowState.Forced(false);
         ClearHiddenForGuidebookServer();
         gameObject.SetActive(true);
 
@@ -1759,17 +1790,49 @@ public class PickableObject : Interactable
     {
         base.Interact(player);
         
-        if (!CanPickUpManually) return;
+        if (!CanPickUpManually) { LogPickupRejected("CanPickUpManually=false"); return; }
 
         // IsHeldByOtherPlayer relies on a NetworkVariable that only updates after a server
         // round-trip. To close the race window where two players click the same object in the
         // same frame, also reject the interaction if the object's colliders are already
         // disabled — they are disabled locally and immediately in PickUpObject before the RPC
         // lands, acting as an optimistic lock visible to both players on the same client.
-        if (IsHeldByOtherPlayer) return;
-        if (!IsInteractable()) return;
+        if (IsHeldByOtherPlayer) { LogPickupRejected("IsHeldByOtherPlayer"); return; }
+        if (!IsInteractable()) { LogPickupRejected("no enabled collider (IsInteractable()=false)"); return; }
 
         player.pickupController.PickUpObject(this);
+    }
+
+    // TEMP DIAGNOSTIC (Day 1 exam notebook not re-pickable in IL2CPP build) — remove once fixed.
+    private void LogPickupRejected(string reason) =>
+        Debug.LogWarning($"[PickupDiag] Pickup of '{name}' rejected: {reason} | {DescribeInteractState()}");
+
+    /// <summary>
+    /// TEMP DIAGNOSTIC: one-line dump of everything that gates picking this object up
+    /// (holder, networked override/lock, root + cached InteractableCollider state, layer).
+    /// </summary>
+    public string DescribeInteractState()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"active={gameObject.activeInHierarchy} enabled={enabled} layer={LayerMask.LayerToName(gameObject.layer)} ");
+        sb.Append($"spawned={IsSpawned} holder={(IsSpawned ? _holdingClientId.Value.ToString() : "n/a")} ");
+        sb.Append($"override={(IsSpawned ? _networkInteractableOverride.Value.ToString() : "n/a")} locked={_interactableLocked} ");
+        sb.Append($"canPickUp={CanPickUpManually} stowed={(IsSpawned && _isStowed.Value.Stowed)} ");
+        sb.Append("rootColliders=[");
+        foreach (Collider col in GetComponents<Collider>())
+            sb.Append($"{col.GetType().Name}(en={col.enabled},trig={col.isTrigger}) ");
+        sb.Append("] cachedICs=[");
+        if (interactableColliders != null)
+        {
+            foreach (var ic in interactableColliders)
+            {
+                if (ic == null) { sb.Append("null "); continue; }
+                Collider c = ic.GetComponent<Collider>();
+                sb.Append($"{ic.name}(ic={ic.enabled},col={(c != null && c.enabled)},act={ic.gameObject.activeInHierarchy}) ");
+            }
+        }
+        sb.Append(']');
+        return sb.ToString();
     }
 
     /// <summary>

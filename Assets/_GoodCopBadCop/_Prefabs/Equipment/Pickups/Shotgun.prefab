@@ -116,6 +116,8 @@ MonoBehaviour:
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
   overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   itemData: {fileID: 11400000, guid: 92d7f584cbed9394aac938b01265850f, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
@@ -123,11 +125,18 @@ MonoBehaviour:
   _cinemachineImpulseSource: {fileID: 34011713963651759}
   muzzleFlashLight: {fileID: 5262919890385291292}
   lightOnTime: 0.2
-  _playerPelletDamage: 8
+  _pelletTrailPrefab: {fileID: 2479173788583674994, guid: 1ec585e0d2a577944ba271d55a3f752f, type: 3}
+  _playerPelletDamage: 1
   _mutantPelletDamage: 10
   _pelletCount: 8
   _spreadAngle: 10
   _bulletRange: 25
+  _fireGate:
+    _shootStateTag: GunShoot
+    _minInterval: 0.1
+    _fallbackCooldown: 0.6
+    _enterTimeout: 0.3
+    _maxLock: 3
   _shootSound: {fileID: 8300000, guid: 7a327aad0d14748d4a1dca3e1dcf73cc, type: 3}
   _shootSoundVolume: 1
   _shootSoundPitch: 0.8

@@ -8047,6 +8047,8 @@ MonoBehaviour:
   camLeftArmRig: {fileID: 3074006920022377660}
   camRightArmIKTarget: {fileID: 8624350057523593228}
   camLeftArmIKTarget: {fileID: 368350669728821417}
+  useStableLeftElbowPole: 1
+  leftElbowPoleDirection: {x: -0.5, y: -1, z: 0}
   headPitchWeight: 0.1
   neckPitchWeight: 0.1
   spinePitchWeight: 0.2
@@ -9113,6 +9115,7 @@ MonoBehaviour:
   attackHitDelay: 0.4
   useSecondAttackAnimation: 0
   secondAttackStateName: Mutant Attack 2
+  secondAttackHitDelay: 0.4
   enableHitAnimation: 0
   hitTriggerName: Hit
   doorDetectionRadius: 3
@@ -10085,6 +10088,8 @@ MonoBehaviour:
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
   overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   _destroyOnCollect: 0
   _kickable: 0
   _burnable: 0

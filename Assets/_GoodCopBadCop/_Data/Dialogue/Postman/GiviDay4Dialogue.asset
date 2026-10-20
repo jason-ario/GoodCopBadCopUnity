@@ -15,7 +15,7 @@ MonoBehaviour:
   isForced: 0
   nodes:
   - type: 0
-    npcLine: The final dispatch, Officer. I think it's the last one.
+    npcLine: The last dispatch, Officer. The satchel feels heavier than it should.
     animationTrigger: FakeCough
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -23,7 +23,7 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: My eyes are going. The fog keeps telling me to pull the wires down.
+    npcLine: Everything's green at the edges. The fog tells me to pull the wires down.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -31,30 +31,30 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: Don't listen to it.
-      npcResponse: I'm trying. It speaks in my voice now. That's the trouble.
+      npcResponse: It speaks in my voice now. I can't tell which of us is talking.
       npcFollowUp: 
       animationTrigger: Talk1
       playLaughSfx: 0
-    - playerChoiceText: Can you still walk?
-      npcResponse: Walk, yes. The route is the only thing I still remember.
+    - playerChoiceText: You should rest.
+      npcResponse: Rest is where it gets in. If I stop walking, I stop being me.
       npcFollowUp: 
-      animationTrigger: TalkShrug
+      animationTrigger: Talk1
       playLaughSfx: 0
   - type: 1
-    npcLine: There's a story in my satchel. I finished it last night.
-    animationTrigger: Talk2
+    npcLine: There's a story in my satchel. The first thing I've finished in years.
+    animationTrigger: Talk3
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
     choices:
     - playerChoiceText: Who's it for?
-      npcResponse: The officer at the gate. You'll know if it's any good.
+      npcResponse: The officer at the gate. Read it when I'm gone, not before.
       npcFollowUp: 
       animationTrigger: Talk3
       playLaughSfx: 0
     - playerChoiceText: What's it about?
-      npcResponse: A man who carried the news until he forgot his own name.
+      npcResponse: A postman who forgot his own name. Not much of a plot.
       npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0

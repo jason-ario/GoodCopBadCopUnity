@@ -30,6 +30,14 @@ public class StartCampaignScreen : MonoBehaviour
              "Day 0\") and never updated to reflect the actual chosen save slot.")]
     [SerializeField] private TextMeshProUGUI dayNumberText;
 
+    [Header("Invite Slots")]
+    [Tooltip("Left label on each empty seat in the player list. Clicking the row opens the Steam invite overlay.")]
+    [SerializeField] private string inviteSlotLabel = "Invite a Friend";
+    [Tooltip("Right label on each empty seat in the player list.")]
+    [SerializeField] private string openSlotLabel = "Open Slot";
+    [Tooltip("Toast shown when the Steam overlay can't open and the code is copied instead.")]
+    [SerializeField] private string overlayUnavailableCopiedMessage = "Steam overlay unavailable - code copied, send it to a friend";
+
     [Header("Copy Feedback")]
     [Tooltip("Optional pre-built \"Copied to clipboard\" toast. If left empty, one is generated at " +
              "runtime underneath the copy button, reusing the ready checkmark sprite and invite code font.")]
@@ -223,6 +231,8 @@ public class StartCampaignScreen : MonoBehaviour
             SpawnPanel(localName, isReady: true, isHost: true);
         }
 
+        SpawnInviteSlots(hasLobby ? members.Length : 1);
+
         EvaluateStartButton(members);
 
         if (waitForHostText != null)
@@ -238,6 +248,26 @@ public class StartCampaignScreen : MonoBehaviour
         panel.gameObject.SetActive(true);
         panel.PopulateInfo(playerName, isReady, isHost);
         _spawnedPanels.Add(panel);
+    }
+
+    /// <summary>
+    /// Fills every free seat (up to <see cref="DevSpectatorConfig.MaxPlayers"/>) with a clickable
+    /// "Invite a Friend" row so it's obvious the campaign can be played co-op. Any lobby member
+    /// may invite — Steam lobbies don't restrict invites to the owner.
+    /// </summary>
+    private void SpawnInviteSlots(int occupiedSeats)
+    {
+        if (!_isMultiplayer || panelPrefab == null || panelsContainer == null) return;
+
+        int openSeats = DevSpectatorConfig.MaxPlayers - occupiedSeats;
+        for (int i = 0; i < openSeats; i++)
+        {
+            PlayerInfoPanel panel = Instantiate(panelPrefab, panelsContainer);
+            panel.name = "Invite Slot";
+            panel.gameObject.SetActive(true);
+            panel.PopulateInviteSlot(Loc.T(inviteSlotLabel), Loc.T(openSlotLabel), InviteFriend);
+            _spawnedPanels.Add(panel);
+        }
     }
 
     /// <summary>Destroys all previously spawned panels.</summary>
@@ -299,27 +329,45 @@ public class StartCampaignScreen : MonoBehaviour
     // Invite
     // ---------------------------------------------------------------------------
 
-    /// <summary>Opens the Steam invite overlay. Only valid in multiplayer.</summary>
+    /// <summary>
+    /// Opens the Steam invite overlay. When the overlay can't open (Steam not running, overlay
+    /// disabled, Editor) the main menu has no error HUD, so copy the join code instead and say so.
+    /// </summary>
     public void InviteFriend()
     {
+        if (!IsSteamOverlayAvailable())
+        {
+            CopyInviteCodeWithMessage(Loc.T(overlayUnavailableCopiedMessage));
+            return;
+        }
+
         LobbyManager.Instance.OpenInviteFriendsPopup();
     }
 
+    private static bool IsSteamOverlayAvailable()
+    {
+        if (!SteamClient.IsValid) return false;
+        try { return SteamUtils.IsOverlayEnabled; }
+        catch (System.Exception) { return false; }
+    }
+
     /// <summary>Copies the current join code to the system clipboard.</summary>
-    public void CopyInviteCode()
+    public void CopyInviteCode() => CopyInviteCodeWithMessage(Loc.T(copiedMessage));
+
+    private void CopyInviteCodeWithMessage(string feedbackMessage)
     {
         string code = LobbyManager.Instance.CurrentJoinCode;
         if (string.IsNullOrEmpty(code)) return;
 
         GUIUtility.systemCopyBuffer = code;
-        ShowCopiedNotification();
+        ShowCopiedNotification(feedbackMessage);
     }
 
     // ---------------------------------------------------------------------------
     // Copy Feedback
     // ---------------------------------------------------------------------------
 
-    private void ShowCopiedNotification()
+    private void ShowCopiedNotification(string message)
     {
         if (copiedNotification == null)
             copiedNotification = BuildCopiedNotification();
@@ -327,6 +375,9 @@ public class StartCampaignScreen : MonoBehaviour
             _copiedBasePosition = ((RectTransform)copiedNotification.transform).anchoredPosition;
         if (copiedNotification == null) return;
         _copiedBaseCaptured = true;
+
+        TextMeshProUGUI label = copiedNotification.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (label != null) label.text = message;
 
         // Restart cleanly on repeated clicks.
         if (_copiedRoutine != null)
@@ -421,9 +472,10 @@ public class StartCampaignScreen : MonoBehaviour
         var rect = (RectTransform)root.transform;
         rect.SetParent(anchorButton.transform, false);
 
-        // Hang below the button's bottom edge, centered.
-        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
-        rect.pivot = new Vector2(0.5f, 1f);
+        // Hang below the button's bottom edge, left-aligned with it so longer messages
+        // (e.g. the overlay-unavailable fallback) grow rightward instead of off-screen.
+        rect.anchorMin = rect.anchorMax = new Vector2(0f, 0f);
+        rect.pivot = new Vector2(0f, 1f);
         _copiedBasePosition = new Vector2(0f, -copiedOffsetBelowButton);
         rect.anchoredPosition = _copiedBasePosition;
 
@@ -436,7 +488,7 @@ public class StartCampaignScreen : MonoBehaviour
 
         var layout = root.GetComponent<HorizontalLayoutGroup>();
         layout.spacing = copiedFontSize * 0.3f;
-        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childAlignment = TextAnchor.MiddleLeft;
         layout.childControlWidth = layout.childControlHeight = true;
         layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 

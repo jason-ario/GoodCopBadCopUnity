@@ -29,6 +29,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 5121497498241078416}
     - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+      propertyPath: attackHitDelay
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: fleeInsteadOfDie
       value: 1
       objectReference: {fileID: 0}
@@ -36,6 +40,10 @@ PrefabInstance:
       propertyPath: ragdollController
       value: 
       objectReference: {fileID: 2867343745489107827}
+    - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
+      propertyPath: secondAttackHitDelay
+      value: 0.53
+      objectReference: {fileID: 0}
     - target: {fileID: 382862180593633284, guid: ed7046db0448a1b44a713eb49a097e81, type: 3}
       propertyPath: _hurtSounds.Array.size
       value: 1
@@ -5044,6 +5052,8 @@ MonoBehaviour:
   - {fileID: 3070987524886969917}
   forceToApplyOnActivate: {x: 0, y: 0, z: 0}
   activateOnAwake: 0
+  maxDepenetrationVelocity: 1
+  continuousCollisionOnActivate: 1
   headTransform: {fileID: 139888931819108268}
   bodyArmsMesh: {fileID: 0}
   firstPersonArms: {fileID: 0}

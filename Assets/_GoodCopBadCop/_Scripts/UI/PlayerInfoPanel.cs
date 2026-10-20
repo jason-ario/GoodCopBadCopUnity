@@ -1,6 +1,8 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.UI;
 
 /// <summary>
 /// Displays a single player's name, ready state, and host status in the pre-game lobby screen.
@@ -28,6 +30,39 @@ public class PlayerInfoPanel : MonoBehaviour
         SetReady(isReady);
         SetHost(isHost);
     }
+
+    /// <summary>
+    /// Turns this panel into a clickable empty-seat row ("Invite a Friend" / "Open Slot") for the
+    /// pre-game lobby. Panels are destroyed and re-spawned on every lobby refresh, so this never
+    /// needs to be reverted back to a player row.
+    /// </summary>
+    public void PopulateInviteSlot(string label, string slotText, UnityAction onClick)
+    {
+        userNameText.text = label;
+        userNameText.color = InviteLabelColor;
+        SetHost(false);
+
+        if (readyIndicator != null)
+        {
+            readyIndicator.text = slotText;
+            readyIndicator.color = OpenSlotColor;
+        }
+
+        // The background panel is the only raycast-target Image; use it as the button graphic.
+        Image background = GetComponentInChildren<Image>(true);
+        if (background != null) background.color *= InviteBackgroundTint;
+
+        if (!TryGetComponent(out Button button))
+            button = gameObject.AddComponent<Button>();
+        button.targetGraphic = background;
+        button.transition = Selectable.Transition.ColorTint;
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(onClick);
+    }
+
+    private static readonly Color InviteLabelColor     = new Color(0f, 0f, 0f, 0.75f);
+    private static readonly Color OpenSlotColor        = new Color(0.25f, 0.25f, 0.25f, 0.8f);
+    private static readonly Color InviteBackgroundTint = new Color(1f, 1f, 1f, 0.6f);
 
     /// <summary>Updates the ready indicator without changing the player name or host icon.</summary>
     public void SetReady(bool isReady)

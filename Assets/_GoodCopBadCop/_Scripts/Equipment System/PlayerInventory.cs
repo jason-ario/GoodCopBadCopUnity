@@ -286,6 +286,7 @@ public class PlayerInventory : NetworkBehaviour
             if (player.IsInCutscene) return "player is in a cutscene";
             if (ScriptedDialogueRunner.IsScriptedModeActive) return "scripted dialogue is active";
             if (DialogueChoiceSystem.IsInDialogueMode) return "dialogue choice mode is active";
+            if (DialogueChoiceSystem.IsPostDialogueInputBlocked) return "post-dialogue input lockout";
             if (!player.CanControl) return "player control is disabled (CanControl=false)";
             if (player.IsViewingShiftReport) return "shift report is open";
         }

@@ -1,4 +1,5 @@
-using Unity.VisualScripting;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class TrashCan : Interactable
@@ -13,7 +14,48 @@ public class TrashCan : Interactable
 
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip throwTrashSound;
-    
+
+    // ── Shared discard registry ──────────────────────────────────────────────
+    // Other discard targets (e.g. DumpsterInteractable) reuse whatever the scene's trash
+    // can(s) accept, so the accept list stays authored in one place.
+
+    private static readonly List<TrashCan> s_instances = new();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_instances.Clear();
+
+    protected override void Awake()
+    {
+        base.Awake();
+        if (!s_instances.Contains(this))
+            s_instances.Add(this);
+    }
+
+    public override void OnDestroy()
+    {
+        s_instances.Remove(this);
+        base.OnDestroy();
+    }
+
+    /// <summary>
+    /// True when any trash can in the loaded scenes would accept <paramref name="item"/>
+    /// (its inspector list, or folders by type). Lets other targets mirror the trash can's
+    /// accepted items without duplicating the list.
+    /// </summary>
+    public static bool IsAcceptedByAnyTrashCan(PickableObject item)
+    {
+        if (item == null) return false;
+        for (int i = s_instances.Count - 1; i >= 0; i--)
+        {
+            TrashCan can = s_instances[i];
+            if (can == null) { s_instances.RemoveAt(i); continue; }
+            if (can.CanInteractWithItem(item)) return true;
+        }
+        return false;
+    }
+
+    // ── Interactable ─────────────────────────────────────────────────────────
+
     public override void Interact(PlayerInteractionController player)
     {
         //throw trash
@@ -41,7 +83,27 @@ public class TrashCan : Interactable
     {
         base.InteractWithItem(playerInteractionController, item);
 
-        if (!CanThrowAway(item)) return;
+        RequestThrowAway(playerInteractionController, item, this, () =>
+        {
+            if (audioSource != null && throwTrashSound != null)
+                audioSource.PlayOneShot(throwTrashSound);
+        });
+    }
+
+    // ── Shared discard flow ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Validates <paramref name="item"/> against the discard rules, asks for confirmation, and
+    /// on "Yes" destroys the player's held item and invokes <paramref name="onDiscarded"/>
+    /// (local client; use it for feedback such as sound). Reused by the dumpster.
+    /// </summary>
+    public static void RequestThrowAway(
+        PlayerInteractionController player,
+        PickableObject item,
+        UnityEngine.Object context,
+        Action onDiscarded)
+    {
+        if (!CanThrowAway(item, context)) return;
 
         // Ask first. If the dialog can't open (unassigned / already open / paused), don't discard.
         UIController ui = UIController.Instance;
@@ -52,25 +114,29 @@ public class TrashCan : Interactable
             body: ConfirmDiscardMessage,
             confirmText: "Yes",
             cancelText: "No",
-            onConfirm: () => ConfirmThrowAway(playerInteractionController, item));
+            onConfirm: () => ConfirmThrowAway(player, item, context, onDiscarded));
     }
 
-    private void ConfirmThrowAway(PlayerInteractionController player, PickableObject item)
+    private static void ConfirmThrowAway(
+        PlayerInteractionController player,
+        PickableObject item,
+        UnityEngine.Object context,
+        Action onDiscarded)
     {
         // State may have changed while the popup was open (item dropped/despawned, verdict...).
         if (player == null || item == null || player.pickupController == null) return;
         if (player.pickupController.HeldObject != item) return;
-        if (!CanThrowAway(item)) return;
+        if (!CanThrowAway(item, context)) return;
 
         player.pickupController.DestroyEquippedItem();
-        audioSource.PlayOneShot(throwTrashSound);
+        onDiscarded?.Invoke();
     }
 
     /// <summary>
     /// All discard rules. Shows the matching error notification and returns false when the
     /// item can't be thrown away right now.
     /// </summary>
-    private bool CanThrowAway(PickableObject item)
+    public static bool CanThrowAway(PickableObject item, UnityEngine.Object context = null)
     {
         if (item is FolderItem folderItem && folderItem.BelongsToUnresolvedSuspectAtWindow())
         {
@@ -86,10 +152,10 @@ public class TrashCan : Interactable
 
         if (item is SupplyBox supplyBox)
         {
-            var remaining = new System.Collections.Generic.List<string>();
+            var remaining = new List<string>();
             if (supplyBox.GetItemsStillInBox(remaining) > 0)
             {
-                Debug.Log($"[TrashCan] Supply box not empty — still contains: {string.Join(", ", remaining)}", this);
+                Debug.Log($"[TrashCan] Supply box not empty — still contains: {string.Join(", ", remaining)}", context);
                 UIController.Instance?.ShowErrorNotification(SupplyBoxNotEmptyMessage);
                 return false;
             }

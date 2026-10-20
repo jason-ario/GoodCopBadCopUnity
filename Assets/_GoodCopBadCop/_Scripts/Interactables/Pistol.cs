@@ -60,6 +60,9 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     /// <summary>Hitscan range in metres. Read by the reticle to show the enemy-in-range color.</summary>
     public float BulletRange => _bulletRange;
 
+    [Tooltip("Blocks the next shot until the arms finish the shoot animation (state tag GunShoot).")]
+    [SerializeField] private GunFireGate _fireGate = new();
+
     [Header("Pistol — Audio")]
     [Tooltip("Gunshot sound played on every client when a round is fired.")]
     [SerializeField] private AudioClip _shootSound;
@@ -158,6 +161,10 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     {
         base.OnStartUse();
 
+        PlayerAnimationController anim = playerPickupController != null ? playerPickupController.PlayerAnimationController : null;
+        if (!_fireGate.CanFire(anim))
+            return;
+
         if (_roundsRemaining.Value <= 0)
         {
             if (_emptySound != null)
@@ -165,9 +172,11 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             return;
         }
 
+        _fireGate.RegisterShot();
+
         Camera cam = Camera.main;
         PlayShootFX(cam.transform.forward);
-        playerPickupController.PlayerAnimationController.SetAnimTrigger("Shoot");
+        if (anim != null) anim.SetAnimTrigger("Shoot");
         _cinemachineImpulseSource?.GenerateImpulse();
 
         PlayerMovementController movement = playerPickupController.GetComponent<PlayerMovementController>();
@@ -561,3 +570,89 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             SFXController.Instance.PlayAtPosition(_reloadSound, transform.position);
     }
 }
+
+// NOTE: GunFireGate lives here because Unity left the new GunFireGate.cs out of Assembly-CSharp.rsp
+// (same CS0246 glitch as MeleeWeaponPickable). To move it, cut it into GunFireGate.cs and reimport.
+
+/// <summary>
+/// Owner-side fire-rate lock shared by hitscan guns (<see cref="Pistol"/>, <see cref="Shotgun"/>).
+///
+/// After a shot, the next one is refused until the first-person arms have entered and then fully
+/// left the gun's shoot state (tagged "GunShoot" in Player.controller, blend back included), and at
+/// least the minimum interval has passed. If the arms animator can't be queried, it falls back to a
+/// plain timer so firing never soft-locks.
+/// </summary>
+[Serializable]
+public class GunFireGate
+{
+    [Tooltip("Animator state tag on this gun's shoot state(s) in Player.controller.")]
+    [SerializeField] private string _shootStateTag = "GunShoot";
+
+    [Tooltip("Minimum seconds between shots, even if the shoot animation finishes sooner.")]
+    [SerializeField] [Min(0f)] private float _minInterval = 0.1f;
+
+    [Tooltip("Cooldown in seconds used when the arms animator can't be queried.")]
+    [SerializeField] [Min(0f)] private float _fallbackCooldown = 0.6f;
+
+    [Tooltip("Max seconds to wait for the arms to enter the shoot state after firing before unlocking.")]
+    [SerializeField] [Min(0f)] private float _enterTimeout = 0.3f;
+
+    [Tooltip("Safety cap: the lock always releases after this many seconds.")]
+    [SerializeField] [Min(0.1f)] private float _maxLock = 3f;
+
+    private float _lastShotTime = float.NegativeInfinity;
+    private bool _enteredShootState;
+    private string _cachedTag;
+    private int _tagHash;
+
+    private int TagHash
+    {
+        get
+        {
+            if (_cachedTag != _shootStateTag)
+            {
+                _cachedTag = _shootStateTag;
+                _tagHash = Animator.StringToHash(_shootStateTag ?? string.Empty);
+            }
+            return _tagHash;
+        }
+    }
+
+    /// <summary>True when the owner may fire again.</summary>
+    public bool CanFire(PlayerAnimationController anim)
+    {
+        float since = Time.time - _lastShotTime;
+        if (since < _minInterval) return false;
+        if (since >= _maxLock) return true;
+
+        if (anim == null || !anim.CanQueryArmsState || string.IsNullOrEmpty(_shootStateTag))
+            return since >= _fallbackCooldown;
+
+        if (anim.IsArmsInTaggedState(TagHash))
+        {
+            _enteredShootState = true;
+            return false;
+        }
+
+        // The trigger is consumed on the animator's next update, so give the arms a moment to enter.
+        if (!_enteredShootState && since < _enterTimeout)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>Call right after a round is actually fired.</summary>
+    public void RegisterShot()
+    {
+        _lastShotTime = Time.time;
+        _enteredShootState = false;
+    }
+
+    /// <summary>Clears the lock (e.g. when the gun changes hands).</summary>
+    public void Reset()
+    {
+        _lastShotTime = float.NegativeInfinity;
+        _enteredShootState = false;
+    }
+}
+

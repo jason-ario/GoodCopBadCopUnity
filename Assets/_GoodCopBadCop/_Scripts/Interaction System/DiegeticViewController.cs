@@ -87,6 +87,16 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// </summary>
     private readonly List<GameObject> _hiddenOtherPlayerBodies = new();
 
+    /// <summary>
+    /// Renderers disabled locally by <see cref="HideHeldItems"/>: the local held item, the
+    /// player-root LineRenderers (throw arc), and other players' proxy held items. Restored on close.
+    /// </summary>
+    private readonly List<Renderer> _hiddenHeldItemRenderers = new();
+
+    /// <summary>Local held item whose renderers are currently hidden; used to catch items acquired mid-view.</summary>
+    private PickableObject _hiddenLocalHeldObject;
+    private PlayerPickupController _localPickup;
+
     /// <summary>Cached outdoor/indoor state at the moment this view opened, restored on close.</summary>
     private bool _preOpenLightActive;
 
@@ -176,6 +186,9 @@ public abstract class DiegeticViewController : MonoBehaviour
         // toggle (like the one above), so it doesn't affect what anyone else sees. Without it,
         // the other player standing near this locker/panel would visually block the view's contents.
         HideOtherPlayers();
+
+        if (HideHeldItems)
+            HideHeldItemRenderers(player);
 
         // Diegetic views must never leave the player's point light off — force it on
         // regardless of any indoor/outdoor state or other system that may have hidden it,
@@ -288,6 +301,70 @@ public abstract class DiegeticViewController : MonoBehaviour
         }
 
         ShowOtherPlayers();
+        RestoreHeldItemRenderers();
+    }
+
+    /// <summary>
+    /// Locally disables renderers on the local player's held world item, the player-root
+    /// LineRenderers (throw arc), and every other player's proxy held item. Held items follow
+    /// the hand socket via ParentConstraint rather than parenting, so hiding Player_Arms/Art
+    /// leaves them floating in front of the view camera. Renderer-only: the item is a live
+    /// NetworkObject and must never be SetActive(false).
+    /// </summary>
+    private void HideHeldItemRenderers(PlayerInteractionController player)
+    {
+        _localPickup = player.GetComponent<PlayerPickupController>();
+        HideLocalHeldObject();
+
+        foreach (LineRenderer line in player.GetComponentsInChildren<LineRenderer>())
+            HideRenderer(line);
+
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null) return;
+
+        NetworkObject localPlayerObject = player.GetComponent<NetworkObject>();
+        foreach (var client in networkManager.ConnectedClientsList)
+        {
+            NetworkObject playerObject = client.PlayerObject;
+            if (playerObject == null || playerObject == localPlayerObject) continue;
+
+            PickableObject otherHeld = playerObject.GetComponent<PlayerPickupController>()?.ProxyHeldObject;
+            if (otherHeld != null)
+                HideRenderersUnder(otherHeld.gameObject);
+        }
+    }
+
+    /// <summary>Hides the local held item's renderers and remembers which item was hidden.</summary>
+    private void HideLocalHeldObject()
+    {
+        _hiddenLocalHeldObject = _localPickup != null ? _localPickup.HeldObject : null;
+        if (_hiddenLocalHeldObject != null)
+            HideRenderersUnder(_hiddenLocalHeldObject.gameObject);
+    }
+
+    private void HideRenderersUnder(GameObject root)
+    {
+        foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+            HideRenderer(r);
+    }
+
+    private void HideRenderer(Renderer r)
+    {
+        if (r == null || !r.enabled || _hiddenHeldItemRenderers.Contains(r)) return;
+        r.enabled = false;
+        _hiddenHeldItemRenderers.Add(r);
+    }
+
+    /// <summary>Re-enables only the renderers hidden by <see cref="HideHeldItemRenderers"/>.</summary>
+    private void RestoreHeldItemRenderers()
+    {
+        foreach (Renderer r in _hiddenHeldItemRenderers)
+            if (r != null)
+                r.enabled = true;
+
+        _hiddenHeldItemRenderers.Clear();
+        _hiddenLocalHeldObject = null;
+        _localPickup = null;
     }
 
     /// <summary>
@@ -383,6 +460,13 @@ public abstract class DiegeticViewController : MonoBehaviour
     protected virtual bool HidePlayerArms => true;
 
     /// <summary>
+    /// When overridden to return true, held world items (local + other players' proxies) and the
+    /// throw arc are hidden locally while this view is open, including items acquired mid-view.
+    /// Defaults to false. Read once inside <see cref="Open"/>.
+    /// </summary>
+    protected virtual bool HideHeldItems => false;
+
+    /// <summary>
     /// When true (default), the player's point light is forced on for the lifetime of the view
     /// and restored on close. Views that must not affect scene lighting (held item zoom) return false.
     /// </summary>
@@ -442,6 +526,10 @@ public abstract class DiegeticViewController : MonoBehaviour
             Close();
             return;
         }
+
+        // Catch items acquired while the view is open (e.g. a shop purchase that keeps the view up).
+        if (_localPickup != null && _localPickup.HeldObject != _hiddenLocalHeldObject)
+            HideLocalHeldObject();
 
         // Don't process any input or interaction while the game is paused.
         if (UIController.Instance != null && UIController.Instance.IsPaused) return;

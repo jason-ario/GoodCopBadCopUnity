@@ -165,7 +165,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private static readonly Setting[] Graphics =
         {
             new Setting(Loc.N("Display Mode"), "display_mode", Loc.N("Borderless"), Loc.N("Fullscreen"), Loc.N("Windowed")),
-            new Setting(Loc.N("Resolution"), "resolution", "1920 x 1080", "1600 x 900", "1280 x 720"),
+            // Option order must match EScreenResolution.
+            new Setting(Loc.N("Resolution"), "resolution",
+                "3840 x 2160", "3200 x 1800", "2560 x 1440", "1920 x 1080", "1600 x 900", "1280 x 720")
+                .WithDefaultIndex((int)EScreenResolution.R1920x1080),
             new Setting(Loc.N("VSync"), "vsync", Loc.N("Off"), Loc.N("On")),
             new Setting(Loc.N("FPS Limit"), "fps_limit", Loc.N("Unlimited"), "30", "60", "120", "144"),
             new Setting(Loc.N("Quality Preset"), "quality", Loc.N("Low"), Loc.N("Medium"), Loc.N("High"), Loc.N("Ultra")).WithDefaultIndex(3),

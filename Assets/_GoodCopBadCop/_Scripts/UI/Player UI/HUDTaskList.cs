@@ -103,6 +103,7 @@ public class HUDTaskList : MonoBehaviour
             if (threat is CleanGraffitiTask graffitiTask && graffitiTask.HasCustomTutorialRow) continue;
             if (threat is FenceRepairTask fenceTask && fenceTask.HasCustomTutorialRow) continue;
             if (threat is CleanBloodTask bloodTask && bloodTask.HasCustomTutorialRow) continue;
+            if (threat is RepelMutantsTask && RepelMutantsTask.HasCustomTutorialRow) continue;
 
             // Same cleanup tasks are skipped entirely once they become optional (every day after
             // Day 1 — see CleanupTaskGating). They still spawn, still show compass pips, and

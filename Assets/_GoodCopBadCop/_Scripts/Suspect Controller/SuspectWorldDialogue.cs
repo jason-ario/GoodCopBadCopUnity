@@ -338,6 +338,32 @@ public class SuspectWorldDialogue : MonoBehaviour
         speaking.RequestBeginEngagement(OnEngagementResponse);
     }
 
+    /// <summary>
+    /// Allocation-free local check for whether <see cref="BeginConversation"/> would open a
+    /// conversation right now. Drives the "[E] Talk" reticle prompt (see
+    /// <see cref="SuspectCharacter.ShowsInteractPrompt"/>). Keep in sync with BeginConversation's gates.
+    /// </summary>
+    public bool CanBeginConversation
+    {
+        get
+        {
+            if (_inConversation || _awaitingEngagementResponse) return false;
+            if (speaking == null) return false;
+            if (IsVerdictClosed()) return false;
+            return HasAnyOptions();
+        }
+    }
+
+    /// <summary>Same data sources as <see cref="ResolveOptionsForConversation"/>, without building the option array.</summary>
+    private bool HasAnyOptions()
+    {
+        int currentDay = ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : 1;
+        DaySet set = GetSetForDay(currentDay);
+        if (set != null && set.options != null && set.options.Length > 0) return true;
+        if (suspectData != null && suspectData.questionResponses != null && suspectData.questionResponses.Length > 0) return true;
+        return manualOptions != null && manualOptions.Length > 0;
+    }
+
     private void OnEngagementResponse(bool granted)
     {
         _awaitingEngagementResponse = false;

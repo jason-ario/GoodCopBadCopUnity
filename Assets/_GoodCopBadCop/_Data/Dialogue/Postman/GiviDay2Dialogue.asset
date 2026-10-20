@@ -23,25 +23,7 @@ MonoBehaviour:
     playLaughSfx: 0
     choices: []
   - type: 1
-    npcLine: Your paper's in the box. The front page says everything is fine.
-    animationTrigger: Talk1
-    cameraTrigger: 
-    wobbleProfileOverride: {fileID: 0}
-    fontOverride: {fileID: 0}
-    playLaughSfx: 0
-    choices:
-    - playerChoiceText: Is it?
-      npcResponse: The front page always says that. You learn to read the back.
-      npcFollowUp: 
-      animationTrigger: TalkShrug
-      playLaughSfx: 0
-    - playerChoiceText: You look pale.
-      npcResponse: Postmen are always pale. We live under satchels and bad weather.
-      npcFollowUp: 
-      animationTrigger: TalkLookAway
-      playLaughSfx: 0
-  - type: 1
-    npcLine: I used to write, you know. Now I carry other people's stories.
+    npcLine: I used to write stories, you know. Now I carry other people's.
     animationTrigger: Talk2
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
@@ -49,17 +31,35 @@ MonoBehaviour:
     playLaughSfx: 0
     choices:
     - playerChoiceText: What happened to yours?
-      npcResponse: They burned. Twenty years of pages, gone in one afternoon.
+      npcResponse: They burned the day of the blast. Twenty years of pages, gone.
       npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
     - playerChoiceText: Why did you stop?
-      npcResponse: Every story needs an ending. I didn't like where mine was going.
+      npcResponse: I didn't like where my story was going. So I picked up the satchel.
       npcFollowUp: 
       animationTrigger: TalkShrug
       playLaughSfx: 0
+  - type: 1
+    npcLine: Lately I find words in my head that aren't mine. Whole sentences.
+    animationTrigger: Talk3
+    cameraTrigger: 
+    wobbleProfileOverride: {fileID: 0}
+    fontOverride: {fileID: 0}
+    playLaughSfx: 0
+    choices:
+    - playerChoiceText: What kind of words?
+      npcResponse: Directions, mostly. To a road my feet already seem to know.
+      npcFollowUp: 
+      animationTrigger: TalkLookAway
+      playLaughSfx: 0
+    - playerChoiceText: Have you seen a doctor?
+      npcResponse: The doctor coughs worse than I do.
+      npcFollowUp: 
+      animationTrigger: TalkSarcasticNod
+      playLaughSfx: 0
   - type: 0
-    npcLine: Keep your water clean, Officer. Clean things are rare now.
+    npcLine: Keep your water boiled, Officer. I'd hate to lose my best reader.
     animationTrigger: FakeCough
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}

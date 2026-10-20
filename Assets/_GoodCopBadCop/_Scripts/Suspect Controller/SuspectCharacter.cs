@@ -862,11 +862,12 @@ public class SuspectCharacter : Interactable
     /// </summary>
     /// <param name="destination">World-space destination.</param>
     /// <param name="onArrived">Optional callback invoked on arrival.</param>
-    public void NavigateTo(Vector3 destination, Action onArrived = null)
+    /// <param name="speedOverride">Optional walk speed for this leg only (units/second); &lt;= 0 uses <see cref="_walkSpeed"/>.</param>
+    public void NavigateTo(Vector3 destination, Action onArrived = null, float speedOverride = -1f)
     {
         if (_navMoveCoroutine != null) StopCoroutine(_navMoveCoroutine);
         _activeTween?.Kill();
-        _navMoveCoroutine = StartCoroutine(NavigateToCoroutine(destination, onArrived));
+        _navMoveCoroutine = StartCoroutine(NavigateToCoroutine(destination, onArrived, speedOverride > 0f ? speedOverride : _walkSpeed));
     }
 
     /// <summary>
@@ -906,14 +907,14 @@ public class SuspectCharacter : Interactable
         _activeTween = null;
     }
 
-    private IEnumerator NavigateToCoroutine(Vector3 destination, Action onArrived)
+    private IEnumerator NavigateToCoroutine(Vector3 destination, Action onArrived, float speed)
     {
         if (_navAgent == null) _navAgent = GetComponent<NavMeshAgent>();
 
         if (_navAgent == null)
         {
             // No NavMeshAgent on this character at all — legacy straight-line fallback.
-            yield return StartCoroutine(WalkToCoroutine(destination, onArrived));
+            yield return StartCoroutine(WalkToCoroutine(destination, onArrived, speed));
             yield break;
         }
 
@@ -929,12 +930,12 @@ public class SuspectCharacter : Interactable
         {
             Debug.LogWarning($"[SuspectCharacter] {name}: NavMeshAgent is not on the NavMesh at " +
                               $"{transform.position} — falling back to a direct move for this leg.");
-            yield return StartCoroutine(WalkToCoroutine(destination, onArrived));
+            yield return StartCoroutine(WalkToCoroutine(destination, onArrived, speed));
             _navAgent.enabled = wasEnabled;
             yield break;
         }
 
-        _navAgent.speed = _walkSpeed;
+        _navAgent.speed = speed;
         _navAgent.angularSpeed = _angularSpeed;
         _navAgent.stoppingDistance = _stoppingDistance;
 
@@ -966,8 +967,10 @@ public class SuspectCharacter : Interactable
     /// Legacy direct-line movement via DOTween. Used only as a fallback when a NavMeshAgent
     /// isn't available or the character can't be linked onto the NavMesh.
     /// </summary>
-    private IEnumerator WalkToCoroutine(Vector3 destination, Action onArrived)
+    private IEnumerator WalkToCoroutine(Vector3 destination, Action onArrived, float speed = -1f)
     {
+        if (speed <= 0f) speed = _walkSpeed;
+
         // Snap to face the destination direction before moving.
         Vector3 dir = destination - transform.position;
         dir.y = 0f;
@@ -978,7 +981,7 @@ public class SuspectCharacter : Interactable
         Vector3 flatStart = new Vector3(transform.position.x, 0f, transform.position.z);
         Vector3 flatEnd   = new Vector3(destination.x,        0f, destination.z);
         float distance    = Vector3.Distance(flatStart, flatEnd);
-        float duration    = distance / Mathf.Max(0.01f, _walkSpeed);
+        float duration    = distance / Mathf.Max(0.01f, speed);
 
         bool done = false;
         _activeTween = transform
@@ -1006,14 +1009,28 @@ public class SuspectCharacter : Interactable
     /// Sets the locomotion animation state and replicates to all clients.
     /// Compares <see cref="_walkSpeed"/> against <see cref="_runThreshold"/>:
     /// if moving and speed is at or above the threshold the 'Running' bool is set; otherwise 'Walking'.
-    /// Both bools are cleared when <paramref name="moving"/> is false.
+    /// Both bools are cleared when <paramref name="moving"/> is false. <paramref name="forceRun"/>
+    /// plays 'Running' regardless of speed (e.g. a leg driven by a NavigateTo speedOverride).
+    /// <paramref name="humanRun"/> drives the non-mutant 'RunningHuman' bool instead of
+    /// 'Running' (whose state plays the full-mutant zombie run).
     /// </summary>
-    public void SetLocomotionState(bool moving)
+    public void SetLocomotionState(bool moving, bool forceRun = false, bool humanRun = false)
     {
-        bool shouldRun = moving && _walkSpeed >= _runThreshold;
+        bool shouldRun = moving && (forceRun || _walkSpeed >= _runThreshold);
+        bool useHumanRun = shouldRun && humanRun;
         SetAnimatorBool("Walking", moving && !shouldRun);
-        SetAnimatorBool("Running", shouldRun);
+        SetAnimatorBool("Running", shouldRun && !useHumanRun);
+
+        // Only touch RunningHuman once it has been used, so characters on controllers without
+        // that parameter never get "Parameter does not exist" warnings.
+        if (useHumanRun || _humanRunActive)
+        {
+            SetAnimatorBool("RunningHuman", useHumanRun);
+            _humanRunActive = useHumanRun;
+        }
     }
+
+    private bool _humanRunActive;
 
     /// <summary>
     /// Sets the movement speed and immediately re-evaluates the locomotion animation state.
@@ -1821,9 +1838,42 @@ public class SuspectCharacter : Interactable
         base.Highlight(highlight);
     }
 
-    /// <summary>A collectible body is junk: Interact-key prompt only while holding a trash bag (E bags it).</summary>
+    /// <summary>
+    /// A collectible body is junk: Interact-key prompt only while holding a trash bag (E bags it).
+    /// A living suspect only offers "[E] Talk" when pressing Interact would actually start or
+    /// rejoin a conversation — see <see cref="CanStartTalk"/>.
+    /// </summary>
     public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
-        IsJunkCollectible ? _junkItem.ShowsInteractPrompt(player) : true;
+        IsJunkCollectible ? _junkItem.ShowsInteractPrompt(player) : CanStartTalk();
+
+    /// <summary>
+    /// Local mirror of <see cref="Interact"/>'s gates: true when an Interact press would start the
+    /// intro, rejoin this suspect's active scripted dialogue, hand off to an
+    /// <see cref="ISuspectTalkOverride"/>, or open the world question conversation. False while
+    /// walking to the booth, locked/closed, dialogue-disabled, inside the post-exit block window,
+    /// or when there is simply nothing to talk about (e.g. Vlad waiting to trigger a queued
+    /// scripted dialogue with no world dialogue attached). Keep in sync with <see cref="Interact"/>.
+    /// </summary>
+    private bool CanStartTalk()
+    {
+        if (_interactionLocked.Value || _verdictClosed.Value || _mutantInteractionClosed.Value) return false;
+        if (_walkingToBooth.Value) return false;
+        if (Time.unscaledTime < _dialogueInteractionBlockedUntil) return false;
+
+        // Rejoining this suspect's in-progress scripted dialogue.
+        ulong activeSpeaker = ScriptedDialogueRunner.ActiveDialogueSpeakerNetId;
+        if (ScriptedDialogueRunner.Instance != null && IsSpawned && activeSpeaker != 0 && activeSpeaker == NetworkObjectId)
+            return true;
+
+        if (_dialogueInteractionDisabled) return false;
+
+        if (IsIntroCandidate() && (IsServer ? !SuspectEncounterManager.HasEncountered(Data) : !_clientKnowsIntroPlayed))
+            return true;
+
+        if (TryGetComponent(out ISuspectTalkOverride _)) return true;
+
+        return worldDialogue != null && worldDialogue.CanBeginConversation;
+    }
 
     /// <summary>
     /// Bagging a body is a world interaction (E, like any junk). Vaccinating / shooting a living

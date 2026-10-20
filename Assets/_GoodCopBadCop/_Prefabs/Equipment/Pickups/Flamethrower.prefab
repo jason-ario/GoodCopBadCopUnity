@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6094814248277228087
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4135421642601873732}
+  m_Layer: 0
+  m_Name: Left IK
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4135421642601873732
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6094814248277228087}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0.7071069, z: -0, w: 0.70710677}
+  m_LocalPosition: {x: 0, y: -0.00071, z: 0.00013}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5175747636520950949}
+  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
 --- !u!1001 &4636819140132961102
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -125,6 +156,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8576573471851385354}
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4135421642601873732}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
       insertIndex: -1
@@ -156,6 +190,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2242020417184382167}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2820331092302098923}
   m_SourcePrefab: {fileID: 100100000, guid: 8d57f9792dbec154c920d7cabb133ddc, type: 3}
 --- !u!4 &5175747636520950949 stripped
 Transform:
@@ -431,7 +468,7 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 70
+  rmsCount: 81
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFXTriggerMode: 0
@@ -501,11 +538,15 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Flamethrower
+  interactVerb: 
   highlightNameFilter: 
   holdHighlightVisibleRange: 50
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
-  holdHighlightPulseMinIntensity: 0.35
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   itemData: {fileID: 11400000, guid: 96a6eaea0ddc1f5408f3aa8767a4b445, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
@@ -744,6 +785,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController
+--- !u!114 &2820331092302098923
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5519200517795235359}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fdc619f45572a6b4a8e28be173a46c0b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IkTargets
+  rightIKTarget: {fileID: 0}
+  leftIKTarget: {fileID: 4135421642601873732}
 --- !u!1001 &4864926771115410430
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -37,6 +37,9 @@ public class ToolLockerDiegeticController : DiegeticViewController
     /// <summary>Freezes camera panning while the purchase popup is open.</summary>
     protected override bool SuppressCameraMovement => _popupOpen;
 
+    /// <summary>Hide held items (and the throw arc) so they don't float in front of the locker camera.</summary>
+    protected override bool HideHeldItems => true;
+
     /// <summary>
     /// When the popup is open, Q dismisses only the popup.
     /// When no popup is open, Q closes the entire diegetic view as normal.

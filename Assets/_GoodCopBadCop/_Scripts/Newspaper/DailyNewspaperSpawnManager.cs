@@ -25,6 +25,11 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
     [Tooltip("World location where the daily newspaper is spawned.")]
     [SerializeField] private Transform _spawnPoint;
 
+    [Tooltip("Mailbox the paper is spawned in. While the paper waits, the mailbox is the target " +
+             "(highlighted, \"Take newspaper\") instead of the paper. Auto-resolved to the scene's " +
+             "PostBox if left empty.")]
+    [SerializeField] private PostBox _mailbox;
+
     [Header("Tutorial Arrow")]
     [Tooltip("World-space tutorial arrow that hovers over the PostBox/Mailbox while today's " +
              "newspaper is waiting to be picked up. Shown right after spawn, hidden as soon as " +
@@ -129,7 +134,17 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
         if (!IsServer) return;
 
         DespawnPreviousNewspaper();
-        SpawnDailyNewspaper();
+        SpawnDailyNewspaper(playMailSound: true);
+    }
+
+    private PostBox Mailbox
+    {
+        get
+        {
+            if (_mailbox == null)
+                _mailbox = FindFirstObjectByType<PostBox>();
+            return _mailbox;
+        }
     }
 
     // ── Despawn ──────────────────────────────────────────────────────────────
@@ -141,6 +156,9 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
         UnsubscribeFromActiveNewspaper();
         HidePickupArrow();
 
+        if (Mailbox != null)
+            Mailbox.ClearNewspaperServer();
+
         if (_activeNewspaper != null && _activeNewspaper.IsSpawned)
             _activeNewspaper.Despawn();
 
@@ -149,7 +167,7 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
 
     // ── Spawn ────────────────────────────────────────────────────────────────
 
-    private void SpawnDailyNewspaper()
+    private void SpawnDailyNewspaper(bool playMailSound = false)
     {
         if (_newspaperPrefab == null)
         {
@@ -190,6 +208,12 @@ public class DailyNewspaperSpawnManager : NetworkBehaviour
         _activeNewspaperComponent = instance.GetComponent<Newspaper>();
         if (_activeNewspaperComponent != null)
             _activeNewspaperComponent.OnPickedUpNetworked += OnActiveNewspaperPickedUp;
+
+        // The paper waits in the mailbox: the mailbox is the target until someone takes it out.
+        if (Mailbox != null && _activeNewspaperComponent != null)
+            Mailbox.PlaceNewspaperServer(_activeNewspaperComponent, playMailSound);
+        else if (Mailbox == null)
+            Debug.LogWarning("[DailyNewspaperSpawnManager] No PostBox found — newspaper is a direct pickup.", this);
 
         ShowPickupArrow();
 

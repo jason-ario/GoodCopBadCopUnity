@@ -227,6 +227,22 @@ public class SuspectController : NetworkBehaviour
              "Falls back to standPos if unassigned.")]
     [SerializeField] private Transform mutantBoothPos;
 
+    /// <summary>Where lineup suspects spawn before walking to the window.</summary>
+    public Transform SpawnPoint => spawnPos;
+
+    /// <summary>The regular suspect stand position at the booth window.</summary>
+    public Transform StandPoint => standPos;
+
+    /// <summary>A point on the player's side of the booth window (the full-mutant climb-through target).</summary>
+    public Transform BoothInteriorPoint => climbThroughTargetPos;
+
+    /// <summary>
+    /// Server-only. Same condition a normal suspect waits for before its entry dialogue: at least one
+    /// player inside the booth and the window shutter open. Used by scripted booth visitors that
+    /// don't go through <see cref="SayEntryDialogue"/> (e.g. <see cref="GiorgiPhantomEncounter"/>).
+    /// </summary>
+    public bool IsBoothReadyForSuspect() => IsAnyPlayerInsideBooth() && IsShutterOpen();
+
     public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1); 
     public int SuspectIndex => suspectIndex.Value;
 
@@ -1560,7 +1576,8 @@ public class SuspectController : NetworkBehaviour
     /// Must only be called on the server after CalculateCategoryScores has run.
     /// The percent-based reward scales linearly from 0 to couponMaxPercentBonus depending on
     /// the fraction of active anomaly categories the player correctly identified.
-    /// totalBonusAmount consolidates the perfect-identification bonus and the evidence bonus.
+    /// The perfect-identification bonus and the evidence bonus are sent separately so each popup
+    /// can name the reason it was earned.
     /// Returns the total coupons issued so the verdict can be itemized on the end-of-shift report.
     /// </summary>
     private int PayOutResults()
@@ -1627,7 +1644,8 @@ public class SuspectController : NetworkBehaviour
             percentReward,
             _symptomsFound,
             _symptomsTotal,
-            perfectBonusAmount + evidenceBonus,
+            perfectBonusAmount,
+            evidenceBonus,
             totalCoupons);
 
         // What the ATM actually paid (after the checkpoint integrity multiplier, or 0 without power).
@@ -1639,17 +1657,19 @@ public class SuspectController : NetworkBehaviour
         int anomalyAmount,
         int symptomsFound,
         int symptomsTotal,
-        int totalBonusAmount,
+        int perfectBonusAmount,
+        int evidenceBonusAmount,
         int totalCoupons)
     {
-        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, symptomsFound, symptomsTotal, totalBonusAmount, totalCoupons));
+        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, symptomsFound, symptomsTotal, perfectBonusAmount, evidenceBonusAmount, totalCoupons));
     }
 
     private IEnumerator ShowCashPopUpSequence(
         int anomalyAmount,
         int symptomsFound,
         int symptomsTotal,
-        int totalBonusAmount,
+        int perfectBonusAmount,
+        int evidenceBonusAmount,
         int totalCoupons)
     {
         yield return new WaitForSeconds(2f);
@@ -1662,14 +1682,21 @@ public class SuspectController : NetworkBehaviour
 
         yield return new WaitForSeconds(2f);
 
-        // Message 2: Bonuses (perfect identification + evidence), if any were earned.
-        if (totalBonusAmount > 0)
+        // Message 2: Perfect identification bonus, if earned.
+        if (perfectBonusAmount > 0)
         {
-            UIController.Instance.ShowCashPopUpNotification(totalBonusAmount, "Bonuses");
+            UIController.Instance.ShowCashPopUpNotification(perfectBonusAmount, "Perfect Inspection");
             yield return new WaitForSeconds(2f);
         }
 
-        // Message 3: Total payout summary.
+        // Message 3: Evidence bonus, if earned.
+        if (evidenceBonusAmount > 0)
+        {
+            UIController.Instance.ShowCashPopUpNotification(evidenceBonusAmount, "Evidence Filed");
+            yield return new WaitForSeconds(2f);
+        }
+
+        // Final message: Total payout summary.
         UIController.Instance.ShowCashPopUpNotification(totalCoupons, "Payout Issued");
     }
     

@@ -12,8 +12,13 @@ namespace GoodCopBadCop.Settings
         Windowed
     }
 
+    // Order must match the Resolution option lists in SettingsMenuView and SettingsRedesignPreviewController
+    // (UI index == enum value). Persisted by name, so reordering is save-compatible.
     public enum EScreenResolution
     {
+        R3840x2160,
+        R3200x1800,
+        R2560x1440,
         R1920x1080,
         R1600x900,
         R1280x720

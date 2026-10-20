@@ -101,7 +101,8 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Hitbox component used to sphere-cast at the melee hit frame.")]
     [SerializeField] private MutantAttackHitbox attackHitbox;
 
-    [Tooltip("Delay in seconds from the start of the attack animation to the melee impact frame.")]
+    [Tooltip("Seconds into the primary attack clip (\"Mutant Attack\") at which the melee impact lands. " +
+             "Measured in clip time — scaled by the attack state's speed and the Animator's speed at runtime.")]
     [SerializeField] private float attackHitDelay = 0.4f;
 
     [Header("Second Attack Animation (optional)")]
@@ -112,6 +113,13 @@ public class MutantEnemy : NetworkBehaviour
     [Tooltip("Animator state name to CrossFade into for the second attack animation. Only used when " +
              "useSecondAttackAnimation is enabled.")]
     [SerializeField] private string secondAttackStateName = "Mutant Attack 2";
+
+    [Tooltip("Seconds into the second attack clip at which the melee impact lands. Only used when " +
+             "useSecondAttackAnimation is enabled.")]
+    [SerializeField] private float secondAttackHitDelay = 0.4f;
+
+    private const string PrimaryAttackStateName = "Mutant Attack";
+    private const float AttackCrossFadeDuration = 0.2f;
 
     [Header("Hit / Knockback Animation (optional)")]
     [Tooltip("When enabled, fires hitTriggerName on the Animator whenever this mutant survives a " +
@@ -1969,8 +1977,8 @@ public class MutantEnemy : NetworkBehaviour
         // fence happens to be cached when the coroutine executes.
         PerimiterFence target = _fenceTarget;
 
-        TriggerAttackAnimationClientRpc();
-        StartCoroutine(DelayedFenceHit(target));
+        float hitDelay = PlayAttackAnimation();
+        StartCoroutine(DelayedFenceHit(target, hitDelay));
     }
 
     /// <summary>
@@ -1978,9 +1986,9 @@ public class MutantEnemy : NetworkBehaviour
     /// that the player attack uses, so the hit only registers when the animation reaches the mutant's
     /// arm. Falls back to a centre-distance check when no hitbox is assigned.
     /// </summary>
-    private IEnumerator DelayedFenceHit(PerimiterFence fence)
+    private IEnumerator DelayedFenceHit(PerimiterFence fence, float hitDelay)
     {
-        yield return new WaitForSeconds(attackHitDelay);
+        yield return new WaitForSeconds(hitDelay);
 
         if (_isDead || fence == null || !fence.IsSpawned)
             yield break;
@@ -2523,8 +2531,7 @@ public class MutantEnemy : NetworkBehaviour
         if (look.sqrMagnitude > 0.0001f)
             transform.rotation = Quaternion.LookRotation(look);
 
-        TriggerAttackAnimationClientRpc();
-        yield return new WaitForSeconds(attackHitDelay);
+        yield return new WaitForSeconds(PlayAttackAnimation());
 
         if (obstacleComponent != null && obstacleComponent is NetworkBehaviour nb && nb.IsSpawned && obstacle.IsClosedToMutant)
         {
@@ -2606,17 +2613,17 @@ public class MutantEnemy : NetworkBehaviour
 
         _attackCooldownTimer = Time.time + data.attackCooldown;
 
-        TriggerAttackAnimationClientRpc();
-        StartCoroutine(DelayedDoorBang(door));
+        float hitDelay = PlayAttackAnimation();
+        StartCoroutine(DelayedDoorBang(door, hitDelay));
     }
 
     /// <summary>
     /// Waits for the melee impact frame, then plays the door-bang sound on all clients.
     /// Validates proximity at impact time so a stale coroutine does not trigger remotely.
     /// </summary>
-    private IEnumerator DelayedDoorBang(DoorController door)
+    private IEnumerator DelayedDoorBang(DoorController door, float hitDelay)
     {
-        yield return new WaitForSeconds(attackHitDelay);
+        yield return new WaitForSeconds(hitDelay);
 
         if (_isDead || door == null || !door.IsSpawned)
             yield break;
@@ -2659,7 +2666,7 @@ public class MutantEnemy : NetworkBehaviour
                 return;
         }
 
-        TriggerAttackAnimationClientRpc();
+        float hitDelay = PlayAttackAnimation();
 
         // Freeze movement for the swing's windup so the mutant plants its feet and actually
         // swings instead of continuing to slide toward the player mid-animation. DelayedHitScan
@@ -2672,7 +2679,7 @@ public class MutantEnemy : NetworkBehaviour
             _agent.isStopped = true;
 
         // Schedule the sphere-cast to fire at the melee impact frame on the server.
-        StartCoroutine(DelayedHitScan(data.damagePerHit));
+        StartCoroutine(DelayedHitScan(data.damagePerHit, hitDelay));
     }
 
     /// <summary>
@@ -2698,9 +2705,9 @@ public class MutantEnemy : NetworkBehaviour
     /// chasing right after the swing connects rather than staying frozen for the rest of the
     /// attack cooldown.
     /// </summary>
-    private IEnumerator DelayedHitScan(float damage)
+    private IEnumerator DelayedHitScan(float damage, float hitDelay)
     {
-        yield return new WaitForSeconds(attackHitDelay);
+        yield return new WaitForSeconds(hitDelay);
 
         // Don't resume movement if a knockback shove started mid-windup (or is still running) —
         // KnockbackCoroutine is responsible for clearing isStopped itself once the shove finishes.
@@ -2713,18 +2720,48 @@ public class MutantEnemy : NetworkBehaviour
         attackHitbox.PerformHitScan(damage);
     }
 
+    /// <summary>
+    /// Server-only. Picks the attack state (primary, or the optional second attack), tells every
+    /// client to play that exact state, and returns the real-time delay until its impact frame.
+    /// Choosing on the server keeps the hit timing matched to the clip that is actually playing —
+    /// previously each client rolled its own random pick while the server always used the
+    /// primary attack's delay.
+    /// </summary>
+    private float PlayAttackAnimation()
+    {
+        bool useSecond = useSecondAttackAnimation
+                         && !string.IsNullOrEmpty(secondAttackStateName)
+                         && UnityEngine.Random.value < 0.5f;
+
+        TriggerAttackAnimationClientRpc(useSecond);
+        return GetAttackHitDelay(useSecond);
+    }
+
+    /// <summary>
+    /// Converts the authored impact time (seconds of clip time) into real seconds by applying the
+    /// Animator's playback speed. (All "Mutant Attack" states currently run at state speed 1.)
+    /// </summary>
+    private float GetAttackHitDelay(bool useSecond)
+    {
+        float clipTime = Mathf.Max(0f, useSecond ? secondAttackHitDelay : attackHitDelay);
+        if (animator == null)
+            return clipTime;
+
+        float playbackSpeed = Mathf.Abs(animator.speed);
+        return playbackSpeed > 0.01f ? clipTime / playbackSpeed : clipTime;
+    }
+
     [ClientRpc]
-    private void TriggerAttackAnimationClientRpc()
+    private void TriggerAttackAnimationClientRpc(bool useSecondAttack)
     {
         if (animator != null)
         {
             // Use CrossFade to authoritatively force the animator into the attack state.
             // This is more robust for networked one-shots than boolean parameters.
-            string attackState = "Mutant Attack";
-            if (useSecondAttackAnimation && !string.IsNullOrEmpty(secondAttackStateName) && UnityEngine.Random.value < 0.5f)
-                attackState = secondAttackStateName;
-
-            animator.CrossFade(attackState, 0.2f, 0, 0f);
+            // normalizedTimeOffset 0 starts the clip from frame 0, so the hit delay is measured
+            // from the moment this RPC lands.
+            string attackState = useSecondAttack ? secondAttackStateName : PrimaryAttackStateName;
+            animator.CrossFade(attackState, AttackCrossFadeDuration, 0, 0f);
         }
     }
 

@@ -78,6 +78,15 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] private Transform camRightArmIKTarget;
     [SerializeField] private Transform camLeftArmIKTarget;
 
+    [Header("Left Elbow Pole")]
+    [Tooltip("Use a fixed elbow bend direction for the left-arm IK re-solve instead of the animated elbow. " +
+             "Stops the elbow flipping upward on two-handed grips (shotgun, flamethrower).")]
+    [SerializeField] private bool useStableLeftElbowPole = true;
+
+    [Tooltip("Direction the left elbow points, in the left arm rig's local space (rig axes follow the " +
+             "character / first-person camera: +X right, +Y up, +Z forward). Default is down and out to the left.")]
+    [SerializeField] private Vector3 leftElbowPoleDirection = new Vector3(-0.5f, -1f, 0f);
+
     public Rig RightArmRig => rightArmRig;
     public Rig CamRightArmRig => camRightArmRig;
 
@@ -454,7 +463,7 @@ public class PlayerAnimationController : NetworkBehaviour
 
         bool leftIKActiveOwner = leftArmRig.weight > 0.01f;
         Vector3 leftElbowHintOwner = leftIKActiveOwner && _leftForeArmBone != null
-            ? _leftForeArmBone.position
+            ? GetLeftElbowHint(_leftUpperArmBone, _leftForeArmBone, leftArmRig)
             : Vector3.zero;
 
         ApplyLocalBodyLean();
@@ -499,7 +508,9 @@ public class PlayerAnimationController : NetworkBehaviour
         {
             SolveTwoBoneIK(
                 _camLeftUpperArmBone, _camLeftForeArmBone, _camLeftHandBone,
-                CamLeftArmRigIKTarget.position, _camLeftForeArmBone.position, camLeftArmRig.weight);
+                CamLeftArmRigIKTarget.position,
+                GetLeftElbowHint(_camLeftUpperArmBone, _camLeftForeArmBone, camLeftArmRig),
+                camLeftArmRig.weight);
             _camLeftHandBone.rotation = Quaternion.Slerp(
                 _camLeftHandBone.rotation, CamLeftArmRigIKTarget.rotation, camLeftArmRig.weight);
         }
@@ -794,7 +805,7 @@ public class PlayerAnimationController : NetworkBehaviour
             rightElbowHint = _rightForeArmBone.position;
 
         if (leftIKActive && _leftForeArmBone != null)
-            leftElbowHint = _leftForeArmBone.position;
+            leftElbowHint = GetLeftElbowHint(_leftUpperArmBone, _leftForeArmBone, leftArmRig);
 
         // --- IK Reach Lean ---
         // When the right arm IK rig is active and the target is beyond comfortable arm reach,
@@ -1073,6 +1084,18 @@ public class PlayerAnimationController : NetworkBehaviour
     /// position). <paramref name="weight"/> blends between the original pose (0) and the
     /// IK solution (1), matching the active rig weight for smooth fade-in/out.
     /// </summary>
+    private Vector3 GetLeftElbowHint(Transform upperArm, Transform foreArm, Rig frame)
+    {
+        // The arm rigs have no hint transforms, so the animated elbow sets the bend plane. When
+        // the grip pulls the arm near straight, that elbow can sit above the shoulder-hand line
+        // and the arm bends upward. A fixed pole in the rig frame keeps it pointing down/out.
+        if (!useStableLeftElbowPole || upperArm == null || frame == null
+            || leftElbowPoleDirection.sqrMagnitude < 0.0001f)
+            return foreArm.position;
+
+        return upperArm.position + frame.transform.rotation * leftElbowPoleDirection.normalized;
+    }
+
     private static void SolveTwoBoneIK(
         Transform root, Transform mid, Transform tip,
         Vector3 targetPos, Vector3 hintPos, float weight)

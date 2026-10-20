@@ -789,6 +789,22 @@ public class UIController : MonoBehaviour
     }
 
     /// <summary>
+    /// Removes one owner's callback added through <see cref="ShowBackButton"/> without clearing
+    /// anyone else's; hides the button when no callbacks remain. Safe to call when not registered.
+    /// </summary>
+    public void RemoveBackButtonCallback(UnityAction onClickCallback)
+    {
+        if (onClickCallback == null) return;
+        _suspendedBackButtonCallbacks.Remove(onClickCallback);
+        if (!_backButtonCallbacks.Remove(onClickCallback)) return;
+        backButton.onClick.RemoveListener(onClickCallback);
+
+        if (_backButtonCallbacks.Count > 0) return;
+        backButtonWasActiveBeforePaused = false;
+        backButtonUI.SetActive(false);
+    }
+
+    /// <summary>
     /// Shows the Back button with <paramref name="onClickCallback"/> as its only action (Escape /
     /// click). Any callbacks already on the button (e.g. an open dialogue's "leave") are set aside
     /// and restored by <see cref="ReleaseExclusiveBackButton"/>.

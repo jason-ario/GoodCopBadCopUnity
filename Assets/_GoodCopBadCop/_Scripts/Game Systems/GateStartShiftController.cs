@@ -108,8 +108,29 @@ public class GateStartShiftController : Interactable
     private void OnDayChanged(int day)
     {
         // The Day 1 start-shift screen remains available to every player until the intro ends.
-        if (IsServer)
-            _introComplete.Value = day != 1;
+        if (!IsServer) return;
+        _introComplete.Value = day != 1;
+
+        // Reset the gate to closed for the new day without the close SFX.
+        ResetSilently();
+    }
+
+    /// <summary>
+    /// Resets the gate to its closed state on all clients without playing the close sound.
+    /// Must be called on the server.
+    /// </summary>
+    public void ResetSilently()
+    {
+        if (!IsServer) return;
+        _gateOpen.Value = false;
+        _openedIn.Value = false;
+        SilentCloseVisualsClientRpc();
+    }
+
+    [ClientRpc]
+    private void SilentCloseVisualsClientRpc()
+    {
+        ApplyGateVisuals(false, false);
     }
 
     public override string GetInteractVerb(PlayerInteractionController player)

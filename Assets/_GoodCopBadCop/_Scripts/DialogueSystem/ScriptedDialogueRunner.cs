@@ -173,10 +173,35 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private bool _joinByInteractionOnly;
     private bool _allowParticipantExit;
 
+    // Client-side: the "leave dialogue" Back-button callback this runner registered, so every exit
+    // path (natural end, early leave) removes exactly that callback and nothing it doesn't own.
+    private UnityEngine.Events.UnityAction _clientLeaveBackAction;
+
+    private void ShowLeaveBackButtonLocal()
+    {
+        if (UIController.Instance == null) return;
+        if (_clientLeaveBackAction == null)
+            _clientLeaveBackAction = () => LeaveScriptedDialogueServerRpc();
+        UIController.Instance.RemoveBackButtonCallback(_clientLeaveBackAction); // never stack it twice
+        UIController.Instance.ShowBackButton(_clientLeaveBackAction);
+    }
+
+    private void HideLeaveBackButtonLocal()
+    {
+        if (_clientLeaveBackAction != null)
+            UIController.Instance?.RemoveBackButtonCallback(_clientLeaveBackAction);
+    }
+
     // Per-sequence: every participant uses the world-dialogue camera (player-camera dolly-in on the
     // speaker, as SuspectWorldDialogue does for scene NPCs) even if they count as inside the booth,
     // instead of the booth suspect cam. For scene-placed NPCs who aren't booth suspects (the postman).
     private bool _useWorldDialogueCamera;
+
+    // Per-sequence (server): the caller passed onAbandoned, so when every participant backs out the
+    // sequence stops right there (instead of auto-advancing to the end) and reports onAbandoned
+    // rather than onComplete — talking to the speaker again starts the dialogue from the top.
+    private bool _abandonWhenEmpty;
+    private bool _abandoned;
 
     // Per-sequence proximity radius. Forced outside conversations (lockOutsidePlayers) seed and
     // late-join strictly by distance so an out-of-range co-op partner is never pulled in; they
@@ -194,6 +219,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // for input. Replaces the server-only _awaitingScriptedInput flag for Update() checks
     // so non-host clients can also skip reveals and advance.
     private bool _clientIsWaitingForInput;
+
+    // Set on ALL clients alongside _clientIsWaitingForInput: true while the current line is
+    // flagged ScriptedDialogueNode.unskippable, so input cannot fast-complete its reveal.
+    private bool _clientRevealUnskippable;
+
+    /// <summary>
+    /// True while the active scripted line is unskippable and its typewriter is still revealing.
+    /// Input sites must neither complete the reveal nor advance until this clears.
+    /// </summary>
+    public static bool IsUnskippableRevealActive =>
+        Instance != null && Instance._clientRevealUnskippable && Instance._clientIsWaitingForInput &&
+        DialogueManager.Instance != null && DialogueManager.Instance.IsAnySubtitleRevealing();
 
     // Local: true once this runner has actually put the local player into DialogueChoiceSystem's
     // dialogue lock (EnterScriptedModeClientRpc / LateJoinClientRpc). False for sequences that
@@ -336,12 +373,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// camera (player-camera dolly-in on the speaker, like <see cref="SuspectWorldDialogue"/> for scene
     /// NPCs) even when they count as inside, instead of the booth suspect cam.
     /// </para>
+    /// <para>
+    /// <paramref name="onAbandoned"/> (requires <paramref name="allowParticipantExit"/>): when every
+    /// participant has backed out, the sequence stops immediately and this fires instead of
+    /// <paramref name="onComplete"/>, so the caller can restart the dialogue from the beginning.
+    /// When null, an emptied sequence keeps auto-advancing to the end as before.
+    /// </para>
     /// </summary>
     public void PlayDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
         Action onComplete = null, bool deferExit = false, bool lockOutsidePlayers = false,
         ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
         bool allowParticipantExit = false, bool hideNonParticipantUI = true,
-        float participantRadius = -1f, bool useWorldDialogueCamera = false)
+        float participantRadius = -1f, bool useWorldDialogueCamera = false, Action onAbandoned = null)
     {
         if (!IsServer) return;
 
@@ -364,7 +407,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             allowParticipantExit,
             hideNonParticipantUI,
             participantRadius,
-            useWorldDialogueCamera));
+            useWorldDialogueCamera,
+            onAbandoned));
     }
 
     /// <summary>
@@ -546,6 +590,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (DialogueManager.Instance.IsAnySubtitleRevealing())
         {
+            // Unskippable line: ignore input until the reveal finishes on its own.
+            if (_clientRevealUnskippable) return;
+
             // First input: complete the typewriter locally without advancing the line.
             // Each player independently skips their own reveal — no network call needed.
             DialogueManager.Instance.CompleteCurrentReveal();
@@ -611,11 +658,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Action onComplete, bool deferExit = false, bool lockOutsidePlayers = false,
         ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
         bool allowParticipantExit = false, bool hideNonParticipantUI = true,
-        float participantRadius = -1f, bool useWorldDialogueCamera = false)
+        float participantRadius = -1f, bool useWorldDialogueCamera = false, Action onAbandoned = null)
     {
         ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
         _activeJoinRadius = participantRadius;
         _useWorldDialogueCamera = useWorldDialogueCamera;
+        _abandoned = false;
 
         Debug.Log($"[ScriptedDialogueRunner] RunDialogue — IsSpawned={IsSpawned}, IsServer={IsServer}, speakerNetId={speakerNetId}, deferExit={deferExit}");
 
@@ -624,6 +672,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // A forced conversation asset must never let the player back out via the escape/Back
         // button, even if a caller mistakenly passes allowParticipantExit: true for it.
         _allowParticipantExit = allowParticipantExit && !dialogue.isForced;
+        _abandonWhenEmpty = _allowParticipantExit && onAbandoned != null;
         // hideNonParticipantUI is retained for API compatibility only: non-participants never
         // lose their HUD any more (see the EnterScriptedModeClientRpc call below).
 
@@ -650,6 +699,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         foreach (var node in dialogue.nodes)
         {
+            if (_abandoned) break;
+
             // Track the active camera key server-side so late-joining clients can catch up
             // to it via LateJoinClientRpc.
             _currentCameraKey = node.cameraTrigger ?? string.Empty;
@@ -666,11 +717,35 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // This prevents a skipped trigger from continuing to play into the new line.
             TriggerSpeakerAnimationServer(speakerNetId, node.animationTrigger);
 
-            yield return StartCoroutine(SayAndWait(speaker, node.npcLine, node.playLaughSfx));
+            yield return StartCoroutine(SayAndWait(speaker, node.npcLine, node.playLaughSfx, node.unskippable));
 
-            if (node.type == ScriptedDialogueNodeType.Choice)
+            if (node.type == ScriptedDialogueNodeType.Choice && !_abandoned)
                 yield return StartCoroutine(PlayChoiceNode(speaker, node, speakerNetId));
         }
+
+        // Every participant backed out of an abandonable sequence: tear it down (they already
+        // got their per-client exit) and report it as abandoned, not completed.
+        if (_abandoned)
+        {
+            _abandoned = false;
+            _abandonWhenEmpty = false;
+            _serverSequenceActive = false;
+            _currentSpeakerTransform = null;
+            _participants.Clear();
+            _leftParticipants.Clear();
+            _joinByInteractionOnly = false;
+            _allowParticipantExit = false;
+            _activeJoinRadius = -1f;
+            _useWorldDialogueCamera = false;
+            HideInWorldSubtitleClientRpc(speakerNetId);
+            SetActiveDialogueSpeakerClientRpc(0);
+            yield return null;
+
+            Debug.Log("[ScriptedDialogueRunner] Scripted dialogue abandoned — every participant left.");
+            onAbandoned?.Invoke();
+            yield break;
+        }
+        _abandonWhenEmpty = false;
 
         // When deferExit is true, scripted mode is kept active so the caller can chain
         // further sequences (e.g. a cutscene followed by megaphone dialogue) before
@@ -702,12 +777,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     /// <summary>Says a line and waits for all connected players to advance (or the timeout to expire).</summary>
-    private IEnumerator SayAndWait(SuspectCharacter speaker, string text, bool playLaughSfx = false)
+    private IEnumerator SayAndWait(SuspectCharacter speaker, string text, bool playLaughSfx = false, bool unskippable = false)
     {
+        if (_abandoned) yield break; // sequence abandoned — don't start another line
+
         _awaitingScriptedInput = true;
         // Target the "input open" signal only to participants — non-participants must not
         // be able to send advance RPCs that interfere with the gate.
-        SetAwaitingInputClientRpc(true, BuildParticipantRpcParams());
+        SetAwaitingInputClientRpc(true, unskippable, BuildParticipantRpcParams());
 
         // While a bystander is disengaged from an otherwise-active dialogue, mirror the line
         // as a small floating bubble above the suspect's head for everyone (see
@@ -980,7 +1057,40 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Debug.Log($"[ScriptedDialogueRunner] Client {senderId} left the dialogue " +
                   $"({_participants.Count} participant(s) remaining).");
 
+        if (_abandonWhenEmpty && _participants.Count == 0)
+        {
+            AbandonSequence();
+            return;
+        }
+
         RecheckGatesAfterParticipantChange();
+    }
+
+    /// <summary>
+    /// Server-only. Stops an abandonable sequence (see <see cref="_abandonWhenEmpty"/>) where it is:
+    /// releases whichever gate RunDialogue is waiting on without resolving a choice, so the
+    /// coroutine falls through to its abandon cleanup.
+    /// </summary>
+    private void AbandonSequence()
+    {
+        if (_abandoned) return;
+        _abandoned = true;
+
+        if (_choiceTimerCoroutine != null)
+        {
+            StopCoroutine(_choiceTimerCoroutine);
+            _choiceTimerCoroutine = null;
+        }
+        if (_awaitingScriptedChoice && !_choiceResolved)
+        {
+            _choiceResolved = true;
+            _resolvedChoiceIndex = 0;
+            HideAdvanceTimerClientRpc();
+        }
+
+        // Also clears the current subtitle line on every client.
+        if (_awaitingScriptedInput && !_scriptedAdvanceReady)
+            OpenAdvanceGate();
     }
 
     /// <summary>
@@ -991,7 +1101,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void RequestRejoinScriptedDialogueServerRpc(ServerRpcParams rpcParams = default)
     {
-        if (!_serverSequenceActive) return;
+        if (!_serverSequenceActive || _abandoned) return; // an abandoned sequence is shutting down
 
         ulong senderId = rpcParams.Receive.SenderClientId;
         if (_participants.Contains(senderId)) return; // already in
@@ -1008,6 +1118,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         IsScriptedModeActive = false;
         _clientIsWaitingForInput = false;
+        _clientRevealUnskippable = false;
+        HideLeaveBackButtonLocal();
 
         DeactivateOverrideCam();
         RestoreSpeakerLook();
@@ -1164,7 +1276,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             lookTarget = netObj.transform;
 
         if (canLeave)
-            UIController.Instance?.ShowBackButton(() => LeaveScriptedDialogueServerRpc());
+            ShowLeaveBackButtonLocal();
 
         // Mirror EnterScriptedModeClientRpc: outside players get movement-locked but must NOT
         // receive the booth suspect-cam activation. Calling EnterScriptedDialogueMode for an
@@ -1321,6 +1433,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _awaitingScriptedChoice = false;
         _activeChoiceTexts = null;
 
+        // Everyone backed out of an abandonable sequence — no response, no choice echo.
+        if (_abandoned) yield break;
+
         // Broadcast the finalized choice: hide the panel, clear highlights, and show the
         // winning player's spoken line as a subtitle on all clients.
         var chosen = node.choices[_resolvedChoiceIndex];
@@ -1475,7 +1590,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             lookTarget = netObj.transform;
 
         if (canLeave)
-            UIController.Instance?.ShowBackButton(() => LeaveScriptedDialogueServerRpc());
+            ShowLeaveBackButtonLocal();
 
         if (LocalUsesWorldDialoguePath)
         {
@@ -1605,6 +1720,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         IsScriptedModeActive = false;
         RestoreSpeakerLook();
 
+        // The sequence ended naturally: its "leave" Back button must go with it (the outside/world
+        // exit path never hides the Back button on its own).
+        HideLeaveBackButtonLocal();
+
         // This sequence never locked the local player (e.g. an unlocked megaphone sequence) and
         // they've since started a world conversation — that conversation owns the dialogue lock,
         // cursor, choice panel, choice echo, cutscene immunity and HUD. Only release what this
@@ -1688,9 +1807,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// any late-joiner who had the flag set also gets it cleared correctly.
     /// </summary>
     [ClientRpc]
-    private void SetAwaitingInputClientRpc(bool waiting, ClientRpcParams rpcParams = default)
+    private void SetAwaitingInputClientRpc(bool waiting, bool revealUnskippable = false, ClientRpcParams rpcParams = default)
     {
         _clientIsWaitingForInput = waiting;
+        _clientRevealUnskippable = waiting && revealUnskippable;
     }
 
     // -------------------------------------------------------------------------

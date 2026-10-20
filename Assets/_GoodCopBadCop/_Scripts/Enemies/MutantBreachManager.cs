@@ -204,6 +204,9 @@ public class MutantBreachManager : NetworkBehaviour
         _breachRunning.OnValueChanged   += OnBreachRunningChanged;
         SetFenceCarving(!_breachRunning.Value);
 
+        // Late joiner mid-breach: give them the task row from the replicated state.
+        SyncRepelMutantsTask();
+
         if (!IsServer)
         {
             // A client that joined mid-breach already has the authoritative values from spawn
@@ -229,6 +232,7 @@ public class MutantBreachManager : NetworkBehaviour
         _breachRemaining.OnValueChanged -= OnBreachRemainingChanged;
         _breachRunning.OnValueChanged   -= OnBreachRunningChanged;
         SetFenceCarving(true);
+        RepelMutantsTask.Remove();
 
         CampaignManager.OnDayChanged -= OnDayChanged;
         ShiftManager.OnPostShiftTasksComplete -= OnPostShiftTasksComplete;
@@ -337,7 +341,24 @@ public class MutantBreachManager : NetworkBehaviour
     /// Forwards to <see cref="OnBreachCountChangedAllClients"/>, which day scripts use to drive
     /// their objective row.
     /// </summary>
-    private void OnBreachRunningChanged(bool previous, bool current) => SetFenceCarving(!current);
+    private void OnBreachRunningChanged(bool previous, bool current)
+    {
+        SetFenceCarving(!current);
+        SyncRepelMutantsTask();
+    }
+
+    /// <summary>
+    /// Runs on every peer. Mirrors the replicated breach state into the registry-driven
+    /// <see cref="RepelMutantsTask"/> so the breach appears on the world-space Task Page, the
+    /// guidebook, and the HUD task list like every other task.
+    /// </summary>
+    private void SyncRepelMutantsTask()
+    {
+        if (_breachRunning.Value)
+            RepelMutantsTask.EnsureRegistered(_breachRemaining.Value, _breachTotal.Value);
+        else
+            RepelMutantsTask.Remove();
+    }
 
     /// <summary>
     /// Toggles perimeter-fence carving. Disabled for the duration of a breach so mutants can path
@@ -350,6 +371,7 @@ public class MutantBreachManager : NetworkBehaviour
         if (_breachTotal.Value <= 0)
             return;
 
+        SyncRepelMutantsTask();
         OnBreachCountChangedAllClients?.Invoke(current, _breachTotal.Value);
     }
 
@@ -371,7 +393,10 @@ public class MutantBreachManager : NetworkBehaviour
         // OnValueChanged never fires for a write that doesn't change the value, so the initial
         // report of a breach whose count already equals the stored value would otherwise be lost.
         if (!remainingChanged)
+        {
+            SyncRepelMutantsTask();
             OnBreachCountChangedAllClients?.Invoke(remaining, total);
+        }
     }
 
     /// <summary>
@@ -543,6 +568,12 @@ public class MutantBreachManager : NetworkBehaviour
 
         _isBreachActive = true;
         _hasTriggeredToday = true;
+
+        // Clear the previous breach's count so listeners (RepelMutantsTask, Day_01's row) don't
+        // show a stale "x/y" during this breach's alarm lead time. Total first, so
+        // OnBreachRemainingChanged sees total == 0 and doesn't forward a bogus report.
+        _breachTotal.Value = 0;
+        _breachRemaining.Value = 0;
         _breachRunning.Value = true;
 
         Debug.Log($"[MutantBreachManager] Breach triggered: '{data.breachName}' — {spawnQueue.Count} mutant(s).");
@@ -797,6 +828,8 @@ public class MutantBreachManager : NetworkBehaviour
     [ClientRpc]
     private void TriggerBreachEffectsClientRpc(string message, float holdDuration, int breachPresetIndex)
     {
+        // Normally already registered via _breachRunning; covers the RPC landing before that delta.
+        RepelMutantsTask.EnsureRegistered(-1, 0);
         OnBreachStartedAllClients?.Invoke();
 
         if (alarmLights != null)
@@ -837,6 +870,7 @@ public class MutantBreachManager : NetworkBehaviour
     [ClientRpc]
     private void EndBreachEffectsClientRpc()
     {
+        RepelMutantsTask.Remove();
         OnBreachClearedAllClients?.Invoke();
 
         if (alarmLights != null)

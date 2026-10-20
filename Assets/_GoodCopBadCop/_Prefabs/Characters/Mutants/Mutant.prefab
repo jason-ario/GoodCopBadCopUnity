@@ -377,9 +377,10 @@ MonoBehaviour:
   lookAnimator: {fileID: 0}
   lookAtRange: 12
   attackHitbox: {fileID: 291297765939751491}
-  attackHitDelay: 0.4
+  attackHitDelay: 0.7
   useSecondAttackAnimation: 0
   secondAttackStateName: Mutant Attack 2
+  secondAttackHitDelay: 0.4
   enableHitAnimation: 0
   hitTriggerName: Hit
   doorDetectionRadius: 3
@@ -459,8 +460,15 @@ MonoBehaviour:
   fleeInsteadOfDie: 0
   fleeSpeed: 12
   fleeDespawnTimeout: 8
+  fleeBreakoutDoorRadius: 8
+  fleeStuckSeconds: 0.75
+  fleeStuckMinDistance: 1
+  fleeStuckGateSearchRadius: 25
+  fleeThroughGateCommitSeconds: 2.5
+  fleeThroughGateExitDistance: 6
   _ignoreFriendlyFireDamage: 0
   _autoInitialiseOnSpawn: 1
+  _fullMutantHealthMultiplier: 2
 --- !u!114 &7127085182576174026
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1118,7 +1126,7 @@ MonoBehaviour:
   AnimationFloorLevel: 0.001
   _Editor_Foldout_Setup_LegsList: 1
   _Editor_EnsureCount: 0
-  _Editor_OnValidateTrigger: 0
+  _Editor_OnValidateTrigger: 1
   _EditorAllowAutoUpdateFeetParams: 1
   _EditorCategory: 0
   _EditorSetupCategory: 0
@@ -1480,11 +1488,13 @@ MonoBehaviour:
   itemsThatCanInteractWith:
   - {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   interactText: 
+  interactVerb: 
   highlightNameFilter: 
   holdHighlightVisibleRange: 50
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
   _destroyOnCollect: 1
   _kickable: 1
   _burnable: 0
