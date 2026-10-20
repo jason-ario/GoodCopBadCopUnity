@@ -16,15 +16,22 @@ public class SpeakingInteraction : NetworkBehaviour
              "SuspectCharacter) provides a FirstName/LastName.")]
     [SerializeField] private string speakerName = "Character";
 
+    [Tooltip("When set, always used as the subtitle / name-tag name, taking priority over SuspectData " +
+             "(e.g. \"???\" for a speaker whose identity is hidden).")]
+    [SerializeField] private string speakerNameOverride = "";
+
     /// <summary>
-    /// Subtitle / dialogue-history name for this speaker. Pulled from the assigned
-    /// <see cref="SuspectData"/> (this component's, else the sibling <see cref="SuspectCharacter.Data"/>)
-    /// as "FirstName LastName"; falls back to the serialized <see cref="speakerName"/>.
+    /// Subtitle / dialogue-history name for this speaker. Uses <see cref="speakerNameOverride"/> when set;
+    /// otherwise pulled from the assigned <see cref="SuspectData"/> (this component's, else the sibling
+    /// <see cref="SuspectCharacter.Data"/>) as "FirstName LastName"; falls back to the serialized
+    /// <see cref="speakerName"/>.
     /// </summary>
     public string SpeakerName
     {
         get
         {
+            if (!string.IsNullOrWhiteSpace(speakerNameOverride)) return speakerNameOverride.Trim();
+
             SuspectData data = suspectData;
             if (data == null)
             {

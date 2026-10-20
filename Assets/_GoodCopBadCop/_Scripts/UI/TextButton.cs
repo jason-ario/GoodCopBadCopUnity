@@ -39,6 +39,11 @@ public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
                     break;
                 }
             }
+
+            // Restore bound defaults on disable. Otherwise a popup closed while greyed out keeps the
+            // grey label, and the next rebind captures grey as the "default", so it never turns white again.
+            if (hasDisabledParam)
+                anim.writeDefaultValuesOnDisable = true;
         }
     }
 

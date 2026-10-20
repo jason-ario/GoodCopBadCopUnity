@@ -226,32 +226,6 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     [Min(0)]
     [SerializeField] private int _mouthGoreStopBurstCount = 3;
 
-    [Header("Mouth Gore — Gut Chunks")]
-    [Tooltip("Mesh-only gut prefabs (no NetworkObject/JunkItem!) flung out of the mouth as local " +
-             "physics chunks while eating. Rigidbody + BoxCollider are added at runtime.")]
-    [SerializeField] private GameObject[] _mouthGutPrefabs;
-
-    [Tooltip("Random delay range (seconds) between gut chunks. x <= 0 disables.")]
-    [SerializeField] private Vector2 _mouthGutInterval = new Vector2(0.5f, 1.4f);
-
-    [Tooltip("Random uniform scale range applied to each gut chunk.")]
-    [SerializeField] private Vector2 _mouthGutScale = new Vector2(0.6f, 1.1f);
-
-    [Tooltip("Launch speed range (m/s) along the pour direction, plus random sideways spread.")]
-    [SerializeField] private Vector2 _mouthGutSpeed = new Vector2(1f, 2.5f);
-
-    [Tooltip("Max gut chunks alive at once; the oldest is removed past this.")]
-    [Min(0)]
-    [SerializeField] private int _mouthGutMax = 16;
-
-    [Tooltip("Seconds before a gut chunk is destroyed. 0 = only removed by the max-count cap.")]
-    [Min(0f)]
-    [SerializeField] private float _mouthGutLifetime = 45f;
-
-    [Tooltip("Gut chunks thrown at once when he stops eating.")]
-    [Min(0)]
-    [SerializeField] private int _mouthGutStopCount = 4;
-
     [Tooltip("Seconds the looping effects keep living after emission stops, so falling blood " +
              "finishes instead of vanishing.")]
     [Min(0f)]
@@ -316,7 +290,6 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     // Local-only cosmetic mouth gore (every client runs its own copy).
     private readonly List<GameObject> _activeMouthLoopFx = new();
     private readonly Queue<GameObject> _mouthDripDecals = new();
-    private readonly Queue<GameObject> _mouthGutChunks = new();
     private Coroutine _mouthGoreRoutine;
     private Transform _resolvedMouthAnchor;
 
@@ -638,8 +611,6 @@ public class OchoEatingVladCutscene : NetworkBehaviour
                 : _mouthGoreBurstPrefabs;
             for (int i = 0; i < _mouthGoreStopBurstCount; i++)
                 SpawnMouthGoreBurst(stopPool);
-            for (int i = 0; i < _mouthGutStopCount; i++)
-                SpawnMouthGutChunk();
         }
 
         if (_audioSource != null)
@@ -744,7 +715,6 @@ public class OchoEatingVladCutscene : NetworkBehaviour
 
         if (!immediate) return;
         DestroyAll(_mouthDripDecals);
-        DestroyAll(_mouthGutChunks);
     }
 
     private static void DestroyAll(Queue<GameObject> queue)
@@ -797,12 +767,8 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         bool dripsEnabled = _mouthDripDecalInterval.x > 0f && _mouthDripDecalMax > 0
                             && _pieceLandingDecalPrefabs != null && _pieceLandingDecalPrefabs.Length > 0;
 
-        bool gutsEnabled = _mouthGutInterval.x > 0f && _mouthGutMax > 0
-                           && _mouthGutPrefabs != null && _mouthGutPrefabs.Length > 0;
-
         float nextBurst = RandomRange(_mouthGoreBurstInterval) * 0.5f;
         float nextDrip = RandomRange(_mouthDripDecalInterval) * 0.5f;
-        float nextGut = RandomRange(_mouthGutInterval) * 0.5f;
 
         while (true)
         {
@@ -812,12 +778,6 @@ public class OchoEatingVladCutscene : NetworkBehaviour
             {
                 SpawnMouthGoreBurst(_mouthGoreBurstPrefabs);
                 nextBurst = RandomRange(_mouthGoreBurstInterval);
-            }
-
-            if (gutsEnabled && (nextGut -= dt) <= 0f)
-            {
-                SpawnMouthGutChunk();
-                nextGut = RandomRange(_mouthGutInterval);
             }
 
             if (dripsEnabled && (nextDrip -= dt) <= 0f)
@@ -841,6 +801,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         GameObject fx = Instantiate(prefab, pos, rot);
         foreach (ParticleSystem ps in fx.GetComponentsInChildren<ParticleSystem>(true))
             ps.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
+        StripImpactMotion(fx);
         AimEmittersAlongPour(fx);
         ApplyIntensity(fx);
         foreach (ParticleSystem ps in GetRootParticleSystems(fx))
@@ -849,47 +810,35 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     }
 
     /// <summary>
-    /// Flings one mesh-only gut chunk out of the mouth as a local, non-networked physics body.
-    /// Purely cosmetic: it is never registered with TakeOutTrashTask and is removed by lifetime/cap.
+    /// Strips the Blood VFX Kit "impact splash" motion that lifts particles above Ocho's head:
+    ///  - Collision: drop emitters (e.g. 'BloodDrops_Front') collide with World on every layer
+    ///    with bounce = 1 / no energy loss, ricocheting off Ocho's and Vlad's colliders.
+    ///  - Velocity over Lifetime: fountain emitters (Blood_Spray, Blood Trail, Head_Explosion)
+    ///    add +1..3 m/s along WORLD +Y, rising ~1 m regardless of emitter rotation.
+    ///  - Force over Lifetime / External Forces: same risk, never wanted for a downward pour.
+    /// Mouth gore is purely cosmetic and ground splats come from the drip decals.
     /// </summary>
-    private void SpawnMouthGutChunk()
+    private static void StripImpactMotion(GameObject fx)
     {
-        if (_mouthGutPrefabs == null || _mouthGutPrefabs.Length == 0 || _mouthGutMax <= 0) return;
-        if (!TryGetMouthPose(out Vector3 pos, out Quaternion rot)) return;
-
-        GameObject prefab = _mouthGutPrefabs[UnityEngine.Random.Range(0, _mouthGutPrefabs.Length)];
-        if (prefab == null) return;
-
-        GameObject chunk = Instantiate(prefab, pos, UnityEngine.Random.rotation);
-        chunk.name = $"{prefab.name} (Ocho Mouth Gut)";
-        chunk.transform.localScale = prefab.transform.localScale * RandomRange(_mouthGutScale);
-
-        if (!chunk.TryGetComponent(out Collider _))
-            chunk.AddComponent<BoxCollider>(); // auto-fits the MeshFilter bounds
-        if (!chunk.TryGetComponent(out Rigidbody rb))
-            rb = chunk.AddComponent<Rigidbody>();
-
-        rb.isKinematic = false;
-        rb.mass = 0.3f;
-        rb.interpolation = RigidbodyInterpolation.Interpolate;
-        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-
-        // Don't let freshly spawned chunks collide with Ocho or the held Vlad pieces.
-        Collider chunkCol = chunk.GetComponent<Collider>();
-        if (_ochoRoot != null)
+        foreach (ParticleSystem ps in fx.GetComponentsInChildren<ParticleSystem>(true))
         {
-            foreach (Collider c in _ochoRoot.GetComponentsInChildren<Collider>(true))
-                Physics.IgnoreCollision(chunkCol, c);
+            ParticleSystem.CollisionModule collision = ps.collision;
+            collision.enabled = false;
+
+            ParticleSystem.VelocityOverLifetimeModule velocity = ps.velocityOverLifetime;
+            velocity.enabled = false;
+
+            ParticleSystem.ForceOverLifetimeModule force = ps.forceOverLifetime;
+            force.enabled = false;
+
+            ParticleSystem.ExternalForcesModule external = ps.externalForces;
+            external.enabled = false;
+
+            // Never let gravity push upward.
+            ParticleSystem.MainModule main = ps.main;
+            if (main.gravityModifierMultiplier < 0f)
+                main.gravityModifierMultiplier = -main.gravityModifierMultiplier;
         }
-
-        Vector3 dir = rot * Vector3.forward;
-        Vector3 spread = UnityEngine.Random.insideUnitSphere * 0.6f;
-        rb.linearVelocity = (dir + spread).normalized * RandomRange(_mouthGutSpeed);
-        rb.angularVelocity = UnityEngine.Random.insideUnitSphere * 8f;
-
-        if (_mouthGutLifetime > 0f)
-            Destroy(chunk, _mouthGutLifetime);
-        EnqueueCapped(_mouthGutChunks, chunk, _mouthGutMax);
     }
 
     /// <summary>
@@ -1118,6 +1067,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
             main.simulationSpace = ParticleSystemSimulationSpace.World;
         }
 
+        StripImpactMotion(fx);
         AimEmittersAlongPour(fx);
         ApplyIntensity(fx);
 
