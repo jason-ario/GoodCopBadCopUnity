@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 0324aea82b799e44dafa8cc37b5de944, type: 3}
   CharacterPrefab: {fileID: 8357816086755924206, guid: c8d8a7a2ab2cf2044beab16196c35a18, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Home after the morning mine shift.
-    - Collecting eastern apartments' coal allocation.
-    - End of shift, Coal Face B.
-    midDaysReasons:
-    - East shaft sealed this morning. Home.
-    - Collecting protective gear from the depot.
-    - Double shift at C shaft. Sleep.
-    finalDaysReasons:
-    - Every mine is closed. Just home.
-    - Nowhere else to go. Mine's shut.
-    - Home to the east block. Wife waits.
+  - Home after the morning mine shift.
+  - Collecting eastern apartments' coal allocation.
+  - End of shift, Coal Face B.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Textile mill clerk. Home for lunch.
-    - First wage packet. Started at the mine Monday.
-    - Home to an empty flat. Never married.
-    midDaysReasons:
-    - Starting my east shaft shift. Coal Face B.
-    - University entrance exam. Mining engineering.
-    - Visiting my sons east. I live west.
-    finalDaysReasons:
-    - The mine runs fine. Back underground now.
-    - Retired ten years ago. Visiting the crew.
-    - The foreman called my name. Back down.
+  - Textile mill clerk. Home for lunch.
+  - First wage packet. Started at the mine Monday.
+  - Home to an empty flat. Never married.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Long shift. Just off the morning rotation, Coal Face B. Papers in order.
-    - I know I'm dirty. The showers at the shaft were out again.
-    dialoguesMidDays:
-    - They moved us to C shaft. Longer walk. Worse air.
-    - Eleven hours today. The ventilation has been bad. I don't complain.
-    dialoguesFinalDays:
-    - They closed the mine. I don't know what I'm supposed to do now.
-    - I used to know what my day was. Just going home.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Long shift. Just off the morning rotation, Coal Face B. Papers in order.
+  - I know I'm dirty. The showers at the shaft were out again.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Good. Thank you, officer. Going home now.
-    dialoguesMidDays:
-    - Right. Thank you. Back to the bunk.
-    dialoguesFinalDays:
-    - Alright. Nothing to go back to anyway.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Good. Thank you, officer. Going home now.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - I've slept in mine shafts tighter than this. I'll manage.
   - Concrete, not rock. But it's the same in the dark.
@@ -110,38 +66,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 0126d7c6e9586af4b99c87708fd95382, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: Coal Face B, east shaft. Morning rotation. Going home to the east block.
-    midDaysAnswer: C shaft. They sealed the east one. Eleven hours. Longer walk home.
-    finalDaysAnswer: Nowhere. The mine is shut. I stood at the gate a while.
-    mismatchEarlyDaysAnswer: The tram depot. I drive the number four line. Twelve years now.
-    mismatchMidDaysAnswer: Coal Face B, east shaft. Same as always. Nothing to report.
-    mismatchFinalDaysAnswer: The station. Wife left on the Tbilisi train. I live alone now.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: Coal Face B, east shaft. Morning rotation. Going home to the east block.
+    mismatchAnswer: The tram depot. I drive the number four line. Twelve years now.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Coal dust. Always coal dust. The mine doctor says my lungs are fine.
-    midDaysAnswer: Some dizziness. Ventilation in C shaft is bad. It passes. Mostly.
-    finalDaysAnswer: Tired. More than usual. No sleep without the shift. Same cough.
-    mismatchEarlyDaysAnswer: Nothing. I am thirty-one. The body does not complain yet.
-    mismatchMidDaysAnswer: Nothing. C shaft has the best air in the mine. New fans.
-    mismatchFinalDaysAnswer: Never coughed in my life. I kept the office ledgers. Never went down.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: Coal dust. Always coal dust. The mine doctor says my lungs are fine.
+    mismatchAnswer: Nothing. I am thirty-one. The body does not complain yet.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - B shaft today. Long one. Papers are in order. Always are.
-    - I know I smell. The showers at the mine were out again.
-    midDays:
-    - Three men on my crew did not show this morning. Nobody said anything.
-    - I do not complain. I just want to get through the week.
-    finalDays:
-    - The mine is closed. First time in thirty years I have nothing to go back to.
-    - Just going home. That is all there is now.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - B shaft today. Long one. Papers are in order. Always are.
+  - I know I smell. The showers at the mine were out again.
+  uncannyIdleBarks: []
   IDNumber: 3871204

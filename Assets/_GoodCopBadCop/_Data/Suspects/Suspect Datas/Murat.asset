@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 75e4f12b7b30fac48b40d9887a3301dc, type: 3}
   CharacterPrefab: {fileID: 8098034281073864286, guid: 6842ef2e3a20cb64fbb66ab4c8c42077, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Delivering textiles to the market.
-    - Two bolts of wool sold. Good day!
-    - Home to my room above Samuil's teahouse.
-    midDaysReasons:
-    - Medical supplies for the triage center.
-    - Traded my last silk for bandages.
-    - Selling batteries. Fair prices, as always!
-    finalDaysReasons:
-    - Home above the teahouse before curfew.
-    - Walking the ash roads. Bazaar is empty.
-    - Mandatory merchant residency count.
+  - Delivering textiles to the market.
+  - Two bolts of wool sold. Good day!
+  - Home to my room above Samuil's teahouse.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Home from eight hours at the steel mill.
-    - Visiting grandmother. I have no children.
-    - Going home. Travel makes me ill.
-    midDaysReasons:
-    - Gave up trading. The road is hopeless.
-    - Getting my first passport. Never left Georgia.
-    - Hauling timber for the sawmill, as usual.
-    finalDaysReasons:
-    - Packing for my first trip ever.
-    - Pension, after forty years at the tractor plant.
-    - Going home to wait for the end. No hope.
+  - Home from eight hours at the steel mill.
+  - Visiting grandmother. I have no children.
+  - Going home. Travel makes me ill.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Merhaba, officer! A fine day to guard such an important gate, no?
-    - My ID lives beside my lucky chestnut. It never fails me!
-    dialoguesMidDays:
-    - I took a shortcut through the mist and met a very polite cow.
-    - I spilled a little tea on the form. The information survived!
-    dialoguesFinalDays:
-    - I found a door in the ruins today. It smelled of cinnamon.
-    - The world is putting on pajamas, officer. A very long nap.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Merhaba, officer! A fine day to guard such an important gate, no?
+  - My ID lives beside my lucky chestnut. It never fails me!
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - May your tea be hot and your path clear!
-    dialoguesMidDays:
-    - You have a kind face. Don't let the gray change it.
-    dialoguesFinalDays:
-    - Until we meet in a brighter chapter. Stay well!
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - May your tea be hot and your path clear!
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - My grandmother said small rooms have the best conversations.
   - Once I waited three days in customs. This is easy!
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 577fc83f8ad13cc46b822224e7bf901e, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The market! Two bolts of wool, then Samuil's black tea. Good day.
-    midDaysAnswer: The triage center. My last silk for bandages and batteries. Fair deal.
-    finalDaysAnswer: The ash roads. The bazaar is empty, so I walk and see what stands.
-    mismatchEarlyDaysAnswer: The tram depot! Twenty years driving the number four. Never missed a stop.
-    mismatchMidDaysAnswer: My flat. I live alone. Nobody to trip over, nobody to feed.
-    mismatchFinalDaysAnswer: The border! I arrived this morning. My first time in your town!
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The market! Two bolts of wool, then Samuil's black tea. Good day.
+    mismatchAnswer: The tram depot! Twenty years driving the number four. Never missed a stop.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Only my knees. Thirty years of roads. They complain, I ignore them.
-    midDaysAnswer: A dusty cough. And I lose my chestnut daily. It always returns.
-    finalDaysAnswer: My heart flutters sometimes. I sit, drink tea if there is tea.
-    mismatchEarlyDaysAnswer: My knees? Perfect. Thirty years at an office desk, barely walking.
-    mismatchMidDaysAnswer: No cough. I have not left the house in a month.
-    mismatchFinalDaysAnswer: Healthy as a bull. And tea? Never touch it. Never liked it.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: Only my knees. Thirty years of roads. They complain, I ignore them.
+    mismatchAnswer: My knees? Perfect. Thirty years at an office desk, barely walking.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - Want to hold my lucky chestnut? It helps, truly.
-    - In the bazaar we say a cloudy sky is better shade for merchants.
-    midDays:
-    - My boots squeak today. A joke, I think. I lack the punchline.
-    - Don't mind my humming. An old song to shorten the road.
-    finalDays:
-    - Don't be sad, officer. Next story, maybe I hold the stamp.
-    - 'My father survived three disasters. After each, he said: have some tea.'
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - Want to hold my lucky chestnut? It helps, truly.
+  - In the bazaar we say a cloudy sky is better shade for merchants.
+  uncannyIdleBarks: []
   IDNumber: 4118424

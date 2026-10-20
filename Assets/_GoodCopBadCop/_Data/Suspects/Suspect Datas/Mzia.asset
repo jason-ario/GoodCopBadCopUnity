@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 092c7c3074fc9da439cbc3acb19f7fc9, type: 3}
   CharacterPrefab: {fileID: 6847779261494379404, guid: cf59afdc9e0ffee49924ebb9a0a10e75, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Home from the market with yarn.
-    - Home to mend a neighbour's coat.
-    - Helping a neighbour hem curtains.
-    midDaysReasons:
-    - Back from the communal kitchen. Soup for all.
-    - Soup for the neighbours on my floor.
-    - Home to my needle. Coats need patching.
-    finalDaysReasons:
-    - Back from mending bunk hall blankets.
-    - Home to finish my grandson's red sweater.
-    - Elderly residency check-in, as required.
+  - Home from the market with yarn.
+  - Home to mend a neighbour's coat.
+  - Helping a neighbour hem curtains.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Moving into the southern block today.
-    - Taking my husband to the clinic.
-    - Buying a coat. I cannot sew.
-    midDaysReasons:
-    - Dinner at a restaurant. I never cook.
-    - Visiting my grandson two floors up.
-    - Back from university lectures. Second year.
-    finalDaysReasons:
-    - Throwing out my sewing basket. Mending's pointless.
-    - Night shift at the steel works.
-    - Going home alone. I never had grandchildren.
+  - Moving into the southern block today.
+  - Taking my husband to the clinic.
+  - Buying a coat. I cannot sew.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Hello, dear. You look thin. Are they feeding you at this booth?
-    - My papers. I kept them under my Bible so they wouldn't wrinkle.
-    dialoguesMidDays:
-    - There's a tear in your sleeve, dear. Bring it here, I have my needle.
-    - My hands shake more today. The air tastes of metal.
-    dialoguesFinalDays:
-    - Going home to finish my grandson's sweater. A very bright red.
-    - Don't mind the sirens, dear. The world's having a little tantrum.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Hello, dear. You look thin. Are they feeding you at this booth?
+  - My papers. I kept them under my Bible so they wouldn't wrinkle.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Bless you, dear. Stay warm, don't work too hard.
-    dialoguesMidDays:
-    - Go home soon. The air is bad for young lungs.
-    dialoguesFinalDays:
-    - I'll save you a bowl of soup. Be safe.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Bless you, dear. Stay warm, don't work too hard.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - Will you send word to Irina? She worries when I'm late.
   - I'll just sit and knit. That's what I've always done.
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: f40dee3705854904f8de5c25569623d2, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The market, dear. Red yarn for my grandson's sweater. The last they had.
-    midDaysAnswer: The communal kitchen. Soup for the whole block, whoever brings a bowl.
-    finalDaysAnswer: The bunk hall, dear. Mending blankets for the ones sleeping there.
-    mismatchEarlyDaysAnswer: The garment factory, dear. Thirty years on the line, still there.
-    mismatchMidDaysAnswer: My flat in the northern block. Only moved in last spring.
-    mismatchFinalDaysAnswer: My sister's. I live alone, dear. Irina moved away years ago.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The market, dear. Red yarn for my grandson's sweater. The last they had.
+    mismatchAnswer: The garment factory, dear. Thirty years on the line, still there.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: My hands shake, dear. Have for years. A wool-dust cough too.
-    midDaysAnswer: The air tastes of metal. My bones are always cold. Soup helps.
-    finalDaysAnswer: Tired, dear. Heavy. But the sweater isn't finished, so not yet.
-    mismatchEarlyDaysAnswer: Steady as a surgeon, dear. My hands have never shaken.
-    mismatchMidDaysAnswer: Nothing. My eyes went years ago, so I gave up sewing.
-    mismatchFinalDaysAnswer: Not a thing. The sweater's long finished. I sleep like a baby.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: My hands shake, dear. Have for years. A wool-dust cough too.
+    mismatchAnswer: Steady as a surgeon, dear. My hands have never shaken.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - I brought extra soup. There's a pot at number seven if you get a break.
-    - Your coat's too thin, dear. Is anyone looking after you?
-    midDays:
-    - You're doing a good job. Someone should be telling you that.
-    - The sky looks very bruised today. Go home before it gets worse.
-    finalDays:
-    - You're still here. Good. Someone has to be.
-    - My grandson would be about your age. He's in the west now. I hope.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - I brought extra soup. There's a pot at number seven if you get a break.
+  - Your coat's too thin, dear. Is anyone looking after you?
+  uncannyIdleBarks: []
   IDNumber: 7802070

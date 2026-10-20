@@ -109,6 +109,52 @@ public class BoothFlickeringLightsController : MonoBehaviour
         _testBurstCoroutine = null;
     }
 
+    private Coroutine _scriptedBurstCoroutine;
+
+    /// <summary>
+    /// Local, one-off flicker burst of a fixed length for scripted moments (e.g. the Giorgi phantom
+    /// phasing through the booth). Every light starts flickering immediately and is restored to its
+    /// normal intensity afterwards. Call it on every peer (e.g. from a ClientRpc); it isn't networked.
+    /// A new call restarts the burst.
+    /// </summary>
+    public void PlayScriptedBurst(float duration, bool playSound = true)
+    {
+        if (boothLights == null || boothLights.Length == 0) return;
+
+        if (_scriptedBurstCoroutine != null)
+        {
+            StopCoroutine(_scriptedBurstCoroutine);
+            RestoreOriginalIntensities();
+        }
+        else if (_flickerLoopCoroutine == null && _testBurstCoroutine == null)
+        {
+            // Nothing else is driving the lights, so their current intensity is the real baseline.
+            CacheOriginalIntensities();
+        }
+
+        _scriptedBurstCoroutine = StartCoroutine(RunScriptedBurst(duration, playSound));
+    }
+
+    private IEnumerator RunScriptedBurst(float duration, bool playSound)
+    {
+        if (playSound && flickerSound != null && SFXController.Instance != null)
+            SFXController.Instance.PlayAtPosition(flickerSound, transform.position, flickerSoundVolume);
+
+        float endTime = Time.time + Mathf.Max(0.05f, duration);
+        while (Time.time < endTime)
+        {
+            for (int i = 0; i < boothLights.Length; i++)
+            {
+                if (boothLights[i] != null)
+                    boothLights[i].intensity = SampleIntensity(i);
+            }
+            yield return new WaitForSeconds(Random.Range(minFlickerStep, maxFlickerStep) / Mathf.Max(1f, maxRateMultiplier));
+        }
+
+        RestoreOriginalIntensities();
+        _scriptedBurstCoroutine = null;
+    }
+
     /// <summary>
     /// Starts the periodic flickering loop. Caches current light intensities for later restoration.
     /// Safe to call even if already running.

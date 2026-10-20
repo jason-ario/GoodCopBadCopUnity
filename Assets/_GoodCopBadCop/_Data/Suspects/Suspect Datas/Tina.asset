@@ -34,71 +34,23 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: b95f411c45eb9a24c86202f9a0008a9f, type: 3}
   CharacterPrefab: {fileID: 1501177916931924578, guid: 572c6160c8045c14eb3dd93c39663819, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Client meeting, downtown finance office.
-    - Home after late-night bookkeeping.
-    - Delivering ledgers to the treasury district.
-    midDaysReasons:
-    - Collecting payments from an associate.
-    - Meeting clients I won't name.
-    - Checking secured deposits. Things deteriorate.
-    finalDaysReasons:
-    - Closing accounts before the last deadline.
-    - Final settlement papers for a client.
-    - Home near the station. Alone, deliberately.
+  - Client meeting, downtown finance office.
+  - Home after late-night bookkeeping.
+  - Delivering ledgers to the treasury district.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Sunday lunch with my parents.
-    - Typing course. Numbers confuse me.
-    - My husband's birthday, with his family.
-    midDaysReasons:
-    - Picking my children up from school.
-    - Ask anything. I have nothing to hide.
-    - Back to my village. Never lived here.
-    finalDaysReasons:
-    - Home to my family. Mother's waiting up.
-    - Settling Father's estate with my brothers.
-    - Opening my flat to evacuated families.
+  - Sunday lunch with my parents.
+  - Typing course. Numbers confuse me.
+  - My husband's birthday, with his family.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Don't mind the mask. Old scars. Nothing interesting.
-    - You have a very serious expression. I find that attractive.
-    dialoguesMidDays:
-    - Still the same face at this window. I appreciate consistency.
-    - I can make this quick. We both have long days ahead.
-    dialoguesFinalDays:
-    - These last few days, I find myself almost sentimental.
-    - I won't ask about your rules. You don't ask about mine.
+  - Don't mind the mask. Old scars. Nothing interesting.
+  - You have a very serious expression. I find that attractive.
   uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - My papers are ready. I was here yesterday. Remember?
-    - The mask is part of my face. It stays.
-    dialoguesMidDays:
-    - I have everything you need. You can ask me things.
-    - I came prepared. I always come prepared for you.
-    dialoguesFinalDays:
-    - I know what you need to see. Look closer.
-    - The mask does not come off. You already know why.
+  - My papers are ready. I was here yesterday. Remember?
+  - The mask is part of my face. It stays.
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Good instincts, officer. I will remember that.
-    dialoguesMidDays:
-    - You make this easier every time. I appreciate that.
-    dialoguesFinalDays:
-    - Smooth as always. Until the next one.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Good instincts, officer. I will remember that.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - I will need to contact someone. One moment.
   - You will hear from people I know. I say that calmly.
@@ -122,38 +74,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 5b17e3fdf6196354dad34cc70d2ac032, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: A client near the station. Ledgers. Nothing to interest you.
-    midDaysAnswer: Collecting payments. People are slow this season. I am patient. Mostly.
-    finalDaysAnswer: Closing accounts before the deadline. Very little left to close.
-    mismatchEarlyDaysAnswer: My mother's flat in Rustavi. She cooks for me every Sunday.
-    mismatchMidDaysAnswer: The airport. I fly in from Moscow. I don't live here.
-    mismatchFinalDaysAnswer: The textile factory, night shift. Numbers were never my talent.
-    uncannyEarlyDaysAnswer: I was already here. Before you sat down.
-    uncannyMidDaysAnswer: The same place I always come from. Behind you.
-    uncannyFinalDaysAnswer: I don't remember where. But I arrived. I always arrive.
+    answer: A client near the station. Ledgers. Nothing to interest you.
+    mismatchAnswer: My mother's flat in Rustavi. She cooks for me every Sunday.
+    uncannyAnswer: I was already here. Before you sat down.
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Nothing. The mask covers old scars, not fever. Stop staring.
-    midDaysAnswer: Tired. I stopped counting sleepless hours. Discuss it privately?
-    finalDaysAnswer: I don't feel much lately. I've started calling that steady.
-    mismatchEarlyDaysAnswer: Nothing. The mask is for show. At home, it's off.
-    mismatchMidDaysAnswer: None. My husband would notice. He notices everything about me.
-    mismatchFinalDaysAnswer: Perfect health. No scars under the mask. Shall I?
-    uncannyEarlyDaysAnswer: No. Ask again. The answer will still be no.
-    uncannyMidDaysAnswer: I don't think so. The skin underneath disagrees.
-    uncannyFinalDaysAnswer: I can't tell anymore. The mask feels for me.
+    answer: Nothing. The mask covers old scars, not fever. Stop staring.
+    mismatchAnswer: Nothing. The mask is for show. At home, it's off.
+    uncannyAnswer: No. Ask again. The answer will still be no.
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - You keep staring. Most people have manners.
-    - The family section is blank on purpose. Note it down.
-    midDays:
-    - I could make this easier. If you're the right professional.
-    - The mask isn't medical or decorative. It is simply mine.
-    finalDays:
-    - By now we know each other. Checkpoints do that.
-    - No next of kin to list. That was always deliberate.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - You keep staring. Most people have manners.
+  - The family section is blank on purpose. Note it down.
+  uncannyIdleBarks: []
   IDNumber: 6703375

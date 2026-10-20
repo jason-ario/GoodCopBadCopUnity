@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: bc3f71ff4d3fec84cbcdec8d13ec171d, type: 3}
   CharacterPrefab: {fileID: 7880033083019812546, guid: 692963596e3dede499489345bf734a53, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Organizing the library archives.
-    - Back from the neighbourhood book club.
-    - Fetching a kerosene lamp for reading.
-    midDaysReasons:
-    - Escaping the smog into the vaults.
-    - Checking rare book humidity seals.
-    - Returning books readers won't need again.
-    finalDaysReasons:
-    - Library's open. No one came. Home.
-    - Home to read the last chapter.
-    - The mandatory residency count.
+  - Organizing the library archives.
+  - Back from the neighbourhood book club.
+  - Fetching a kerosene lamp for reading.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Getting my first library card. Rarely read.
-    - Bakery night shift, twenty years now.
-    - Visiting from Kutaisi, seeing the sights.
-    midDaysReasons:
-    - Taking my husband and children to shelter.
-    - Panicking. I need a doctor for my nerves.
-    - Furnace three duty at the steel works.
-    finalDaysReasons:
-    - Burning library books for heat. Just paper.
-    - Retiring after forty years. Collecting pension.
-    - Fleeing to my sister's. Never saw this coming.
+  - Getting my first library card. Rarely read.
+  - Bakery night shift, twenty years now.
+  - Visiting from Kutaisi, seeing the sights.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - You have a very interesting lifeline. It's shorter than you think.
-    - Don't mind the dust on my coat. We'll all be dust soon.
-    dialoguesMidDays:
-    - I saw a bird fly backward today. The clock is resetting itself.
-    - You look like a man who hasn't realized he's in the final chapter.
-    dialoguesFinalDays:
-    - Why bother with the gate? The walls are already ghosts.
-    - I've seen your ending. It's quite dark, but very quiet.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - You have a very interesting lifeline. It's shorter than you think.
+  - Don't mind the dust on my coat. We'll all be dust soon.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Go on. Your story still has a few pages.
-    dialoguesMidDays:
-    - You're letting the ending inside. I hope you're ready.
-    dialoguesFinalDays:
-    - Go where you like. The ink is already dry.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Go on. Your story still has a few pages.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - A room without a window. How very on-the-nose.
   - You think the cage changes the story. It doesn't.
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: a860c39d3bee20a4dbf1652f7a813971, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The archive on the hill. Three readers today. One will not return.
-    midDaysAnswer: The rare books vault. The smog gets into the bindings. I sealed what I could.
-    finalDaysAnswer: The library. I still unlock it each morning. No one comes.
-    mismatchEarlyDaysAnswer: The school on Chavchavadze Street. Twenty years teaching children literature.
-    mismatchMidDaysAnswer: Home. My husband keeps the stove going while I read.
-    mismatchFinalDaysAnswer: The archive? It closed years ago. I haven't been since.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The archive on the hill. Three readers today. One will not return.
+    mismatchAnswer: The school on Chavchavadze Street. Twenty years teaching children literature.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: None. I sleep well. Though I dreamt something I had no right to know.
-    midDaysAnswer: Cold hands, for weeks now. The headaches arrive before the weather does.
-    finalDaysAnswer: I tire quickly. The archive stairs take longer. All as I expected.
-    mismatchEarlyDaysAnswer: Nothing. Past sixty, a little stiffness. Nothing more than that.
-    mismatchMidDaysAnswer: Warm hands, clear head. I have no idea what tomorrow holds.
-    mismatchFinalDaysAnswer: Nothing now. The doctor forbade me the archive stairs, so I rest.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: None. I sleep well. Though I dreamt something I had no right to know.
+    mismatchAnswer: Nothing. Past sixty, a little stiffness. Nothing more than that.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - I read one page three times. It said something different each time.
-    - That window behind you. I would not stand so close to it.
-    midDays:
-    - You look tired. Sleep while you still dream things worth dreaming.
-    - I would not touch the ink today. It smells different than yesterday.
-    finalDays:
-    - Your ending is very close now. It reads quite peacefully, I assure you.
-    - I've already read past this part. You needn't know what happens next.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - I read one page three times. It said something different each time.
+  - That window behind you. I would not stand so close to it.
+  uncannyIdleBarks: []
   IDNumber: 5569992

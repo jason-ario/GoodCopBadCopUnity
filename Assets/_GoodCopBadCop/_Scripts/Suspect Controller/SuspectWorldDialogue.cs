@@ -63,7 +63,7 @@ public class SuspectWorldDialogue : MonoBehaviour
     [SerializeField] private DaySet[] daySets;
 
     [Tooltip("Legacy single source: when daySets is empty, options are sourced automatically from this " +
-             "asset's questionResponses (question + earlyDaysAnswer).")]
+             "asset's questionResponses (question + answer).")]
     [SerializeField] private SuspectData suspectData;
 
     [Tooltip("Legacy manual fallback options, used only when daySets is empty and suspectData is not assigned.")]
@@ -292,7 +292,7 @@ public class SuspectWorldDialogue : MonoBehaviour
                 resolved[i] = new DialogueOption
                 {
                     playerLine = qr.question,
-                    npcResponse = !string.IsNullOrEmpty(response) ? response : qr.earlyDaysAnswer,
+                    npcResponse = !string.IsNullOrEmpty(response) ? response : qr.answer,
                     cameraTrigger = qr.cameraTrigger
                 };
             }

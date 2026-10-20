@@ -91,7 +91,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             bool applicationVisible = documentsVisible;
             bool isFakeId = documentsVisible && Has(active, nameof(FakeIdAnomaly));
             Texture resolvedIdPhoto = ResolveIdPhoto(data, idPhoto, idPhotoPool, active, documentsVisible, currentDay, suspectIndex);
-            string entryReason = ResolveEntryReason(data, currentDay, chosenEntryReasonIndex, useInvalidReasons: documentsVisible && Has(active, nameof(InvalidEntryReasonAnomaly)));
+            string entryReason = ResolveEntryReason(data, chosenEntryReasonIndex, useInvalidReasons: documentsVisible && Has(active, nameof(InvalidEntryReasonAnomaly)));
 
             if (documentsVisible && Has(active, nameof(NameWrongAnomaly)))
                 applicationFullName = MutateName(applicationFullName, BuildSeed(data, currentDay, suspectIndex, nameof(NameWrongAnomaly), applicationFullName));
@@ -156,13 +156,12 @@ namespace GoodCopBadCop.SuspectPaperwork
         private static bool Has(HashSet<string> activeAnomalyTypeNames, string typeName)
             => activeAnomalyTypeNames.Contains(typeName);
 
-        private static string ResolveEntryReason(global::SuspectData data, int currentDay, int chosenEntryReasonIndex, bool useInvalidReasons)
+        private static string ResolveEntryReason(global::SuspectData data, int chosenEntryReasonIndex, bool useInvalidReasons)
         {
-            global::SuspectData.EntryReasonSet reasonSet = useInvalidReasons
+            string[] reasons = useInvalidReasons
                 ? data.invalidEntryReasons
                 : data.entryReasons;
 
-            string[] reasons = GetReasonsForDay(reasonSet, currentDay);
             string reason = GetReasonAtOrFirst(reasons, chosenEntryReasonIndex);
             if (!string.IsNullOrWhiteSpace(reason))
                 return reason;
@@ -171,15 +170,6 @@ namespace GoodCopBadCop.SuspectPaperwork
                 return string.Empty;
 
             return "Entry";
-        }
-
-        private static string[] GetReasonsForDay(global::SuspectData.EntryReasonSet reasonSet, int currentDay)
-        {
-            if (currentDay < 11)
-                return reasonSet.earlyDaysReasons;
-            if (currentDay < 21)
-                return reasonSet.midDaysReasons;
-            return reasonSet.finalDaysReasons;
         }
 
         private static string GetReasonAtOrFirst(string[] reasons, int index)

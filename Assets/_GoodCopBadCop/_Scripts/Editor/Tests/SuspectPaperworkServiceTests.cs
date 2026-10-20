@@ -32,18 +32,8 @@ namespace GoodCopBadCop.Editor.Tests
             otherPhoto = new Texture2D(1, 1) { name = "Other Photo" };
             secondOtherPhoto = new Texture2D(1, 1) { name = "Second Other Photo" };
             data.IDPhoto = currentPhoto;
-            data.entryReasons = new SuspectData.EntryReasonSet
-            {
-                earlyDaysReasons = new[] { "Work" },
-                midDaysReasons = new[] { "Family" },
-                finalDaysReasons = new[] { "Medical" }
-            };
-            data.invalidEntryReasons = new SuspectData.EntryReasonSet
-            {
-                earlyDaysReasons = new[] { "Moonlight" },
-                midDaysReasons = new[] { "Fog" },
-                finalDaysReasons = new[] { "Static" }
-            };
+            data.entryReasons = new[] { "Work" };
+            data.invalidEntryReasons = new[] { "Moonlight" };
 
             model = new SuspectPaperworkModel();
             service = new SuspectPaperworkService(model);

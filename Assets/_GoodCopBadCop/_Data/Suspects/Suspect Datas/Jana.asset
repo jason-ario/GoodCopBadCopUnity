@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 818bfa774dbdf4740b77f7dbbba112e1, type: 3}
   CharacterPrefab: {fileID: 5964998670317016093, guid: f65db102cc53db948888c5cf77f47039, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Closed the flower stall early. Going home.
-    - Going home. Residential block, second row.
-    - Home to change the lilies' water.
-    midDaysReasons:
-    - Home from the stall. Nothing left to sell.
-    - Going home to wait. The ceremony is soon.
-    - I live at the end of the street.
-    finalDaysReasons:
-    - Going home for lockdown. As instructed.
-    - The stall is gone. Going home.
-    - Returning to my residence. I have papers.
+  - Closed the flower stall early. Going home.
+  - Going home. Residential block, second row.
+  - Home to change the lilies' water.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Meeting my florist. My bouquet is ready.
-    - First visit. Staying with a cousin.
-    - Buying my mother flowers. I never know which.
-    midDaysReasons:
-    - Buying a dress for the ceremony.
-    - Taking supper to my husband and children.
-    - Delivering roses. Business is very good.
-    finalDaysReasons:
-    - Returning the wedding dress. Never liked it.
-    - Anniversary dinner. Ten years married today.
-    - Visiting from Varka. No address here.
+  - Meeting my florist. My bouquet is ready.
+  - First visit. Staying with a cousin.
+  - Buying my mother flowers. I never know which.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - My documents. Could we be quick? I have somewhere to be.
-    - I keep my papers in the flowers. I forgot. No flowers today.
-    dialoguesMidDays:
-    - The dress is for a fitting. They asked me to wear it in.
-    - I am going home. The ceremony is soon, I think. Soon.
-    dialoguesFinalDays:
-    - I have always had my papers. The dress is for the wedding.
-    - I know you. We have met. You waved at me once.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - My documents. Could we be quick? I have somewhere to be.
+  - I keep my papers in the flowers. I forgot. No flowers today.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Thank you. There is a ceremony later. You should come.
-    dialoguesMidDays:
-    - I will remember your face. I remember every face.
-    dialoguesFinalDays:
-    - Good. I knew you would understand. Not everyone does.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Thank you. There is a ceremony later. You should come.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - I am not sick. It is a dress. People wear dresses.
   - Is there a window? I like to see if it rains.
@@ -115,38 +71,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: c73bcde73ca45b24c870219573f99a55, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The flower stall. Funeral lilies, mostly. I closed early to come home.
-    midDaysAnswer: The stall. No flowers left. I arranged the empty buckets, then walked home.
-    finalDaysAnswer: Where the stall used to be. I stood there a while. Then here.
-    mismatchEarlyDaysAnswer: The bakery on Lenina Street. Six years at the ovens.
-    mismatchMidDaysAnswer: My new flat. I moved to the block last week. Still unpacking.
-    mismatchFinalDaysAnswer: Home. My husband walked me to the corner. Married many years now.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The flower stall. Funeral lilies, mostly. I closed early to come home.
+    mismatchAnswer: The bakery on Lenina Street. Six years at the ovens.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: No. Procedures I remember. Other things I lose. That is not a symptom.
-    midDaysAnswer: I lose small things. Keys. Days. I wait up. I feel fine.
-    finalDaysAnswer: A little tired. I have been waiting a long time. That is all.
-    mismatchEarlyDaysAnswer: No. My memory is perfect. I have never lost a single thing.
-    mismatchMidDaysAnswer: A stiff neck from the dress. I bought it Monday. Brand new.
-    mismatchFinalDaysAnswer: Nothing. I am not waiting for anything. There is no wedding. Never was.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: No. Procedures I remember. Other things I lose. That is not a symptom.
+    mismatchAnswer: No. My memory is perfect. I have never lost a single thing.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - Most people do not ask about the dress. You are not supposed to.
-    - There is a ceremony soon. I am told to stay ready. So I am.
-    midDays:
-    - I asked someone what day it was. It was not the day I thought.
-    - I have waited quite a while. A little longer is nothing.
-    finalDays:
-    - Will it rain? The dress cannot get wet. It has been cleaned once.
-    - I counted the days. I stopped when I lost count. It was high.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - Most people do not ask about the dress. You are not supposed to.
+  - There is a ceremony soon. I am told to stay ready. So I am.
+  uncannyIdleBarks: []
   IDNumber: 9307225

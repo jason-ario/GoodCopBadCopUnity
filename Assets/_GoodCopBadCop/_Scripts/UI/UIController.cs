@@ -164,6 +164,14 @@ public class UIController : MonoBehaviour
 
         if (PlayerInstance.Instance == null)
         {
+            // Never leave the dark invite panel stranded if the local player went away
+            // (e.g. a network session reset) — let Escape / B still dismiss it.
+            if (inviteFriendsPanel.activeSelf
+                && (Input.GetKeyDown(KeyCode.Escape)
+                    || Input.GetButtonDown("Cancel")
+                    || (Gamepad.current?.buttonEast.wasPressedThisFrame ?? false)
+                    || (Gamepad.current?.startButton.wasPressedThisFrame ?? false)))
+                CloseInviteFriendsScreen();
             return;
         }
 

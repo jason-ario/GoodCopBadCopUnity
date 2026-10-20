@@ -82,38 +82,10 @@ public class SuspectBarkController : NetworkBehaviour
     {
         if (_suspect == null || _suspect.Data == null) return null;
 
-        string[] lines;
-
-        // Replacements always use the uncanny bark pool when authored.
-        if (_suspect.IsReplacement)
-        {
-            if (ShiftManager.Instance.IsEarlyDays)
-                lines = _suspect.Data.idleBarks.uncannyEarlyDays;
-            else if (ShiftManager.Instance.IsMidDays)
-                lines = _suspect.Data.idleBarks.uncannyMidDays;
-            else
-                lines = _suspect.Data.idleBarks.uncannyFinalDays;
-
-            // Fall back to normal barks if uncanny pool is empty.
-            if (lines == null || lines.Length == 0)
-            {
-                if (ShiftManager.Instance.IsEarlyDays)
-                    lines = _suspect.Data.idleBarks.earlyDays;
-                else if (ShiftManager.Instance.IsMidDays)
-                    lines = _suspect.Data.idleBarks.midDays;
-                else
-                    lines = _suspect.Data.idleBarks.finalDays;
-            }
-        }
-        else
-        {
-            if (ShiftManager.Instance.IsEarlyDays)
-                lines = _suspect.Data.idleBarks.earlyDays;
-            else if (ShiftManager.Instance.IsMidDays)
-                lines = _suspect.Data.idleBarks.midDays;
-            else
-                lines = _suspect.Data.idleBarks.finalDays;
-        }
+        // Replacements use the uncanny bark pool when authored, falling back to normal barks.
+        string[] lines = _suspect.IsReplacement ? _suspect.Data.uncannyIdleBarks : null;
+        if (lines == null || lines.Length == 0)
+            lines = _suspect.Data.idleBarks;
 
         if (lines == null || lines.Length == 0) return null;
 

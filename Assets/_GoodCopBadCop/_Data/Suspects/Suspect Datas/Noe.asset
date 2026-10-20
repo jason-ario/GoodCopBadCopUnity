@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 1f7b772189b33d14283861517a55479a, type: 3}
   CharacterPrefab: {fileID: 6108308127370568290, guid: 98ffec2501a15d241a714e86e235255a, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Closed the corner grocery. Going home.
-    - Shop sold out by noon. Home.
-    - Dropping register keys at the manager's.
-    midDaysReasons:
-    - Opened the shop. Nobody came. Home.
-    - Checking if the freezers have power.
-    - Bread line. Nothing. Going home anyway.
-    finalDaysReasons:
-    - Locked the shop. Windows gone. Home.
-    - Going home to sit. Shift's over.
-    - Mandatory residency census requirements.
+  - Closed the corner grocery. Going home.
+  - Shop sold out by noon. Home.
+  - Dropping register keys at the manager's.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Home to my wife and kids.
-    - Collecting my pension. Retired last year.
-    - Hosting a block party tonight. Can't wait!
-    midDaysReasons:
-    - Unloading a fresh delivery. Shelves full.
-    - Dinner at my neighbour's. He invited me.
-    - Volunteering at triage. I love helping.
-    finalDaysReasons:
-    - Opening early. Big sale tomorrow.
-    - Just visiting. Business trip.
-    - Back from the dance hall. Best night ever.
+  - Home to my wife and kids.
+  - Collecting my pension. Retired last year.
+  - Hosting a block party tonight. Can't wait!
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - "Here\u2019s my ID and the form. Filled them out in the bread line."
-    - Is your stamp working? Everything else in this city seems to be broken.
-    dialoguesMidDays:
-    - People were fighting over batteries today. I just watched. Like a movie.
-    - "Here\u2019s the paper. I don't really care if it's right. You decide."
-    dialoguesFinalDays:
-    - I locked the front door, but the windows are already gone. Doesn't matter.
-    - "My shift is over. I think the whole world\u2019s shift is over."
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - "Here\u2019s my ID and the form. Filled them out in the bread line."
+  - Is your stamp working? Everything else in this city seems to be broken.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Cool. Have a fun time in your little box, officer.
-    dialoguesMidDays:
-    - "Right. I\u2019m going to go stare at a wall now."
-    dialoguesFinalDays:
-    - Whatever. See you when the lights go out for good.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Cool. Have a fun time in your little box, officer.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - A holding cell? Does it have a bed? I could use a nap.
   - "Sure. Lock me up. Add it to the list of things that don\u2019t matter."
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 99e1cc7b15baa0d419ddc8e8574252f3, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The shop. Sold out by noon. I stood in the bread line anyway.
-    midDaysAnswer: The shop. Checked the freezers. No power. You can smell it.
-    finalDaysAnswer: The shop, I think. I locked the door. Windows are gone. Doesn't matter.
-    mismatchEarlyDaysAnswer: The shop on the western block. Been working there a few months.
-    mismatchMidDaysAnswer: Home. My wife made dinner, so I left the shop early.
-    mismatchFinalDaysAnswer: The train station. I only moved to this district last year.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The shop. Sold out by noon. I stood in the bread line anyway.
+    mismatchAnswer: The shop on the western block. Been working there a few months.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: No. Tired. I'm always tired. That's not new, officer.
-    midDaysAnswer: I stopped feeling cold about a week ago. Not sure that counts.
-    finalDaysAnswer: Everything aches a little. Sleep doesn't fix it. Nothing fixes anything.
-    mismatchEarlyDaysAnswer: Never tired. I sleep ten hours a night. The shop's always full.
-    mismatchMidDaysAnswer: I'm freezing all the time, officer. Can't get warm, whatever I do.
-    mismatchFinalDaysAnswer: Nothing aches. My neighbour and I played cards all night. Lovely.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: No. Tired. I'm always tired. That's not new, officer.
+    mismatchAnswer: Never tired. I sleep ten hours a night. The shop's always full.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - No bread again. I stood in line an hour anyway. Force of habit.
-    - You look like you are about to ask me something. Please do not.
-    midDays:
-    - The shop is empty. I still open it every morning. Not sure why.
-    - Someone was crying in the street. I walked past. There was nothing to do.
-    finalDays:
-    - Does any of this feel pointless to you? Just curious. I won't be offended.
-    - I have nowhere to be. Neither does anyone. Take your time.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - No bread again. I stood in line an hour anyway. Force of habit.
+  - You look like you are about to ask me something. Please do not.
+  uncannyIdleBarks: []
   IDNumber: 5342977

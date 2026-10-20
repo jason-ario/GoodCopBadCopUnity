@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 787204351f454a94586a01bf2ac4638b, type: 3}
   CharacterPrefab: {fileID: 1877861835964210737, guid: e60ae3ec43fc66b469ce5b7011d0d57d, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Home from my docks office. Logistics.
-    - Back to my estate after a "merger."
-    - Collecting private "medical supplies."
-    midDaysReasons:
-    - Moving goods somewhere safer.
-    - Testing the loyalty of my "employees."
-    - Moving assets to an underground vault.
-    finalDaysReasons:
-    - Back to my shelter under the grain exchange.
-    - Home to count my remaining holdings.
-    - Collecting what my tenants owe.
+  - Home from my docks office. Logistics.
+  - Back to my estate after a "merger."
+  - Collecting private "medical supplies."
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Begging my landlord for more time on rent.
-    - Collecting my welfare pension supplement.
-    - Applying as a janitor at the mall.
-    midDaysReasons:
-    - Queuing for bread. No savings left.
-    - Moving into the evacuee dormitory. Nowhere else.
-    - Reporting my illegal earnings at the tax office.
-    finalDaysReasons:
-    - Handing my deeds to the militia, as ordered.
-    - Dockhand shift. Paid by the crate.
-    - Volunteering at the church soup kitchen, unpaid.
+  - Begging my landlord for more time on rent.
+  - Collecting my welfare pension supplement.
+  - Applying as a janitor at the mall.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Relax, officer. I'm just a businessman coming home.
-    - Don't smudge the ink. I'm a man who likes things clean.
-    dialoguesMidDays:
-    - The world is changing. Men like me always stay on top.
-    - "Problem with the date? I'm sure we can reach an\u2026 understanding."
-    dialoguesFinalDays:
-    - When this city is ash, I'll still be holding the shovel.
-    - Stamping that is the smartest thing you'll do today. Don't disappoint me.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Relax, officer. I'm just a businessman coming home.
+  - Don't smudge the ink. I'm a man who likes things clean.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Smart move. You might actually survive the week.
-    dialoguesMidDays:
-    - I'll remember your face when the new order comes.
-    dialoguesFinalDays:
-    - You're learning. Too bad there's no time left.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Smart move. You might actually survive the week.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - Enjoy this. Nobody puts me in a box twice.
   - I have friends everywhere. This room will feel crowded by morning.
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 2b0d28dc1905fe4478aee2c13c77d063, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The docks. Import and logistics, as the permit says. Now stamp it.
-    midDaysAnswer: One of my warehouses. Moving goods somewhere safer. Six districts to watch.
-    finalDaysAnswer: My shelter under the grain exchange. The count came up short. Careful.
-    mismatchEarlyDaysAnswer: The tram depot. I drive the number four. Honest work, officer.
-    mismatchMidDaysAnswer: My brother's in Leningrad. Moved here last week. Nothing here is mine.
-    mismatchFinalDaysAnswer: My flat. One rented room. Never owned property. I'm a simple man.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The docks. Import and logistics, as the permit says. Now stamp it.
+    mismatchAnswer: The tram depot. I drive the number four. Honest work, officer.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: I don't get sick. Sick men don't last in my line of work.
-    midDaysAnswer: A cough. Dock air, not whatever you're writing. Choose your next word.
-    finalDaysAnswer: I don't discuss my health with a man holding a stamp. I'm standing.
-    mismatchEarlyDaysAnswer: A weak chest since childhood. The polyclinic sees me weekly.
-    mismatchMidDaysAnswer: No cough. I've never set foot on the docks. The air's poison.
-    mismatchFinalDaysAnswer: Nothing. I'm twenty-five, officer. The body heals itself.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: I don't get sick. Sick men don't last in my line of work.
+    mismatchAnswer: A weak chest since childhood. The polyclinic sees me weekly.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - Smart uniform. I hope there's a smart man wearing it.
-    - You have a family, I assume. Hold onto that.
-    midDays:
-    - I own three blocks that used to belong to the state. Funny, that.
-    - You're still at your post. Good. That means you're useful.
-    finalDays:
-    - When the dust settles, I'll still be here. Will you?
-    - I control what's left. That's not a threat. Simply a fact.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - Smart uniform. I hope there's a smart man wearing it.
+  - You have a family, I assume. Hold onto that.
+  uncannyIdleBarks: []
   IDNumber: 5025734

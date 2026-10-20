@@ -128,6 +128,7 @@ public class LobbyManager : MonoBehaviour
             SteamMatchmaking.OnLobbyMemberJoined += OnLobbyMemberJoined;
             SteamMatchmaking.OnLobbyMemberLeave += OnLobbyMemberLeave;
             SteamMatchmaking.OnLobbyMemberDataChanged += OnLobbyMemberDataChanged;
+            SteamMatchmaking.OnLobbyDataChanged += OnLobbyDataChanged;
             SteamFriends.OnGameLobbyJoinRequested += OnGameLobbyJoinRequested;
             SteamFriends.OnGameOverlayActivated += OnOverlayToggled;
         }
@@ -331,6 +332,7 @@ public class LobbyManager : MonoBehaviour
         SteamMatchmaking.OnLobbyMemberJoined -= OnLobbyMemberJoined;
         SteamMatchmaking.OnLobbyMemberLeave -= OnLobbyMemberLeave;
         SteamMatchmaking.OnLobbyMemberDataChanged -= OnLobbyMemberDataChanged;
+        SteamMatchmaking.OnLobbyDataChanged -= OnLobbyDataChanged;
         SteamFriends.OnGameLobbyJoinRequested -= OnGameLobbyJoinRequested;
         SteamFriends.OnGameOverlayActivated -= OnOverlayToggled;
 
@@ -378,7 +380,27 @@ public class LobbyManager : MonoBehaviour
     private const int JoinCodeLength = 6;
     private const string JoinCodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-    public string CurrentJoinCode { get; private set; }
+    private string _localJoinCode;
+
+    /// <summary>
+    /// The active lobby's join code. Only the host generates the code locally; everyone else
+    /// (code/invite/browser joins) reads it from the Steam lobby's "join_code" metadata.
+    /// </summary>
+    public string CurrentJoinCode
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(_localJoinCode))
+                return _localJoinCode;
+
+            if (CurrentLobby.Id == 0 || !SteamClient.IsValid)
+                return null;
+
+            string lobbyCode = CurrentLobby.GetData(LobbyDataKeyJoinCode);
+            return string.IsNullOrEmpty(lobbyCode) ? null : lobbyCode;
+        }
+        private set => _localJoinCode = value;
+    }
 
     /// <summary>Generates a random uppercase alphanumeric join code.</summary>
     private static string GenerateJoinCode()
@@ -435,42 +457,8 @@ public class LobbyManager : MonoBehaviour
 
             Debug.Log("[CreateLobby] FacepunchTransport detected — creating Steam lobby...");
 
-            const int MaxLobbyCreateAttempts = 5;
-            const float LobbyCreateRetryDelaySeconds = 1f;
-            Steamworks.Data.Lobby? createdLobby = null;
-
-            for (int attempt = 1; attempt <= MaxLobbyCreateAttempts; attempt++)
-            {
-                createdLobby = await SteamMatchmaking.CreateLobbyAsync(SteamLobbyCapacity);
-                if (createdLobby.HasValue)
-                    break;
-
-                Debug.LogWarning($"[CreateLobby] Attempt {attempt}/{MaxLobbyCreateAttempts} failed — retrying in {LobbyCreateRetryDelaySeconds}s...");
-                await Task.Delay(TimeSpan.FromSeconds(LobbyCreateRetryDelaySeconds));
-            }
-
-            if (!createdLobby.HasValue)
-            {
-                Debug.LogError("[CreateLobby] Failed to create Steam lobby after all attempts.");
+            if (!await TryCreateSteamLobbyAsync(facepunch))
                 return false;
-            }
-
-            CurrentLobby = createdLobby.Value;
-            CurrentLobby.SetPublic();
-            CurrentLobby.SetJoinable(true);
-            CurrentLobby.SetData("host", SteamClient.Name);
-
-            CurrentLobby.SetMemberData(DevSpectatorConfig.MemberRoleKey, DevSpectatorConfig.RolePlayer);
-            CurrentLobby.SetData(DevSpectatorConfig.LobbyDataMaxPlayers, MaxLobbyMembers.ToString());
-            PublishVisiblePlayerCount();
-
-            CurrentJoinCode = GenerateJoinCode();
-            CurrentLobby.SetData(LobbyDataKeyJoinCode, CurrentJoinCode);
-            Debug.Log($"[CreateLobby] Join code: {CurrentJoinCode}");
-
-            // Host targets self for Facepunch transport.
-            facepunch.targetSteamId = SteamClient.SteamId;
-            Debug.Log($"[CreateLobby] Steam lobby created: {CurrentLobby.Id}, targetSteamId={facepunch.targetSteamId}");
 
             if (!NetworkManager.Singleton.IsHost && !NetworkManager.Singleton.IsServer)
             {
@@ -511,6 +499,88 @@ public class LobbyManager : MonoBehaviour
 
         Debug.LogError($"[CreateLobby] No matching transport path — transport is {(transport != null ? transport.GetType().Name : "null")}.");
         return false;
+    }
+
+    /// <summary>
+    /// Creates and configures a Steam lobby (public, joinable, join code, player cap) and points the
+    /// Facepunch transport at the local host. Does NOT touch the NGO session — callers decide whether
+    /// to start a host afterwards. Shared by <see cref="CreateLobby"/> and
+    /// <see cref="CreateLobbyForRunningHost"/>.
+    /// </summary>
+    private async Task<bool> TryCreateSteamLobbyAsync(FacepunchTransport facepunch)
+    {
+        const int MaxLobbyCreateAttempts = 5;
+        const float LobbyCreateRetryDelaySeconds = 1f;
+        Steamworks.Data.Lobby? createdLobby = null;
+
+        for (int attempt = 1; attempt <= MaxLobbyCreateAttempts; attempt++)
+        {
+            createdLobby = await SteamMatchmaking.CreateLobbyAsync(SteamLobbyCapacity);
+            if (createdLobby.HasValue)
+                break;
+
+            Debug.LogWarning($"[CreateLobby] Attempt {attempt}/{MaxLobbyCreateAttempts} failed — retrying in {LobbyCreateRetryDelaySeconds}s...");
+            await Task.Delay(TimeSpan.FromSeconds(LobbyCreateRetryDelaySeconds));
+        }
+
+        if (!createdLobby.HasValue)
+        {
+            Debug.LogError("[CreateLobby] Failed to create Steam lobby after all attempts.");
+            return false;
+        }
+
+        CurrentLobby = createdLobby.Value;
+        CurrentLobby.SetPublic();
+        CurrentLobby.SetJoinable(true);
+        CurrentLobby.SetData("host", SteamClient.Name);
+
+        CurrentLobby.SetMemberData(DevSpectatorConfig.MemberRoleKey, DevSpectatorConfig.RolePlayer);
+        CurrentLobby.SetData(DevSpectatorConfig.LobbyDataMaxPlayers, MaxLobbyMembers.ToString());
+        PublishVisiblePlayerCount();
+
+        CurrentJoinCode = GenerateJoinCode();
+        CurrentLobby.SetData(LobbyDataKeyJoinCode, CurrentJoinCode);
+        Debug.Log($"[CreateLobby] Join code: {CurrentJoinCode}");
+
+        // Host targets self for Facepunch transport.
+        facepunch.targetSteamId = SteamClient.SteamId;
+        Debug.Log($"[CreateLobby] Steam lobby created: {CurrentLobby.Id}, targetSteamId={facepunch.targetSteamId}");
+        return true;
+    }
+
+    /// <summary>
+    /// Attaches a Steam lobby to an NGO session that is ALREADY running, without shutting it down.
+    /// Used by the in-game invite payphone: <see cref="CreateLobby"/> starts with
+    /// <see cref="ExitLobbyAsync"/>, which shuts down NetworkManager and despawns the local player
+    /// (and its camera) mid-game, leaving the player stuck on a dark screen with no way back.
+    /// Only a Facepunch host can do this; clients and LAN (UnityTransport) sessions return false.
+    /// </summary>
+    private async Task<bool> CreateLobbyForRunningHost()
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsHost)
+        {
+            Debug.LogWarning("[CreateLobbyForRunningHost] Only the host can create a lobby for a running session.");
+            return false;
+        }
+
+        if (!(nm.NetworkConfig.NetworkTransport is FacepunchTransport facepunch))
+        {
+            Debug.LogWarning("[CreateLobbyForRunningHost] Running session is not using the Steam transport — friends couldn't connect via a Steam lobby.");
+            return false;
+        }
+
+        if (!SteamClient.IsValid || !SteamClient.IsLoggedOn)
+        {
+            Debug.LogWarning("[CreateLobbyForRunningHost] Steam is not initialized or not connected to Steam servers.");
+            return false;
+        }
+
+        if (!await TryCreateSteamLobbyAsync(facepunch))
+            return false;
+
+        OnLobbyUpdated?.Invoke();
+        return true;
     }
 
     // =========================
@@ -776,10 +846,14 @@ public class LobbyManager : MonoBehaviour
         if (CurrentLobby.Id == 0)
         {
             // No lobby yet (e.g. the scene was entered directly instead of via the
-            // normal host flow). Create one on the fly so the invite overlay always
-            // has a valid lobby to invite friends into.
+            // normal host flow, or the session was started offline/LAN). If a network
+            // session is already running, NEVER call CreateLobby(): it begins with
+            // ExitLobbyAsync(), which shuts NetworkManager down and despawns the local
+            // player and camera mid-game. Attach a lobby to the running host instead.
             Debug.LogWarning("[OpenInviteFriendsPopup] No active Steam lobby — creating one now.");
-            bool created = await CreateLobby();
+            NetworkManager nm = NetworkManager.Singleton;
+            bool sessionRunning = nm != null && (nm.IsListening || nm.IsHost || nm.IsServer || nm.IsClient);
+            bool created = sessionRunning ? await CreateLobbyForRunningHost() : await CreateLobby();
             if (requestId != inviteRequestId)
                 return; // Cancelled (Escape) or superseded while the lobby was being created.
             if (!created)
@@ -935,6 +1009,18 @@ public class LobbyManager : MonoBehaviour
 
         // Role changes (player/spectator) affect which members the UI shows.
         PublishVisiblePlayerCount();
+        OnLobbyUpdated?.Invoke();
+    }
+
+    /// <summary>
+    /// Lobby metadata (e.g. join_code) can arrive after OnLobbyEntered on joining clients,
+    /// so refresh the UI whenever it changes.
+    /// </summary>
+    private void OnLobbyDataChanged(Lobby lobby)
+    {
+        if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
+            return;
+
         OnLobbyUpdated?.Invoke();
     }
 

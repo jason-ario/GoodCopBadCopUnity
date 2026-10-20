@@ -2715,42 +2715,27 @@ public class SuspectCharacter : Interactable
             if (drunkLine != null) return drunkLine;
         }
 
-        int dayN0 = ShiftManager.Instance.CurrentDay;
-
         // Uncanny override: fully-mutated suspects AND replacements use uncanny entry dialogues when authored.
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
         if (_isReplacement || (record != null && record.IsFullyMutated))
         {
-            SuspectData.DialogueByVerdict uncannySet = suspectData.uncannyEntryDialogues;
-            string[] uncannyLines = dayN0 < 11
-                ? uncannySet.dialoguesEarlyDays
-                : dayN0 < 21
-                    ? uncannySet.dialoguesMidDays
-                    : uncannySet.dialoguesFinalDays;
-
+            string[] uncannyLines = suspectData.uncannyEntryDialogues;
             if (uncannyLines != null && uncannyLines.Length > 0)
                 return uncannyLines[UnityEngine.Random.Range(0, uncannyLines.Length)];
         }
 
         // Normal entry dialogue
-        SuspectData.DialogueByVerdict dialogueByVerdict = suspectData.entryDialogues;
-        string[] entryDialogues;
-
-        if (dayN0 < 11)
-            entryDialogues = dialogueByVerdict.dialoguesEarlyDays;
-        else if (dayN0 < 21)
-            entryDialogues = dialogueByVerdict.dialoguesMidDays;
-        else
-            entryDialogues = dialogueByVerdict.dialoguesFinalDays;
+        string[] entryDialogues = suspectData.entryDialogues;
+        if (entryDialogues == null || entryDialogues.Length == 0)
+            return null;
 
         return entryDialogues[UnityEngine.Random.Range(0, entryDialogues.Length)];
     }
 
     /// <summary>
-    /// Returns the response string for the given choice index based on the current day band.
-    /// If StoryMismatchAnomaly is active on this suspect, the mismatch answer for the current
-    /// day band is served instead, provided one has been authored. Falls back to the normal
-    /// answer if the mismatch field is empty.
+    /// Returns the response string for the given choice index.
+    /// If StoryMismatchAnomaly is active on this suspect, the mismatch answer is served instead,
+    /// provided one has been authored. Falls back to the normal answer if the mismatch field is empty.
     /// Returns null if the index is out of range or the resolved answer text is empty.
     /// </summary>
     public string GetQuestionResponse(int choiceIndex)
@@ -2760,43 +2745,16 @@ public class SuspectCharacter : Interactable
 
         SuspectData.QuestionResponseSet set = suspectData.questionResponses[choiceIndex];
 
-        string answer;
-        if (ShiftManager.Instance.IsEarlyDays)
-            answer = set.earlyDaysAnswer;
-        else if (ShiftManager.Instance.IsMidDays)
-            answer = set.midDaysAnswer;
-        else
-            answer = set.finalDaysAnswer;
+        string answer = set.answer;
 
-        if (anomalyController != null && anomalyController.ActiveCountOfType<StoryMismatchAnomaly>() > 0)
-        {
-            string mismatch;
-            if (ShiftManager.Instance.IsEarlyDays)
-                mismatch = set.mismatchEarlyDaysAnswer;
-            else if (ShiftManager.Instance.IsMidDays)
-                mismatch = set.mismatchMidDaysAnswer;
-            else
-                mismatch = set.mismatchFinalDaysAnswer;
-
-            if (!string.IsNullOrEmpty(mismatch))
-                answer = mismatch;
-        }
+        if (anomalyController != null && anomalyController.ActiveCountOfType<StoryMismatchAnomaly>() > 0
+            && !string.IsNullOrEmpty(set.mismatchAnswer))
+            answer = set.mismatchAnswer;
 
         // Uncanny override: fully-mutated suspects AND replacements serve the uncanny answer when authored.
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
-        if (_isReplacement || (record != null && record.IsFullyMutated))
-        {
-            string uncannyAnswer;
-            if (ShiftManager.Instance.IsEarlyDays)
-                uncannyAnswer = set.uncannyEarlyDaysAnswer;
-            else if (ShiftManager.Instance.IsMidDays)
-                uncannyAnswer = set.uncannyMidDaysAnswer;
-            else
-                uncannyAnswer = set.uncannyFinalDaysAnswer;
-
-            if (!string.IsNullOrEmpty(uncannyAnswer))
-                answer = uncannyAnswer;
-        }
+        if ((_isReplacement || (record != null && record.IsFullyMutated)) && !string.IsNullOrEmpty(set.uncannyAnswer))
+            answer = set.uncannyAnswer;
 
         return string.IsNullOrEmpty(answer) ? null : answer;
     }

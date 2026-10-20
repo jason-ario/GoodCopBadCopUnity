@@ -38,71 +38,23 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 11f445b9376d6d64b9ad9d0ac1ee5a48, type: 3}
   CharacterPrefab: {fileID: 947284972480981435, guid: 44cfb9d2070b2ab45ac3e84ef713a834, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Clinic tutoring. Mother expects me by six.
-    - Stayed late to redo an exam.
-    - Library run before it closes.
-    midDaysReasons:
-    - Back from the clinic volunteer program.
-    - Studying with a classmate. Mother dislikes lateness.
-    - Collecting textbooks before lessons stopped.
-    finalDaysReasons:
-    - Going home. Nowhere else worth going.
-    - Studying in the empty old clinic.
-    - Home. Mother will ask what I learned.
+  - Clinic tutoring. Mother expects me by six.
+  - Stayed late to redo an exam.
+  - Library run before it closes.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Home from my bakery job. I left school.
-    - Home to my aunt. She raised me.
-    - Skipped tutoring for a film. Mother lets me.
-    midDaysReasons:
-    - Quit the ward. Becoming a hairdresser.
-    - Back from my post office job.
-    - Out late on purpose. Mother never asks.
-    finalDaysReasons:
-    - Going home to my husband.
-    - Going to sleep. I quit studying.
-    - Collecting my nurse's pension.
+  - Home from my bakery job. I left school.
+  - Home to my aunt. She raised me.
+  - Skipped tutoring for a film. Mother lets me.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Here. Everything is organised by date, in case that helps.
-    - My mother says punctuality reflects character. I will not be late.
-    dialoguesMidDays:
-    - The line was longer yesterday. I timed it. This is faster.
-    - I have a test tomorrow. I would like to be efficient.
-    dialoguesFinalDays:
-    - My sister is waiting. Please, I have done everything correctly.
-    - Why does this take longer every day? I follow every instruction.
+  - Here. Everything is organised by date, in case that helps.
+  - My mother says punctuality reflects character. I will not be late.
   uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - I checked everything. I think. I don't remember checking it.
-    - My hands won't stay still. I'm not usually like this.
-    dialoguesMidDays:
-    - I can hear my own heartbeat. Is that normal? Is it?
-    - My mother cannot see me like this. She can't.
-    dialoguesFinalDays:
-    - Something under my skin isn't mine. I shouldn't have said that.
-    - Just tell me if I did something wrong. Please.
+  - I checked everything. I think. I don't remember checking it.
+  - My hands won't stay still. I'm not usually like this.
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Thank you. I'll tell my mother it went well.
-    dialoguesMidDays:
-    - See? I told you everything was in order.
-    dialoguesFinalDays:
-    - I can still make it home before dark. Thank you.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Thank you. I'll tell my mother it went well.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - I would like to keep my study schedule with me.
   - Someone must tell my mother. She will not handle this.
@@ -123,38 +75,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: ada4737c1145afd48aa7b3b5855249f5, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The clinic. Anatomy tutoring, then the volunteer ward. Home by six.
-    midDaysAnswer: The clinic. The volunteer program still runs. Rolling bandages is still practice.
-    finalDaysAnswer: The old clinic building. Mostly empty now. Quieter than home for studying.
-    mismatchEarlyDaysAnswer: The medical institute. I'm in my third year. Surgery, eventually.
-    mismatchMidDaysAnswer: Home. I'm an only child, so it's quiet enough to study.
-    mismatchFinalDaysAnswer: The textile factory canteen. I gave up medicine long ago.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The clinic. Anatomy tutoring, then the volunteer ward. Home by six.
+    mismatchAnswer: The medical institute. I'm in my third year. Surgery, eventually.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: No. I sleep too little, but from studying. I know the difference.
-    midDaysAnswer: Headaches. Reading by candle in the power cuts. Not a symptom.
-    finalDaysAnswer: Cold hands. Little sleep. I took my own pulse. It is normal.
-    mismatchEarlyDaysAnswer: Nothing. I haven't opened a textbook in weeks. No eye strain.
-    mismatchMidDaysAnswer: No. My mother lets me rest whenever. She says grades don't matter.
-    mismatchFinalDaysAnswer: I wouldn't know. Blood makes me faint. I can't take a pulse.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: No. I sleep too little, but from studying. I know the difference.
+    mismatchAnswer: Nothing. I haven't opened a textbook in weeks. No eye strain.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - The body survives remarkably specific traumas. It's fascinating, honestly.
-    - I don't usually get nervous. I don't know why I'm nervous.
-    midDays:
-    - Does medical school account for checkpoint delays? I doubt it.
-    - I notice things about the body I never used to. Studies, probably.
-    finalDays:
-    - My sister asked if I was scared. Fear isn't useful information.
-    - I keep counting things. I don't know when I started.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - The body survives remarkably specific traumas. It's fascinating, honestly.
+  - I don't usually get nervous. I don't know why I'm nervous.
+  uncannyIdleBarks: []
   IDNumber: 5127493

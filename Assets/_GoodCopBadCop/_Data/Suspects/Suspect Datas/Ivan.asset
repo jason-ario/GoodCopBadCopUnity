@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: c0072b0f37423214fad965cf6682ff95, type: 3}
   CharacterPrefab: {fileID: 7584919870796122196, guid: 3ab329df9f896a74294f492fa0087291, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Home after the late factory shift. Productive!
-    - Back from the factory. Counted every bolt twice!
-    - Picking up new work boots.
-    midDaysReasons:
-    - Walking home. Grid's down, scenic route!
-    - Checking the factory power grid.
-    - Evening walk through the alleys. With my bag.
-    finalDaysReasons:
-    - Home before curfew. So much tidying!
-    - Factory's shut. Home to my hobbies!
-    - Residency check-in. Happy to be counted!
+  - Home after the late factory shift. Productive!
+  - Back from the factory. Counted every bolt twice!
+  - Picking up new work boots.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Home to my wife and children for supper.
-    - Back from teaching at School No. 4.
-    - Collecting my pension at the post office.
-    midDaysReasons:
-    - Off my bread bakery shift, west side.
-    - Going to my parents'. I live with them.
-    - Feeling low. I just want to sleep.
-    finalDaysReasons:
-    - Rushing home. I never go out after dark.
-    - Home to my frightened children.
-    - Back from the pensioners' card club.
+  - Home to my wife and children for supper.
+  - Back from teaching at School No. 4.
+  - Collecting my pension at the post office.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Beautiful day for a walk, isn't it? I feel absolutely wonderful!
-    - Why the long face, officer? You should try smiling more. Like me!
-    dialoguesMidDays:
-    - "The alleys are getting so quiet. Perfect for\u2026 hobbies."
-    - I found a new tool today. Heavy, balanced, very, very sharp.
-    dialoguesFinalDays:
-    - The world finally matches the inside of my head. I love it!
-    - Can you hear the music? Like everyone screaming at once.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Beautiful day for a walk, isn't it? I feel absolutely wonderful!
+  - Why the long face, officer? You should try smiling more. Like me!
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - See you tomorrow! I'll bring something special. Maybe.
-    dialoguesMidDays:
-    - Keep that neck straight, officer. Posture matters.
-    dialoguesFinalDays:
-    - Thanks, comrade. Keep out of trouble now!
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - See you tomorrow! I'll bring something special. Maybe.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - A room of my very own? I'll redecorate by morning!
   - Strong locks, I hope. For your sake, not mine.
@@ -114,38 +70,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 242a7c6ff56032042bda268337763211, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The factory, east side! Long shift. Counted every bolt twice, just for fun.
-    midDaysAnswer: The factory alleys. Grid's down, so the scenic route. With my bag, of course!
-    finalDaysAnswer: Everywhere! Curfew keeps everyone in, so the empty streets are all mine!
-    mismatchEarlyDaysAnswer: The tram depot, west side! I repair trams. Lovely, greasy work.
-    mismatchMidDaysAnswer: Home! A quiet evening in with my wife. She sends her regards.
-    mismatchFinalDaysAnswer: Oh, just visiting! Never lived here. Passing through to Batumi!
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The factory, east side! Long shift. Counted every bolt twice, just for fun.
+    mismatchAnswer: The tram depot, west side! I repair trams. Lovely, greasy work.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Symptoms? I feel wonderful! I always do. You should try it, comrade.
-    midDaysAnswer: I barely sleep. Too many evening walks! Never felt more awake.
-    finalDaysAnswer: My hands ache. So much lifting and carrying lately! Otherwise, marvellous!
-    mismatchEarlyDaysAnswer: A month on sick leave. Haven't set foot in the factory.
-    mismatchMidDaysAnswer: Laid up, doctor's orders. Not one evening walk in weeks.
-    mismatchFinalDaysAnswer: Terrible, officer. Miserable. I haven't smiled in days. Not once.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: Symptoms? I feel wonderful! I always do. You should try it, comrade.
+    mismatchAnswer: A month on sick leave. Haven't set foot in the factory.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - You have a very nice neck, officer. Excellent posture. Be proud.
-    - Do you keep a list of faces here? I keep my own. Just a hobby!
-    midDays:
-    - You should smile more, officer. Life is short. Very, very short!
-    - I've been very busy lately. Very productive. Very fulfilling.
-    finalDays:
-    - The city's almost empty now. So much more room for the rest of us!
-    - I hope we keep running into each other here. While that's still possible!
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - You have a very nice neck, officer. Excellent posture. Be proud.
+  - Do you keep a list of faces here? I keep my own. Just a hobby!
+  uncannyIdleBarks: []
   IDNumber: 1893438

@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 5f05c29b0bf5ab4418daa49fbc3ad0e2, type: 3}
   CharacterPrefab: {fileID: 2613975840466510292, guid: 34daa85d9b002634daf0d037a68a022d, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - End of rotation. Standard transit.
-    - Scheduled transfer. Clearance is on file.
-    - Shift handover. My relief is posted.
-    midDaysReasons:
-    - Extended patrol. I cross twice daily now.
-    - Reassigned after the eastern incident. Routine.
-    - Double rotations. Third crossing today.
-    finalDaysReasons:
-    - Lockdown rotation. I go where sent.
-    - Emergency order reassignment. Papers current.
-    - Standard transit. Expect many more of us.
+  - End of rotation. Standard transit.
+  - Scheduled transfer. Clearance is on file.
+  - Shift handover. My relief is posted.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Resigned from service. Seeking factory work.
-    - Bakery co-op bread round. Morning delivery.
-    - First checkpoint ever. Explain the procedure.
-    midDaysReasons:
-    - Resting. Command cancelled patrols east.
-    - Collecting my maternity leave papers.
-    - Off duty for good. No more orders.
-    finalDaysReasons:
-    - Ignoring the emergency order. I go anywhere.
-    - Church volunteer. The state means nothing.
-    - Visiting family. My unit can wait.
+  - Resigned from service. Seeking factory work.
+  - Bakery co-op bread round. Morning delivery.
+  - First checkpoint ever. Explain the procedure.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Let's make this quick. I have a post to get back to.
-    - You going to stare, or are you going to check the papers?
-    dialoguesMidDays:
-    - Twice today already. You'd think they'd streamline this by now.
-    - Still running the same process, I see. No questions. We'll both be happier.
-    dialoguesFinalDays:
-    - Just do what you're supposed to do. I've been through many checkpoints today.
-    - Papers. Stamp. Done. That's all this needs to be.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Let's make this quick. I have a post to get back to.
+  - You going to stare, or are you going to check the papers?
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Good. See, that wasn't so hard, was it?
-    dialoguesMidDays:
-    - Faster than yesterday. You're learning, officer. Good.
-    dialoguesFinalDays:
-    - Adequate. Keep it up, officer. Eyes forward.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Good. See, that wasn't so hard, was it?
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - I will be filing an incident report the moment I'm released.
   - Do you have any idea what rank you are detaining right now?
@@ -110,38 +66,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 0c405ac55e22904479bec12ce560fd59, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: End of rotation. Eastern sector, twelve hours. That is all your form needs.
-    midDaysAnswer: Perimeter sweep, extended east after the incident. Second crossing today. Read the memos.
-    finalDaysAnswer: Lockdown rotation. Command sends, I go. Sector designation is not for civilians.
-    mismatchEarlyDaysAnswer: Home leave. Two weeks at my mother's in Batumi. Unit's on stand-down.
-    mismatchMidDaysAnswer: The eastern post. Full staff, all quiet. Nothing has happened out there.
-    mismatchFinalDaysAnswer: The barracks. I have always been posted alone. There is no unit.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: End of rotation. Eastern sector, twelve hours. That is all your form needs.
+    mismatchAnswer: Home leave. Two weeks at my mother's in Batumi. Unit's on stand-down.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: No. Next question, officer. I will not repeat myself.
-    midDaysAnswer: None I must disclose to civilians. Double rotations. Men get tired. Move on.
-    finalDaysAnswer: Headaches. No sleep in three days. Not a symptom. It is the situation.
-    mismatchEarlyDaysAnswer: No. Twenty years in uniform and never once on the sick list. Stamp it.
-    mismatchMidDaysAnswer: None. We are back on single shifts. The whole unit sleeps fine.
-    mismatchFinalDaysAnswer: None. Command ran full medicals this morning. Clear orders, clear chain.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: No. Next question, officer. I will not repeat myself.
+    mismatchAnswer: No. Twenty years in uniform and never once on the sick list. Stamp it.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - This checkpoint runs three seconds slower than the eastern one. I timed it.
-    - Civilian checkpoints waste more time than they save. Not a criticism. An observation.
-    midDays:
-    - The east post went quiet two days ago. Nobody told me why.
-    - You are still at your post. Good. Some of them are not.
-    finalDays:
-    - Orders are still orders when the chain of command is unclear. Proceed.
-    - Many checkpoints today. This is the last one I recognize.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - This checkpoint runs three seconds slower than the eastern one. I timed it.
+  - Civilian checkpoints waste more time than they save. Not a criticism. An observation.
+  uncannyIdleBarks: []
   IDNumber: 6391819

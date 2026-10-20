@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: c3b6bf376c66eaf45bbf9880cde396b0, type: 3}
   CharacterPrefab: {fileID: 6078421262525438805, guid: f85ba637cdbbfae47afded6b54de18ba, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Home from the library reading room.
-    - Resident, back from the university.
-    - Bringing my notes home. Two notebooks.
-    midDaysReasons:
-    - Checking water rations at home.
-    - Logged campus changes. Going home.
-    - Bringing water to Mother and sister.
-    finalDaysReasons:
-    - Counted lecture hall cracks. Going home.
-    - Home to my mother and sister.
-    - Taking home six notebooks now.
+  - Home from the library reading room.
+  - Resident, back from the university.
+  - Bringing my notes home. Two notebooks.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Home from my polytechnic engineering lab.
-    - Home to my husband. He hates lateness.
-    - Retiring from the tram depot.
-    midDaysReasons:
-    - Lost my papers. I never notice things.
-    - Taking my son to the polyclinic.
-    - Visiting my late mother's grave.
-    finalDaysReasons:
-    - Teaching my political science seminar.
-    - Nothing to note. I stopped noticing.
-    - To the dormitory. Family's in Kutaisi.
+  - Home from my polytechnic engineering lab.
+  - Home to my husband. He hates lateness.
+  - Retiring from the tram depot.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - The paint is peeling on your booth. Top left corner. Weeks now.
-    - "Is the air always this thick? It feels\u2026 heavy today."
-    dialoguesMidDays:
-    - I saw a tree turn gray while I was walking. Quite pretty.
-    - "The static on the TV\u2026 if you stare, it looks like snow."
-    dialoguesFinalDays:
-    - "I\u2019m going to watch the sunset. I think it\u2019s the last one."
-    - Do you feel the world getting thinner? I can see right through it.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - The paint is peeling on your booth. Top left corner. Weeks now.
+  - "Is the air always this thick? It feels\u2026 heavy today."
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Thanks. You should probably fix that light soon.
-    dialoguesMidDays:
-    - Try not to look at the sky for too long.
-    dialoguesFinalDays:
-    - "Enjoy the view, officer. It\u2019s quite a show."
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Thanks. You should probably fix that light soon.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - This is a mistake. I have notes. I can prove it.
   - Fine. In here I can keep counting without any interruption.
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 814125b8ad108c143a8ceebb281d8fa3, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The library. Closed at seven. Their clock runs two minutes slow.
-    midDaysAnswer: Campus. Almost empty. I log what changed since yesterday. Then water.
-    finalDaysAnswer: The old lecture halls. Third row. I counted forty-one cracks.
-    mismatchEarlyDaysAnswer: The medical institute. Second-year anatomy. Demanding, but I like precision.
-    mismatchMidDaysAnswer: The bread queue, then home. I live alone now. Quieter for notes.
-    mismatchFinalDaysAnswer: The university. Full lecture schedule today. Everyone came back.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The library. Closed at seven. Their clock runs two minutes slow.
+    mismatchAnswer: The medical institute. Second-year anatomy. Demanding, but I like precision.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Tired. Late hours with my notes. Stress, not a symptom. I checked.
-    midDaysAnswer: Hair in the brush every morning. Thirty-two strands today. I count.
-    finalDaysAnswer: I bruise at a touch. The numbers keep going when eyes close.
-    mismatchEarlyDaysAnswer: Nothing. I sleep ten hours a night and barely notice anything.
-    mismatchMidDaysAnswer: Nothing. I am twenty-three, officer. My body recovers fast.
-    mismatchFinalDaysAnswer: Fine. I burned the notebooks. Stopped counting things. I feel much better.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: Tired. Late hours with my notes. Stress, not a symptom. I checked.
+    mismatchAnswer: Nothing. I sleep ten hours a night and barely notice anything.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - The paint on your booth is peeling, top left. Wrong for weeks.
-    - Your light flickers on a three-second interval. Has it always?
-    midDays:
-    - Thirty percent fewer people through here than last week. I counted.
-    - The intervals are getting shorter. Something is accelerating. I have data.
-    finalDays:
-    - The patterns are converging. I thought finding them would be a relief.
-    - Six notebooks full. I do not know who they are for anymore.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - The paint on your booth is peeling, top left. Wrong for weeks.
+  - Your light flickers on a three-second interval. Has it always?
+  uncannyIdleBarks: []
   IDNumber: 2720955

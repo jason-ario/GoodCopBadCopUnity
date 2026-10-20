@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 5ad95428a0acdf54c8c192919acfeb0c, type: 3}
   CharacterPrefab: {fileID: 2426892980417719112, guid: f6bc53fd6529ba64dbccf80b57f37fa7, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Going home, as the State requires!
-    - Census route. Every name saves someone!
-    - Home before curfew. Curfew is a gift.
-    midDaysReasons:
-    - Updating the registry. The State is busy!
-    - Delivering forms. They let me carry them!
-    - Staying indoors, as told. So looked after.
-    finalDaysReasons:
-    - Being counted first. I asked to be!
-    - Perfecting the records. The State is coming.
-    - Going home. Door unlocked, as they asked.
+  - Going home, as the State requires!
+  - Census route. Every name saves someone!
+  - Home before curfew. Curfew is a gift.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Fetching my husband from the bread factory.
-    - New here. Looking for the housing office.
-    - Paying a fine for filing late.
-    midDaysReasons:
-    - Moving into a shared flat. I hate being alone.
-    - Census office trainee. Started this week.
-    - Meeting this post's officer. Forgot his name.
-    finalDaysReasons:
-    - Taking my children to the shelter.
-    - The records don't matter. Nobody will save us.
-    - Leaving before they order something worse.
+  - Fetching my husband from the bread factory.
+  - New here. Looking for the housing office.
+  - Paying a fine for filing late.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Good evening! The State asked for documents. I was SO happy to bring them.
-    - Every paper correct. I filled them in twice, just for the joy.
-    dialoguesMidDays:
-    - Gaps in the registry now. People who did not listen. All to plan.
-    - The radio says not to speculate about the blast. I never need to!
-    dialoguesFinalDays:
-    - They say the State abandoned us. I have written their names down.
-    - The State knew about the blast long before us. Soon it will explain.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Good evening! The State asked for documents. I was SO happy to bring them.
+  - Every paper correct. I filled them in twice, just for the joy.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Wonderful! The State thanks you. I will remember your face.
-    dialoguesMidDays:
-    - You did as instructed. Look how beautifully it all works!
-    dialoguesFinalDays:
-    - The State sees your obedience. Does it not feel good?
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Wonderful! The State thanks you. I will remember your face.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - Writing materials, please. I have so much gratitude to record.
   - The State put me here. The safest room in the district!
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: d71e962d6af69bf4f8e4449472844fc2, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: My census route! Every door answered but two. I reported which two.
-    midDaysAnswer: The district office. Registry corrections, plus everyone who questioned the curfew.
-    finalDaysAnswer: My last addresses. Doors open, as instructed. I recorded what was inside.
-    mismatchEarlyDaysAnswer: The tram depot ticket office. The census forms are just a Sunday hobby.
-    mismatchMidDaysAnswer: The district office, explaining why the registry is late. I have been careless.
-    mismatchFinalDaysAnswer: The western district. I only moved to this town last month.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: My census route! Every door answered but two. I reported which two.
+    mismatchAnswer: The tram depot ticket office. The census forms are just a Sunday hobby.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: None! I report my health to the office every morning. My favourite part!
-    midDaysAnswer: Three hours of sleep since the blast. I cannot miss a single broadcast!
-    finalDaysAnswer: None. If I had any, the State would tell me. And I would thank it.
-    mismatchEarlyDaysAnswer: My eyes blur faces now. I could not name the officer before you.
-    mismatchMidDaysAnswer: No. I sleep beautifully. My husband forbids me working at night.
-    mismatchFinalDaysAnswer: Forgetfulness. Yesterday I could not recall my own block number.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: None! I report my health to the office every morning. My favourite part!
+    mismatchAnswer: My eyes blur faces now. I could not name the officer before you.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - I have recorded every resident in this district. Is that not a comfort?
-    - The last officer here asked about the blast. He was not here long.
-    midDays:
-    - The list is shorter now. Those people did not listen. Exactly to plan.
-    - I wrote your name down! Do not worry. A list of the faithful. For now.
-    finalDays:
-    - Whatever the blast was, it was permitted. That is what makes it beautiful.
-    - Doubt spreads faster than any sickness. I report both. Happily!
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - I have recorded every resident in this district. Is that not a comfort?
+  - The last officer here asked about the blast. He was not here long.
+  uncannyIdleBarks: []
   IDNumber: 7070787

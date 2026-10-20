@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: dd5af1ad80484714c878f383187e2b3a, type: 3}
   CharacterPrefab: {fileID: 1587370763167483291, guid: 2b5231f856134934a9836d09d5cc74cd, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Home to the harbor flats after cards.
-    - Cards until dawn. Going home to sleep.
-    - Settling a sports debt with a friend.
-    midDaysReasons:
-    - Basement game by the tram depot. Home now.
-    - Checking on my hidden "nest egg."
-    - Metropol's shut. Home to count what's left.
-    finalDaysReasons:
-    - Folded early. Back to my lockdown bunk.
-    - Going home to fold my hand.
-    - Resident check-in. The odds say show up.
+  - Home to the harbor flats after cards.
+  - Cards until dawn. Going home to sleep.
+  - Settling a sports debt with a friend.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - State Savings Bank teller. Home by six.
-    - Visiting for the week. I live in Batumi.
-    - Handing in my pension papers.
-    midDaysReasons:
-    - Off to the Metropol card room. Open nightly.
-    - Off duty from the militia post.
-    - Moving in with an uncle. New to the city.
-    finalDaysReasons:
-    - Monastery novice, returning for prayers.
-    - Sixty-five and retired. Collecting my veteran's card.
-    - Arriving from Poti to register as resident.
+  - State Savings Bank teller. Home by six.
+  - Visiting for the week. I live in Batumi.
+  - Handing in my pension papers.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Heads or tails, officer? Kidding. Here are my documents.
-    - I'm betting on the city's quick recovery. The spread looks good.
-    dialoguesMidDays:
-    - I put everything on the "red sky" theory. I'm cleaning up.
-    - The house always wins. Right now, the house is falling down.
-    dialoguesFinalDays:
-    - One last spin. Let's see if my ID still carries value.
-    - Luck is a lady, but she left on the last bus.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Heads or tails, officer? Kidding. Here are my documents.
+  - I'm betting on the city's quick recovery. The spread looks good.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - My lucky streak continues! See you next turn.
-    dialoguesMidDays:
-    - Thanks. Five-to-one you're still here tomorrow.
-    dialoguesFinalDays:
-    - Stakes are too high for me now. Take care.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - My lucky streak continues! See you next turn.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - Corner pocket. Fine. I've bluffed out of worse hands.
   - Two-to-one I'm out by morning. I like those odds.
@@ -112,38 +68,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: c454d2cbd878f6c43a1186adcbc49f01, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The Metropol back room. Cards till dawn. Now home to sleep it off.
-    midDaysAnswer: The Metropol shut at curfew. Now it's a basement game by the tram depot.
-    finalDaysAnswer: A cellar across the river. Three players, one candle. I folded early.
-    mismatchEarlyDaysAnswer: The evening train from Kutaisi. First time in your town, officer.
-    mismatchMidDaysAnswer: Loading freighters at the port. Honest work. I quit cards years ago.
-    mismatchFinalDaysAnswer: The Metropol. The card room's open again. Full tables all night!
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The Metropol back room. Cards till dawn. Now home to sleep it off.
+    mismatchAnswer: The evening train from Kutaisi. First time in your town, officer.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Sweaty palms, as always. Bad for holding cards, good for bluffing.
-    midDaysAnswer: I sleep all afternoon and wake tired. The numbers won't sit still.
-    finalDaysAnswer: I forget whole hands now. Twenty years, I never forgot a card.
-    mismatchEarlyDaysAnswer: Nothing. Dry hands, steady as a surgeon. Always have been.
-    mismatchMidDaysAnswer: No late nights since I quit cards. I sleep like a Party official.
-    mismatchFinalDaysAnswer: Nothing. At forty-five a man paces himself. Rest, eat, no trouble.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: Sweaty palms, as always. Bad for holding cards, good for bluffing.
+    mismatchAnswer: Nothing. Dry hands, steady as a surgeon. Always have been.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - You have a poker face that would bankrupt me in ten minutes.
-    - The odds keep shifting. I keep adjusting. That's all you can do.
-    midDays:
-    - I found a four-leaf clover in the ash. Taking that as a sign.
-    - The house always wins, does it not? Right now it's on fire.
-    finalDays:
-    - No out-bluffing the end of the world. Going home to fold.
-    - Every player knows when to walk away. I'm almost there.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - You have a poker face that would bankrupt me in ten minutes.
+  - The odds keep shifting. I keep adjusting. That's all you can do.
+  uncannyIdleBarks: []
   IDNumber: 3488018

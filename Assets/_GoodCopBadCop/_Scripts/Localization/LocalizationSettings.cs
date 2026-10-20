@@ -113,7 +113,7 @@ public class LocalizationSettings : ScriptableObject
                 "entryDialogues", "uncannyEntryDialogues",
                 "exitDialoguesPassed", "exitDialoguesQuarantined", "exitDialoguesKilled",
                 "quarantineExitLines", "killExitLines",
-                "questionResponses", "idleBarks"
+                "questionResponses", "idleBarks", "uncannyIdleBarks"
             }
         }
     };

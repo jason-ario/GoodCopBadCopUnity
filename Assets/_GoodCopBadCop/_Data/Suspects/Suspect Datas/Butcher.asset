@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: 0fcfca4c7492c9d498418140abe8b5dd, type: 3}
   CharacterPrefab: {fileID: 4439616193100157912, guid: 65efe317c1c1ebc45af7d3a211747f54, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Late close. Fixed the stall's freezer door.
-    - Home after the late shift. Block scrubbed.
-    - Back to sharpen the cleavers.
-    midDaysReasons:
-    - Checking the back door seals.
-    - Gauze ration from the polyclinic. Two rolls.
-    - Bartering meat at market. Protein is protein.
-    finalDaysReasons:
-    - Back from the fence. Needed the sky.
-    - Stall's empty. Nothing left to cut.
-    - Looking for a bed that isn't grey.
+  - Late close. Fixed the stall's freezer door.
+  - Home after the late shift. Block scrubbed.
+  - Back to sharpen the cleavers.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - Home from the tax inspectorate. Day shift.
-    - New in town. Seeking market work.
-    - Posing for the art institute portrait class.
-    midDaysReasons:
-    - Vegetarian society meeting. No meat in years.
-    - Pension after forty years at the bakery.
-    - Fainted at blood again. Seeing the doctor.
-    finalDaysReasons:
-    - Inspector checking radiation safety protocols.
-    - Coming from a wedding. I was flower boy.
-    - Restocking my stall. Fresh deliveries daily.
+  - Home from the tax inspectorate. Day shift.
+  - New in town. Seeking market work.
+  - Posing for the art institute portrait class.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - "Careful with the permit. My hands are always a bit\u2026 slick."
-    - The bandages? Little accident at the shop. Don't stare.
-    dialoguesMidDays:
-    - The hunger isn't in my stomach anymore. It's in my teeth.
-    - I feel the air touching my raw face through the gauze.
-    dialoguesFinalDays:
-    - My papers. Sorry about the blood. Comes with the profession.
-    - Hope you're not sick of me. I've been dying to see you.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - "Careful with the permit. My hands are always a bit\u2026 slick."
+  - The bandages? Little accident at the shop. Don't stare.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Stop by later. I'll give you a 'cut'. Get it?
-    dialoguesMidDays:
-    - Try to stay plump, officer. It suits you.
-    dialoguesFinalDays:
-    - Go on. The world's one big cold-storage anyway.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Stop by later. I'll give you a 'cut'. Get it?
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - Solitary? My favourite kind of kitchen. Very private.
   - The walls look chewy. I'll tell you how they taste.
@@ -112,38 +68,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 84cf4fdd911f2254099f3740d809c986, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: My market stall. Scrubbed the block, fixed the freezer door. Late shift.
-    midDaysAnswer: Polyclinic for gauze, two rolls a week. Then the stall's back door seals.
-    finalDaysAnswer: The boundary fence. Wanted the sky. Nothing left at the stall to cut.
-    mismatchEarlyDaysAnswer: The meat plant on the river road. Day shift, good union job.
-    mismatchMidDaysAnswer: Polyclinic. Stitches out. The grinder only got me last month.
-    mismatchFinalDaysAnswer: The burns ward. My face healed nicely since the kitchen fire.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: My market stall. Scrubbed the block, fixed the freezer door. Late shift.
+    mismatchAnswer: The meat plant on the river road. Day shift, good union job.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: My back, like every butcher's. The face itches under the gauze.
-    midDaysAnswer: Sweating. The room goes dark when I stand. And hungry. Always hungry.
-    finalDaysAnswer: Hands shake since last week. Bad, with knives. I still cut straight.
-    mismatchEarlyDaysAnswer: Nothing. Twenty years lifting carcasses and not one sore back.
-    mismatchMidDaysAnswer: Healthy as a bull. Schoolboy blood pressure. I barely eat these days.
-    mismatchFinalDaysAnswer: Steady, look. Sold the stall in spring. Haven't touched a knife since.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: My back, like every butcher's. The face itches under the gauze.
+    mismatchAnswer: Nothing. Twenty years lifting carcasses and not one sore back.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - Ever notice how quiet the streets are at night? I love that.
-    - Got a special cut waiting at the shop. Looking forward to it all day.
-    midDays:
-    - Hear the grinding? It doesn't stop. I've stopped trying to make it.
-    - The hunger's gotten very specific lately. Hard to explain over a booth.
-    finalDays:
-    - You look like you haven't slept, officer. Neither have I. Don't miss it.
-    - Bandages are dry today. First time in a while. Testing a theory.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - Ever notice how quiet the streets are at night? I love that.
+  - Got a special cut waiting at the shop. Looking forward to it all day.
+  uncannyIdleBarks: []
   IDNumber: 9722713

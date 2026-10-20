@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: d03a80ab24358784b9cf7b9eed8c485e, type: 3}
   CharacterPrefab: {fileID: 1896175955159167368, guid: 80fd0ca23a5eedc4585657454979dbec, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Delivering timber to the city yards.
-    - Buying supplies. Twice a season, always.
-    - Winter grain for my livestock plot.
-    midDaysReasons:
-    - Iron traps for the "things" in the mist.
-    - Trading wolf pelts for water filters.
-    - Lamp oil. The fog comes lower nightly.
-    finalDaysReasons:
-    - The tree line is dead. Need a roof.
-    - Seeking shelter. The sky is watching.
-    - Nothing grows past the north gate. Food.
+  - Delivering timber to the city yards.
+  - Buying supplies. Twice a season, always.
+  - Winter grain for my livestock plot.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - To my office at city planning.
-    - Picking my wife and kids up from school.
-    - Moving to a flat. Never liked the forest.
-    midDaysReasons:
-    - Selling my cabin. Never lived outside the city.
-    - Which way is the north gate? Never been.
-    - Hiring a guide to teach me tracking.
-    finalDaysReasons:
-    - Selling fresh forest mushrooms. Good harvest.
-    - Cinema with my neighbours from the block.
-    - Hosting a dinner party for friends tonight.
+  - To my office at city planning.
+  - Picking my wife and kids up from school.
+  - Moving to a flat. Never liked the forest.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Papers. Fresh from the envelope. Something moves in the tree line.
-    - Supplies. The trees are starting to taste like copper.
-    dialoguesMidDays:
-    - Take the form. The ink smells like old blood today.
-    - The fog is getting teeth. I need my cabin before it bites.
-    dialoguesFinalDays:
-    - "The forest is gone. It didn't die; it just\u2026 left."
-    - I don't need a name anymore. The wind doesn't use them.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Papers. Fresh from the envelope. Something moves in the tree line.
+  - Supplies. The trees are starting to taste like copper.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Stay quiet, officer. Listen to the wind.
-    dialoguesMidDays:
-    - Watch your back, officer. The walls are getting thin.
-    dialoguesFinalDays:
-    - "Bury your heart deep. It\u2019s the only way to keep it."
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Stay quiet, officer. Listen to the wind.
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - A den. I have slept in worse. I will wait.
   - Watch the door. Things follow you more than you think.
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 544d33efb8c0ec647a20787bd40441a9, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: The northern forest. Timber for the city yards. Twice a season.
-    midDaysAnswer: My cabin past the north gate. Wire does not hold. I need iron.
-    finalDaysAnswer: The tree line. What is left. Nothing grows. I came for a roof.
-    mismatchEarlyDaysAnswer: The southern orchards. Kolkhoz apples. Never cared for the forest.
-    mismatchMidDaysAnswer: My flat in block seven. I only see woods on Sundays.
-    mismatchFinalDaysAnswer: The forest. Green and full. The birds came back this week.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: The northern forest. Timber for the city yards. Twice a season.
+    mismatchAnswer: The southern orchards. Kolkhoz apples. Never cared for the forest.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: No. Sap on my hands. Smoke in my chest. Every winter.
-    midDaysAnswer: Stiff joints in the morning. I do not sleep. I listen.
-    finalDaysAnswer: Dry skin, cracked knuckles. The air does it. I do not complain.
-    mismatchEarlyDaysAnswer: Nothing. At fifty a man knows his body. Mine is fine.
-    mismatchMidDaysAnswer: Nothing. I sleep sound. My neighbours watch the tree line for me.
-    mismatchFinalDaysAnswer: Nothing. Soft hands. I sit at a forestry office desk all day.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: No. Sap on my hands. Smoke in my chest. Every winter.
+    mismatchAnswer: Nothing. At fifty a man knows his body. Mine is fine.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - The birds left the valley this morning. They know before we do.
-    - The wind comes from the wrong direction today. Watch yourself, officer.
-    midDays:
-    - You have a shadow that does not match your feet. Careful, officer.
-    - Something moves in the fog now. Nothing I recognize. Nothing natural.
-    finalDays:
-    - The forest did not die. It left. You do not understand that yet.
-    - Everything that was green is gone. Stay under something solid.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - The birds left the valley this morning. They know before we do.
+  - The wind comes from the wrong direction today. Watch yourself, officer.
+  uncannyIdleBarks: []
   IDNumber: 1849021

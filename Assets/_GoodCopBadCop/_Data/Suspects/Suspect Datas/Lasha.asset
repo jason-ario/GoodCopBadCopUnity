@@ -34,65 +34,21 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: d5651fdd6900dd14fa45f1adfa3633ca, type: 3}
   CharacterPrefab: {fileID: 199770865469659255, guid: 6e920bda57f6de84eba63381a300818a, type: 3}
   entryReasons:
-    earlyDaysReasons:
-    - Home after a twelve-hour driving shift.
-    - Home to the western block. Family's waiting.
-    - Dropping the cab at the fleet garage.
-    midDaysReasons:
-    - Cab won't start. Walking home west.
-    - Checking my building's security.
-    - Hunting a Volga part. Engine's dead again.
-    finalDaysReasons:
-    - Cab's dead in the depot. Going home.
-    - Home to my wife and kids.
-    - Mandatory residency check-in.
+  - Home after a twelve-hour driving shift.
+  - Home to the western block. Family's waiting.
+  - Dropping the cab at the fleet garage.
   invalidEntryReasons:
-    earlyDaysReasons:
-    - First day driving a taxi. Still learning streets.
-    - Walking. Never learned to drive, hate cars.
-    - Pension. Retired from driving last year.
-    midDaysReasons:
-    - Driving my new car. Purrs like a kitten.
-    - Home alone. Never married, never wanted kids.
-    - Back from my Writers' Union desk.
-    finalDaysReasons:
-    - Driving fares all night. Business is booming.
-    - Home to the eastern district, as always.
-    - Going to my mother's. My only family.
+  - First day driving a taxi. Still learning streets.
+  - Walking. Never learned to drive, hate cars.
+  - Pension. Retired from driving last year.
   entryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays:
-    - Move it along, officer. I've got a fare and time is money.
-    - What, you need to see my teeth too? Check the damn paper.
-    dialoguesMidDays:
-    - My car won't start and the streets are full of junk. Happy now?
-    - We're all breathing the same poison. The booth doesn't make you special.
-    dialoguesFinalDays:
-    - Go ahead, keep me here. There's nowhere left to drive anyway.
-    - You're a bouncer for a club that's burning down.
-  uncannyEntryDialogues:
-    lastVerdict: 0
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Move it along, officer. I've got a fare and time is money.
+  - What, you need to see my teeth too? Check the damn paper.
+  uncannyEntryDialogues: []
   exitDialoguesPassed:
-    lastVerdict: 1
-    dialoguesEarlyDays:
-    - Finally. Work a bit faster next time, yeah?
-    dialoguesMidDays:
-    - Yeah, yeah. Watch your back. It's getting ugly.
-    dialoguesFinalDays:
-    - Whatever. Enjoy your little cage while it lasts.
-  exitDialoguesQuarantined:
-    lastVerdict: 2
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
-  exitDialoguesKilled:
-    lastVerdict: 3
-    dialoguesEarlyDays: []
-    dialoguesMidDays: []
-    dialoguesFinalDays: []
+  - Finally. Work a bit faster next time, yeah?
+  exitDialoguesQuarantined: []
+  exitDialoguesKilled: []
   quarantineExitLines:
   - You have GOT to be out of your mind, I swear!
   - FINE! But on the record, this is completely WRONG!
@@ -113,38 +69,17 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: a2b79f2d85f1d9744a163ff045d2e5af, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    earlyDaysAnswer: Fleet garage. Twelve hours, and the Volga's clutch is shot again. Can I go?
-    midDaysAnswer: My building, western block. Checked the locks. Cab's dead, so I walked.
-    finalDaysAnswer: Nowhere. Cab's dead in the depot yard. I walked the ash like everybody.
-    mismatchEarlyDaysAnswer: My place on the east side. I could drive that route blind.
-    mismatchMidDaysAnswer: A fare out to Varka and back. Car ran like a dream.
-    mismatchFinalDaysAnswer: My brother's flat. Wife left, no kids, nothing to go home to.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: Fleet garage. Twelve hours, and the Volga's clutch is shot again. Can I go?
+    mismatchAnswer: My place on the east side. I could drive that route blind.
+    uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    earlyDaysAnswer: Runny nose. Twelve hours of exhaust does that. Next question.
-    midDaysAnswer: Dizzy when I stand too fast. It passes. Don't write that down.
-    finalDaysAnswer: My ears ring all day and night. Sirens or me. Who cares?
-    mismatchEarlyDaysAnswer: Healthy as a horse. Haven't driven in months, no fumes.
-    mismatchMidDaysAnswer: Two weeks in bed with a fever. Haven't left the flat once.
-    mismatchFinalDaysAnswer: Clean lungs. Gave up the cab years ago. I push papers now.
-    uncannyEarlyDaysAnswer: 
-    uncannyMidDaysAnswer: 
-    uncannyFinalDaysAnswer: 
+    answer: Runny nose. Twelve hours of exhaust does that. Next question.
+    mismatchAnswer: Healthy as a horse. Haven't driven in months, no fumes.
+    uncannyAnswer: 
     cameraTrigger: 
   idleBarks:
-    earlyDays:
-    - Move it along, would you? Twelve minutes I've been standing here.
-    - Someone should sort out the roads in this district. Absolute mess.
-    midDays:
-    - My cab doesn't start anymore. Three years I kept that engine running.
-    - Half the streets are blocked now. Your people closed them.
-    finalDays:
-    - Take your time. Not like the world's ending or anything.
-    - Still stamping papers? Fine. Stamp the paper. I'll wait.
-    uncannyEarlyDays: []
-    uncannyMidDays: []
-    uncannyFinalDays: []
+  - Move it along, would you? Twelve minutes I've been standing here.
+  - Someone should sort out the roads in this district. Absolute mess.
+  uncannyIdleBarks: []
   IDNumber: 3442788

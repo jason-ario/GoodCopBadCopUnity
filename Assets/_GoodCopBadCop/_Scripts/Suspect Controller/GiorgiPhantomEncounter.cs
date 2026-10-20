@@ -53,11 +53,21 @@ public class GiorgiPhantomEncounter : NetworkBehaviour
 
     [Header("Phase Through")]
     [Tooltip("Glide speed while phasing through the window and booth (units/second).")]
-    [SerializeField] private float _phaseSpeed = 7.8f;
+    [SerializeField] private float _phaseSpeed = 15.6f;
 
     [Tooltip("Total distance (units) he glides along his local +Z from the window before vanishing. " +
              "Must carry him through the whole booth and out the far wall.")]
     [SerializeField] private float _phaseDistance = 14f;
+
+    [Header("Booth Lights")]
+    [Tooltip("Flicker the booth lights (BoothFlickeringLightsController) while he phases through.")]
+    [SerializeField] private bool _flickerBoothLights = true;
+
+    [Tooltip("Extra seconds the booth lights keep flickering after he has vanished.")]
+    [SerializeField] private float _lightFlickerTail = 0.8f;
+
+    [Tooltip("Play the booth's flicker buzz sound with the light flicker.")]
+    [SerializeField] private bool _lightFlickerSound = true;
 
     [Tooltip("Randomly flicker his renderers while phasing, for a glitchy 'not really there' look.")]
     [SerializeField] private bool _flickerWhilePhasing = false;
@@ -221,7 +231,7 @@ public class GiorgiPhantomEncounter : NetworkBehaviour
         bool glassBroken = glass == null || glass.IsSmashed;
 
         SetPose(Pose.Phasing);
-        BeginPhaseClientRpc();
+        BeginPhaseClientRpc(duration);
 
         float t = 0f;
 
@@ -281,10 +291,17 @@ public class GiorgiPhantomEncounter : NetworkBehaviour
     }
 
     [ClientRpc]
-    private void BeginPhaseClientRpc()
+    private void BeginPhaseClientRpc(float phaseDuration)
     {
         if (_stingerClip != null)
             SFXController.Instance?.Play(_stingerClip, _stingerVolume);
+
+        if (_flickerBoothLights)
+        {
+            BoothFlickeringLightsController lights = FindFirstObjectByType<BoothFlickeringLightsController>();
+            if (lights != null)
+                lights.PlayScriptedBurst(phaseDuration + _lightFlickerTail, _lightFlickerSound);
+        }
 
         if (_giggleClip != null && _audioSource != null)
         {
