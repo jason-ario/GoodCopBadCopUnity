@@ -14,6 +14,10 @@ public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
     public bool disableAnimation;
     private bool isActiveTab;
 
+    private static readonly int DisabledParam = Animator.StringToHash("Disabled");
+    private bool hasDisabledParam;
+    private bool? lastInteractable;
+
     /// <summary>True if this button plays its own click sound on pointer down.</summary>
     public bool HasClickSfx => sfxOnClick != null;
 
@@ -23,7 +27,49 @@ public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
 
         // Menu feedback must keep animating while a single-player pause has Time.timeScale at 0.
         if (anim != null)
+        {
             anim.updateMode = AnimatorUpdateMode.UnscaledTime;
+
+            // Only controllers with a "Disabled" bool (e.g. Text Button.controller) get the greyed-out state.
+            foreach (AnimatorControllerParameter p in anim.parameters)
+            {
+                if (p.nameHash == DisabledParam && p.type == AnimatorControllerParameterType.Bool)
+                {
+                    hasDisabledParam = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    private void OnEnable()
+    {
+        // Animator parameters reset when the object is re-enabled, so force a resync.
+        lastInteractable = null;
+        SyncDisabledState();
+    }
+
+    private void Update() => SyncDisabledState();
+
+    /// <summary>
+    /// Mirrors <see cref="Selectable.interactable"/> into the animator's "Disabled" bool so
+    /// non-interactable buttons (e.g. Buy when the player can't afford it) show the greyed-out state.
+    /// </summary>
+    private void SyncDisabledState()
+    {
+        if (!hasDisabledParam || button == null || !anim.isActiveAndEnabled) return;
+
+        bool interactable = button.interactable;
+        if (lastInteractable == interactable) return;
+        lastInteractable = interactable;
+
+        anim.SetBool(DisabledParam, !interactable);
+        if (!interactable)
+        {
+            // Hover/select handlers early-out while disabled, so clear any stale highlight now.
+            anim.SetBool("Selected", false);
+            anim.SetBool("Hovering", false);
+        }
     }
 
     public void OnPointerEnter(PointerEventData eventData)
