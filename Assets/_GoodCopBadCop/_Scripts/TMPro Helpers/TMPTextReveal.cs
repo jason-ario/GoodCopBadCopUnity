@@ -21,6 +21,9 @@ public class TMPTextReveal : MonoBehaviour
     [Tooltip("Extra pause (seconds) after a line break is revealed, like a teleprinter carriage return. 0 = none.")]
     [SerializeField] private float lineBreakDelay = 0f;
 
+    [Tooltip("Lay out the complete text up front and reveal it via maxVisibleCharacters, so the block starts at its final size and lines never shift as more are typed (e.g. vertically centered text). Leave off for bubbles that rely on TMPWidthFitter/ContentSizeFitter growing with the visible text.")]
+    [SerializeField] private bool reserveFullTextLayout = false;
+
     /// <summary>
     /// Raised once per revealed character with that character and whether a line break ('\n')
     /// was crossed to reach it. Lets other components (e.g. <see cref="TeleprinterRevealAudio"/>)
@@ -60,7 +63,11 @@ public class TMPTextReveal : MonoBehaviour
     {
         if (!IsRevealing) return;
         StopCurrentRoutine();
-        if (tmp != null && _fullText != null) tmp.text = _fullText;
+        if (tmp != null && _fullText != null)
+        {
+            tmp.text = _fullText;
+            tmp.maxVisibleCharacters = 99999;
+        }
     }
 
     IEnumerator RevealAfterEnableCoroutine()
@@ -123,7 +130,10 @@ public class TMPTextReveal : MonoBehaviour
         // Reveal by progressively growing tmp.text to a longer substring each step.
         // This makes TMP measure only the currently visible portion, so TMPWidthFitter
         // and any ContentSizeFitter in the hierarchy reflect the actual visible width.
-        tmp.maxVisibleCharacters = 99999;
+        // With reserveFullTextLayout the full text stays laid out and only the visible count grows,
+        // so the block keeps its final size/position from the first character.
+        if (!reserveFullTextLayout)
+            tmp.maxVisibleCharacters = 99999;
 
         _skipLineRequested = false;
         int previousStringIndex = -1;
@@ -141,7 +151,10 @@ public class TMPTextReveal : MonoBehaviour
             }
 
             int stringIndex = charStringIndices[i];
-            tmp.text = fullText.Substring(0, stringIndex + 1);
+            if (reserveFullTextLayout)
+                tmp.maxVisibleCharacters = i + 1;
+            else
+                tmp.text = fullText.Substring(0, stringIndex + 1);
 
             // Detect a crossed line break whether or not TMP lists '\n' as its own character.
             bool crossedLineBreak = false;
@@ -176,6 +189,7 @@ public class TMPTextReveal : MonoBehaviour
 
         // Restore the complete string so any closing rich-text tags are included.
         tmp.text = fullText;
+        tmp.maxVisibleCharacters = 99999;
         revealRoutine = null;
     }
 

@@ -370,7 +370,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     [ClientRpc]
     private void ShowDefeatRewardClientRpc(int amount, bool isFullMutant)
     {
-        UIController.Instance?.ShowCashPopUpNotification(amount, isFullMutant ? "Full Mutant Defeated" : "Mutant Thwarted");
+        UIController.Instance?.ShowCashPopUpNotification(amount, isFullMutant ? Loc.T("Full Mutant Defeated") : Loc.T("Mutant Thwarted"));
     }
 
     // ── Safety Net ─────────────────────────────────────────────────────────────

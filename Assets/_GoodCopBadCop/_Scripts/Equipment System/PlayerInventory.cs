@@ -7,9 +7,10 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Two-slot hotbar inventory for the local player (three slots when
 /// <see cref="GameSettings.ThreeInventorySlots"/> is enabled — read once in Awake).
-/// Press 1/2(/3) to equip the item in that slot, scroll the mouse wheel, or press the gamepad
+/// Press 1/2(/3) to equip the item in that slot, scroll the mouse wheel (up = left, down = right,
+/// stopping at the end slots), or press the gamepad
 /// <see cref="GameAction.NextSlot"/> / <see cref="GameAction.PreviousSlot"/> bindings (Y toggles
-/// by default; PreviousSlot unbound) to cycle through held/carried items. Hotbar input is ignored while
+/// by default; PreviousSlot unbound; these wrap) to cycle through held/carried items. Hotbar input is ignored while
 /// the guidebook or a diegetic view is open. Picking up an item brings it straight to hand;
 /// placing/dropping empties the hand.
 ///
@@ -260,13 +261,15 @@ public class PlayerInventory : NetworkBehaviour
         }
         if (ReloadPressed()) TryReloadActiveWeapon();
 
+        // Scroll wheel steps without wrapping: up = left (previous slot), down = right (next slot),
+        // stopping at the first/last slot.
         float scroll = Input.mouseScrollDelta.y;
-        if (scroll > 0f) CycleActiveItem(1);
-        else if (scroll < 0f) CycleActiveItem(-1);
+        if (scroll > 0f) CycleActiveItem(-1, wrap: false);
+        else if (scroll < 0f) CycleActiveItem(1, wrap: false);
 
-        // Gamepad slot cycling (Y toggles by default, rebindable).
-        if (RebindableInput.GetGamepadDown(GameAction.NextSlot)) CycleActiveItem(1);
-        else if (RebindableInput.GetGamepadDown(GameAction.PreviousSlot)) CycleActiveItem(-1);
+        // Gamepad slot cycling wraps (Y toggles by default, rebindable).
+        if (RebindableInput.GetGamepadDown(GameAction.NextSlot)) CycleActiveItem(1, wrap: true);
+        else if (RebindableInput.GetGamepadDown(GameAction.PreviousSlot)) CycleActiveItem(-1, wrap: true);
     }
 
     /// <summary>Index of the first slot whose number key (1..SlotCount) went down this frame, or -1.</summary>
@@ -304,12 +307,14 @@ public class PlayerInventory : NetworkBehaviour
     }
 
     /// <summary>
-    /// Scroll-wheel slot cycling. Steps the selection one slot forward/backward (wrapping), via
-    /// <see cref="EquipSlot"/>. With two slots either direction simply selects the other slot,
-    /// whether or not it holds an item; with three it steps through them in order.
+    /// Steps the selection one slot right (+1) or left (-1) via <see cref="PlayerEquipSlot"/>,
+    /// selecting the slot whether or not it holds an item. With <paramref name="wrap"/> the
+    /// selection loops around (gamepad cycling, so Y keeps toggling with two slots); without it
+    /// (scroll wheel) it stops at the leftmost/rightmost slot and further input is a no-op.
     /// </summary>
-    /// <param name="direction">+1 to scroll to the next slot, -1 for the previous.</param>
-    private void CycleActiveItem(int direction)
+    /// <param name="direction">+1 for the slot to the right, -1 for the slot to the left.</param>
+    /// <param name="wrap">True to loop past the ends, false to clamp at them.</param>
+    private void CycleActiveItem(int direction, bool wrap)
     {
         if (!IsOwner) return;
 
@@ -317,7 +322,9 @@ public class PlayerInventory : NetworkBehaviour
         if (IsHandLocked) return;
 
         int count = _slots.Length;
-        int next = ((_activeSlot + direction) % count + count) % count;
+        int next = _activeSlot + direction;
+        if (wrap) next = (next % count + count) % count;
+        else if (next < 0 || next >= count) return;   // already at the edge
         PlayerEquipSlot(next);
     }
 

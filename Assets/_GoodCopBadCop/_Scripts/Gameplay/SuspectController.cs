@@ -1648,8 +1648,8 @@ public class SuspectController : NetworkBehaviour
 
         // Message 1: Individual symptom identification breakdown.
         string anomalyMessage = symptomsTotal > 0
-            ? $"Found {symptomsFound}/{symptomsTotal} symptoms"
-            : "No anomalies present";
+            ? Loc.T("Found {0}/{1} symptoms", symptomsFound, symptomsTotal)
+            : Loc.T("No anomalies present");
         UIController.Instance.ShowCashPopUpNotification(anomalyAmount, anomalyMessage);
 
         yield return new WaitForSeconds(2f);
@@ -1657,19 +1657,19 @@ public class SuspectController : NetworkBehaviour
         // Message 2: Perfect identification bonus, if earned.
         if (perfectBonusAmount > 0)
         {
-            UIController.Instance.ShowCashPopUpNotification(perfectBonusAmount, "Perfect Inspection");
+            UIController.Instance.ShowCashPopUpNotification(perfectBonusAmount, Loc.T("Perfect Inspection"));
             yield return new WaitForSeconds(2f);
         }
 
         // Message 3: Evidence bonus, if earned.
         if (evidenceBonusAmount > 0)
         {
-            UIController.Instance.ShowCashPopUpNotification(evidenceBonusAmount, "Evidence Filed");
+            UIController.Instance.ShowCashPopUpNotification(evidenceBonusAmount, Loc.T("Evidence Filed"));
             yield return new WaitForSeconds(2f);
         }
 
         // Final message: Total payout summary.
-        UIController.Instance.ShowCashPopUpNotification(totalCoupons, "Payout Issued");
+        UIController.Instance.ShowCashPopUpNotification(totalCoupons, Loc.T("Payout Issued"));
     }
     
     public void Quarantine()
