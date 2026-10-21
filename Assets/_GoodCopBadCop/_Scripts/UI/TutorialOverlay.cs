@@ -31,10 +31,7 @@ public class TutorialOverlay : MonoBehaviour
     [SerializeField] private GameObject movementTutorialScreen;
     [SerializeField] private GameObject handlingItemsTutorialScreen;
     [SerializeField] private GameObject accuracyPayoutTutorialScreen;
-    [SerializeField] private GameObject trashTutorialScreen;
-    [SerializeField] private GameObject graffitiTutorialScreen;
     [SerializeField] private GameObject sortingMailTutorialScreen;
-    [SerializeField] private GameObject killCriteriaTutorialScreen;
     [SerializeField] private GameObject fixPowerTutorialScreen;
     [Tooltip("Day 3 power-station fuse-box puzzle screen ('Fix Fuse Tutorial').")]
     [SerializeField] private GameObject fixFuseTutorialScreen;
@@ -128,20 +125,8 @@ public class TutorialOverlay : MonoBehaviour
     /// <summary>Shows the accuracy-payout tutorial overlay (more accurate anomaly marking = more coupons).</summary>
     public void ShowAccuracyPayoutTutorial(Action onComplete = null) => ShowScreen(accuracyPayoutTutorialScreen, onComplete);
 
-    /// <summary>Shows the end-of-shift trash task tutorial overlay.</summary>
-    public void ShowTrashTutorial(Action onComplete = null) => ShowScreen(trashTutorialScreen, onComplete);
-
-    /// <summary>Shows the end-of-shift graffiti task tutorial overlay.</summary>
-    public void ShowGraffitiTutorial(Action onComplete = null) => ShowScreen(graffitiTutorialScreen, onComplete);
-
     /// <summary>Shows the sorting-mail tutorial overlay (Day 2, right after Vlad unlocks the tool locker).</summary>
     public void ShowSortingMailTutorial(Action onComplete = null) => ShowScreen(sortingMailTutorialScreen, onComplete);
-
-    /// <summary>
-    /// Shows the kill-criteria tutorial overlay (Day 2 kill tutorial) — explains the
-    /// quarantine/kill symptom-count thresholds right after the kill scripted dialogue.
-    /// </summary>
-    public void ShowKillCriteriaTutorial(Action onComplete = null) => ShowScreen(killCriteriaTutorialScreen, onComplete);
 
     /// <summary>
     /// Shows the "go fix the power outage at the electrical panel" tutorial overlay.
@@ -181,8 +166,8 @@ public class TutorialOverlay : MonoBehaviour
     /// <summary>
     /// Shows the "Checkpoint Integrity Score" tutorial overlay — explains that graffiti, trash,
     /// and damaged fences all lower the score, and that a lower score reduces coupon payouts.
-    /// Triggered by Day_01 right after the trash and graffiti tutorial overlays, when the
-    /// end-of-shift cleanup tasks are first assigned.
+    /// Triggered by Day_01 after the Dusk banner, when the end-of-shift cleanup tasks are
+    /// first assigned.
     /// </summary>
     public void ShowCheckpointIntegrityTutorial(Action onComplete = null) => ShowScreen(checkpointIntegrityTutorialScreen, onComplete);
 
