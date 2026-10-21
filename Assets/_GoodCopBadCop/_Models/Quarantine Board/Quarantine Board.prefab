@@ -138,9 +138,9 @@ MonoBehaviour:
   m_fontSize: 25.7
   m_fontSizeBase: 25.7
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_fontSizeMax: 25.7
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 256
@@ -152,9 +152,9 @@ MonoBehaviour:
   m_lineSpacingMax: 0
   m_paragraphSpacing: 0
   m_charWidthMaxAdj: 0
-  m_TextWrappingMode: 1
+  m_TextWrappingMode: 0
   m_wordWrappingRatios: 0.4
-  m_overflowMode: 0
+  m_overflowMode: 1
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
@@ -1012,7 +1012,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3539710026
+  GlobalObjectIdHash: 890426372
   InScenePlacedSourceGlobalObjectIdHash: 890426372
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -1319,6 +1319,9 @@ MonoBehaviour:
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   _diegeticController: {fileID: 3475816293155328353}
 --- !u!65 &7739867495218985146
 BoxCollider:

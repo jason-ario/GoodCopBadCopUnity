@@ -22,6 +22,9 @@ public class TextSizeGroup : MonoBehaviour
     [Tooltip("Labels sharing one size. Leave empty and press 'Collect children' to fill from child TMP texts.")]
     public List<Member> members = new List<Member>();
 
+    [Tooltip("Include inactive members when finding the shared size, so it doesn't change as rows toggle.")]
+    public bool measureInactive;
+
     private readonly List<string> _lastTexts = new List<string>();
     private Vector2 _lastSize;
     private bool _dirty = true;
@@ -38,6 +41,14 @@ public class TextSizeGroup : MonoBehaviour
     }
 
     public void MarkDirty() { _dirty = true; }
+
+    /// <summary>Adds a text with its design range (used for rows created at runtime). Duplicates are ignored.</summary>
+    public void AddMember(TMP_Text text, float maxSize, float minSize)
+    {
+        if (text == null || members.Exists(m => m.text == text)) return;
+        members.Add(new Member { text = text, maxSize = maxSize, minSize = minSize });
+        _dirty = true;
+    }
 
     private void OnRectTransformDimensionsChange() { _dirty = true; }
 
@@ -84,7 +95,7 @@ public class TextSizeGroup : MonoBehaviour
         foreach (var m in members)
         {
             _lastTexts.Add(m.text != null ? m.text.text : null);
-            if (m.text == null || !m.text.isActiveAndEnabled || string.IsNullOrEmpty(m.text.text)) continue;
+            if (m.text == null || (!m.text.isActiveAndEnabled && !measureInactive) || string.IsNullOrEmpty(m.text.text)) continue;
             var t = m.text;
             t.fontSizeMax = m.maxSize;
             t.fontSizeMin = m.minSize;

@@ -17,12 +17,20 @@ public class ControlHintRow : MonoBehaviour
     [Tooltip("Label after the icon.")]
     [SerializeField] private TMP_Text _label;
 
+    /// <summary>Prefix label, registered with the overlay's shared TextSizeGroup.</summary>
+    public TMP_Text PrefixLabel => _prefixLabel;
+
+    /// <summary>Main label, registered with the overlay's shared TextSizeGroup.</summary>
+    public TMP_Text Label => _label;
+
     public void Apply(string prefix, Sprite icon, string text)
     {
         bool hasPrefix = !string.IsNullOrEmpty(prefix);
         if (_prefixLabel != null)
         {
-            if (hasPrefix && _prefixLabel.text != prefix) _prefixLabel.text = prefix;
+            // Hidden labels are cleared so they don't take part in the shared size.
+            string value = hasPrefix ? prefix : string.Empty;
+            if (_prefixLabel.text != value) _prefixLabel.text = value;
             SetActive(_prefixLabel.gameObject, hasPrefix);
         }
 
@@ -38,6 +46,13 @@ public class ControlHintRow : MonoBehaviour
             if (_label.text != value) _label.text = value;
             SetActive(_label.gameObject, value.Length > 0);
         }
+    }
+
+    /// <summary>Clears both labels for a pooled row that is being hidden.</summary>
+    public void Clear()
+    {
+        if (_prefixLabel != null) _prefixLabel.text = string.Empty;
+        if (_label != null) _label.text = string.Empty;
     }
 
     private static void SetActive(GameObject go, bool active)
