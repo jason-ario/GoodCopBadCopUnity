@@ -46,7 +46,7 @@ public class RadiationScanner : PickableObject
     }
 
     /// <summary>LMB (held) scans radiation levels.</summary>
-    public override string GetHeldUseVerb() => "Scan";
+    public override string GetHeldUseVerb() => Loc.N("Scan");
 
     public override void OnStartUse()
     {

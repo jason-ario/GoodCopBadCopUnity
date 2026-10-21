@@ -3,7 +3,7 @@ using UnityEngine;
 public class Speaker : Interactable
 {
     [SerializeField] private string[] choices;
-    protected override string DefaultInteractVerb => "Talk";
+    protected override string DefaultInteractVerb => Loc.N("Talk");
 
     public override void Interact(PlayerInteractionController player)
     {

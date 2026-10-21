@@ -147,7 +147,7 @@ public class Drawer : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return _targetOpen ? "Close" : "Open";
+        return _targetOpen ? Loc.N("Close") : Loc.N("Open");
     }
 
     /// <summary>Tap Interact toggles the drawer open/closed.</summary>

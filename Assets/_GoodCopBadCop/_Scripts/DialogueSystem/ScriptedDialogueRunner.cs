@@ -75,7 +75,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     [Header("Megaphone Speaker")]
     [Tooltip("Speaker name shown in subtitles when playing megaphone scripted dialogue.")]
-    [SerializeField] private string _megaphoneSpeakerName = "Megaphone";
+    [SerializeField, LocalizeField] private string _megaphoneSpeakerName = "Megaphone";
 
     [Tooltip("Name colour for megaphone subtitles.")]
     [SerializeField] private Color _megaphoneSpeakerColor = new Color(1f, 0.65f, 0f);

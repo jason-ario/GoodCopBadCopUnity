@@ -61,11 +61,39 @@ public class TutorialObjectiveItem : MonoBehaviour
     /// <summary>Prefix shown before every objective's text, e.g. "- Talk to Vlad".</summary>
     private const string BulletPrefix = "- ";
 
+    /// <summary>Trailing live counter such as " 2/5" or " (2/5)" appended to an authored label.</summary>
+    private static readonly System.Text.RegularExpressions.Regex ProgressSuffix =
+        new(@"^(.*?\S)(\s*\(?\d+\s*/\s*\d+\)?)$");
+
+    /// <summary>
+    /// Translates objective text before the bullet is prepended — render-time lookup only matches
+    /// exact English sources, so "- Place folder at the window" would never resolve. Text ending in
+    /// a live counter ("Throw away trash 2/5") translates the label and keeps the counter.
+    /// </summary>
+    private static string BuildDisplay(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return BulletPrefix;
+
+        string translated = Loc.TranslateSource(text);
+        if (translated == text)
+        {
+            var match = ProgressSuffix.Match(text);
+            if (match.Success)
+            {
+                string head = Loc.TranslateSource(match.Groups[1].Value);
+                if (head != match.Groups[1].Value)
+                    translated = head + match.Groups[2].Value;
+            }
+        }
+
+        return Loc.Verbatim(BulletPrefix + translated);
+    }
+
     /// <summary>Sets the display text for this objective.</summary>
     public void SetText(string text)
     {
         if (label != null)
-            label.text = BulletPrefix + text;
+            label.text = BuildDisplay(text);
     }
 
     /// <summary>
@@ -183,7 +211,7 @@ public class TutorialObjectiveItem : MonoBehaviour
     {
         if (label == null) return;
 
-        string prefixed = BulletPrefix + text;
+        string prefixed = BuildDisplay(text);
         bool changed = label.text != prefixed;
         label.text = prefixed;
 

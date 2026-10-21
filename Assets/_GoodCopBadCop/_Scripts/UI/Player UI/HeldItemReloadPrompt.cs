@@ -24,7 +24,7 @@ public class HeldItemReloadPrompt : MonoBehaviour
     [Tooltip("Label next to the icon.")]
     [SerializeField] private TMP_Text _label;
 
-    [SerializeField] private string _text = "to reload";
+    [SerializeField, LocalizeField] private string _text = "to reload";
 
     private void Awake()
     {

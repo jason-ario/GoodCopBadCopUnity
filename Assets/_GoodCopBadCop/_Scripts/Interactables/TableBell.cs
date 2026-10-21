@@ -47,7 +47,7 @@ public class TableBell : Interactable
     // Player interaction
     // -------------------------------------------------------------------------
 
-    protected override string DefaultInteractVerb => "Ring";
+    protected override string DefaultInteractVerb => Loc.N("Ring");
 
     public override void Interact(PlayerInteractionController player)
     {

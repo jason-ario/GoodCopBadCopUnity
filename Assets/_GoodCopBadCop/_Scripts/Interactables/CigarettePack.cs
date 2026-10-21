@@ -6,5 +6,5 @@ public class CigarettePack : ContainerPickableObject
         => "to grab cigarette";
 
     /// <summary>Reticle hold prompt: "Hold E to grab a cigarette".</summary>
-    protected override string ExtractVerb => "grab a cigarette";
+    protected override string ExtractVerb => Loc.N("grab a cigarette");
 }

@@ -26,7 +26,7 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
     // ── Inspector ────────────────────────────────────────────────────────────
 
     [Header("Task Properties")]
-    [SerializeField] private string _taskName   = "Clean Booth Mess";
+    [SerializeField, LocalizeField] private string _taskName   = "Clean Booth Mess";
     [SerializeField] private float  _scoreWeight = 1f;
 
     [Header("Scene Objects")]

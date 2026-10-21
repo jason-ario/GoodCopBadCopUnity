@@ -32,7 +32,7 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
     public static bool SuppressNextShiftStart = false;
 
     [Header("Task Properties")]
-    [SerializeField] private string _taskName = "Process Residents";
+    [SerializeField, LocalizeField] private string _taskName = "Process Residents";
 
     // ── Networked state ──────────────────────────────────────────────────────
 

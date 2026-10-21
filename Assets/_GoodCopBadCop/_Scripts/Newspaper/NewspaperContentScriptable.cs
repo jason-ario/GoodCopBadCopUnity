@@ -3,13 +3,13 @@ using UnityEngine;
 [ CreateAssetMenu(fileName = "NewspaperContent", menuName = "NewspaperContent")]
 public class NewspaperContentScriptable : ScriptableObject
 {
-    [TextArea(3, 10)]
+    [TextArea(3, 10), LocalizeField]
     public string headerText; 
-    [TextArea(3, 10)]
+    [TextArea(3, 10), LocalizeField]
     public string subheaderText; 
-    [TextArea(3, 10)]
+    [TextArea(3, 10), LocalizeField]
     public string descriptionText;
-    [TextArea(3, 10)]
+    [TextArea(3, 10), LocalizeField]
     public string footerText;
 
     [Tooltip("Photo printed on this day's newspaper. Fitted (aspect preserved) into the newspaper's " +

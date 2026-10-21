@@ -80,12 +80,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1282518936
+  GlobalObjectIdHash: 1061115661
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 1
   SpawnWithObservers: 1
@@ -108,7 +110,15 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Drawer
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   audioSource: {fileID: 630535897967452424}
   drawerOpenSound: {fileID: 8300000, guid: 0186c93f2c26f7e4bb08581ff245beac, type: 3}
   drawerCloseSound: {fileID: 8300000, guid: 0186c93f2c26f7e4bb08581ff245beac, type: 3}
@@ -118,11 +128,8 @@ MonoBehaviour:
   _drawerMesh: {fileID: 3372983779603771663}
   _closedPos: {x: 0, y: 0, z: 0}
   _openPos: {x: 0.001, y: 0, z: 0.357}
-  _rightIkTarget: {fileID: 8047937578891929337}
-  _leftIkTarget: {fileID: 5860300106050939416}
-  _dragSensitivity: -0.05
-  _controllerDragSpeed: 1.5
-  _snapDuration: 0.2
+  _slideDuration: 0.35
+  _slideEase: 9
 --- !u!95 &7015960570428413188
 Animator:
   serializedVersion: 7
@@ -506,7 +513,7 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 2
+  rmsCount: 3
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFXTriggerMode: 0
@@ -780,6 +787,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3372983779603771663}
     m_Modifications:
+    - target: {fileID: 4332947241397095671, guid: dc420b92a3baf364683edcfd4fce7a9f, type: 3}
+      propertyPath: m_fontSize
+      value: 41.7
+      objectReference: {fileID: 0}
+    - target: {fileID: 4332947241397095671, guid: dc420b92a3baf364683edcfd4fce7a9f, type: 3}
+      propertyPath: m_fontSizeMin
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 6307209452569470104, guid: dc420b92a3baf364683edcfd4fce7a9f, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 4.483
+      objectReference: {fileID: 0}
+    - target: {fileID: 6307209452569470104, guid: dc420b92a3baf364683edcfd4fce7a9f, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0
+      objectReference: {fileID: 0}
     - target: {fileID: 6598924933152449450, guid: dc420b92a3baf364683edcfd4fce7a9f, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.0017

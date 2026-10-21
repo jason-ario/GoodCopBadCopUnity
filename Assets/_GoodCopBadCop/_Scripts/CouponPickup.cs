@@ -72,7 +72,7 @@ public class CouponPickup : Interactable
 
     // ── Interaction ──────────────────────────────────────────────────────────
 
-    protected override string DefaultInteractVerb => "Take";
+    protected override string DefaultInteractVerb => Loc.N("Take");
 
     /// <summary>
     /// Triggered by the local player via E or left-click. Disables the component

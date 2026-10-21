@@ -55,7 +55,7 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public static readonly bool BloodCleanupEnabled = false;
 
     [Header("Task Properties")]
-    [SerializeField] private string _taskName = "Clean Blood";
+    [SerializeField, LocalizeField] private string _taskName = "Clean Blood";
     [Tooltip("Number of coupons the ATM dispenses when all blood has been scrubbed.")]
     [SerializeField] private int _couponReward = 10;
 

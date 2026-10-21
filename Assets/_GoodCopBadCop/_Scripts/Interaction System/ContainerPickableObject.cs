@@ -110,7 +110,7 @@ public abstract class ContainerPickableObject : PickableObject, IAmmoProvider
     // ── Interaction ───────────────────────────────────────────────────────────
 
     /// <summary>Verb for the hold prompt ("Hold E to {verb}"). Override for a more specific label.</summary>
-    protected virtual string ExtractVerb => "take one out";
+    protected virtual string ExtractVerb => Loc.N("take one out");
 
     /// <summary>
     /// Hold Interact extracts one item while the container still has one and the player's hand is free.

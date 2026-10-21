@@ -31,7 +31,12 @@ public class PlayerInventory : NetworkBehaviour
              "Position it at the hip or belt. If unassigned, swapping between full slots is disabled.")]
     [SerializeField] private Transform stowPoint;
 
+    [Tooltip("Minimum seconds between player-initiated slot swaps (hotkeys, scroll wheel, gamepad). " +
+             "Prevents rapid swapping from fast mouse-wheel spins. Input during the cooldown is dropped, not queued.")]
+    [SerializeField, Min(0f)] private float swapCooldown = 0.2f;
+
     private PlayerPickupController _pickup;
+    private float _nextSwapAllowedTime;
 
     /// <summary>Hotbar size when <see cref="GameSettings.ThreeInventorySlots"/> is off.</summary>
     public const int DefaultSlotCount = 2;
@@ -247,7 +252,7 @@ public class PlayerInventory : NetworkBehaviour
 
         if (!TextInputFocus.IsCapturingKeyboard)
         {
-            if (hotkeyPressed) EquipSlot(pressedSlot);
+            if (hotkeyPressed) PlayerEquipSlot(pressedSlot);
         }
         else if (hotkeyPressed)
         {
@@ -313,7 +318,23 @@ public class PlayerInventory : NetworkBehaviour
 
         int count = _slots.Length;
         int next = ((_activeSlot + direction) % count + count) % count;
-        EquipSlot(next);
+        PlayerEquipSlot(next);
+    }
+
+    /// <summary>
+    /// Player-input wrapper around <see cref="EquipSlot"/> that enforces <see cref="swapCooldown"/>.
+    /// Only an actual change of the selected slot starts the cooldown, and re-pressing the selected
+    /// slot's key (self-heal) is never blocked. Programmatic swaps (e.g. <see cref="TryFreeHandForPickup"/>)
+    /// call <see cref="EquipSlot"/> directly and bypass the cooldown.
+    /// </summary>
+    private void PlayerEquipSlot(int slotIndex)
+    {
+        if (slotIndex != _activeSlot && Time.time < _nextSwapAllowedTime) return;
+
+        int previous = _activeSlot;
+        EquipSlot(slotIndex);
+        if (_activeSlot != previous)
+            _nextSwapAllowedTime = Time.time + swapCooldown;
     }
 
     // ── Reloading ─────────────────────────────────────────────────────────────

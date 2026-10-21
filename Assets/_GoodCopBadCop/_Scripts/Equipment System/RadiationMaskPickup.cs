@@ -12,7 +12,7 @@ public class RadiationMaskPickup : PickableObject
     /// Equips the mask on the player's face and removes the pickup from hand.
     /// </summary>
     /// <summary>LMB puts the mask on.</summary>
-    public override string GetHeldUseVerb() => "Put on";
+    public override string GetHeldUseVerb() => Loc.N("Put on");
 
     public override void OnStartUse()
     {

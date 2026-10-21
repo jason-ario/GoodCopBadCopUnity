@@ -5,7 +5,7 @@ public class Paper : PickableObject
 {
     [SerializeField] private NetworkDrawableLine _drawableLine;
     /// <summary>LMB raises the paper to read it.</summary>
-    public override string GetHeldUseVerb() => "Read";
+    public override string GetHeldUseVerb() => Loc.N("Read");
 
     public override void OnStartUse()
     {
@@ -17,7 +17,7 @@ public class Paper : PickableObject
         playerPickupController.PlayerAnimationController.SetAnimBool("UsingTool", false);
     }
     
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Draw";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Draw");
 
     /// <summary>Drawing is the pencil's tool function, so it stays on LMB / RT.</summary>
     public override HeldItemTargetKey GetItemTargetKey(PlayerInteractionController player, PickableObject item)

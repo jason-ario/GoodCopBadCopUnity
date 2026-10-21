@@ -40,13 +40,13 @@ public class OchoBoothEncounter : NetworkBehaviour
 
     [Header("Ocho Booth Encounter — Rejected Verdict")]
     [Tooltip("Line Ocho delivers after reappearing, when the player used the green (Pass) stamp.")]
-    [SerializeField] private string _passRejectedLine = "Passed? Ha! You really think paperwork like that gets to just walk through?";
+    [SerializeField, LocalizeField] private string _passRejectedLine = "Passed? Ha! You really think paperwork like that gets to just walk through?";
 
     [Tooltip("Line Ocho delivers after reappearing, when the player used the yellow (Quarantine) stamp.")]
-    [SerializeField] private string _quarantineRejectedLine = "Quarantine? Adorable. Like a cage was ever going to hold me.";
+    [SerializeField, LocalizeField] private string _quarantineRejectedLine = "Quarantine? Adorable. Like a cage was ever going to hold me.";
 
     [Tooltip("Line Ocho delivers after reappearing, when the player used the red (Kill) stamp.")]
-    [SerializeField] private string _killRejectedLine = "Ahh, interesting choice! I bet you would love to kill again wouldn't you?";
+    [SerializeField, LocalizeField] private string _killRejectedLine = "Ahh, interesting choice! I bet you would love to kill again wouldn't you?";
 
     [Tooltip("Seconds between Ocho taking the folder and vanishing.")]
     [SerializeField] private float _takeFolderDelay = 0.6f;
@@ -117,8 +117,8 @@ public class OchoBoothEncounter : NetworkBehaviour
     [SerializeField] private Interactable _electricalPanelInteractable;
 
     [Header("Ocho Booth Encounter — Megaphone Barks (after power restored)")]
-    [SerializeField] private string _powerRestoredBark1 = "Did you guys lose power?";
-    [SerializeField] private string _powerRestoredBark2 = "Don't worry, it's Georgia, happens all the time.";
+    [SerializeField, LocalizeField] private string _powerRestoredBark1 = "Did you guys lose power?";
+    [SerializeField, LocalizeField] private string _powerRestoredBark2 = "Don't worry, it's Georgia, happens all the time.";
     [SerializeField] private float _barkGap = 2.5f;
     [SerializeField] private float _finalDelayBeforeNextSuspect = 1.5f;
 

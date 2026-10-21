@@ -29,10 +29,10 @@ public class LeverDiegeticController : DiegeticViewController
 
     [Header("Prompt")]
     [Tooltip("Text shown next to the LMB / RT icon while the view is open.")]
-    [SerializeField] private string _dragPromptText = "to drag";
+    [SerializeField, LocalizeField] private string _dragPromptText = "to drag";
 
     [Tooltip("Text shown next to the gamepad stick icon while a gamepad is active (the stick moves the lever directly).")]
-    [SerializeField] private string _gamepadPromptText = "to pull";
+    [SerializeField, LocalizeField] private string _gamepadPromptText = "to pull";
 
     [Tooltip("Gamepad icon shown instead of RT while a gamepad is active (left stick up/down).")]
     [SerializeField] private Sprite _gamepadPromptSprite;

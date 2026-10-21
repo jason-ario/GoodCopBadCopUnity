@@ -213,7 +213,7 @@ public class ApplicationLetter : FolderItem
     // HoldingNewspaper pose so it shares the Reading Newspaper animation).
     // Zoom mode "holds LMB" through the same path (see HeldDocumentInspection).
     /// <summary>LMB reads the letter up close.</summary>
-    public override string GetHeldUseVerb() => "Read";
+    public override string GetHeldUseVerb() => Loc.N("Read");
 
     public override void OnStartUse()
     {

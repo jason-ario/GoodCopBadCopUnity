@@ -28,5 +28,5 @@ public class TrashBagRoll : ContainerPickableObject
         => $"Extract Trash Bag ({itemsRemaining} left)";
 
     /// <summary>Reticle hold prompt: "Hold E to tear off a bag".</summary>
-    protected override string ExtractVerb => "tear off a bag";
+    protected override string ExtractVerb => Loc.N("tear off a bag");
 }

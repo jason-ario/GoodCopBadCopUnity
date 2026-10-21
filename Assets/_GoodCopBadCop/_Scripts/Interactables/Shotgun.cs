@@ -134,7 +134,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         => interactText = $"Shotgun ({rounds}/{MaxRounds})";
 
     /// <summary>LMB fires the shotgun.</summary>
-    public override string GetHeldUseVerb() => "Shoot";
+    public override string GetHeldUseVerb() => Loc.N("Shoot");
 
     public override void OnStartUse()
     {

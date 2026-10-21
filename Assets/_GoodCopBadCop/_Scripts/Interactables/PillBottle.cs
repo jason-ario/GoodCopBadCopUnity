@@ -51,7 +51,7 @@ public class PillBottle : PickableObject, IAmmoProvider
     /// Destroys the bottle after the last dose is consumed.
     /// </summary>
     /// <summary>LMB takes a pill; nothing when the bottle is empty.</summary>
-    public override string GetHeldUseVerb() => _usesRemaining.Value <= 0 ? null : "Take pill";
+    public override string GetHeldUseVerb() => _usesRemaining.Value <= 0 ? null : Loc.N("Take pill");
 
     public override void OnStartUse()
     {

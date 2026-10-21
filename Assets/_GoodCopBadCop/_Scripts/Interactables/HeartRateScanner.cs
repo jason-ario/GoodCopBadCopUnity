@@ -110,7 +110,7 @@ public class HeartRateScanner : PickableObject
     }
 
     /// <summary>LMB (held) scans a heart rate. Inherited by Scanner.</summary>
-    public override string GetHeldUseVerb() => "Scan";
+    public override string GetHeldUseVerb() => Loc.N("Scan");
 
     public override void OnStartUse()
     {
@@ -143,7 +143,7 @@ public class HeartRateScanner : PickableObject
             ShutOff();
     }
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Recharge";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Recharge");
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {

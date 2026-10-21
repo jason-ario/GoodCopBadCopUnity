@@ -34,7 +34,7 @@ public class ProhibitedGoodsSignDisplay : MonoBehaviour
     [SerializeField] private TextMeshPro[] _goodsTypeTexts;
 
     [Tooltip("Text shown in a slot when there is no prohibited category for it today.")]
-    [SerializeField] private string _emptySlotText = "";
+    [SerializeField, LocalizeField] private string _emptySlotText = "";
 
     [Tooltip("The WorldSpace canvas holding the sign's HiddenUI text. Kept inactive except while " +
              "the render camera is capturing it, so it never sits around doing nothing.")]

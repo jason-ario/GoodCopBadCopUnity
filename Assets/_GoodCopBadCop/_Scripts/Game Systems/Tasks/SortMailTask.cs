@@ -60,7 +60,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public static SortMailTask Instance { get; private set; }
 
     [Header("Threat Properties")]
-    [SerializeField] private string _threatName = "Sort mail";
+    [SerializeField, LocalizeField] private string _threatName = "Sort mail";
     [Tooltip("Coupons awarded when every package has been correctly sorted.")]
     [SerializeField] private int _couponReward = 10;
 
@@ -111,7 +111,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [SerializeField] private GateButtonInteractable _gateButtonInteractable;
     [Tooltip("Task-list label registered in TaskRegistry while the delivery truck is waiting at the " +
              "closed checkpoint gate. Completed (removed) as soon as the gate opens.")]
-    [SerializeField] private string _openGateTaskName = "Open the gate for a shipment";
+    [SerializeField, LocalizeField] private string _openGateTaskName = "Open the gate for a shipment";
     [Tooltip("Seconds between the \"shipment is waiting at the gate\" alert fading out and showing " +
              "again. It keeps repeating until a player opens the gate.")]
     [SerializeField, Min(0f)] private float _gateAlertRepeatInterval = 5f;

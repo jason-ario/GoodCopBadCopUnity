@@ -14,11 +14,11 @@ public class SpeakingInteraction : NetworkBehaviour
     [Header("Speaker Identity")]
     [Tooltip("Fallback subtitle name. Ignored when a SuspectData (on this component or on the sibling " +
              "SuspectCharacter) provides a FirstName/LastName.")]
-    [SerializeField] private string speakerName = "Character";
+    [SerializeField, LocalizeField] private string speakerName = "Character";
 
     [Tooltip("When set, always used as the subtitle / name-tag name, taking priority over SuspectData " +
              "(e.g. \"???\" for a speaker whose identity is hidden).")]
-    [SerializeField] private string speakerNameOverride = "";
+    [SerializeField, LocalizeField] private string speakerNameOverride = "";
 
     /// <summary>
     /// Subtitle / dialogue-history name for this speaker. Uses <see cref="speakerNameOverride"/> when set;

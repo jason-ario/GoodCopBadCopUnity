@@ -90,7 +90,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     public PickableItemData[] itemsThatCanInteractWith;
     public UnityAction OnInteract;
     public UnityAction OnInteractWithItem;
-    public string interactText;
+    [LocalizeField] public string interactText;
 
     /// <summary>
     /// When true, the reticle shows <see cref="interactText"/> next to the Interact key icon while
@@ -124,10 +124,10 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
         return overrides;
     }
     [Tooltip("Action name shown next to the Interact key on the reticle (e.g. \"Open\", \"Talk\"). Leave empty to use the script's default verb.")]
-    [SerializeField] protected string interactVerb;
+    [SerializeField, LocalizeField] protected string interactVerb;
 
     /// <summary>Script default for the reticle's Interact action name when <see cref="interactVerb"/> is empty.</summary>
-    protected virtual string DefaultInteractVerb => "Use";
+    protected virtual string DefaultInteractVerb => Loc.N("Use");
 
     /// <summary>
     /// Action name shown next to the Interact key icon (e.g. "[E] Pick up"). Override for
@@ -140,7 +140,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// Action name shown next to the key from <see cref="GetItemTargetKey"/> when <paramref name="item"/>
     /// can be applied to this target (see <see cref="CanInteractWithItem"/>), e.g. "Insert fuse", "Stamp".
     /// </summary>
-    public virtual string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Use";
+    public virtual string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Use");
 
     /// <summary>
     /// Which key applies <paramref name="item"/> to this target via <see cref="InteractWithItem"/>

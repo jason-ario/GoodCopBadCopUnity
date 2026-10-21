@@ -49,7 +49,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     public static FenceRepairTask Instance { get; private set; }
 
     [Header("Task Properties")]
-    [SerializeField] private string _taskName = "Fix Perimeter Fences";
+    [SerializeField, LocalizeField] private string _taskName = "Fix Perimeter Fences";
     [SerializeField] private int _couponReward = 15;
     [Tooltip("Relative weight of this threat when computing the Checkpoint Integrity Score.")]
     [SerializeField] private float _scoreWeight = 1f;

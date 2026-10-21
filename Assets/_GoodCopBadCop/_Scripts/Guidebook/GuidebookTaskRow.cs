@@ -45,7 +45,7 @@ public class GuidebookTaskRow : MonoBehaviour
         _threat = threat;
 
         if (_nameLabel != null)
-            _nameLabel.text = threat.ThreatName.ToUpper();
+            _nameLabel.text = Loc.TranslateSource(threat.ThreatName).ToUpper();
 
         if (_descriptionLabel != null)
             _descriptionLabel.text = threat.ThreatDescription;

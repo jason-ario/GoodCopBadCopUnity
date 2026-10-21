@@ -37,6 +37,7 @@ public static class LocalizationScanner
     {
         var items = new List<ScanItem>();
         GameScriptCache.Clear();
+        LocalizeFieldTypeCache.Clear();
         var deny = new HashSet<string>(settings.fieldDenyList ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
 
         try
@@ -50,6 +51,7 @@ public static class LocalizationScanner
                     foreach (var root in scene.GetRootGameObjects())
                     {
                         ScanHierarchy(root, scene.path, table, items);
+                        ScanLocalizeFields(root, scene.path, table, items);
                         if (suspectObjects) ScanSuspectComponents(root, scene.path, deny, table, items);
                     }
                 }
@@ -66,6 +68,7 @@ public static class LocalizationScanner
                     var go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                     if (go == null) continue;
                     ScanHierarchy(go, path, table, items);
+                    ScanLocalizeFields(go, path, table, items);
                     if (suspectObjects) ScanSuspectComponents(go, path, deny, table, items);
                 }
             }
@@ -83,8 +86,9 @@ public static class LocalizationScanner
                     if (i % 25 == 0 && EditorUtility.DisplayCancelableProgressBar("Localization scan", path, 0.6f + (float)i / guids.Length * 0.4f)) break;
                     var obj = AssetDatabase.LoadAssetAtPath<ScriptableObject>(path);
                     if (obj == null || obj.GetType().Assembly != assembly || obj is LocalizationSettings || !IsGameScript(obj)) continue;
-                    if (!IsDialogueAssetType(obj.GetType(), settings)) continue;
-                    ScanScriptable(obj, path, deny, settings, table, items);
+                    bool dialogue = IsDialogueAssetType(obj.GetType(), settings);
+                    if (!dialogue && !HasLocalizeFields(obj.GetType())) continue;
+                    ScanScriptable(obj, path, deny, settings, table, items, onlyMarked: !dialogue);
                 }
             }
 
@@ -271,6 +275,128 @@ public static class LocalizationScanner
         }
     }
 
+    // ---- [LocalizeField] component fields (any game script, scenes and prefabs, incl. prefab-instance overrides) ----
+
+    private static readonly Dictionary<Type, bool> LocalizeFieldTypeCache = new Dictionary<Type, bool>();
+    private const System.Reflection.BindingFlags FieldFlags =
+        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+
+    /// <summary>True when the type (or a serializable type nested in its fields) declares a [LocalizeField] field.</summary>
+    private static bool HasLocalizeFields(Type type, int depth = 0)
+    {
+        if (type == null || depth > 4 || type.IsPrimitive || type == typeof(string) || type.IsEnum) return false;
+        if (LocalizeFieldTypeCache.TryGetValue(type, out bool cached)) return cached;
+        LocalizeFieldTypeCache[type] = false; // guards recursive types
+        bool result = false;
+        for (var t = type; t != null && t != typeof(MonoBehaviour) && t != typeof(ScriptableObject) && t != typeof(object) && !result; t = t.BaseType)
+        {
+            foreach (var f in t.GetFields(FieldFlags | System.Reflection.BindingFlags.DeclaredOnly))
+            {
+                if (f.IsDefined(typeof(LocalizeFieldAttribute), true)) { result = true; break; }
+                var ft = ElementType(f.FieldType);
+                if (ft.IsSerializable && !typeof(UnityEngine.Object).IsAssignableFrom(ft) && ft.Assembly == type.Assembly
+                    && HasLocalizeFields(ft, depth + 1)) { result = true; break; }
+            }
+        }
+        LocalizeFieldTypeCache[type] = result;
+        return result;
+    }
+
+    private static Type ElementType(Type t)
+    {
+        if (t.IsArray) return t.GetElementType();
+        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>)) return t.GetGenericArguments()[0];
+        return t;
+    }
+
+    private static System.Reflection.FieldInfo FindField(Type type, string name)
+    {
+        for (var t = type; t != null && t != typeof(object); t = t.BaseType)
+        {
+            var f = t.GetField(name, FieldFlags | System.Reflection.BindingFlags.DeclaredOnly);
+            if (f != null) return f;
+        }
+        return null;
+    }
+
+    /// <summary>Resolves "hints.Array.data[2].text" against the component type and returns whether the leaf field has [LocalizeField].</summary>
+    private static bool IsLocalizeFieldPath(Type rootType, string propertyPath)
+    {
+        Type current = rootType;
+        System.Reflection.FieldInfo field = null;
+        var parts = propertyPath.Split('.');
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (parts[i] == "Array") { i++; current = ElementType(field.FieldType); continue; } // skip data[n]
+            field = FindField(current, parts[i]);
+            if (field == null) return false;
+            current = field.FieldType;
+        }
+        return field != null && field.IsDefined(typeof(LocalizeFieldAttribute), true);
+    }
+
+    private static void ScanLocalizeFields(GameObject root, string assetPath, LocalizationTable table, List<ScanItem> items)
+    {
+        var assembly = typeof(ScriptedDialogue).Assembly;
+        string assetName = Path.GetFileNameWithoutExtension(assetPath);
+
+        foreach (var comp in root.GetComponentsInChildren<MonoBehaviour>(true))
+        {
+            if (comp == null || comp.GetType().Assembly != assembly || !HasLocalizeFields(comp.GetType()) || !IsGameScript(comp)) continue;
+            if (comp.GetComponentInParent<SuspectCharacter>(true) != null) continue; // covered by ScanSuspectComponents
+            bool instance = PrefabUtility.IsPartOfPrefabInstance(comp); // source prefab covers unmodified values
+
+            string objPath = LocalizationApply.ObjectPathOf(comp.transform);
+            string typeName = comp.GetType().FullName;
+            string sheet = SheetFor(assetPath, objPath + " " + comp.GetType().Name);
+            int compIndex = 0;
+            foreach (var other in comp.GetComponents<Component>())
+            {
+                if (other == comp) break;
+                if (other != null && other.GetType() == comp.GetType()) compIndex++;
+            }
+
+            var so = new SerializedObject(comp);
+            var it = so.GetIterator();
+            while (it.Next(true))
+            {
+                if (it.propertyType != SerializedPropertyType.String) continue;
+                if (instance && !it.prefabOverride) continue;
+                if (!IsLocalizeFieldPath(comp.GetType(), it.propertyPath)) continue;
+                string text = it.stringValue;
+                if (!LooksLikeCopy(text)) continue;
+
+                string field = FieldName(it.propertyPath);
+                string key = SheetPrefix(sheet) + "." + LocKeys.Sanitize(assetName) + "." + KeyTail(objPath) + "."
+                             + LocKeys.Sanitize(comp.GetType().Name) + "." + LocKeys.PathToKeyPart(it.propertyPath);
+                var item = new ScanItem
+                {
+                    sheet = sheet,
+                    key = key,
+                    text = text,
+                    category = "Label",
+                    context = sheet + "|" + comp.GetType().Name + "|" + field,
+                    notes = comp.GetType().Name + " | " + assetName + " > " + objPath + " > " + it.propertyPath,
+                    binding = new LocBinding
+                    {
+                        key = key, kind = "MB", assetPath = assetPath, objectPath = objPath, propertyPath = it.propertyPath,
+                        componentType = typeName, componentIndex = compIndex, category = "Label"
+                    }
+                };
+                item.binding.context = item.context;
+
+                if (table.TryGet(key, out var e))
+                    item.state = e.source != text ? ScanState.SourceChanged : ScanState.Localized;
+                else
+                {
+                    item.state = ScanState.Unlocalized;
+                    item.selected = true;
+                }
+                items.Add(item);
+            }
+        }
+    }
+
     // ---- Code strings: English literals wrapped in Loc.T("...") or marked with Loc.N("...") ----
 
     private static readonly System.Text.RegularExpressions.Regex CodeCall = new System.Text.RegularExpressions.Regex(
@@ -437,6 +563,7 @@ public static class LocalizationScanner
                 typeCache[b.assetPath] = t;
             }
             if (t == null) return false; // missing assets are left alone
+            if (IsLocalizeFieldPath(t, b.propertyPath)) return false; // explicitly marked [LocalizeField]
             if (used != null && !used.Contains(b.assetPath)) return true; // never loaded by the game
             return !IsDialogueAssetType(t, settings) || !IsAllowedDataField(t, b.propertyPath, settings);
         }
@@ -448,7 +575,11 @@ public static class LocalizationScanner
             .ToList();
     }
 
-    private static void ScanScriptable(ScriptableObject obj, string path, HashSet<string> deny, LocalizationSettings settings, LocalizationTable table, List<ScanItem> items)
+    /// <param name="onlyMarked">
+    /// True for game data assets that aren't dialogue types: only their [LocalizeField] fields are scanned
+    /// (allowlist rules and the identifier deny list don't apply, the attribute is the opt-in).
+    /// </param>
+    private static void ScanScriptable(ScriptableObject obj, string path, HashSet<string> deny, LocalizationSettings settings, LocalizationTable table, List<ScanItem> items, bool onlyMarked = false)
     {
         var so = new SerializedObject(obj);
         var it = so.GetIterator();
@@ -459,8 +590,15 @@ public static class LocalizationScanner
         while (it.NextVisible(true))
         {
             if (it.propertyType != SerializedPropertyType.String) continue;
-            if (!IsAllowedDataField(objType, it.propertyPath, settings)) continue;
-            if (IsIdentifierField(FieldName(it.propertyPath), deny)) continue;
+            if (onlyMarked)
+            {
+                if (!IsLocalizeFieldPath(objType, it.propertyPath)) continue;
+            }
+            else
+            {
+                if (!IsAllowedDataField(objType, it.propertyPath, settings)) continue;
+                if (IsIdentifierField(FieldName(it.propertyPath), deny)) continue;
+            }
             string text = it.stringValue;
             if (!LooksLikeCopy(text)) continue;
 

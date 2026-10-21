@@ -103,7 +103,7 @@ public class Polaroid : PickableObject
 
     /// <summary>Sets UsingTool on the player animator while LMB is held.</summary>
     /// <summary>LMB holds the photo up to look at it.</summary>
-    public override string GetHeldUseVerb() => "Inspect";
+    public override string GetHeldUseVerb() => Loc.N("Inspect");
 
     public override void OnStartUse()
     {

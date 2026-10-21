@@ -25,7 +25,7 @@ public class LowHealthAlertUI : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float _lowHealthThreshold = 0.3f;
 
     [Header("Alert")]
-    [SerializeField] private string _alertMessage = "Health low. Eat or smoke to heal.";
+    [SerializeField, LocalizeField] private string _alertMessage = "Health low. Eat or smoke to heal.";
 
     [Header("Vignette Pulse")]
     [SerializeField] private Color _vignetteColor = new Color(0.75f, 0.02f, 0.02f, 1f);

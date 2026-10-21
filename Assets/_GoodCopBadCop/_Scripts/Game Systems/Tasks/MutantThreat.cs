@@ -26,7 +26,7 @@ public class MutantThreat : NetworkBehaviour, ISystemicThreat
     public static bool DropActive { get; private set; }
 
     [Header("Threat Properties")]
-    [SerializeField] private string _threatName = "Mutant Activity";
+    [SerializeField, LocalizeField] private string _threatName = "Mutant Activity";
     [SerializeField] private float _scoreWeight = 1f;
 
     [Header("Spawner Reference")]

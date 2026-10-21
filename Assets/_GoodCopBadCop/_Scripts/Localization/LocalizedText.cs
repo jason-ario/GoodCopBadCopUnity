@@ -28,6 +28,7 @@ public class LocalizedText : MonoBehaviour
     private readonly LocalizedFontSwap _fontSwap = new LocalizedFontSwap();
     private float _originalSize, _originalMax, _originalMin;
     private bool _captured;
+    private string _lastApplied;
 
     /// <summary>The label's authored font (before any language font swap).</summary>
     public TMP_FontAsset OriginalFont => _fontSwap.OriginalFont;
@@ -55,6 +56,7 @@ public class LocalizedText : MonoBehaviour
     public void SetKey(string newKey)
     {
         key = newKey;
+        if (Text != null) _lastApplied = Text.text; // an explicit key from code always drives the label
         Refresh();
     }
 
@@ -74,12 +76,30 @@ public class LocalizedText : MonoBehaviour
 
         // Missing keys (or no runtime table) leave the current text untouched; LocalizationTextRuntime still
         // pseudolocalizes / reverse-translates it at render time, so the label follows the language either way.
-        if (!string.IsNullOrEmpty(key) && Loc.TryGet(key, out string value))
+        // The key only drives the label while it still shows the key's English (or what this component last set):
+        // prefab instances that override the text and labels written from code keep their own text, which is
+        // reverse-translated at render time instead of being replaced by the shared prefab key.
+        if (!string.IsNullOrEmpty(key) && OwnsText(t.text) && Loc.TryGet(key, out string value))
+        {
             t.text = value;
+            _lastApplied = value;
+        }
 
         if (applyLanguageFont) ApplyFont(t);
         // Re-run TMP's parse so the render-time localization sees the new language even when the text didn't change.
         t.havePropertiesChanged = true;
+    }
+
+    private bool OwnsText(string current)
+    {
+        if (_lastApplied != null && current == _lastApplied) return true;
+        if (!Loc.Table.TryGet(key, out var entry)) return true; // missing key: TryGet below warns and leaves the text
+        return Normalize(current) == Normalize(entry.source);
+    }
+
+    private static string Normalize(string s)
+    {
+        return string.IsNullOrEmpty(s) ? "" : s.Replace("\r\n", "\n").Trim();
     }
 
     private void ApplyFont(TMP_Text t)

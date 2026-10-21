@@ -1882,14 +1882,14 @@ public class SuspectCharacter : Interactable
     public override HeldItemTargetKey GetItemTargetKey(PlayerInteractionController player, PickableObject item) =>
         IsJunkCollectible ? HeldItemTargetKey.Interact : HeldItemTargetKey.UseItem;
 
-    protected override string DefaultInteractVerb => "Talk";
+    protected override string DefaultInteractVerb => Loc.N("Talk");
 
     public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item)
     {
-        if (_junkItem != null && _junkItem.IsCollectible.Value) return "Collect";
-        if (item is Vaccine) return "Vaccinate";
-        if (item != null && item.ItemData != null && item.ItemData.name == "Shotgun") return "Shoot";
-        return "Use";
+        if (_junkItem != null && _junkItem.IsCollectible.Value) return Loc.N("Collect");
+        if (item is Vaccine) return Loc.N("Vaccinate");
+        if (item != null && item.ItemData != null && item.ItemData.name == "Shotgun") return Loc.N("Shoot");
+        return Loc.N("Use");
     }
 
     public override void Interact(PlayerInteractionController player)

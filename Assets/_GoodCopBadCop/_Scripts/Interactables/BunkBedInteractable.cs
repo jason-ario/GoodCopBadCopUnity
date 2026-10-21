@@ -38,12 +38,12 @@ public class BunkBedInteractable : Interactable
     [Header("Tutorial Objective List")]
     [Tooltip("Text shown in the tutorial objective overlay once the shift is over and the player " +
              "may go to bed. Day 1 drives its own scripted go-to-bed sequence, so this is skipped on Day 1.")]
-    [SerializeField] private string _goToBedObjectiveText = "Go to bed for the night";
+    [SerializeField, LocalizeField] private string _goToBedObjectiveText = "Go to bed for the night";
     [Tooltip("Seconds the completed objective row stays visible (struck through) before it is removed.")]
     [SerializeField] private float _objectiveCompletedLingerDuration = 1f;
 
-    private const string InteractTextReady    = "Sleep";
-    private const string InteractTextNotReady = "Finish remaining tasks to end the day  ";
+    private static readonly string InteractTextReady    = Loc.N("Sleep");
+    private static readonly string InteractTextNotReady = Loc.N("Finish remaining tasks to end the day  ");
 
     /// <summary>
     /// Fired locally when the player confirms ending the day at the bunk bed.
@@ -318,7 +318,7 @@ public class BunkBedInteractable : Interactable
 
     // ─── IInteractable ───────────────────────────────────────────────────────
 
-    protected override string DefaultInteractVerb => "Sleep";
+    protected override string DefaultInteractVerb => Loc.N("Sleep");
 
     /// <summary>Always opens the bed view. Popup content depends on whether sleeping is allowed.</summary>
     public override void Interact(PlayerInteractionController player)

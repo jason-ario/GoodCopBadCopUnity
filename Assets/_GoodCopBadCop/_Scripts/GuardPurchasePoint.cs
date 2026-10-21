@@ -155,7 +155,7 @@ public class GuardPurchasePoint : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return _guardPurchased.Value ? "Inspect" : "Hire guard";
+        return _guardPurchased.Value ? Loc.N("Inspect") : Loc.N("Hire guard");
     }
 
     public override void Interact(PlayerInteractionController player)

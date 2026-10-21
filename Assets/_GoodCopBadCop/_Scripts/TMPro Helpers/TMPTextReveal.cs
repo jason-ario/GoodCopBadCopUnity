@@ -32,6 +32,7 @@ public class TMPTextReveal : MonoBehaviour
     public event Action RevealInterrupted;
 
     private string _fullText;
+    private bool _skipLineRequested;
     private float _lastSoundPlayTime = float.NegativeInfinity;
 
     private void Awake()
@@ -124,9 +125,21 @@ public class TMPTextReveal : MonoBehaviour
         // and any ContentSizeFitter in the hierarchy reflect the actual visible width.
         tmp.maxVisibleCharacters = 99999;
 
+        _skipLineRequested = false;
         int previousStringIndex = -1;
         for (int i = 0; i < totalChars; i++)
         {
+            if (_skipLineRequested)
+            {
+                // Jump to the end of the line being typed; the next line then types on normally.
+                _skipLineRequested = false;
+                int current = charStringIndices[i];
+                int searchFrom = current < fullText.Length && fullText[current] == '\n' ? current + 1 : current;
+                int lineEnd = searchFrom < fullText.Length ? fullText.IndexOf('\n', searchFrom) : -1;
+                if (lineEnd < 0) break; // last line: finish the whole text
+                while (i + 1 < totalChars && charStringIndices[i + 1] < lineEnd) i++;
+            }
+
             int stringIndex = charStringIndices[i];
             tmp.text = fullText.Substring(0, stringIndex + 1);
 
@@ -207,6 +220,15 @@ public class TMPTextReveal : MonoBehaviour
             elapsed += Time.unscaledDeltaTime;
             yield return null;
         }
+    }
+
+    /// <summary>
+    /// Instantly finishes the line ('\n'-separated) currently being typed; the reveal then continues with the
+    /// next line. On the last line this finishes the reveal. Does nothing if no reveal is in progress.
+    /// </summary>
+    public void CompleteCurrentLine()
+    {
+        if (IsRevealing) _skipLineRequested = true;
     }
 
     /// <summary>

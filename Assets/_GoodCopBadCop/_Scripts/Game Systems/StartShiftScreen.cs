@@ -44,7 +44,9 @@ public class StartShiftScreen : MonoBehaviour
             _animator.SetBool(BlackBarsOn, true);
 
         yield return new WaitForSeconds(dayNumberDelay);
-        dayNumberText.RevealText("Day " + dayNumber);
+        // Translate the whole label first: the typewriter shows partial strings ("D", "Da"...) that the
+        // render-time lookup can't match, so the English would show until the last character.
+        dayNumberText.RevealText(Loc.Verbatim(Loc.T("Day {0}", dayNumber)));
         yield return new WaitForSeconds(dayNumberDuration);
         dayNumberText.gameObject.SetActive(false);
 

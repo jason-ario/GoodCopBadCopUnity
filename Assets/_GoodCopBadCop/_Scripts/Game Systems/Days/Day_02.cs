@@ -1058,7 +1058,7 @@ public class Day_02 : DayBase, IDailyTask
     private IEnumerator UVLightRevealTutorialBeat()
     {
         // Task 1 — switch the flashlight to UV mode.
-        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVSwitchToUV, "Switch the Flashlight to UV mode");
+        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVSwitchToUV, Loc.N("Switch the Flashlight to UV mode"));
 
         bool switchedToUV = Flashlight.AnyFlashlightInUVMode;
         Action onUVEntered = () => switchedToUV = true;
@@ -1093,7 +1093,7 @@ public class Day_02 : DayBase, IDailyTask
         yield return ShowAndWait("Tick the boxes for every mutation you can identify.");
 
         // Task 3 — mark the revealed veins on the physical exam notebook.
-        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVMarkExam, "Mark the veins on the Physical Exam");
+        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVMarkExam, Loc.N("Mark the veins on the Physical Exam"));
 
         if (ChecklistItem.AnyBoxChecked)
             anyBoxChecked = true;

@@ -113,7 +113,7 @@ public class PostBox : CollectableContainer
     }
 
     public override string GetInteractVerb(PlayerInteractionController player)
-        => HasNewspaper ? "Take newspaper" : base.GetInteractVerb(player);
+        => HasNewspaper ? Loc.N("Take newspaper") : base.GetInteractVerb(player);
 
     public override void Interact(PlayerInteractionController player)
     {
@@ -187,7 +187,7 @@ public class PostBox : CollectableContainer
 
     // ── Mutant bits ───────────────────────────────────────────────────────────
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Deposit";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Deposit");
 
     /// <summary>
     /// Called by PlayerInteractionController when the player left-clicks the PostBox

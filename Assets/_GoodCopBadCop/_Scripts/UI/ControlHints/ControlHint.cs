@@ -25,16 +25,16 @@ public enum ControlHintDevice
 public class ControlHint
 {
     [Tooltip("Label after the icon, e.g. \"to rotate\".")]
-    public string text;
+    [LocalizeField] public string text;
 
     [Tooltip("Optional label used instead of Text while a gamepad is active.")]
-    public string gamepadText;
+    [LocalizeField] public string gamepadText;
 
     [Tooltip("Optional word(s) before the icon, e.g. \"Hold\".")]
-    public string prefix;
+    [LocalizeField] public string prefix;
 
     [Tooltip("Optional prefix used instead of Prefix while a gamepad is active.")]
-    public string gamepadPrefix;
+    [LocalizeField] public string gamepadPrefix;
 
     [Tooltip("Which input device this row is shown for.")]
     public ControlHintDevice showFor = ControlHintDevice.Both;

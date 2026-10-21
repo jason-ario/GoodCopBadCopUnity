@@ -175,7 +175,7 @@ public class DumpsterInteractable : CollectableContainer
     // ── Interact-based deposit (holding a TrashBag) ──────────────────────────
 
     public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item)
-        => item is TrashBag ? "Throw in" : "Throw away";
+        => item is TrashBag ? Loc.N("Throw in") : Loc.N("Throw away");
 
     // ── General discard (reuses the booth TrashCan's rules) ──────────────────
 

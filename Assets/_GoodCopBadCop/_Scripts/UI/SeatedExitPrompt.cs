@@ -37,7 +37,7 @@ namespace GoodCopBadCop.UI
         [Tooltip("Optional label next to the icon.")]
         [SerializeField] private TextMeshProUGUI _label;
 
-        [SerializeField] private string _text = "Stand Up";
+        [SerializeField, LocalizeField] private string _text = "Stand Up";
 
         [Tooltip("Icon for the keyboard Jump input (Space).")]
         [SerializeField] private Sprite _keyboardSprite;

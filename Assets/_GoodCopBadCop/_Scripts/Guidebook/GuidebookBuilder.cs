@@ -198,9 +198,9 @@ public class GuidebookBuilder : MonoBehaviour
 
             _faces.Add(new GuidebookFaceContent
             {
-                Header      = page.Header,
-                Title       = page.Title,
-                Body        = bodyFilter != null ? bodyFilter(page.Body) : page.Body,
+                Header      = L(page.Header),
+                Title       = L(page.Title),
+                Body        = bodyFilter != null ? bodyFilter(L(page.Body)) : L(page.Body),
                 Image       = page.Image,
                 ImageRow    = hasRow ? page.ImageRow : null,
                 IntegrityPanel = hasPanel ? _database.IntegrityPanel : null,
@@ -246,7 +246,7 @@ public class GuidebookBuilder : MonoBehaviour
 
         // Open the section as a spread, like the anomaly sections.
         if (_faces.Count % 2 == 0) _faces.Add(NotesFace());
-        _tabs.Add((_faces.Count, _database.IntegrityTabLabel, _database.IntegrityTabColor, null));
+        _tabs.Add((_faces.Count, L(_database.IntegrityTabLabel), _database.IntegrityTabColor, null));
         Color  accent       = Accent(_database.IntegrityTabColor);
         string maxDeduction = MaxIntegrityDeductionPercent().ToString();
 
@@ -261,7 +261,7 @@ public class GuidebookBuilder : MonoBehaviour
         if (pages == null || pages.Count == 0) return;
 
         if (_faces.Count % 2 == 0) _faces.Add(NotesFace());
-        _tabs.Add((_faces.Count, _database.SurvivalTabLabel, _database.SurvivalTabColor, null));
+        _tabs.Add((_faces.Count, L(_database.SurvivalTabLabel), _database.SurvivalTabColor, null));
         AddAuthoredPages(pages, Accent(_database.SurvivalTabColor));
     }
 
@@ -280,7 +280,7 @@ public class GuidebookBuilder : MonoBehaviour
 
         // Like every other section, open Rules as a spread when something precedes it.
         if (_faces.Count > 0 && _faces.Count % 2 == 0) _faces.Add(NotesFace());
-        _tabs.Add((_faces.Count, _database.RulesTabLabel, _database.RulesTabColor, null));
+        _tabs.Add((_faces.Count, L(_database.RulesTabLabel), _database.RulesTabColor, null));
 
         AddAuthoredPages(rules, _rulesAccent);
     }
@@ -298,27 +298,30 @@ public class GuidebookBuilder : MonoBehaviour
                                    TMPro.TextAlignmentOptions.MidlineLeft,
                                    TMPro.TextAlignmentOptions.MidlineLeft },
         };
-        disposition.Rows.Add(new[] { "SCORE", "STATUS", "ACTION" });
+        disposition.Rows.Add(new[] { Loc.T("SCORE"), Loc.T("STATUS"), Loc.T("ACTION") });
         foreach (GuidebookDatabase.DispositionBand band in bands)
         {
             string range = band.MinScore == band.MaxScore ? band.MinScore.ToString() : $"{band.MinScore}-{band.MaxScore}";
-            disposition.Rows.Add(new[] { range, Upper(band.Status), Upper(band.Action) });
+            disposition.Rows.Add(new[] { range, Upper(L(band.Status)), Upper(L(band.Action)) });
         }
 
         _faces.Add(new GuidebookFaceContent
         {
-            Header      = _database.ScoringHeader,
-            Title       = _database.ScoringTitle,
-            Body        = _database.ScoringIntro,
+            Header      = L(_database.ScoringHeader),
+            Title       = L(_database.ScoringTitle),
+            Body        = L(_database.ScoringIntro),
             Tables      = new[] { disposition },
             Callout     = string.IsNullOrEmpty(_database.DispositionWarning)
                               ? null
-                              : "<b>WARNING:</b> " + _database.DispositionWarning,
+                              : "<b>" + Loc.T("WARNING:") + "</b> " + L(_database.DispositionWarning),
             AccentColor = _rulesAccent,
         });
     }
 
     private static string Upper(string s) => string.IsNullOrEmpty(s) ? s : s.ToUpperInvariant();
+
+    /// <summary>Database text is authored in English and looked up by source (GuidebookDatabase rows in Guidebook.csv).</summary>
+    private static string L(string english) => Loc.TranslateSource(english);
 
     private void AddSections()
     {
@@ -340,28 +343,28 @@ public class GuidebookBuilder : MonoBehaviour
             sectionNumber++;
             int   cost   = AnomalyController.GetAnomalyPointCost(style.Category);
             Color accent = Accent(style.TabColor);
-            string costText = cost == 1 ? "+1 POINT" : $"+{cost} POINTS";
+            string costText = cost == 1 ? Loc.T("+1 POINT") : Loc.T("+{0} POINTS", cost);
 
             int introIndex = _faces.Count;
             var sectionAnomalies = new List<string>(sectionEntries.Count);
-            _tabs.Add((introIndex, style.TabLabel, style.TabColor, sectionAnomalies));
+            _tabs.Add((introIndex, L(style.TabLabel), style.TabColor, sectionAnomalies));
             _faces.Add(default); // filled below once anomaly page numbers are known
 
             var contents = new StringBuilder();
             foreach (GuidebookDatabase.AnomalyEntry entry in sectionEntries)
             {
-                contents.Append(ListMarker).Append(entry.DisplayName).Append(PosRight).Append(_faces.Count + 1).Append("</indent>\n");
+                contents.Append(ListMarker).Append(L(entry.DisplayName)).Append(PosRight).Append(_faces.Count + 1).Append("</indent>\n");
 
-                string body = entry.Description;
+                string body = L(entry.Description);
                 if (!string.IsNullOrEmpty(entry.HowToDetect))
-                    body += "\n\n<b>HOW TO DETECT</b>\n" + entry.HowToDetect;
+                    body += "\n\n<b>" + Loc.T("HOW TO DETECT") + "</b>\n" + L(entry.HowToDetect);
 
                 _faces.Add(new GuidebookFaceContent
                 {
-                    Header      = style.DisplayName.ToUpperInvariant(),
-                    Title       = entry.DisplayName.ToUpperInvariant(),
+                    Header      = L(style.DisplayName).ToUpperInvariant(),
+                    Title       = L(entry.DisplayName).ToUpperInvariant(),
                     Image       = entry.Illustration,
-                    Badge       = $"{costText} TO RISK SCORE",
+                    Badge       = Loc.T("{0} TO RISK SCORE", costText),
                     Body        = body,
                     AccentColor = accent,
                     IsNew       = !GuidebookSeenState.IsSeen(entry.AnomalyTypeName),
@@ -370,15 +373,15 @@ public class GuidebookBuilder : MonoBehaviour
             }
 
             var intro = new StringBuilder();
-            if (!string.IsNullOrEmpty(style.Intro)) intro.Append(style.Intro).Append("\n\n");
-            if (!string.IsNullOrEmpty(style.Tools)) intro.Append("<b>TOOLS</b>\n").Append(style.Tools).Append("\n\n");
-            intro.Append("<b>IN THIS SECTION</b>").Append(PosRight).Append("<b>PAGE</b>\n").Append(contents);
+            if (!string.IsNullOrEmpty(style.Intro)) intro.Append(L(style.Intro)).Append("\n\n");
+            if (!string.IsNullOrEmpty(style.Tools)) intro.Append("<b>").Append(Loc.T("TOOLS")).Append("</b>\n").Append(L(style.Tools)).Append("\n\n");
+            intro.Append("<b>").Append(Loc.T("IN THIS SECTION")).Append("</b>").Append(PosRight).Append("<b>").Append(Loc.T("PAGE")).Append("</b>\n").Append(contents);
 
             _faces[introIndex] = new GuidebookFaceContent
             {
-                Header      = $"SECTION {sectionNumber}",
-                Title       = style.DisplayName.ToUpperInvariant(),
-                Badge       = $"{costText} PER CONFIRMED ANOMALY",
+                Header      = Loc.T("SECTION {0}", sectionNumber),
+                Title       = L(style.DisplayName).ToUpperInvariant(),
+                Badge       = Loc.T("{0} PER CONFIRMED ANOMALY", costText),
                 Body        = intro.ToString(),
                 AccentColor = accent,
             };
@@ -387,7 +390,7 @@ public class GuidebookBuilder : MonoBehaviour
 
     private GuidebookFaceContent NotesFace() => new GuidebookFaceContent
     {
-        Header      = _database.NotesHeader,
+        Header      = L(_database.NotesHeader),
         AccentColor = _rulesAccent,
         IsBlank     = true,
     };

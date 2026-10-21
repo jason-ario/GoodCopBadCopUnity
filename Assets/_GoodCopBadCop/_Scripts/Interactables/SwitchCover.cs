@@ -23,7 +23,7 @@ public class SwitchCover : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return switchCoverOpen.Value ? "Close" : "Open";
+        return switchCoverOpen.Value ? Loc.N("Close") : Loc.N("Open");
     }
 
     public override void Interact(PlayerInteractionController player)

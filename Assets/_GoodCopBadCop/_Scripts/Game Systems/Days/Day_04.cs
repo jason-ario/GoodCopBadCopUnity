@@ -42,7 +42,7 @@ public class Day_04 : DayBase
 
     [Tooltip("Subtitle speaker name for the new voice, overriding the default 'Megaphone' name. " +
              "Kept intentionally vague/anonymous since the player never learns who this really is.")]
-    [SerializeField] private string _newVoiceSpeakerName = "???";
+    [SerializeField, LocalizeField] private string _newVoiceSpeakerName = "???";
 
     [Tooltip("Subtitle name colour for the new voice — deliberately cold/clinical, distinct from " +
              "the warm orange used for Vlad's usual megaphone lines.")]
@@ -56,7 +56,7 @@ public class Day_04 : DayBase
     [Tooltip("Creepy one-off line the new voice says over the megaphone the instant Day 4's " +
              "breach alarm starts, played with the alternate voice so it's audibly distinct from " +
              "Vlad's usual bark. Leave empty to skip.")]
-    [SerializeField] private string _breachStartBark =
+    [SerializeField, LocalizeField] private string _breachStartBark =
         "Oh, what's this? A little breach. Hehehehe...";
 
     // -------------------------------------------------------------------------

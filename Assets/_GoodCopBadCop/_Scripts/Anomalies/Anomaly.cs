@@ -3,7 +3,7 @@ using UnityEngine;
 public class Anomaly : MonoBehaviour
 {
     [Tooltip("Player-facing name shown in the end-of-shift report details. Leave empty to derive it from the class name (e.g. BlackEyesAnomaly -> \"Black Eyes\").")]
-    [SerializeField] private string reportDisplayName;
+    [SerializeField, LocalizeField] private string reportDisplayName;
 
     /// <summary>Name shown for this anomaly on the end-of-shift report detail popup.</summary>
     public string ReportDisplayName => string.IsNullOrWhiteSpace(reportDisplayName)

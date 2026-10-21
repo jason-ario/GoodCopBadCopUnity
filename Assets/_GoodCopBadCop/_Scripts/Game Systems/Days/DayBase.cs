@@ -299,7 +299,7 @@ public abstract class DayBase : MonoBehaviour
     }
 
     private static string GetAutomaticSubjectCounterText(int processed, int total) =>
-        $"Process {total} subjects {Mathf.Min(processed, total)}/{total}";
+        Loc.T("Process {0} subjects {1}/{2}", total, Mathf.Min(processed, total), total);
 
     // -------------------------------------------------------------------------
     // C# Events — subscribe from external systems or day subclasses

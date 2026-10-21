@@ -675,7 +675,7 @@ public class PlayerInteractionController : NetworkBehaviour
                 {
                     // Aim-shown ghost commits on the Interact key (see TryPlaceHeldObjectAtGhost) â€” show its icon.
                     if (aimGhostRequested)
-                        reticle.SetInteractState(true, placementBoard.AimHoverText, true, actionVerb: "Place");
+                        reticle.SetInteractState(true, placementBoard.AimHoverText, true, actionVerb: Loc.N("Place"));
                     else
                         reticle.SetInteractState(false);
                     reticle.SetTooFarState(false);
@@ -729,7 +729,7 @@ public class PlayerInteractionController : NetworkBehaviour
             if (_playerPickupController.IsHoldingObject)
             {
                 if (nearbyAimGhostRequested)
-                    reticle.SetInteractState(true, nearbyBoard.AimHoverText, true, actionVerb: "Place");
+                    reticle.SetInteractState(true, nearbyBoard.AimHoverText, true, actionVerb: Loc.N("Place"));
                 else
                     reticle.SetInteractState(false);
                 reticle.SetTooFarState(false);

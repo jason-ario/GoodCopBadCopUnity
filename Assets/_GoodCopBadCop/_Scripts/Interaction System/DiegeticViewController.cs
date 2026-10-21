@@ -477,7 +477,7 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// e.g. "to interact". Return null for look-only views where LMB does nothing.
     /// Read once inside <see cref="Open"/>; the prompt is hidden on <see cref="Close"/>.
     /// </summary>
-    protected virtual string ActionPromptText => "to interact";
+    protected virtual string ActionPromptText => Loc.N("to interact");
 
     /// <summary>
     /// Optional label used instead of <see cref="ActionPromptText"/> while a gamepad is active

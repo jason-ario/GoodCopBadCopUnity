@@ -197,9 +197,9 @@ public class Flashlight : PickableObject
         if (internalBattery != null && internalBattery.IsBatteryEmpty()) return null;
         return _lightState.Value switch
         {
-            0 => "Turn on",
-            1 => "Switch to UV",
-            _ => "Turn off",
+            0 => Loc.N("Turn on"),
+            1 => Loc.N("Switch to UV"),
+            _ => Loc.N("Turn off"),
         };
     }
 
@@ -209,7 +209,7 @@ public class Flashlight : PickableObject
         CycleFlashlightServerRpc();
     }
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Recharge";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Recharge");
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {

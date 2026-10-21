@@ -27,7 +27,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public static CleanGraffitiTask Instance { get; private set; }
 
     [Header("Task Properties")]
-    [SerializeField] private string _taskName     = "Clean Graffiti";
+    [SerializeField, LocalizeField] private string _taskName     = "Clean Graffiti";
     [SerializeField] private int    _couponReward  = 10;
 
     [Header("Daily Task")]
@@ -654,7 +654,7 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// for this task — see <see cref="OnDailyTaskCompleted"/>) can reuse the same format.
     /// </summary>
     public string GetTutorialObjectiveText() =>
-        $"Clean graffiti {Mathf.Min(_scrubbed.Value, _totalCount.Value)}/{_totalCount.Value}";
+        Loc.T("Clean graffiti {0}/{1}", Mathf.Min(_scrubbed.Value, _totalCount.Value), _totalCount.Value);
 
     // ── Editor gizmos ─────────────────────────────────────────────────────────
 

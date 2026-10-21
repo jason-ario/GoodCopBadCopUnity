@@ -8,7 +8,7 @@ using UnityEngine;
 public class HatData : ScriptableObject
 {
     [Tooltip("Human-readable name shown in UI (e.g. shop or inventory).")]
-    [SerializeField] private string displayName;
+    [SerializeField, LocalizeField] private string displayName;
     public string DisplayName => displayName;
 
     [Tooltip("Optional sprite used in UI previews.")]

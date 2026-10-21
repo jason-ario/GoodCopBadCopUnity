@@ -39,7 +39,7 @@ public class WorldPurchaseActionInteractable : Interactable
 
     [Header("Purchase Action")]
     [Tooltip("Title shown in the purchase popup. When empty, falls back to the ShopItem name (without the 'Buy ' prefix).")]
-    [SerializeField] private string _popupTitle;
+    [SerializeField, LocalizeField] private string _popupTitle;
 
     [Tooltip("Fired on all clients after a successful purchase.")]
     [SerializeField] private UnityEvent _onPurchaseConfirmed;
@@ -206,7 +206,7 @@ public class WorldPurchaseActionInteractable : Interactable
 
     // ─── Interactable override ─────────────────────────────────────────────────
 
-    protected override string DefaultInteractVerb => "Buy";
+    protected override string DefaultInteractVerb => Loc.N("Buy");
 
     /// <summary>Opens the purchase popup when the player clicks or presses E on this object.</summary>
     public override void Interact(PlayerInteractionController player)

@@ -124,7 +124,7 @@ public class FuseSlot : Interactable
     /// <summary>Only an empty slot takes items (anything but a fuse is "Not compatible").</summary>
     public override bool AcceptsHeldItems => !IsFilled;
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Insert fuse";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Insert fuse");
 
     /// <summary>Interact key (empty-handed) on a filled slot extracts the fuse.</summary>
     public override void Interact(PlayerInteractionController player)

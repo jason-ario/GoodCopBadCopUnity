@@ -535,8 +535,8 @@ public class FolderController : PickableObject
 
     public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item)
     {
-        if (IsStampItem(item)) return "Stamp";
-        return "Add to folder";
+        if (IsStampItem(item)) return Loc.N("Stamp");
+        return Loc.N("Add to folder");
     }
 
     /// <summary>Stamping is the stamp's tool function (LMB / RT); adding a document is a world interaction (E).</summary>
@@ -1151,7 +1151,7 @@ public class FolderController : PickableObject
     }
 
     /// <summary>LMB toggles the folder open or closed.</summary>
-    public override string GetHeldUseVerb() => isOpen.Value ? "Close" : "Open";
+    public override string GetHeldUseVerb() => isOpen.Value ? Loc.N("Close") : Loc.N("Open");
 
     public override void OnStartUse()
     {

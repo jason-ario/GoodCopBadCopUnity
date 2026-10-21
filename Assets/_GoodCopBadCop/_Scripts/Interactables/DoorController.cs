@@ -42,7 +42,7 @@ public class DoorController : Interactable, IMutantPassable
     [SerializeField] private MachineShake _machineShake;
     [SerializeField] private AudioSource _lockedDoorAudio;
     [SerializeField] private AudioClip _doorShakeClip;
-    [SerializeField] private string[] _tryToLeaveTutorialText;
+    [SerializeField, LocalizeField] private string[] _tryToLeaveTutorialText;
     [Tooltip("When enabled, this door automatically locks when the shift starts and unlocks when it ends.")]
     [SerializeField] private bool _lockDuringShift = false;
 
@@ -116,7 +116,7 @@ public class DoorController : Interactable, IMutantPassable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return _doorOpen.Value ? "Close" : "Open";
+        return _doorOpen.Value ? Loc.N("Close") : Loc.N("Open");
     }
 
     public override void Interact(PlayerInteractionController player)

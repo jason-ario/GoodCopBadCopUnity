@@ -78,8 +78,8 @@ public class CameraPickup : PickableObject
     // ── Constants ─────────────────────────────────────────────────────────────
 
     private const string UsingToolBool = "UsingTool";
-    private const string InteractTextDefault = "Camera";
-    private const string InteractTextHasPhoto = "to grab photo";
+    private static readonly string InteractTextDefault = Loc.N("Camera");
+    private static readonly string InteractTextHasPhoto = Loc.N("to grab photo");
 
     /// <summary>
     /// Brief window after entering camera mode during which LMB does not fire the shutter,
@@ -169,7 +169,7 @@ public class CameraPickup : PickableObject
     /// Enables the viewfinder camera, sets the "usingTool" animator bool, and suppresses world interaction.
     /// </summary>
     /// <summary>First LMB / RT enters camera mode, where it then takes the photo.</summary>
-    public override string GetHeldUseVerb() => _inCameraMode ? "Take photo" : "Use camera";
+    public override string GetHeldUseVerb() => _inCameraMode ? Loc.N("Take photo") : Loc.N("Use camera");
 
     public override void OnStartUse()
     {
@@ -533,7 +533,7 @@ public class CameraPickup : PickableObject
     {
         if (_netPolaroidId.Value == 0UL) return null;
         if (player.pickupController.HeldObject != null) return null;
-        return "grab photo";
+        return Loc.N("grab photo");
     }
 
     /// <summary>

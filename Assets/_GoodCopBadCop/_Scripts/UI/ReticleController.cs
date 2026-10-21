@@ -273,7 +273,7 @@ public class ReticleController : MonoBehaviour
         {
             // Hold is the only Interact action: one "[E] Hold to {verb}" row, so the key icon is still shown.
             _holdOnTapRow = hasHold;
-            SetPrompt(hasHold, hasHold ? $"Hold to {holdVerb}" : null, useVerb: useItemVerb);
+            SetPrompt(hasHold, hasHold ? HoldLabel(holdVerb) : null, useVerb: useItemVerb);
             return;
         }
 
@@ -282,6 +282,8 @@ public class ReticleController : MonoBehaviour
         // "[E] {verb}" above "[LMB] {useItemVerb}" above a text-only "Hold to {holdVerb}" row.
         SetPrompt(true, tapLabel, holdVerb, useItemVerb);
     }
+
+    private static string HoldLabel(string holdVerb) => Loc.T("Hold to {0}", Loc.TranslateSource(holdVerb));
 
     /// <summary>
     /// Fills the hold ring around the reticle. 0 (or less) hides it; 1 is a full ring.
@@ -390,6 +392,9 @@ public class ReticleController : MonoBehaviour
     /// </summary>
     private void SetPrompt(bool keyIconVisible, string label, string holdVerb = null, string useVerb = null)
     {
+        // Verbs / interact texts arrive as English (Loc.N literals or [LocalizeField] values) and are looked up by source.
+        label = Loc.TranslateSource(label);
+        useVerb = Loc.TranslateSource(useVerb);
         bool labelVisible = !string.IsNullOrEmpty(label);
 
         if (_useRow != null)
@@ -431,7 +436,7 @@ public class ReticleController : MonoBehaviour
             bool holdVisible = !string.IsNullOrEmpty(holdVerb);
             if (holdVisible)
             {
-                string text = $"Hold to {holdVerb}";
+                string text = HoldLabel(holdVerb);
                 if (_holdLabel != null && _holdLabel.text != text)
                     _holdLabel.text = text;
             }

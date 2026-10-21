@@ -90,7 +90,7 @@ public class WorldShopItemInteractable : Interactable
     public override bool IsInteractable => base.IsInteractable && _shopItem != null && _shopItem.IsAvailable;
 
 
-    protected override string DefaultInteractVerb => "Buy";
+    protected override string DefaultInteractVerb => Loc.N("Buy");
 
     /// <summary>Opens the purchase view when the player clicks or presses E on this item.</summary>
     public override void Interact(PlayerInteractionController player)

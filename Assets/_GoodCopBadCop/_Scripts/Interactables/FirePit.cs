@@ -146,7 +146,7 @@ public class FirePit : Interactable, IIgnitable
 
     // ── Interactable overrides ─────────────────────────────────────────────────
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Light";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Light");
 
     /// <summary>Striking a match is the item's tool function, so lighting stays on LMB / RT.</summary>
     public override HeldItemTargetKey GetItemTargetKey(PlayerInteractionController player, PickableObject item)

@@ -107,7 +107,7 @@ public class Radio : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return _isOn.Value ? "Turn off" : "Turn on";
+        return _isOn.Value ? Loc.N("Turn off") : Loc.N("Turn on");
     }
 
     public override void Interact(PlayerInteractionController player)

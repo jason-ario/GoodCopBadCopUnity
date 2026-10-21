@@ -72,7 +72,8 @@ public class GuidebookIconListView : MonoBehaviour
             Place(icon.rectTransform, 0f, y, rowHeight, rowHeight, width);
 
             TextMeshProUGUI text = TextAt(i);
-            text.text = string.IsNullOrEmpty(item.Label) ? item.Text : $"<b>{item.Label}</b>\n{item.Text}";
+            string label = Loc.TranslateSource(item.Label), body = Loc.TranslateSource(item.Text);
+            text.text = string.IsNullOrEmpty(label) ? body : $"<b>{label}</b>\n{body}";
             text.fontSizeMax = fontSize;
             text.fontSizeMin = Mathf.Min(10f, fontSize);
             text.fontSize = fontSize;

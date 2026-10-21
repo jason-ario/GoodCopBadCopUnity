@@ -31,7 +31,7 @@ public class BunkerDoorInteractable : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return _bunkerDoor != null && _bunkerDoor.IsOpen ? "Close" : "Turn wheel";
+        return _bunkerDoor != null && _bunkerDoor.IsOpen ? Loc.N("Close") : Loc.N("Turn wheel");
     }
 
     /// <summary>

@@ -99,7 +99,7 @@ public abstract class AmmoPickup : PickableObject, IAmmoProvider
     /// A full reserve is reported immediately (no round-trip) and the request is skipped.
     /// </summary>
     /// <summary>LMB loads the ammo into the player's reserve; nothing when empty.</summary>
-    public override string GetHeldUseVerb() => Amount <= 0 ? null : "Load ammo";
+    public override string GetHeldUseVerb() => Amount <= 0 ? null : Loc.N("Load ammo");
 
     public override void OnStartUse()
     {

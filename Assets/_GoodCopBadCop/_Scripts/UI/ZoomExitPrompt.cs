@@ -29,7 +29,7 @@ namespace GoodCopBadCop.UI
         [Tooltip("Optional label next to the icon.")]
         [SerializeField] private TextMeshProUGUI _label;
 
-        [SerializeField] private string _text = "Exit";
+        [SerializeField, LocalizeField] private string _text = "Exit";
 
         private GameAction? _shownAction;
 

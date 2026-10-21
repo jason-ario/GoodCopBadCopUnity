@@ -73,9 +73,18 @@ public class HeldItemUsePrompt : MonoBehaviour
         SetVisible(visible);
     }
 
-    /// <summary>"Take photo" → "to take photo". Only the first letter is lowered so acronyms ("UV") survive.</summary>
-    private static string FormatLabel(string verb) =>
-        "to " + char.ToLowerInvariant(verb[0]) + verb.Substring(1);
+    /// <summary>
+    /// "Take photo" → "to take photo" (French "Prendre une photo" → "pour prendre une photo"). The verb is translated
+    /// before composing, since the render-time lookup can't match the combined string. Only the first letter is lowered
+    /// so acronyms ("UV") survive.
+    /// </summary>
+    private static string FormatLabel(string verb)
+    {
+        string translated = Loc.TranslateSource(verb);
+        if (string.IsNullOrEmpty(translated)) return translated;
+        string lowered = char.ToLowerInvariant(translated[0]) + translated.Substring(1);
+        return Loc.Verbatim(Loc.T("to {0}", lowered));
+    }
 
     private static string ResolveVerb()
     {

@@ -157,7 +157,7 @@ public class PowerSwitch : Interactable
 
     // ── Interact ──────────────────────────────────────────────────────────────
 
-    protected override string DefaultInteractVerb => "Flip";
+    protected override string DefaultInteractVerb => Loc.N("Flip");
 
     public override void Interact(PlayerInteractionController player)
     {

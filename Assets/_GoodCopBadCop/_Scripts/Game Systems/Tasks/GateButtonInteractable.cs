@@ -39,7 +39,7 @@ public class GateButtonInteractable : Interactable
             audioSource = GetComponent<AudioSource>();
     }
 
-    protected override string DefaultInteractVerb => "Press";
+    protected override string DefaultInteractVerb => Loc.N("Press");
 
     public override void Interact(PlayerInteractionController player)
     {

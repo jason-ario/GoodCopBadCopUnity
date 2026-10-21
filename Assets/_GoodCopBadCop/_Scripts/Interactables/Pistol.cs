@@ -155,7 +155,7 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     /// Plays a dry-fire click when the magazine is empty.
     /// </summary>
     /// <summary>LMB fires the pistol.</summary>
-    public override string GetHeldUseVerb() => "Shoot";
+    public override string GetHeldUseVerb() => Loc.N("Shoot");
 
     public override void OnStartUse()
     {

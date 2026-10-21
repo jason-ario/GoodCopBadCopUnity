@@ -25,7 +25,7 @@ public class GoHuntingTask : NetworkBehaviour, IBetweenShiftTask
     public static bool IsTaskActive { get; private set; }
 
     [Header("Task Properties")]
-    [SerializeField] private string _taskName = "Go Hunting";
+    [SerializeField, LocalizeField] private string _taskName = "Go Hunting";
     [SerializeField] private int _couponReward = 10;
     [SerializeField] private int _totalBits = 5;
 

@@ -305,7 +305,7 @@ public class JunkItem : Interactable
     public override bool ShowsInteractPrompt(PlayerInteractionController player) =>
         player != null && player.HeldObject is TrashBag;
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject heldItem) => "Collect";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject heldItem) => Loc.N("Collect");
 
     /// <summary>
     /// Interact key while holding a compatible item (TrashBag) — collects this junk item into the bag.

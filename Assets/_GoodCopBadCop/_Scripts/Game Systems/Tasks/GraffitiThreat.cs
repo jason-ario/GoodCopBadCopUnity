@@ -23,7 +23,7 @@ public class GraffitiThreat : NetworkBehaviour, ISystemicThreat
     public static GraffitiThreat Instance { get; private set; }
 
     [Header("Threat Properties")]
-    [SerializeField] private string _threatName = "Graffiti";
+    [SerializeField, LocalizeField] private string _threatName = "Graffiti";
     [SerializeField] private float _scoreWeight = 1f;
 
     [Header("Spawning")]

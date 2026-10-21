@@ -145,7 +145,7 @@ public class FuseBoxPuzzleController : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return _doorOpen.Value ? "Close" : "Open";
+        return _doorOpen.Value ? Loc.N("Close") : Loc.N("Open");
     }
 
     public override void Interact(PlayerInteractionController player)

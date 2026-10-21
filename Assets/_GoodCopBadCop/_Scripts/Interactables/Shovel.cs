@@ -141,7 +141,7 @@ public abstract class MeleeWeaponPickable : PickableObject
     // ── PickableObject overrides ───────────────────────────────────────────────
 
     /// <summary>LMB swings the weapon.</summary>
-    public override string GetHeldUseVerb() => "Swing";
+    public override string GetHeldUseVerb() => Loc.N("Swing");
 
     /// <summary>Owner-only (called by <see cref="PlayerPickupController"/>): starts or buffers a swing.</summary>
     public override void OnStartUse()

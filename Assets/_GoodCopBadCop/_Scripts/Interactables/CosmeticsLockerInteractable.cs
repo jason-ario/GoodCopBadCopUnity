@@ -66,7 +66,7 @@ public class CosmeticsLockerInteractable : Interactable
 
     // ─── IInteractable ───────────────────────────────────────────────────────
 
-    protected override string DefaultInteractVerb => "Browse";
+    protected override string DefaultInteractVerb => Loc.N("Browse");
 
     public override void Interact(PlayerInteractionController player)
     {

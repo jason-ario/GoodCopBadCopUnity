@@ -48,8 +48,8 @@ public class PurchaseLocker : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        if (!isPurchased.Value) return "Buy";
-        return isOpen.Value ? "Close" : "Open";
+        if (!isPurchased.Value) return Loc.N("Buy");
+        return isOpen.Value ? Loc.N("Close") : Loc.N("Open");
     }
 
     public override void Interact(PlayerInteractionController player)

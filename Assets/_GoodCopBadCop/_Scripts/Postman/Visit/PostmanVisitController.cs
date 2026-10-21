@@ -108,7 +108,7 @@ namespace GoodCopBadCop.Postman
         [SerializeField] private float _giveRecoverTime = 1.2f;
 
         [Header("Notification")]
-        [SerializeField] private string _arrivalNotification = "The postman is arriving with today's mail.";
+        [SerializeField, LocalizeField] private string _arrivalNotification = "The postman is arriving with today's mail.";
 
         [Header("Dialogue")]
         [Tooltip("Per-day scripted dialogue. The entry matching ShiftManager.CurrentDay is used (else the " +

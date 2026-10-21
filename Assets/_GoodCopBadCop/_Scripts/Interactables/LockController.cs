@@ -126,9 +126,9 @@ public class LockController : Interactable
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
-    protected override string DefaultInteractVerb => "Inspect";
+    protected override string DefaultInteractVerb => Loc.N("Inspect");
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Unlock";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Unlock");
 
     /// <summary>
     /// Called when the player interacts with the padlock without holding the required key.

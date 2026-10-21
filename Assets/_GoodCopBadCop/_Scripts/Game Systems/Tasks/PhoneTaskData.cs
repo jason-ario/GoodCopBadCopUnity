@@ -10,13 +10,13 @@ using UnityEngine;
 public class PhoneTaskData
 {
     [Header("Task Info")]
-    [SerializeField] private string _taskName = "New Task";
-    [SerializeField, TextArea(2, 4)] private string _taskDescription = "Complete the task.";
+    [SerializeField, LocalizeField] private string _taskName = "New Task";
+    [SerializeField, LocalizeField, TextArea(2, 4)] private string _taskDescription = "Complete the task.";
     [SerializeField] private int _couponReward = 5;
 
     [Header("Voice Line")]
     [Tooltip("Text shown as subtitles when the player answers the call.")]
-    [SerializeField, TextArea(2, 6)] private string _voiceLine = "This is HQ. You have a new task.";
+    [SerializeField, LocalizeField, TextArea(2, 6)] private string _voiceLine = "This is HQ. You have a new task.";
     [Tooltip("Audio clips cycled to produce the voice effect. Leave empty for text-only subtitles.")]
     [SerializeField] private AudioClip[] _voiceAudioClips;
 

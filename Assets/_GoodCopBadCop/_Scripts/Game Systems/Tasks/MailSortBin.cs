@@ -127,7 +127,7 @@ public class MailSortBin : Interactable
         return _depositTarget != null ? _depositTarget.position : transform.position;
     }
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Sort";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Sort");
 
     /// <summary>
     /// Called by <see cref="PlayerInteractionController"/> on the local client when the player

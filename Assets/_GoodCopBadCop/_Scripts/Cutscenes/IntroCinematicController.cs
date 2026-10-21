@@ -12,9 +12,9 @@ using UnityEngine.InputSystem.Controls;
 ///
 /// This is purely local/client-side: each connected player reveals and advances through the
 /// lines independently — and reveals into gameplay as soon as they finish, never waiting on
-/// another player — by pressing any key, mouse button, or gamepad button. The first input
-/// completes the typewriter reveal for that line, a further input advances to the next line
-/// (playing <see cref="continueSound"/>).
+/// another player — by pressing any key, mouse button, or gamepad button. An input while a page
+/// is typing finishes the line being typed (the page keeps typing after it); once the page is
+/// fully shown, an input advances to the next page (playing <see cref="continueSound"/>).
 ///
 /// Call <see cref="PlayIfNeeded"/> from <see cref="GameManager.LobbyTransitionSequence"/>.
 /// Subsequent calls (e.g. after a Restart Day scene reload) are no-ops once the cinematic has
@@ -42,7 +42,7 @@ public class IntroCinematicController : MonoBehaviour
 
     [Tooltip("Story pages shown in order, one at a time, over the black screen. Put each sentence on its own line.")]
     [TextArea(2, 6)]
-    [SerializeField]
+    [SerializeField, LocalizeField]
     private string[] storyLines =
     {
         "20 October 1989 - Saplavi Checkpoint, Soviet Georgia",
@@ -99,8 +99,8 @@ public class IntroCinematicController : MonoBehaviour
 
         if (textReveal != null && textReveal.IsRevealing)
         {
-            // First input just completes the typewriter for this line — does not advance yet.
-            textReveal.CompleteReveal();
+            // Input during the typewriter finishes only the line being typed; the page keeps typing after it.
+            textReveal.CompleteCurrentLine();
             return;
         }
 
@@ -211,7 +211,9 @@ public class IntroCinematicController : MonoBehaviour
         _advanceRequested = false;
         _awaitingInput = true;
 
-        textReveal.RevealText(line);
+        // Translate the whole page up front: the typewriter feeds TMP partial substrings, which the
+        // render-time localization can't match. Pages are looked up by their English text (UI.csv, ui.intro_cinematic.*).
+        textReveal.RevealText(Loc.Verbatim(Loc.TranslateSource(line)));
 
         yield return new WaitUntil(() => !textReveal.IsRevealing);
 

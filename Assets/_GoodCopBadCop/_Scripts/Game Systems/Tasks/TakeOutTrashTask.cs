@@ -44,7 +44,7 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public static TakeOutTrashTask Instance { get; private set; }
 
     [Header("Threat Properties")]
-    [SerializeField] private string _threatName = "Take out trash";
+    [SerializeField, LocalizeField] private string _threatName = "Take out trash";
     [Tooltip("Number of coupons the ATM dispenses when all trash has been deposited.")]
     [SerializeField] private int _couponReward = 10;
 

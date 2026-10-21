@@ -164,9 +164,11 @@ public class HUDTaskList : MonoBehaviour
 
     private static string BuildLabel(ISystemicThreat threat)
     {
+        // Translate each part before composing; the combined "Name: desc" has no source row.
+        string name = Loc.TranslateSource(threat.ThreatName);
         bool hasDescription = !string.IsNullOrEmpty(threat.ThreatDescription);
-        return hasDescription
-            ? $"{threat.ThreatName}: {threat.ThreatDescription}"
-            : threat.ThreatName;
+        return Loc.Verbatim(hasDescription
+            ? $"{name}: {Loc.TranslateSource(threat.ThreatDescription)}"
+            : name);
     }
 }

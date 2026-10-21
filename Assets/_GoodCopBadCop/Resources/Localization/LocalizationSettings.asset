@@ -75,6 +75,26 @@ MonoBehaviour:
     fallbackFonts:
     - {fileID: 11400000, guid: d1817fc22b816dc4591aafe7b764befe, type: 2}
     sizeScale: 1
+  - code: fr
+    displayName: "Fran\xE7ais"
+    font: {fileID: 11400000, guid: 59c92f9358bcf464eb728bfdf766c53a, type: 2}
+    roleFonts:
+    - role: UI
+      font: {fileID: 11400000, guid: 3e4f9d7cebc202349a7efb7f15be8949, type: 2}
+    - role: Dialogue
+      font: {fileID: 11400000, guid: 59c92f9358bcf464eb728bfdf766c53a, type: 2}
+    - role: World
+      font: {fileID: 11400000, guid: 3ecc18ecd0398214f8a84de47f99f7bf, type: 2}
+    - role: Handwriting
+      font: {fileID: 11400000, guid: e62f21d3583554246b1a04cfc1fa16ae, type: 2}
+    - role: Secondary UI
+      font: {fileID: 11400000, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
+    - role: ID Card
+      font: {fileID: 11400000, guid: 59c92f9358bcf464eb728bfdf766c53a, type: 2}
+    - role: Marker World
+      font: {fileID: 11400000, guid: 48347035eb1fe44b6b53601c7be2467d, type: 2}
+    fallbackFonts: []
+    sizeScale: 1
   pseudoExpansion: 0.4
   forbiddenCharacters: 
   maxLengthRatio: 1.4
@@ -84,6 +104,7 @@ MonoBehaviour:
   dialogueAssetTypes:
   - ScriptedDialogue
   - SuspectData
+  - GuidebookDatabase
   onlyUsedDialogueAssets: 1
   dialogueFieldRules:
   - typeName: SuspectData
@@ -100,6 +121,22 @@ MonoBehaviour:
     - questionResponses
     - idleBarks
     - uncannyIdleBarks
+  - typeName: GuidebookDatabase
+    fields:
+    - _integrityTabLabel
+    - _integrityPages
+    - _survivalTabLabel
+    - _survivalPages
+    - _rulesTabLabel
+    - _rulePages
+    - _scoringHeader
+    - _scoringTitle
+    - _scoringIntro
+    - _dispositionBands
+    - _dispositionWarning
+    - _categories
+    - _entries
+    - _notesHeader
   fieldDenyList:
   - m_Name
   - animationTrigger
@@ -119,6 +156,7 @@ MonoBehaviour:
   - sceneName
   - parameterName
   - stateName
+  - AnomalyTypeName
   fontRoles:
   - name: UI
     sourceFonts: []

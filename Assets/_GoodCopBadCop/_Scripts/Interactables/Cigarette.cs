@@ -34,7 +34,7 @@ public class Cigarette : PickableObject
    }
 
    /// <summary>LMB (held) smokes the cigarette.</summary>
-   public override string GetHeldUseVerb() => "Smoke";
+   public override string GetHeldUseVerb() => Loc.N("Smoke");
 
    public override void OnStartUse()
    {

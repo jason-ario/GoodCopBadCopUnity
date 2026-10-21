@@ -74,7 +74,7 @@ public abstract class CollectableContainer : Interactable
 
     // ── Interact (no held item) ───────────────────────────────────────────────
 
-    protected override string DefaultInteractVerb => "Call HQ";
+    protected override string DefaultInteractVerb => Loc.N("Call HQ");
 
     /// <summary>Interact only calls HQ once the container is full and no collector is en route.</summary>
     public override bool ShowsInteractPrompt(PlayerInteractionController player) => IsFull && !IsAwaitingPickup;

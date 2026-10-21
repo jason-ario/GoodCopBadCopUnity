@@ -83,7 +83,7 @@ public class Khinkali : PickableObject
     /// then despawns the item.
     /// </summary>
     /// <summary>LMB eats the khinkali.</summary>
-    public override string GetHeldUseVerb() => "Eat";
+    public override string GetHeldUseVerb() => Loc.N("Eat");
 
     public override void OnStartUse()
     {

@@ -130,7 +130,7 @@ public class CampaignSlot : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
         // day the player is on (matches CampaignManager.StartCampaign's own Mathf.Max(1, ...)
         // clamp) — do not add 1 here, that double-counts and shows one day ahead of reality.
         int displayDay = Mathf.Max(1, slot.CurrentDay);
-        dayNumberText.text = slot.IsDuskCheckpointFor(slot.CurrentDay) ? $"Day {displayDay} - Dusk" : $"Day {displayDay}";
+        dayNumberText.text = slot.IsDuskCheckpointFor(slot.CurrentDay) ? Loc.T("Day {0} - Dusk", displayDay) : Loc.T("Day {0}", displayDay);
         cashAmountText.text = $"{slot.TotalCashEarned:N0}";
         lastSavedText.text = slot.LastSaved != default
             ? slot.LastSaved.ToLocalTime().ToString("MMM d, yyyy")

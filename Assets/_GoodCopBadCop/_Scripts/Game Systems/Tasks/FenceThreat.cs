@@ -30,7 +30,7 @@ public class FenceThreat : NetworkBehaviour, ISystemicThreat
     public static FenceThreat Instance { get; private set; }
 
     [Header("Threat Properties")]
-    [SerializeField] private string _threatName = "Perimeter Fence";
+    [SerializeField, LocalizeField] private string _threatName = "Perimeter Fence";
     [SerializeField] private float _scoreWeight = 0.5f;
 
     [Header("Fence Configuration")]

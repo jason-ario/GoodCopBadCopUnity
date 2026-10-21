@@ -47,10 +47,10 @@ public class EndOfShiftReportUI : MonoBehaviour
     [SerializeField] private RectTransform paper;
     [Tooltip("Filled with the report's day. {0} = day number.")]
     [SerializeField] private TextMeshProUGUI dayText;
-    [SerializeField] private string dayTextFormat = "Shift Day {0}";
+    [SerializeField, LocalizeField] private string dayTextFormat = "Shift Day {0}";
     [Tooltip("Filled with a report reference number. {0} = day, {1} = subjects processed.")]
     [SerializeField] private TextMeshProUGUI reportNumberText;
-    [SerializeField] private string reportNumberFormat = "Report No. {0:000}-{1}";
+    [SerializeField, LocalizeField] private string reportNumberFormat = "Report No. {0:000}-{1}";
 
     [Header("Rows")]
     [Tooltip("Inactive template row. Rows are cloned from it on demand and pooled across reports.")]
@@ -466,10 +466,10 @@ public class EndOfShiftReportUI : MonoBehaviour
     private void FillHeader()
     {
         if (dayText != null)
-            dayText.text = string.Format(dayTextFormat, _data.Day);
+            dayText.text = string.Format(Loc.TranslateSource(dayTextFormat), _data.Day);
 
         if (reportNumberText != null)
-            reportNumberText.text = string.Format(reportNumberFormat, _data.Day, _data.Subjects.Count);
+            reportNumberText.text = string.Format(Loc.TranslateSource(reportNumberFormat), _data.Day, _data.Subjects.Count);
     }
 
     // ----- Rows -----

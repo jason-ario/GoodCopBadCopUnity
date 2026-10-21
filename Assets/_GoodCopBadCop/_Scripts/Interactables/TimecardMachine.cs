@@ -114,15 +114,15 @@ public class TimecardMachine : Interactable
 
     [Header("Interact Text")]
     [Tooltip("Text shown on the reticle while the machine is primed for clock-in.")]
-    [SerializeField] private string _clockInInteractText = "Clock In";
+    [SerializeField, LocalizeField] private string _clockInInteractText = "Clock In";
 
     [Header("Tutorial Objective List")]
     [Tooltip("Text shown in the tutorial objective overlay while clock-in is available. " +
              "Day 1 drives its own scripted tutorial objectives, so this is skipped on Day 1.")]
-    [SerializeField] private string _clockInObjectiveText = "Clock in for the day";
+    [SerializeField, LocalizeField] private string _clockInObjectiveText = "Clock in for the day";
     [Tooltip("Text shown in the tutorial objective overlay while clock-out is available. " +
              "Day 1 drives its own scripted tutorial objectives, so this is skipped on Day 1.")]
-    [SerializeField] private string _clockOutObjectiveText = "Clock out for the day";
+    [SerializeField, LocalizeField] private string _clockOutObjectiveText = "Clock out for the day";
     [Tooltip("Seconds the completed objective row stays visible (struck through) before it is removed.")]
     [SerializeField] private float _objectiveCompletedLingerDuration = 1f;
 
@@ -232,7 +232,7 @@ public class TimecardMachine : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return _clockOutArmed.Value ? "Clock out" : "Clock in";
+        return _clockOutArmed.Value ? Loc.N("Clock out") : Loc.N("Clock in");
     }
 
     public override void Interact(PlayerInteractionController player)

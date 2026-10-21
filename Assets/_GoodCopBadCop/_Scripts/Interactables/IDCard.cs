@@ -380,7 +380,7 @@ public class IDCard : FolderItem
 
    // LMB inspect. Zoom mode "holds LMB" through the same path (see HeldDocumentInspection).
    /// <summary>LMB inspects the card up close.</summary>
-   public override string GetHeldUseVerb() => "Inspect";
+   public override string GetHeldUseVerb() => Loc.N("Inspect");
 
    public override void OnStartUse()
    {

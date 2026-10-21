@@ -77,7 +77,7 @@ public class TrashCan : Interactable
     /// <summary>Always takes items (folders by type even with an empty inspector list).</summary>
     public override bool AcceptsHeldItems => true;
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Throw away";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Throw away");
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {

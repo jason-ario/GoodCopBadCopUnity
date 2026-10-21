@@ -21,7 +21,7 @@ public class PlacementBoard : MonoBehaviour
     public bool ShowGhostWhileAiming => showGhostWhileAiming;
 
     [Tooltip("Reticle hint text shown while aiming at this board with ShowGhostWhileAiming enabled and holding an item.")]
-    [SerializeField] private string aimHoverText = "Place Item";
+    [SerializeField, LocalizeField] private string aimHoverText = "Place Item";
 
     /// <summary>Reticle hint text used by <see cref="showGhostWhileAiming"/>.</summary>
     public string AimHoverText => aimHoverText;

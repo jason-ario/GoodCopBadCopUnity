@@ -15,7 +15,7 @@ public class RadiationAlertUI : MonoBehaviour
     [Tooltip("Normalized radiation (0-1) at or above which the high-radiation alert is shown.")]
     [SerializeField] private float _highRadiationThreshold = 0.5f;
 
-    [SerializeField] private string _alertMessage = "Radiation high. Take pills to reduce.";
+    [SerializeField, LocalizeField] private string _alertMessage = "Radiation high. Take pills to reduce.";
 
     private PlayerRadiation _playerRadiation;
     private PlayerHealth _playerHealth;

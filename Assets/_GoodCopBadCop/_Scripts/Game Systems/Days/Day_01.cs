@@ -92,7 +92,7 @@ public class Day_01 : DayBase
 
     [Tooltip("HUD task text shown alongside the tutorial arrow, from the moment the Day number pop-up " +
              "plays until the player clocks in on the Time Card Machine.")]
-    [SerializeField] private string _taskClockInText = "Clock in for your shift";
+    [SerializeField, LocalizeField] private string _taskClockInText = "Clock in for your shift";
 
     [Header("Day 1 — Soldier")]
     [Tooltip("The Soldier's SuspectCharacter placed directly in the scene (not runtime-spawned). " +
@@ -146,27 +146,27 @@ public class Day_01 : DayBase
     [Header("Day 1 — Trash Task Tutorial")]
     [Tooltip("Base label shown in the objective list for the end-of-shift trash task. " +
              "The deposited/total count is appended automatically, e.g. 'Throw away trash 2/10'.")]
-    [SerializeField] private string _taskThrowTrashText = "Throw away trash";
+    [SerializeField, LocalizeField] private string _taskThrowTrashText = "Throw away trash";
 
     [Tooltip("Base label for the Soldier's body objective shown alongside the trash task. The " +
              "collected/total count is appended automatically, e.g. 'Pick up gore 0/1'. The body is " +
              "tracked separately and is NOT included in the trash count.")]
-    [SerializeField] private string _taskPickUpGoreText = "Pick up gore";
+    [SerializeField, LocalizeField] private string _taskPickUpGoreText = "Pick up gore";
 
     [Tooltip("Objective label shown after the trash task is done, prompting the player to open the bunker door.")]
-    [SerializeField] private string _taskOpenBunkerText = "Open the bunker";
+    [SerializeField, LocalizeField] private string _taskOpenBunkerText = "Open the bunker";
 
     [Tooltip("Objective label shown after the bunker door opens, prompting the player to go to bed. " +
              "Keeps the end-of-day task (and its compass pip) visible for the rest of the bunker sequence, " +
              "matching the 'go to bed' row shown on every day after Day 1 (see BunkBedInteractable).")]
-    [SerializeField] private string _taskGoToBedText = "Go to bed for the night";
+    [SerializeField, LocalizeField] private string _taskGoToBedText = "Go to bed for the night";
 
     [Tooltip("Seconds the completed 'Go to bed' row stays visible (struck through) before it is removed.")]
     [SerializeField] private float _goToBedObjectiveCompletedLingerDuration = 1f;
 
     [Tooltip("Objective label shown after the trash and graffiti tasks are done, prompting the player " +
              "to clock out on the Time Card Machine before heading to the bunker.")]
-    [SerializeField] private string _taskClockOutText = "Clock out for the day";
+    [SerializeField, LocalizeField] private string _taskClockOutText = "Clock out for the day";
 
     [Tooltip("ShopItem.Name of the Documentation Exam pile — used for the synced/persisted unlock.")]
     [SerializeField] private string _documentationExamItemName = "Documentation Exam";
@@ -180,10 +180,10 @@ public class Day_01 : DayBase
     [SerializeField] private int _quarantineDocumentationAnomalyCount = 5;
 
     [Tooltip("Task text shown while the player needs to get a documentation checklist.")]
-    [SerializeField] private string _taskGetChecklistText = "Get a documentation checklist from the drawer";
+    [SerializeField, LocalizeField] private string _taskGetChecklistText = "Get a documentation checklist from the drawer";
 
     [Tooltip("Task text shown while the player needs to check documentation anomalies and file the page.")]
-    [SerializeField] private string _taskCheckDocumentationText = "Check documentation anomalies and add the page to the folder";
+    [SerializeField, LocalizeField] private string _taskCheckDocumentationText = "Check documentation anomalies and add the page to the folder";
 
     [Tooltip("First megaphone scripted dialogue — plays when the player first picks up one of the quarantine tutorial suspect's documents.")]
     [FormerlySerializedAs("_ivanMegaphonePart1")]
@@ -218,17 +218,17 @@ public class Day_01 : DayBase
 
     [Tooltip("What Vlad says when he drops his documents.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _vladPaperworkBark =
+    [SerializeField, LocalizeField] private string _vladPaperworkBark =
         "Papers. ID card, application form — pick them up, have a look.";
 
     [Tooltip("What Vlad says once the player picks up both documents.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _vladFolderBark =
+    [SerializeField, LocalizeField] private string _vladFolderBark =
         "Good. Now grab a folder from that drawer — file them in.";
 
     [Tooltip("What Vlad says once the player places the folder on the desk.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _vladFolderPlacedBark =
+    [SerializeField, LocalizeField] private string _vladFolderPlacedBark =
         "File the documents into the folder.";
 
     [Tooltip("The PlacementBoard on the office desk — used to detect when the player places the folder down.")]
@@ -237,7 +237,7 @@ public class Day_01 : DayBase
     [Header("Day 1 — Stamp Permission")]
     [Tooltip("What Vlad says after both documents are filed, granting permission to use the green stamp.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _vladStampPermissionBark =
+    [SerializeField, LocalizeField] private string _vladStampPermissionBark =
         "Green stamp — use it to approve them. Go ahead.";
 
     [Tooltip("Seconds after both documents are filed before Vlad delivers the stamp permission bark.")]
@@ -246,7 +246,7 @@ public class Day_01 : DayBase
     [Header("Day 1 — Hand-off Instruction")]
     [Tooltip("What Vlad says after the folder is stamped, instructing the player to place it at the window.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _vladHandOffBark =
+    [SerializeField, LocalizeField] private string _vladHandOffBark =
         "Now put the folder at the window. Deliver the verdict — let him through.";
 
     [Tooltip("Seconds after the stamp completes before Vlad delivers the hand-off bark.")]
@@ -268,27 +268,27 @@ public class Day_01 : DayBase
     [Header("Day 1 — Tutorial Task HUD")]
     [Tooltip("HUD task text shown alongside the world-space marker while the player needs to pick up " +
              "Vlad's ID card and application form.")]
-    [SerializeField] private string _taskPickUpDocsText = "Pick up Vlad's documents";
+    [SerializeField, LocalizeField] private string _taskPickUpDocsText = "Pick up Vlad's documents";
 
     [Tooltip("HUD task text shown while the player needs to grab a folder and place it on the desk.")]
-    [SerializeField] private string _taskFolderDocs = "Grab a folder and place it on the desk";
+    [SerializeField, LocalizeField] private string _taskFolderDocs = "Grab a folder and place it on the desk";
 
     [Tooltip("HUD task text shown while the player needs to place the documents inside the folder.")]
-    [SerializeField] private string _taskPlaceDocsText = "Place documents in folder";
+    [SerializeField, LocalizeField] private string _taskPlaceDocsText = "Place documents in folder";
 
     [Tooltip("HUD task text shown while the player needs to stamp the folder with the green stamp.")]
-    [SerializeField] private string _taskStampFolder = "Stamp the folder with the green stamp";
+    [SerializeField, LocalizeField] private string _taskStampFolder = "Stamp the folder with the green stamp";
 
     [Tooltip("HUD task text shown while the player needs to place the folder at the window slot.")]
-    [SerializeField] private string _taskHandOffText = "Place folder at the window";
+    [SerializeField, LocalizeField] private string _taskHandOffText = "Place folder at the window";
 
     [Header("Day 1 — Post-Vlad ATM Tasks")]
     [Tooltip("HUD task text shown while the player needs to collect the payout coupons from the ATM.")]
-    [SerializeField] private string _taskCollectCouponsText = "Collect coupons at ATM";
+    [SerializeField, LocalizeField] private string _taskCollectCouponsText = "Collect coupons at ATM";
 
     [Tooltip("HUD task text shown after all coupons are collected, prompting the player to press the " +
              "switch button to call the first real subject.")]
-    [SerializeField] private string _taskPressButtonText = "Press button to call next subject";
+    [SerializeField, LocalizeField] private string _taskPressButtonText = "Press button to call next subject";
 
     [Header("Day 1 — Tutorial Markers")]
     [Tooltip("World-space point above Vlad's document drop zone — marker shown during 'pick up docs' task.")]
@@ -344,10 +344,10 @@ public class Day_01 : DayBase
 
     [Header("Day 1 — Quarantine Tutorial")]
     [Tooltip("Task text shown while the player needs to grab the quarantine stamp.")]
-    [SerializeField] private string _taskGrabQuarantineStampText = "Grab the quarantine stamp";
+    [SerializeField, LocalizeField] private string _taskGrabQuarantineStampText = "Grab the quarantine stamp";
 
     [Tooltip("Task text shown while the player needs to place the folder at the window after stamping.")]
-    [SerializeField] private string _taskQuarantineHandOffText = "Place folder at the window";
+    [SerializeField, LocalizeField] private string _taskQuarantineHandOffText = "Place folder at the window";
 
     [Header("Other Day Notebooks — Hidden During Day 1")]
     [Tooltip("The Mutation Exam Notebook — hidden for the entirety of Day 1.")]
@@ -377,7 +377,7 @@ public class Day_01 : DayBase
              "shortly after this line, so the player learns clocking out is gated behind " +
              "surviving the breach.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _preBreachClockOutFakeoutBark =
+    [SerializeField, LocalizeField] private string _preBreachClockOutFakeoutBark =
         "Great work, you can now clock out to end the day.";
 
     [Tooltip("First checkpoint shovel — locked until the first mutant breach begins, then unlocked " +
@@ -397,24 +397,24 @@ public class Day_01 : DayBase
 
     [Tooltip("First megaphone bark played the instant the first breach begins.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _breachWarningBark1 = "Ah shit, not again. The mutants are coming.";
+    [SerializeField, LocalizeField] private string _breachWarningBark1 = "Ah shit, not again. The mutants are coming.";
 
     [Tooltip("Second megaphone bark played shortly after the first breach-warning bark.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _breachWarningBark2 = "Quick, grab anything you can find and fend them off!";
+    [SerializeField, LocalizeField] private string _breachWarningBark2 = "Quick, grab anything you can find and fend them off!";
 
     [Tooltip("Task label shown in the objective list while mutants remain during the breach. " +
              "The defeated/total count is appended automatically, e.g. 'Repel the mutants (1/3)'.")]
-    [SerializeField] private string _taskRepelMutantsText = "Repel the mutants";
+    [SerializeField, LocalizeField] private string _taskRepelMutantsText = "Repel the mutants";
 
     [Tooltip("Vlad's megaphone bark once the first breach is fully repelled.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _breachClearedBark1 = "Well done, you survived your first breach.";
+    [SerializeField, LocalizeField] private string _breachClearedBark1 = "Well done, you survived your first breach.";
 
     [Tooltip("Follow-up megaphone bark after the breach-cleared line — sends the player into the " +
              "post-breach gore/fence cleanup instead of straight to bed.")]
     [TextArea(2, 4)]
-    [SerializeField] private string _breachClearedBark2 = "Clean up all this gore before bed, will you?";
+    [SerializeField, LocalizeField] private string _breachClearedBark2 = "Clean up all this gore before bed, will you?";
 
     [Tooltip("Seconds between the two breach-cleared megaphone barks.")]
     [SerializeField] private float _breachClearedBarkGap = 2.5f;
@@ -422,14 +422,14 @@ public class Day_01 : DayBase
     [Header("Day 1 — Fix Perimeter Fences (post-breach)")]
     [Tooltip("Base objective text shown in the tutorial list for the post-breach fence-repair " +
              "task. The repaired/total count is appended automatically, e.g. 'Fix Perimeter Fences 1/3'.")]
-    [SerializeField] private string _taskFixFencesText = "Fix Perimeter Fences";
+    [SerializeField, LocalizeField] private string _taskFixFencesText = "Fix Perimeter Fences";
 
     [Header("Day 1 — Take Out Gore (post-breach)")]
     [Tooltip("Base objective text shown in the tutorial list for the post-breach gore clean-up " +
              "task (corpses and gore pieces the breach left in the yard). The deposited/total " +
              "count is appended automatically, e.g. 'Take out the gore 1/3'. Only shown if the " +
              "breach actually left junk behind.")]
-    [SerializeField] private string _taskTakeOutGoreText = "Take out the gore";
+    [SerializeField, LocalizeField] private string _taskTakeOutGoreText = "Take out the gore";
 
     // Guards against OnDayStarted running more than once if OnDayStart fires twice.
     private bool _dayStartedFired = false;
@@ -2282,7 +2282,7 @@ public class Day_01 : DayBase
     }
 
     private string GetSubjectCountText() =>
-        $"Process {SubjectsToProcess} subjects {_subjectProcessedCount}/{SubjectsToProcess}";
+        Loc.T("Process {0} subjects {1}/{2}", SubjectsToProcess, _subjectProcessedCount, SubjectsToProcess);
 
     private IEnumerator StartClosingDialogue()
     {
@@ -3372,7 +3372,7 @@ public class Day_01 : DayBase
         int defeated = Mathf.Clamp(_lastBreachTotal - _lastBreachRemaining, 0, _lastBreachTotal);
         _taskRepelMutants.SetText(_lastBreachRemaining > 0
             ? $"{_taskRepelMutantsText} ({defeated}/{_lastBreachTotal})"
-            : $"{_taskRepelMutantsText} — all clear!");
+            : Loc.T("{0} — all clear!", Loc.TranslateSource(_taskRepelMutantsText)));
     }
 
     /// <summary>

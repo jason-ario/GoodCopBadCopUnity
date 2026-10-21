@@ -94,7 +94,7 @@ public class Telephone : Interactable
     private bool _voiceDefaultBypassReverb;
 
     [Tooltip("Speaker name displayed in the subtitle bar during the voice line.")]
-    [SerializeField] private string _hqSpeakerName = "HQ";
+    [SerializeField, LocalizeField] private string _hqSpeakerName = "HQ";
     [Tooltip("Animator driving the phone ringing animation. Optional.")]
     [SerializeField] private Animator _phoneAnimator;
     [Tooltip("Trigger parameter name on the Animator that fires a single ring animation cycle.")]
@@ -292,10 +292,10 @@ public class Telephone : Interactable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        if (_isRinging.Value && !_isGrabbed.Value) return "Answer";
-        if (!_isGrabbed.Value) return "Pick up";
-        if (player != null && _grabbingClientId.Value == player.OwnerClientId) return "Hang up";
-        return "Use";
+        if (_isRinging.Value && !_isGrabbed.Value) return Loc.N("Answer");
+        if (!_isGrabbed.Value) return Loc.N("Pick up");
+        if (player != null && _grabbingClientId.Value == player.OwnerClientId) return Loc.N("Hang up");
+        return Loc.N("Use");
     }
 
     public override void Interact(PlayerInteractionController player)

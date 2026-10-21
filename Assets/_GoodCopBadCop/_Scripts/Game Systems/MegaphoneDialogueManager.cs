@@ -25,7 +25,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
 
     [Header("Subtitle Identity")]
     [Tooltip("Speaker name shown on the standard dialogue subtitle when a bark plays.")]
-    [SerializeField] private string _speakerName = "Megaphone";
+    [SerializeField, LocalizeField] private string _speakerName = "Megaphone";
     [Tooltip("Speaker name color shown on the standard dialogue subtitle when a bark plays.")]
     [SerializeField] private Color _speakerColor = new Color(1f, 0.65f, 0f);
 

@@ -162,7 +162,7 @@ public class BearTrap : PickableObject
     public override string GetHoldInteractVerb(PlayerInteractionController player)
     {
         if (IsHeld || _isArmed.Value || _isTriggered) return null;
-        return "arm";
+        return Loc.N("arm");
     }
 
     /// <summary>

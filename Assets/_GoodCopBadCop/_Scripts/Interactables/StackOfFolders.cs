@@ -62,7 +62,7 @@ public class StackOfFolders : Interactable
             _isInteractable.Value = true;
     }
 
-    protected override string DefaultInteractVerb => "Take folder";
+    protected override string DefaultInteractVerb => Loc.N("Take folder");
 
     public override void Interact(PlayerInteractionController player)
     {

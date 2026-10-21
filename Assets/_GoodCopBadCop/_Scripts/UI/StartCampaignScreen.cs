@@ -32,17 +32,17 @@ public class StartCampaignScreen : MonoBehaviour
 
     [Header("Invite Slots")]
     [Tooltip("Left label on each empty seat in the player list. Clicking the row opens the Steam invite overlay.")]
-    [SerializeField] private string inviteSlotLabel = "Invite a Friend";
+    [SerializeField, LocalizeField] private string inviteSlotLabel = "Invite a Friend";
     [Tooltip("Right label on each empty seat in the player list.")]
-    [SerializeField] private string openSlotLabel = "Open Slot";
+    [SerializeField, LocalizeField] private string openSlotLabel = "Open Slot";
     [Tooltip("Toast shown when the Steam overlay can't open and the code is copied instead.")]
-    [SerializeField] private string overlayUnavailableCopiedMessage = "Steam overlay unavailable - code copied, send it to a friend";
+    [SerializeField, LocalizeField] private string overlayUnavailableCopiedMessage = "Steam overlay unavailable - code copied, send it to a friend";
 
     [Header("Copy Feedback")]
     [Tooltip("Optional pre-built \"Copied to clipboard\" toast. If left empty, one is generated at " +
              "runtime underneath the copy button, reusing the ready checkmark sprite and invite code font.")]
     [SerializeField] private CanvasGroup copiedNotification;
-    [SerializeField] private string copiedMessage = "Copied to clipboard";
+    [SerializeField, LocalizeField] private string copiedMessage = "Copied to clipboard";
     [SerializeField] private float copiedFontSize = 18f;
     [SerializeField] private float copiedOffsetBelowButton = 6f;
     [SerializeField] private float copiedFadeInDuration = 0.12f;
@@ -185,9 +185,11 @@ public class StartCampaignScreen : MonoBehaviour
         SaveSlot slot = SaveDataManager.Instance?.ActiveSlot;
         int displayDay = Mathf.Max(1, slot?.CurrentDay ?? 0);
         bool isNewGame = slot == null || !slot.IsOccupied;
-        string duskSuffix = !isNewGame && slot.IsDuskCheckpointFor(slot.CurrentDay) ? " (Dusk)" : string.Empty;
+        bool dusk = !isNewGame && slot.IsDuskCheckpointFor(slot.CurrentDay);
 
-        dayNumberText.text = isNewGame ? $"New Game - Day {displayDay}" : $"Continue - Day {displayDay}{duskSuffix}";
+        dayNumberText.text = isNewGame
+            ? Loc.T("New Game - Day {0}", displayDay)
+            : dusk ? Loc.T("Continue - Day {0} (Dusk)", displayDay) : Loc.T("Continue - Day {0}", displayDay);
     }
 
     private void RefreshUI()

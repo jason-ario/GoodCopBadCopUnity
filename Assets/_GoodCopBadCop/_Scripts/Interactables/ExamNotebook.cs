@@ -1037,7 +1037,7 @@ public class ExamNotebook : PickableObject
     }
 
     /// <summary>LMB opens the notebook for checklist marking; nothing while a page is being added to a folder.</summary>
-    public override string GetHeldUseVerb() => addingToFolder ? null : "Open";
+    public override string GetHeldUseVerb() => addingToFolder ? null : Loc.N("Open");
 
     public override void OnStartUse()
     {

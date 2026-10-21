@@ -235,7 +235,7 @@ public class SupplyBox : PickableObject
 
     /// <summary>Hold Interact — open / close. Always available, held item or not.</summary>
     public override string GetHoldInteractVerb(PlayerInteractionController player) =>
-        isOpen ? "close" : "open";
+        isOpen ? Loc.N("close") : Loc.N("open");
 
     /// <summary>Hold Interact — toggle open / closed.</summary>
     public override void InteractHold(PlayerInteractionController player)

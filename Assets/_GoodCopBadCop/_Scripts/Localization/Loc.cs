@@ -409,6 +409,7 @@ public static class Loc
     {
         Init();
         if (string.IsNullOrEmpty(english) || _language == SourceLanguage) return english;
+        if (english.IndexOf(Marker, StringComparison.Ordinal) >= 0) return english; // already localized / verbatim
 
         if (_sourceIndex == null)
         {
@@ -423,6 +424,16 @@ public static class Loc
 
         if (_sourceIndex.TryGetValue(english, out var matches) && matches.Count > 0)
             return Resolve(matches[0], false);
+
+        // Authored labels often carry stray leading/trailing whitespace ("Ready Up ", "Case #02\n\n"): match the
+        // trimmed text and keep the original padding around the translation.
+        string trimmed = english.Trim();
+        if (trimmed.Length > 0 && trimmed.Length != english.Length &&
+            _sourceIndex.TryGetValue(trimmed, out matches) && matches.Count > 0)
+        {
+            int start = english.IndexOf(trimmed, StringComparison.Ordinal);
+            return english.Substring(0, start) + Resolve(matches[0], false) + english.Substring(start + trimmed.Length);
+        }
 
         return IsPseudoAvailable(_language) ? PseudoOf(english) : english;
     }

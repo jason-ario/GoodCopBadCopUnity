@@ -39,7 +39,7 @@ public class MutantBreachData : ScriptableObject
     public bool showUniqueMutantBossHealthBar = false;
 
     [Tooltip("Name shown above the boss health bar. Falls back to the breachName if empty.")]
-    public string bossDisplayName = "";
+    [LocalizeField] public string bossDisplayName = "";
 
     [Header("Timing")]
     [Tooltip("Seconds between the alarm/notification starting and the first mutant spawning. " +
@@ -54,7 +54,7 @@ public class MutantBreachData : ScriptableObject
     [Header("Notification")]
     [Tooltip("Message shown via PlayerTutorialUI when the breach is detected.")]
     [TextArea]
-    public string notificationMessage = "A mutant breach has been detected. Ready yourself for combat.";
+    [LocalizeField] public string notificationMessage = "A mutant breach has been detected. Ready yourself for combat.";
 
     [Tooltip("Seconds the notification text stays on screen.")]
     [Min(0.5f)]

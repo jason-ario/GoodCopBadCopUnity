@@ -33,8 +33,8 @@ public class CoinSlotPanel : Interactable
 {
     private const string InsertCoinTrigger = "InsertCoin";
     private const string HoldingCoinBool   = "HoldingCoin";
-    private const string InteractTextReady = "Coin Slot";
-    private const string InteractTextUsed  = "Coin Slot (Used)";
+    private static readonly string InteractTextReady = Loc.N("Coin Slot");
+    private static readonly string InteractTextUsed  = Loc.N("Coin Slot (Used)");
 
     // ── Camera & IK ───────────────────────────────────────────────────────────
 
@@ -109,7 +109,7 @@ public class CoinSlotPanel : Interactable
 
     // ── InteractWithItem ──────────────────────────────────────────────────────
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Insert coin";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Insert coin");
 
     /// <summary>
     /// Called via left-click while holding a Kill Coin.

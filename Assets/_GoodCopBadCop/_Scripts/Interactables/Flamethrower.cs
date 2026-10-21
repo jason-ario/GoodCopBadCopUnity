@@ -255,7 +255,7 @@ public class Flamethrower : PickableObject, IAmmoProvider, IInventoryReloadable
     /// other clients display the effect.
     /// </summary>
     /// <summary>LMB (held) sprays flame; nothing when out of fuel.</summary>
-    public override string GetHeldUseVerb() => _fuel.Value <= 0f ? null : "Burn";
+    public override string GetHeldUseVerb() => _fuel.Value <= 0f ? null : Loc.N("Burn");
 
     public override void OnStartUse()
     {

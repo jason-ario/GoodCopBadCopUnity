@@ -10,7 +10,7 @@ public class ToiletController : Interactable
     [SerializeField] private AudioClip _flushSound;
     [SerializeField] private Animator _animator;
 
-    protected override string DefaultInteractVerb => "Flush";
+    protected override string DefaultInteractVerb => Loc.N("Flush");
 
     public override void Interact(PlayerInteractionController player)
     {

@@ -78,13 +78,13 @@ public class DoorWheelDiegeticController : DiegeticViewController
     [Header("Prompt")]
     // Renamed from _openPromptText ("to open") on purpose, so stale serialized values don't override the new text.
     [Tooltip("Word(s) shown before the LMB / RT icon while the view is open.")]
-    [SerializeField] private string _promptPrefix = "Hold";
+    [SerializeField, LocalizeField] private string _promptPrefix = "Hold";
 
     [Tooltip("Text shown after the LMB icon while the view is open (keyboard/mouse).")]
-    [SerializeField] private string _rotatePromptText = "to rotate";
+    [SerializeField, LocalizeField] private string _rotatePromptText = "to rotate";
 
     [Tooltip("Text shown after the RT icon while a gamepad is active (RT grabs, right stick turns).")]
-    [SerializeField] private string _gamepadRotatePromptText = "+ Right Stick to rotate";
+    [SerializeField, LocalizeField] private string _gamepadRotatePromptText = "+ Right Stick to rotate";
 
     protected override string ActionPromptPrefix => _promptPrefix;
     protected override string ActionPromptText => _rotatePromptText;

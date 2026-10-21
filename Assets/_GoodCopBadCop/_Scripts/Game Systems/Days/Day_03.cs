@@ -292,7 +292,7 @@ public class Day_03 : DayBase, IDailyTask
 
     [Tooltip("Fallback lines for the wrong-panel reminder when no dialogue asset is assigned. " +
              "Supports [[keyword]] markup.")]
-    [SerializeField, TextArea(2, 4)] private string[] _wrongPanelReminderLines =
+    [SerializeField, LocalizeField, TextArea(2, 4)] private string[] _wrongPanelReminderLines =
     {
         "Central Power Authority again. Your booth panel can't fix a grid fault!",
         "Get to the [[power station]] and replace the fuses in the [[fuse box]].",

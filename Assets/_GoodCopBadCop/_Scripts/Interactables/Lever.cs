@@ -79,7 +79,7 @@ public class Lever : Interactable
     private bool _isDragging;
     private bool _isInteractable = true;
 
-    protected override string DefaultInteractVerb => "Pull";
+    protected override string DefaultInteractVerb => Loc.N("Pull");
 
     public override void OnNetworkSpawn()
     {

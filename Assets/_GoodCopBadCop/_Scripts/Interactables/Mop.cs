@@ -248,7 +248,7 @@ public class Mop : PickableObject
     /// Only runs on the owning client.
     /// </summary>
     /// <summary>LMB scrubs with the mop.</summary>
-    public override string GetHeldUseVerb() => "Mop";
+    public override string GetHeldUseVerb() => Loc.N("Mop");
 
     public override void OnStartUse()
     {

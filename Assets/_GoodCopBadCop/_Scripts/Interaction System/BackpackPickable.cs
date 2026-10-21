@@ -16,8 +16,7 @@ using UnityEngine;
 public class BackpackPickable : PickableObject
 {
     private const KeyCode UnequipKey = KeyCode.G;
-    private const string InteractTextEmpty  = "Backpack";
-    private const string InteractTextFormat = "Backpack ({0} stored)";
+    private static readonly string InteractTextEmpty  = Loc.N("Backpack");
 
     [Header("Backpack Audio")]
     [SerializeField] private AudioClip _addItemSound;
@@ -163,7 +162,7 @@ public class BackpackPickable : PickableObject
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
         bool holdingOther = player != null && player.pickupController != null
             && player.pickupController.HeldObject != null && player.pickupController.HeldObject != this;
-        return holdingOther ? "Store item" : base.GetInteractVerb(player);
+        return holdingOther ? Loc.N("Store item") : base.GetInteractVerb(player);
     }
 
     /// <summary>
@@ -191,7 +190,7 @@ public class BackpackPickable : PickableObject
     public override string GetHoldInteractVerb(PlayerInteractionController player)
     {
         if (player.pickupController.HeldObject != null) return null;
-        return _storedItems.Count > 0 ? "take out" : null;
+        return _storedItems.Count > 0 ? Loc.N("take out") : null;
     }
 
     /// <summary>Hold Interact (empty-handed) → extract the oldest stored item into the player's hands.</summary>
@@ -204,7 +203,7 @@ public class BackpackPickable : PickableObject
 
     /// <summary>LMB while held → equip backpack to player's back.</summary>
     /// <summary>LMB puts the backpack on.</summary>
-    public override string GetHeldUseVerb() => "Put on";
+    public override string GetHeldUseVerb() => Loc.N("Put on");
 
     public override void OnStartUse()
     {
@@ -505,7 +504,7 @@ public class BackpackPickable : PickableObject
     private void UpdateInteractText()
     {
         interactText = _storedItems.Count > 0
-            ? string.Format(InteractTextFormat, _storedItems.Count)
+            ? Loc.T("Backpack ({0} stored)", _storedItems.Count)
             : InteractTextEmpty;
     }
 

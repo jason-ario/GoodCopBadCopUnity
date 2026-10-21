@@ -244,7 +244,7 @@ public class InkStamp : Interactable, IPickupSlot
     /// </summary>
     public static event System.Action<InkStamp> OnAnyStampPickedUp;
 
-    protected override string DefaultInteractVerb => "Take stamp";
+    protected override string DefaultInteractVerb => Loc.N("Take stamp");
 
     /// <summary>
     /// "[E] Take stamp" only when Interact would actually take it: the stamp is in the slot and the
@@ -257,7 +257,7 @@ public class InkStamp : Interactable, IPickupSlot
     /// <summary>Only an empty slot takes items (the matching stamp); a filled slot never reports "Not compatible".</summary>
     public override bool AcceptsHeldItems => !_isPlaced.Value;
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Put back";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Put back");
 
     public override void Interact(PlayerInteractionController player)
     {

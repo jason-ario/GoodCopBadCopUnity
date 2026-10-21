@@ -30,7 +30,7 @@ public class Thermometer : PickableObject
     }
 
     /// <summary>LMB (held) takes a temperature reading.</summary>
-    public override string GetHeldUseVerb() => "Take temperature";
+    public override string GetHeldUseVerb() => Loc.N("Take temperature");
 
     public override void OnStartUse()
     {
@@ -58,7 +58,7 @@ public class Thermometer : PickableObject
         }
     }
 
-    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => "Recharge";
+    public override string GetItemUseVerb(PlayerInteractionController player, PickableObject item) => Loc.N("Recharge");
 
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {

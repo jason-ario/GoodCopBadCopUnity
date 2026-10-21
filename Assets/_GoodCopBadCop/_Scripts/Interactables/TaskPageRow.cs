@@ -43,9 +43,10 @@ public class TaskPageRow : MonoBehaviour
     {
         if (_label == null || _threat == null) return;
 
-        string description = _threat.ThreatDescription;
-        _label.text = string.IsNullOrWhiteSpace(description)
-            ? $"- {_threat.ThreatName}"
-            : $"- {_threat.ThreatName} ({description})";
+        string name = Loc.TranslateSource(_threat.ThreatName);
+        string description = Loc.TranslateSource(_threat.ThreatDescription);
+        _label.text = Loc.Verbatim(string.IsNullOrWhiteSpace(description)
+            ? $"- {name}"
+            : $"- {name} ({description})");
     }
 }

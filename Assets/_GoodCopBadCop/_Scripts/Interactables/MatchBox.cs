@@ -147,7 +147,7 @@ public class MatchBox : PickableObject, IIgnitionSource
     /// </summary>
     /// <summary>LMB strikes a match; nothing happens while one is burning or the box is empty.</summary>
     public override string GetHeldUseVerb()
-        => IsLit || _isLighting.Value || _matchCount.Value <= 0 ? null : "Light match";
+        => IsLit || _isLighting.Value || _matchCount.Value <= 0 ? null : Loc.N("Light match");
 
     public override void OnStartUse()
     {

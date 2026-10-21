@@ -10,7 +10,7 @@ public class Guard : Interactable
         base.Awake();
     }
 
-    protected override string DefaultInteractVerb => "Talk";
+    protected override string DefaultInteractVerb => Loc.N("Talk");
 
     /// <summary>
     /// Picks a random blurb and delegates speaking to the SpeakingInteraction component.

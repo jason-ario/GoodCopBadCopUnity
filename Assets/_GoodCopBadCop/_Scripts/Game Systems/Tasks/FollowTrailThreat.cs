@@ -36,7 +36,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     [Header("Threat Properties")]
-    [SerializeField] private string _threatName = "Use UV light to follow the trail of irradiated blood.";
+    [SerializeField, LocalizeField] private string _threatName = "Use UV light to follow the trail of irradiated blood.";
     [Tooltip("Number of coupons the ATM dispenses when the trail destination is discovered.")]
     [SerializeField] private int _couponReward = 10;
 

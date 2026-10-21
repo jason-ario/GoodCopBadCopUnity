@@ -99,7 +99,7 @@ public class SwitchButton : Interactable
         }
     }
 
-    protected override string DefaultInteractVerb => "Press";
+    protected override string DefaultInteractVerb => Loc.N("Press");
 
     public override void Interact(PlayerInteractionController player)
     {

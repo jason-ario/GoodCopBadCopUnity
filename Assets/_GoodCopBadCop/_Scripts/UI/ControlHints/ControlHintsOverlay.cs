@@ -152,7 +152,8 @@ public class ControlHintsOverlay : MonoBehaviour
 
             ControlHintRow row = GetRow(used++);
             if (row == null) break;
-            row.Apply(hint.PrefixFor(gamepad), hint.ResolveIcon(gamepad, _iconDatabase), hint.TextFor(gamepad));
+            row.Apply(Loc.TranslateSource(hint.PrefixFor(gamepad)), hint.ResolveIcon(gamepad, _iconDatabase),
+                      Loc.TranslateSource(hint.TextFor(gamepad)));
             SetActive(row.gameObject, true);
         }
 

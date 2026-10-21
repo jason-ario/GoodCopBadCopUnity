@@ -199,7 +199,7 @@ public class GateController : Interactable, IMutantPassable, ILockable
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
-        return _gateOpen.Value ? "Close" : "Open";
+        return _gateOpen.Value ? Loc.N("Close") : Loc.N("Open");
     }
 
     public override void Interact(PlayerInteractionController player)

@@ -162,7 +162,7 @@ public class ToolsLocker : Interactable, ILockable
     [ContextMenu("Open")]
     public void ForceOpen() => OpenLockerServerRpc();
 
-    protected override string DefaultInteractVerb => "Open";
+    protected override string DefaultInteractVerb => Loc.N("Open");
 
     public override void Interact(PlayerInteractionController player)
     {

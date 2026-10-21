@@ -77,7 +77,7 @@ public class ElectricPanelController : Interactable
     private static string DeadPanelMessage => Loc.T("No current reaching the panel. The fault is at the power station.");
 
     [Tooltip("Reticle verb shown on the panel during a grid outage (instead of 'Open').")]
-    [SerializeField] private string _deadPanelInteractVerb = "Inspect";
+    [SerializeField, LocalizeField] private string _deadPanelInteractVerb = "Inspect";
 
     /// <summary>
     /// Fired on the server whenever any player tries the panel during a grid outage. Day
@@ -137,7 +137,7 @@ public class ElectricPanelController : Interactable
 
     // ─── Interactable override ────────────────────────────────────────────────
 
-    protected override string DefaultInteractVerb => "Open";
+    protected override string DefaultInteractVerb => Loc.N("Open");
 
     public override string GetInteractVerb(PlayerInteractionController player)
         => IsGridOutage && !string.IsNullOrEmpty(_deadPanelInteractVerb)
