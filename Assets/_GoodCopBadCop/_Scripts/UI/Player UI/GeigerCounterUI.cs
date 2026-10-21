@@ -34,18 +34,18 @@ public class GeigerCounterUI : MonoBehaviour
     [SerializeField] private float jitterSmoothing = 4f;
 
     [Header("Arc Fill")]
-    [Tooltip("The Image whose fill represents the current radiation level.")]
+    [Tooltip("The Image whose fill represents the current radiation level. " +
+             "Tinted with the status light's band colour (steady, no pulse).")]
     [SerializeField] private Image arcFillImage;
     [Tooltip("The Image used as the full-arc background gauge.")]
     [SerializeField] private Image arcBgImage;
-    [SerializeField] private Color arcColorLow  = new Color(0.13f, 1.00f, 0.27f);  // green
-    [SerializeField] private Color arcColorHigh = new Color(1.00f, 0.13f, 0.09f);  // red
 
     [Header("Display")]
+    [Tooltip("Readout showing the radiation band as \"Radiation: LOW / MEDIUM / HIGH\". Uses the status light " +
+             "thresholds. Written from code, so its LocalizedText (if any) must have an empty key.")]
     [SerializeField] private TMP_Text radiationValueText;
-    [Tooltip("C# format string for the radiation value. {0} is the float.")]
-    [SerializeField] private string valueFormat = "{0:F1}";
-    [SerializeField] private string valueSuffix = " Sv";
+    [Tooltip("Colour of the \"Radiation:\" prefix. The LOW/MEDIUM/HIGH word uses the status light's band colour.")]
+    [SerializeField] private Color valueLabelColor = new Color(0.85f, 0.85f, 0.85f);
 
     [Header("Crack Overlay – High Radiation Damage")]
     [Tooltip("The Image using the GoodCopBadCop/GlassCrackOverlay material, layered over the gauge glass.")]
@@ -105,6 +105,9 @@ public class GeigerCounterUI : MonoBehaviour
     private bool _isFull;
     private bool _isPreview;
 
+    /// <summary>Band currently shown by the readout (0 low, 1 medium, 2 high; -1 = not written yet).</summary>
+    private int _shownBand = -1;
+
     // ── Preview (static display copies, e.g. the guidebook) ────────────────────
 
     /// <summary>
@@ -131,14 +134,12 @@ public class GeigerCounterUI : MonoBehaviour
         if (arcFillImage != null)
         {
             arcFillImage.fillAmount = normalized;
-            arcFillImage.color      = Color.Lerp(arcColorLow, arcColorHigh, normalized);
+            arcFillImage.color      = GetLightColor(normalized, out _, out _);
         }
-
-        if (radiationValueText != null)
-            radiationValueText.text = string.Format(valueFormat, normalized * maxRadiation) + valueSuffix;
 
         // Steady (non-blinking) bulb colour for the band.
         _normalizedRadiation = normalized;
+        RefreshValueText(force: true);
         if (statusLightImage != null)
             statusLightImage.color = GetLightColor(normalized, out _, out _);
 
@@ -165,9 +166,16 @@ public class GeigerCounterUI : MonoBehaviour
 
     private void OnEnable()
     {
-        if (_isPreview) return;
+        Loc.LanguageChanged += OnLanguageChanged;
+        if (_isPreview)
+        {
+            RefreshValueText(force: true);
+            return;
+        }
         SubscribeTo(SpectateManager.HudSubject);
     }
+
+    private void OnLanguageChanged() => RefreshValueText(force: true);
 
     private void Update()
     {
@@ -191,6 +199,7 @@ public class GeigerCounterUI : MonoBehaviour
 
     private void OnDisable()
     {
+        Loc.LanguageChanged -= OnLanguageChanged;
         SubscribeTo(null);
     }
 
@@ -213,7 +222,7 @@ public class GeigerCounterUI : MonoBehaviour
         if (arcFillImage != null)
         {
             arcFillImage.fillAmount    = 0f;
-            arcFillImage.color         = arcColorLow;
+            arcFillImage.color         = lightColorSafe;
         }
     }
 
@@ -286,13 +295,11 @@ public class GeigerCounterUI : MonoBehaviour
         if (arcFillImage != null)
         {
             arcFillImage.fillAmount = normalized;
-            arcFillImage.color      = Color.Lerp(arcColorLow, arcColorHigh, normalized);
+            arcFillImage.color      = GetLightColor(normalized, out _, out _);
         }
 
-        if (radiationValueText != null)
-            radiationValueText.text = string.Format(valueFormat, current) + valueSuffix;
-
         _normalizedRadiation = normalized;
+        RefreshValueText(force: false);
 
         // ── Crack overlay and shake – both scale with the overall/accumulated radiation ────
         _crackProgressTarget = Mathf.Clamp01(Mathf.InverseLerp(crackStartThreshold, 1f, normalized));
@@ -355,6 +362,44 @@ public class GeigerCounterUI : MonoBehaviour
             Time.deltaTime * crackSmoothSpeed);
 
         _crackMaterialInstance.SetFloat(CrackProgressId, _crackProgressCurrent);
+    }
+
+    // ── Readout ────────────────────────────────────────────────────────────────
+
+    /// <summary>0 = low, 1 = medium, 2 = high, using the same thresholds as the status light.</summary>
+    private int GetRadiationBand(float normalized)
+    {
+        if (normalized >= lightDangerThreshold)  return 2;
+        if (normalized >= lightWarningThreshold) return 1;
+        return 0;
+    }
+
+    /// <summary>
+    /// Writes "Radiation: LOW / MEDIUM / HIGH". Only rewrites when the band changes (or when forced,
+    /// e.g. after a language change) because radiation events arrive every frame.
+    /// </summary>
+    private void RefreshValueText(bool force)
+    {
+        if (radiationValueText == null) return;
+
+        int band = GetRadiationBand(_normalizedRadiation);
+        if (!force && band == _shownBand) return;
+        _shownBand = band;
+
+        string level = band switch
+        {
+            2 => Loc.T("HIGH"),
+            1 => Loc.T("MEDIUM"),
+            _ => Loc.T("LOW"),
+        };
+
+        // Prefix in the label colour, level word tinted with the bulb's steady band colour (rich text).
+        string levelHex = ColorUtility.ToHtmlStringRGB(GetLightColor(_normalizedRadiation, out _, out _));
+        string coloredLevel = "<color=#" + levelHex + ">" + level + "</color>";
+
+        radiationValueText.color = valueLabelColor;
+        // Already localized: Verbatim stops render-time localization from processing the combined string again.
+        radiationValueText.text  = Loc.Verbatim(Loc.T("Radiation: {0}", coloredLevel));
     }
 
     // ── Status light ───────────────────────────────────────────────────────────
