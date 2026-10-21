@@ -42,6 +42,9 @@ public class ControlHintsOverlay : MonoBehaviour
 
     private readonly List<ControlHintRow> _rows = new List<ControlHintRow>();
 
+    // Keeps every pooled row's labels at one shared size so rows never differ in height.
+    private TextSizeGroup _sizeGroup;
+
     /// <summary>
     /// Shows <paramref name="hints"/> for <paramref name="owner"/>, replacing any previous request from the
     /// same owner and moving it to the top. The list is read again on every refresh, so keep it unchanged
@@ -93,6 +96,12 @@ public class ControlHintsOverlay : MonoBehaviour
     {
         _instance = this;
         SetActive(_root, false);
+
+        if (_rowContainer != null)
+        {
+            if (!_rowContainer.TryGetComponent(out _sizeGroup)) _sizeGroup = _rowContainer.gameObject.AddComponent<TextSizeGroup>();
+            _sizeGroup.measureInactive = true;
+        }
     }
 
     private void OnDestroy()
@@ -148,7 +157,12 @@ public class ControlHintsOverlay : MonoBehaviour
         }
 
         for (int i = used; i < _rows.Count; i++)
+        {
+            _rows[i].Clear();
             SetActive(_rows[i].gameObject, false);
+        }
+
+        if (_sizeGroup != null) _sizeGroup.MarkDirty();
     }
 
     private ControlHintRow GetRow(int index)
@@ -160,9 +174,23 @@ public class ControlHintsOverlay : MonoBehaviour
                 Debug.LogWarning("[ControlHintsOverlay] Row prefab or row container is not assigned.", this);
                 return null;
             }
-            _rows.Add(Instantiate(_rowPrefab, _rowContainer));
+            ControlHintRow row = Instantiate(_rowPrefab, _rowContainer);
+            _rows.Add(row);
+            if (_sizeGroup != null)
+            {
+                Register(row.PrefixLabel);
+                Register(row.Label);
+            }
         }
         return _rows[index];
+    }
+
+    private void Register(TMPro.TMP_Text t)
+    {
+        if (t == null) return;
+        float max = t.enableAutoSizing ? t.fontSizeMax : t.fontSize;
+        float min = t.enableAutoSizing ? t.fontSizeMin : max;
+        _sizeGroup.AddMember(t, max, min);
     }
 
     private static void SetActive(GameObject go, bool active)
