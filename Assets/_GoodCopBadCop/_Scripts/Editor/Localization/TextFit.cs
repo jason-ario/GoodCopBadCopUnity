@@ -100,38 +100,6 @@ public static class TextFit
         return rows;
     }
 
-    /// <summary>
-    /// Rows for a single prefab ("Assets/...prefab") or loaded scene ("Assets/...unity"), using the same rules as <see cref="Scan"/>.
-    /// Returns null when the prefab doesn't exist or the scene isn't loaded.
-    /// </summary>
-    public static List<FitRow> ScanAsset(string assetPath)
-    {
-        if (string.IsNullOrEmpty(assetPath)) return null;
-        var rows = new List<FitRow>();
-
-        if (assetPath.EndsWith(".unity"))
-        {
-            var scene = SceneManager.GetSceneByPath(assetPath);
-            if (!scene.IsValid() || !scene.isLoaded) return null;
-            foreach (var go in scene.GetRootGameObjects())
-                foreach (var t in go.GetComponentsInChildren<TMP_Text>(true))
-                {
-                    if (PrefabUtility.IsPartOfPrefabInstance(t)) continue;
-                    rows.Add(Make(t, scene.path, true, null));
-                }
-            return rows;
-        }
-
-        var root = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
-        if (root == null) return null;
-        foreach (var t in root.GetComponentsInChildren<TMP_Text>(true))
-        {
-            if (PrefabUtility.GetCorrespondingObjectFromSource(t) != null) continue;
-            rows.Add(Make(t, assetPath, false, root.transform));
-        }
-        return rows;
-    }
-
     private static FitRow Make(TMP_Text t, string assetPath, bool isScene, Transform root)
     {
         var row = new FitRow { tmp = t, assetPath = assetPath, isScene = isScene };
@@ -249,14 +217,8 @@ public static class TextFit
         return t.enableAutoSizing == auto && t.textWrappingMode == wrap && t.overflowMode == overflow;
     }
 
-    /// <summary>
-    /// Applies each row's chosen category. Returns how many components changed.
-    /// minRatioOverride: when above 0, replaces the category's min-size ratio.
-    /// growHeightForEnglish: for anchored, non-layout Header/Body texts, first raises the rect height so English fits at its design size.
-    /// saveScenes: also saves scenes that were changed (the Text Fit tab only marks them dirty).
-    /// </summary>
-    public static int Apply(IEnumerable<FitRow> rows, LocalizationSettings settings,
-        float minRatioOverride = -1f, bool growHeightForEnglish = false, bool saveScenes = false)
+    /// <summary>Applies each row's chosen category. Returns how many components changed.</summary>
+    public static int Apply(IEnumerable<FitRow> rows, LocalizationSettings settings)
     {
         Undo.SetCurrentGroupName("Text Fit");
         int group = Undo.GetCurrentGroup();
@@ -282,13 +244,9 @@ public static class TextFit
             }
             else
             {
-                if (growHeightForEnglish && (row.chosen == FitCategory.Header || row.chosen == FitCategory.Body))
-                    GrowHeightForEnglish(t, row, design);
-
-                float ratio = minRatioOverride > 0f ? minRatioOverride : MinRatio(row.chosen, settings);
                 t.fontSize = design;
                 t.fontSizeMax = design;
-                t.fontSizeMin = Mathf.Min(design, Mathf.Round(design * ratio * 10f) / 10f);
+                t.fontSizeMin = Mathf.Min(design, Mathf.Round(design * MinRatio(row.chosen, settings) * 10f) / 10f);
                 t.enableAutoSizing = auto;
                 t.textWrappingMode = wrap;
                 t.overflowMode = overflow;
@@ -301,43 +259,11 @@ public static class TextFit
         }
 
         foreach (var root in prefabRoots) PrefabUtility.SavePrefabAsset(root);
-        foreach (var s in scenes)
-        {
-            EditorSceneManager.MarkSceneDirty(s);
-            if (saveScenes) EditorSceneManager.SaveScene(s);
-        }
+        foreach (var s in scenes) EditorSceneManager.MarkSceneDirty(s);
         Undo.CollapseUndoOperations(group);
 
         foreach (var row in rows) Refresh(row);
         return changed;
-    }
-
-    /// <summary>Raises an anchored rect's height to English's preferred height at design size. Layout-driven or stretched rects are left alone.</summary>
-    private static void GrowHeightForEnglish(TMP_Text t, FitRow row, float design)
-    {
-        if (row.inLayout) return;
-        var rt = t.rectTransform;
-        if (!Mathf.Approximately(rt.anchorMin.y, rt.anchorMax.y)) return;
-        float width = rt.rect.width;
-        if (width < 1f) return;
-
-        bool wasAuto = t.enableAutoSizing;
-        float wasSize = t.fontSize;
-        var wasWrap = t.textWrappingMode;
-        t.enableAutoSizing = false;
-        t.fontSize = design;
-        t.textWrappingMode = TextWrappingModes.Normal;
-        float needed = t.GetPreferredValues(t.text, width, Mathf.Infinity).y;
-        t.enableAutoSizing = wasAuto;
-        t.fontSize = wasSize;
-        t.textWrappingMode = wasWrap;
-
-        if (needed <= rt.rect.height + 0.01f) return;
-        Undo.RecordObject(rt, "Text Fit");
-        var sd = rt.sizeDelta;
-        sd.y = Mathf.Ceil(needed * 10f) / 10f;
-        rt.sizeDelta = sd;
-        EditorUtility.SetDirty(rt);
     }
 
     // ---------------------------------------------------------------- size groups
@@ -395,8 +321,6 @@ public static class TextFit
             float design = t.enableAutoSizing ? t.fontSizeMax : t.fontSize;
             var cat = row.chosen == FitCategory.Skip || row.chosen == FitCategory.Grow ? FitCategory.Label : row.chosen;
             float min = Mathf.Round(design * MinRatio(cat, settings) * 10f) / 10f;
-            // A preset applied before grouping already chose the min; keep it.
-            if (t.enableAutoSizing && t.fontSizeMin > 0f && t.fontSizeMin <= design) min = t.fontSizeMin;
             Target(cat, out _, out var wrap, out var overflow);
             t.textWrappingMode = wrap;
             t.overflowMode = overflow;

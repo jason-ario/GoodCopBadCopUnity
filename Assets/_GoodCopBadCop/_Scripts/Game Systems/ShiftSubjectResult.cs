@@ -113,8 +113,19 @@ public static class ShiftAnomalyCategories
         }
     }
 
-    /// <summary>Player-facing anomaly name, e.g. "RandomTumorAnomaly" -> "Tumors". See <see cref="AnomalyDisplayNames"/>.</summary>
-    public static string PrettifyTypeName(string typeName) => AnomalyDisplayNames.Get(typeName);
+    /// <summary>"BlackEyesAnomaly" -> "Black Eyes", "IDNumberWrongAnomaly" -> "ID Number Wrong".</summary>
+    public static string PrettifyTypeName(string typeName)
+    {
+        if (string.IsNullOrEmpty(typeName))
+            return "Unknown Anomaly";
+
+        const string suffix = "Anomaly";
+        if (typeName.Length > suffix.Length && typeName.EndsWith(suffix, StringComparison.Ordinal))
+            typeName = typeName.Substring(0, typeName.Length - suffix.Length);
+
+        return System.Text.RegularExpressions.Regex.Replace(
+            typeName, "(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ");
+    }
 }
 
 /// <summary>

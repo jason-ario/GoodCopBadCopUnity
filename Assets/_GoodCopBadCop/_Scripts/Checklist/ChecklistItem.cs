@@ -132,11 +132,36 @@ public class ChecklistItem : MonoBehaviour
     }
 
     /// <summary>
-    /// Converts an anomaly C# type name into its player-facing checklist label, e.g.
-    /// "RandomTumorAnomaly" → "Tumors". See <see cref="AnomalyDisplayNames"/>.
+    /// Converts an anomaly C# type name into a readable checklist label, e.g.
+    /// "ExpirationDateAnomaly" → "Expiration Date", "IDNumberWrongAnomaly" → "ID Number Wrong".
     /// </summary>
-    private static string HumanizeAnomalyTypeName(string typeName) =>
-        string.IsNullOrEmpty(typeName) ? string.Empty : AnomalyDisplayNames.Get(typeName);
+    private static string HumanizeAnomalyTypeName(string typeName)
+    {
+        if (string.IsNullOrEmpty(typeName)) return string.Empty;
+
+        const string suffix = "Anomaly";
+        string trimmed = typeName.EndsWith(suffix, StringComparison.Ordinal)
+            ? typeName.Substring(0, typeName.Length - suffix.Length)
+            : typeName;
+
+        if (trimmed.Length == 0) return typeName;
+
+        // Insert a space before each capital letter that starts a new word, while keeping
+        // consecutive capitals (acronyms like "ID") together as a single word.
+        var sb = new System.Text.StringBuilder(trimmed.Length + 8);
+        sb.Append(trimmed[0]);
+        for (int i = 1; i < trimmed.Length; i++)
+        {
+            char c = trimmed[i];
+            bool prevIsLower = char.IsLower(trimmed[i - 1]);
+            bool startsAcronymWord = char.IsUpper(c) && i + 1 < trimmed.Length && char.IsLower(trimmed[i + 1])
+                                      && char.IsUpper(trimmed[i - 1]);
+            if (char.IsUpper(c) && (prevIsLower || startsAcronymWord))
+                sb.Append(' ');
+            sb.Append(c);
+        }
+        return sb.ToString();
+    }
 
     /// <summary>Routes a checkbox click through the network via ExamPage.</summary>
     public void OnCheckboxClicked(bool currentValue)

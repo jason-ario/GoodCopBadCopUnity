@@ -374,7 +374,7 @@ public class AnomalyDebugUI : MonoBehaviour
         var nameLE = nameLabelGO.AddComponent<LayoutElement>();
         nameLE.flexibleWidth = 1f;
         var nameTmp = nameLabelGO.AddComponent<TextMeshProUGUI>();
-        nameTmp.text      = anomaly.ReportDisplayName;
+        nameTmp.text      = anomaly.GetType().Name.Replace("Anomaly", "");
         nameTmp.fontSize  = RowFontSize;
         nameTmp.color     = Color.white;
         nameTmp.alignment = TextAlignmentOptions.MidlineLeft;
