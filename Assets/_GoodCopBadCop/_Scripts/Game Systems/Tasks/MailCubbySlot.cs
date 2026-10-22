@@ -78,6 +78,8 @@ public class MailCubbySlot : MonoBehaviour
     /// The resident's name abbreviated for the tape label, e.g. "Sandro P." instead of the full
     /// "Sandro Petrov" — keeps <see cref="ResidentName"/> (used for delivery matching) untouched.
     /// Falls back to the full first name if there is no last name to abbreviate.
+    /// Display only: names are translated into the local language via <see cref="Loc.Name"/>
+    /// (matching the ID card / registry spelling), so each client shows its own language.
     /// </summary>
     public string AbbreviatedResidentName
     {
@@ -85,8 +87,8 @@ public class MailCubbySlot : MonoBehaviour
         {
             if (_assignedResident == null) return string.Empty;
 
-            string firstName = _assignedResident.FirstName?.Trim() ?? string.Empty;
-            string lastName = _assignedResident.LastName?.Trim() ?? string.Empty;
+            string firstName = Loc.Name(_assignedResident.FirstName?.Trim() ?? string.Empty)?.Trim() ?? string.Empty;
+            string lastName = Loc.Name(_assignedResident.LastName?.Trim() ?? string.Empty)?.Trim() ?? string.Empty;
 
             if (string.IsNullOrEmpty(lastName)) return firstName;
             if (string.IsNullOrEmpty(firstName)) return $"{lastName[0]}.";
@@ -128,6 +130,17 @@ public class MailCubbySlot : MonoBehaviour
             Debug.LogWarning($"[MailCubbySlot] '{name}' has no assigned resident — this cubby will never accept a delivery.", this);
 
         RefreshLabel();
+    }
+
+    private void OnEnable()
+    {
+        Loc.LanguageChanged += RefreshLabel;
+        RefreshLabel();
+    }
+
+    private void OnDisable()
+    {
+        Loc.LanguageChanged -= RefreshLabel;
     }
 
     private void OnDestroy()

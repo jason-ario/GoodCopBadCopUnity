@@ -587,14 +587,27 @@ public class MailPackageItem : PickableObject
         rb.AddForce(kick, ForceMode.Impulse);
     }
 
+    private void OnEnable()  { Loc.LanguageChanged += RefreshLabel; }
+    private void OnDisable() { Loc.LanguageChanged -= RefreshLabel; }
+
+    /// <summary>
+    /// Rebuilds the package's visible text in the local language. <see cref="ResidentName"/> and
+    /// <see cref="GoodsLabel"/> stay replicated in English (used for logs/state); only the display
+    /// is translated, so every client sees its own language and a language switch refreshes live.
+    /// </summary>
     private void RefreshLabel()
     {
+        string displayName  = Loc.Name(ResidentName);
+        string displayGoods = Loc.TranslateSource(GoodsLabel);
+
         if (_residentNameText != null)
-            _residentNameText.text = ResidentName;
+            _residentNameText.text = displayName;
 
         if (_goodsLabelText != null)
-            _goodsLabelText.text = GoodsLabel;
+            _goodsLabelText.text = displayGoods;
 
-        interactText = string.IsNullOrEmpty(ResidentName) ? "Package" : $"Package — {ResidentName} ({GoodsLabel})";
+        interactText = string.IsNullOrEmpty(ResidentName)
+            ? Loc.T("Package")
+            : Loc.T("Package — {0} ({1})", displayName, displayGoods);
     }
 }

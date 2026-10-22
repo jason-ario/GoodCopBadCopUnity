@@ -22,7 +22,8 @@ public sealed class ProfileView : MonoBehaviour
         if (suspectData == null)
             return;
 
-        SetText(nameLabel, "Name: " + suspectData.FirstName + " " + suspectData.LastName);
+        // Registry name in the local language, matching the documents (PC re-renders on language change).
+        SetText(nameLabel, "Name: " + Loc.Name(suspectData.FirstName) + " " + Loc.Name(suspectData.LastName));
         SetText(dateOfBirth, "DoB: " + suspectData.DateOfBirth);
         SetText(sex, "Sex: " + suspectData.Sex);
         SetText(status, "Status: " + NormalizeUnknown(displayStatus));

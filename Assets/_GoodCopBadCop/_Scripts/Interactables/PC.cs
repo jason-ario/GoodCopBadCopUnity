@@ -1201,7 +1201,7 @@ public class PC : Interactable
         if (!HasMetSuspect(suspectData)) return "unknown";
         SuspectPaperworkModel model = new SuspectPaperworkModel();
         SuspectPaperworkService service = new SuspectPaperworkService(model);
-        SuspectPaperworkState state = service.BuildForPreview(suspectData, suspectData.IDPhoto, Array.Empty<string>(), GetPaperworkDay(), GetSuspectSetIndex(suspectData));
+        SuspectPaperworkState state = service.BuildForPreview(suspectData, suspectData.IDPhoto, Array.Empty<string>(), GetPaperworkDay(), GetSuspectSetIndex(suspectData), localize: true);
         model.Dispose();
         return string.IsNullOrWhiteSpace(state.EntryReason) ? "unknown" : state.EntryReason;
     }

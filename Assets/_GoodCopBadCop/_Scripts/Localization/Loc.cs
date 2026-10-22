@@ -404,6 +404,12 @@ public static class Loc
     /// <summary>Sheet holding character names (keys <c>name.&lt;lowercase&gt;</c>). Excluded from source-text lookup.</summary>
     public const string NamesSheet = "Names";
 
+    /// <summary>Document vocabulary (doc.month.*, doc.sex.*), resolved by key from paperwork code. Excluded from source-text lookup.</summary>
+    public const string DocumentsSheet = "Documents";
+
+    /// <summary>Sheets whose entries are only resolved by key, never by render-time source-text matching.</summary>
+    public static bool IsLookupOnlySheet(string sheet) => sheet == NamesSheet || sheet == DocumentsSheet;
+
     /// <summary>Key for a character name or name word: <c>name.</c> + lowercase, spaces as underscores.</summary>
     public static string NameKey(string englishName)
     {
@@ -485,7 +491,7 @@ public static class Loc
         _sourceIndex = new Dictionary<string, List<LocEntry>>();
         foreach (var e in _table.entries)
         {
-            if (string.IsNullOrEmpty(e.source) || e.sheet == NamesSheet) continue;
+            if (string.IsNullOrEmpty(e.source) || IsLookupOnlySheet(e.sheet)) continue;
             if (!_sourceIndex.TryGetValue(e.source, out var list)) _sourceIndex[e.source] = list = new List<LocEntry>();
             list.Add(e);
         }

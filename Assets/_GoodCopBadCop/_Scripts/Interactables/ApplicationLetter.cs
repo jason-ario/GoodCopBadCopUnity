@@ -26,6 +26,8 @@ public class ApplicationLetter : FolderItem
     private readonly NetworkVariable<FixedString512Bytes> syncedEntryReason = new(new FixedString512Bytes(string.Empty));
     private readonly NetworkVariable<bool> syncedVisible = new(true);
     private readonly NetworkVariable<bool> syncedShowDrawing = new(false);
+    // Language-neutral paperwork description: each client rebuilds the form (including its anomalies) in its own language.
+    private readonly NetworkVariable<PaperworkSpec> syncedSpec = new();
 
     public override void OnNetworkSpawn()
     {
@@ -39,6 +41,8 @@ public class ApplicationLetter : FolderItem
         syncedEntryReason.OnValueChanged += OnEntryReasonChanged;
         syncedVisible.OnValueChanged += OnVisibleChanged;
         syncedShowDrawing.OnValueChanged += OnShowDrawingChanged;
+        syncedSpec.OnValueChanged += OnSpecChanged;
+        Loc.LanguageChanged += ApplySyncedState;
 
         ApplySyncedState();
     }
@@ -53,6 +57,8 @@ public class ApplicationLetter : FolderItem
         syncedEntryReason.OnValueChanged -= OnEntryReasonChanged;
         syncedVisible.OnValueChanged -= OnVisibleChanged;
         syncedShowDrawing.OnValueChanged -= OnShowDrawingChanged;
+        syncedSpec.OnValueChanged -= OnSpecChanged;
+        Loc.LanguageChanged -= ApplySyncedState;
 
         base.OnNetworkDespawn();
     }
@@ -81,7 +87,7 @@ public class ApplicationLetter : FolderItem
             suspectData);
     }
 
-    public void SetPaperworkState(SuspectPaperworkState state, SuspectData suspectData)
+    public void SetPaperworkState(SuspectPaperworkState state, SuspectData suspectData, PaperworkSpec spec = default)
     {
         if (!IsServer)
             return;
@@ -93,6 +99,7 @@ public class ApplicationLetter : FolderItem
         syncedExpirationDate.Value = ToFixedString(state.ApplicationExpirationDate);
         syncedEntryReason.Value = ToFixedString(state.EntryReason);
         syncedVisible.Value = state.ApplicationVisible;
+        syncedSpec.Value = spec;
 
         ApplySyncedState();
     }
@@ -114,8 +121,26 @@ public class ApplicationLetter : FolderItem
         ApplyEntryReasonVisual(showDrawing);
     }
 
+    /// <summary>
+    /// With a replicated <see cref="PaperworkSpec"/>, rebuilds the form in the local language (misspelled name in the
+    /// local alphabet, translated months/sex/entry reason, same anomalies as every other client). Visibility always
+    /// comes from the replicated flag. Without a spec, the replicated English strings are shown.
+    /// </summary>
     private void ApplySyncedState()
     {
+        PaperworkSpec spec = syncedSpec.Value;
+        SuspectData data = spec.IsValid ? SuspectDataLookup.Find(spec.DataName.ToString()) : null;
+        if (data != null)
+        {
+            SuspectPaperworkState local = SuspectPaperworkService.BuildFromSpec(data, spec);
+            ApplyState(new SuspectPaperworkState(
+                local.ApplicationFullName, local.ApplicationBirthDate, local.ApplicationSex, local.ApplicationIdNumber,
+                local.ApplicationFullName, local.ApplicationBirthDate, local.ApplicationSex, local.ApplicationIdNumber,
+                local.ApplicationExpirationDate, local.EntryReason, string.Empty, false,
+                syncedVisible.Value, syncedVisible.Value, false, null));
+            return;
+        }
+
         ApplyState(new SuspectPaperworkState(
             syncedFullName.Value.ToString(),
             syncedBirthDate.Value.ToString(),
@@ -156,12 +181,13 @@ public class ApplicationLetter : FolderItem
             reasonForEntryText.gameObject.SetActive(!showDrawing);
     }
 
-    private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => nameText.text = current.ToString();
-    private void OnBirthDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => birthDateText.text = current.ToString();
-    private void OnSexChanged(FixedString512Bytes previous, FixedString512Bytes current) => sexText.text = current.ToString();
-    private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => idNumberText.text = current.ToString();
-    private void OnExpirationDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => SetText(expirationDateText, current.ToString());
-    private void OnEntryReasonChanged(FixedString512Bytes previous, FixedString512Bytes current) => reasonForEntryText.text = current.ToString();
+    private void OnSpecChanged(PaperworkSpec previous, PaperworkSpec current) => ApplySyncedState();
+    private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedState();
+    private void OnBirthDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedState();
+    private void OnSexChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedState();
+    private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedState();
+    private void OnExpirationDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedState();
+    private void OnEntryReasonChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedState();
     private void OnShowDrawingChanged(bool previous, bool current) => ApplyEntryReasonVisual(current);
     private void OnVisibleChanged(bool previous, bool current)
     {

@@ -8,8 +8,95 @@ namespace GoodCopBadCop.SuspectPaperwork
 {
     public interface ISuspectPaperworkService
     {
-        SuspectPaperworkState BuildForSuspect(global::SuspectCharacter suspect, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null);
-        SuspectPaperworkState BuildForPreview(global::SuspectData data, Texture idPhoto, IEnumerable<string> activeAnomalyTypeNames, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null);
+        SuspectPaperworkState BuildForSuspect(global::SuspectCharacter suspect, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null, bool localize = false);
+        SuspectPaperworkState BuildForPreview(global::SuspectData data, Texture idPhoto, IEnumerable<string> activeAnomalyTypeNames, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null, bool localize = false);
+    }
+
+    /// <summary>
+    /// Language-neutral description of a suspect's paperwork, replicated on documents so every client can rebuild the
+    /// text in its OWN language (<see cref="SuspectPaperworkService.BuildFromSpec"/>). Only identifiers and the
+    /// documentation-anomaly mask travel; misspellings and date mutations are re-derived locally from the same seeds.
+    /// </summary>
+    public struct PaperworkSpec : Unity.Netcode.INetworkSerializable, IEquatable<PaperworkSpec>
+    {
+        public Unity.Collections.FixedString64Bytes DataName;
+        public int Day;
+        public int SuspectIndex;
+        public int EntryReasonIndex;
+        public ushort Anomalies;
+
+        public bool IsValid => DataName.Length > 0;
+
+        public void NetworkSerialize<T>(Unity.Netcode.BufferSerializer<T> serializer) where T : Unity.Netcode.IReaderWriter
+        {
+            serializer.SerializeValue(ref DataName);
+            serializer.SerializeValue(ref Day);
+            serializer.SerializeValue(ref SuspectIndex);
+            serializer.SerializeValue(ref EntryReasonIndex);
+            serializer.SerializeValue(ref Anomalies);
+        }
+
+        public bool Equals(PaperworkSpec other) =>
+            DataName.Equals(other.DataName) && Day == other.Day && SuspectIndex == other.SuspectIndex &&
+            EntryReasonIndex == other.EntryReasonIndex && Anomalies == other.Anomalies;
+    }
+
+    /// <summary>
+    /// Resolves the <see cref="global::SuspectData"/> named in a <see cref="PaperworkSpec"/> on any client: from the live
+    /// suspect object when given, otherwise from loaded SuspectData assets (documents outlive their suspect in folders).
+    /// </summary>
+    public static class SuspectDataLookup
+    {
+        private static readonly Dictionary<string, global::SuspectData> Cache = new(StringComparer.Ordinal);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => Cache.Clear();
+
+        public static global::SuspectData Find(string assetName, global::SuspectCharacter liveSuspect = null)
+        {
+            if (string.IsNullOrEmpty(assetName)) return null;
+            if (liveSuspect != null && liveSuspect.Data != null && liveSuspect.Data.name == assetName)
+                return liveSuspect.Data;
+
+            if (Cache.TryGetValue(assetName, out global::SuspectData cached) && cached != null)
+                return cached;
+
+            Cache.Clear();
+            foreach (global::SuspectData data in Resources.FindObjectsOfTypeAll<global::SuspectData>())
+                if (data != null && !Cache.ContainsKey(data.name))
+                    Cache[data.name] = data;
+
+            return Cache.TryGetValue(assetName, out cached) ? cached : null;
+        }
+    }
+
+    /// <summary>Bit mask of the anomaly types that change paperwork text (see <see cref="PaperworkSpec"/>).</summary>
+    public static class PaperworkAnomalyMask
+    {
+        private static readonly string[] TypeNames =
+        {
+            nameof(NameWrongAnomaly), nameof(BirthDateWrongAnomaly), nameof(IDNumberWrongAnomaly), nameof(SexWrongAnomaly),
+            nameof(ExpirationDateAnomaly), nameof(InvalidEntryReasonAnomaly), nameof(MissingDocumentAnomaly),
+            nameof(FakeIdAnomaly), nameof(PhotoIDMismatchAnomaly)
+        };
+
+        public static ushort FromTypeNames(IEnumerable<string> typeNames)
+        {
+            ushort mask = 0;
+            if (typeNames == null) return mask;
+            foreach (string name in typeNames)
+            {
+                int bit = Array.IndexOf(TypeNames, name);
+                if (bit >= 0) mask |= (ushort)(1 << bit);
+            }
+            return mask;
+        }
+
+        public static IEnumerable<string> ToTypeNames(ushort mask)
+        {
+            for (int bit = 0; bit < TypeNames.Length; bit++)
+                if ((mask & (1 << bit)) != 0) yield return TypeNames[bit];
+        }
     }
 
     public sealed class SuspectPaperworkService : ISuspectPaperworkService
@@ -21,7 +108,7 @@ namespace GoodCopBadCop.SuspectPaperwork
             this.model = model;
         }
 
-        public SuspectPaperworkState BuildForSuspect(global::SuspectCharacter suspect, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null)
+        public SuspectPaperworkState BuildForSuspect(global::SuspectCharacter suspect, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null, bool localize = false)
         {
             if (suspect == null || suspect.Data == null)
             {
@@ -29,26 +116,21 @@ namespace GoodCopBadCop.SuspectPaperwork
                 return SuspectPaperworkState.Empty;
             }
 
-            IEnumerable<string> activeAnomalyTypeNames = suspect.AnomalyController != null
-                ? suspect.AnomalyController.activeAnomalies
-                    .Where(anomaly => anomaly != null)
-                    .Select(anomaly => anomaly.GetType().Name)
-                : Enumerable.Empty<string>();
-
             SuspectPaperworkState state = BuildState(
                 suspect.Data,
                 suspect.IDPhoto,
-                activeAnomalyTypeNames,
+                ActiveAnomalyTypeNames(suspect),
                 currentDay,
                 suspectIndex,
                 suspect.ChosenEntryReasonIndex,
-                idPhotoPool);
+                idPhotoPool,
+                localize);
 
             model.SetCurrent(state);
             return state;
         }
 
-        public SuspectPaperworkState BuildForPreview(global::SuspectData data, Texture idPhoto, IEnumerable<string> activeAnomalyTypeNames, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null)
+        public SuspectPaperworkState BuildForPreview(global::SuspectData data, Texture idPhoto, IEnumerable<string> activeAnomalyTypeNames, int currentDay, int suspectIndex, IEnumerable<Texture> idPhotoPool = null, bool localize = false)
         {
             SuspectPaperworkState state = BuildState(
                 data,
@@ -57,10 +139,47 @@ namespace GoodCopBadCop.SuspectPaperwork
                 currentDay,
                 suspectIndex,
                 chosenEntryReasonIndex: 0,
-                idPhotoPool);
+                idPhotoPool,
+                localize);
 
             model.SetCurrent(state);
             return state;
+        }
+
+        /// <summary>Language-neutral spec for a suspect's paperwork, replicated on the spawned documents.</summary>
+        public static PaperworkSpec BuildSpec(global::SuspectCharacter suspect, int currentDay, int suspectIndex)
+        {
+            if (suspect == null || suspect.Data == null) return default;
+            return new PaperworkSpec
+            {
+                DataName = new Unity.Collections.FixedString64Bytes(suspect.Data.name),
+                Day = currentDay,
+                SuspectIndex = suspectIndex,
+                EntryReasonIndex = suspect.ChosenEntryReasonIndex,
+                Anomalies = PaperworkAnomalyMask.FromTypeNames(ActiveAnomalyTypeNames(suspect))
+            };
+        }
+
+        /// <summary>
+        /// Rebuilds paperwork text from a replicated <see cref="PaperworkSpec"/> in the LOCAL language. Misspelled names
+        /// use the local alphabet, month names and sex/entry-reason text are translated, and every mutation uses the same
+        /// seeds as the server, so each client sees the same anomaly in its own language. The photo is not resolved here
+        /// (documents replicate the photo name separately).
+        /// </summary>
+        public static SuspectPaperworkState BuildFromSpec(global::SuspectData data, PaperworkSpec spec)
+        {
+            return BuildState(data, null, PaperworkAnomalyMask.ToTypeNames(spec.Anomalies), spec.Day, spec.SuspectIndex,
+                spec.EntryReasonIndex, null, localize: true);
+        }
+
+        private static IEnumerable<string> ActiveAnomalyTypeNames(global::SuspectCharacter suspect)
+        {
+            return suspect.AnomalyController != null
+                ? suspect.AnomalyController.activeAnomalies
+                    .Where(anomaly => anomaly != null)
+                    .Select(anomaly => anomaly.GetType().Name)
+                    .ToList()
+                : Enumerable.Empty<string>();
         }
 
         private static SuspectPaperworkState BuildState(
@@ -70,14 +189,19 @@ namespace GoodCopBadCop.SuspectPaperwork
             int currentDay,
             int suspectIndex,
             int chosenEntryReasonIndex,
-            IEnumerable<Texture> idPhotoPool)
+            IEnumerable<Texture> idPhotoPool,
+            bool localize = false)
         {
             if (data == null)
                 return SuspectPaperworkState.Empty;
 
+            // English is the source: no translation pass, byte-identical to the original behaviour.
+            localize = localize && Loc.CurrentLanguage != Loc.SourceLanguage;
+
             var active = new HashSet<string>(activeAnomalyTypeNames ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
 
-            string fullName = $"{data.FirstName} {data.LastName}".Trim();
+            string sourceFullName = $"{data.FirstName} {data.LastName}".Trim();
+            string fullName = localize ? $"{Loc.Name(data.FirstName)} {Loc.Name(data.LastName)}".Trim() : sourceFullName;
             string birthDate = data.DateOfBirth;
             string sex = data.Sex;
             string idNumber = data.IDNumber;
@@ -91,10 +215,12 @@ namespace GoodCopBadCop.SuspectPaperwork
             bool applicationVisible = documentsVisible;
             bool isFakeId = documentsVisible && Has(active, nameof(FakeIdAnomaly));
             Texture resolvedIdPhoto = ResolveIdPhoto(data, idPhoto, idPhotoPool, active, documentsVisible, currentDay, suspectIndex);
-            string entryReason = ResolveEntryReason(data, chosenEntryReasonIndex, useInvalidReasons: documentsVisible && Has(active, nameof(InvalidEntryReasonAnomaly)));
+            string entryReason = ResolveEntryReason(data, chosenEntryReasonIndex, useInvalidReasons: documentsVisible && Has(active, nameof(InvalidEntryReasonAnomaly)), localize);
 
+            // Seeds always derive from the English source values, so every language mutates "the same way"
+            // (same number of changes, same positions where the lengths allow) and results stay deterministic.
             if (documentsVisible && Has(active, nameof(NameWrongAnomaly)))
-                applicationFullName = MutateName(applicationFullName, BuildSeed(data, currentDay, suspectIndex, nameof(NameWrongAnomaly), applicationFullName));
+                applicationFullName = MutateName(applicationFullName, BuildSeed(data, currentDay, suspectIndex, nameof(NameWrongAnomaly), sourceFullName));
 
             if (documentsVisible && Has(active, nameof(BirthDateWrongAnomaly)))
                 applicationBirthDate = MutateDocumentDate(applicationBirthDate, BuildSeed(data, currentDay, suspectIndex, nameof(BirthDateWrongAnomaly), applicationBirthDate));
@@ -107,6 +233,17 @@ namespace GoodCopBadCop.SuspectPaperwork
 
             if (documentsVisible && Has(active, nameof(ExpirationDateAnomaly)))
                 applicationExpirationDate = MutateDocumentDate(applicationExpirationDate, BuildSeed(data, currentDay, suspectIndex, nameof(ExpirationDateAnomaly), applicationExpirationDate));
+
+            // Dates and sex are mutated in the English/invariant form (digits only), then rendered in the local language.
+            if (localize)
+            {
+                birthDate = LocalizeDocumentDate(birthDate);
+                applicationBirthDate = LocalizeDocumentDate(applicationBirthDate);
+                expirationDate = LocalizeDocumentDate(expirationDate);
+                applicationExpirationDate = LocalizeDocumentDate(applicationExpirationDate);
+                sex = LocalizeSex(sex);
+                applicationSex = LocalizeSex(applicationSex);
+            }
 
             return new SuspectPaperworkState(
                 fullName,
@@ -156,37 +293,42 @@ namespace GoodCopBadCop.SuspectPaperwork
         private static bool Has(HashSet<string> activeAnomalyTypeNames, string typeName)
             => activeAnomalyTypeNames.Contains(typeName);
 
-        private static string ResolveEntryReason(global::SuspectData data, int chosenEntryReasonIndex, bool useInvalidReasons)
+        private static string ResolveEntryReason(global::SuspectData data, int chosenEntryReasonIndex, bool useInvalidReasons, bool localize)
         {
             string[] reasons = useInvalidReasons
                 ? data.invalidEntryReasons
                 : data.entryReasons;
 
-            string reason = GetReasonAtOrFirst(reasons, chosenEntryReasonIndex);
-            if (!string.IsNullOrWhiteSpace(reason))
-                return reason;
+            int index = GetReasonIndexAtOrFirst(reasons, chosenEntryReasonIndex);
+            if (index >= 0)
+            {
+                string reason = reasons[index];
+                if (!localize) return reason;
+                string field = useInvalidReasons ? nameof(global::SuspectData.invalidEntryReasons) : nameof(global::SuspectData.entryReasons);
+                return Loc.GetFor(data, $"{field}.Array.data[{index}]", reason);
+            }
 
             if (useInvalidReasons)
                 return string.Empty;
 
-            return "Entry";
+            return localize ? Loc.Get("doc.entry_reason.default") : "Entry";
         }
 
-        private static string GetReasonAtOrFirst(string[] reasons, int index)
+        private static int GetReasonIndexAtOrFirst(string[] reasons, int index)
         {
             if (reasons == null || reasons.Length == 0)
-                return null;
+                return -1;
 
             if (index >= 0 && index < reasons.Length && !string.IsNullOrWhiteSpace(reasons[index]))
-                return reasons[index];
+                return index;
 
-            return reasons.FirstOrDefault(reason => !string.IsNullOrWhiteSpace(reason));
+            return Array.FindIndex(reasons, reason => !string.IsNullOrWhiteSpace(reason));
         }
 
         private static string MutateName(string value, int seed)
         {
             if (string.IsNullOrWhiteSpace(value))
-                return "WRONG NAME";
+                return Loc.CurrentLanguage == Loc.SourceLanguage ? "WRONG NAME" : Loc.Get("doc.wrong_name");
 
             char[] chars = value.ToCharArray();
             List<int> candidates = new();
@@ -211,10 +353,56 @@ namespace GoodCopBadCop.SuspectPaperwork
             return new string(chars);
         }
 
+        private const string LatinLetters = "abcdefghijklmnopqrstuvwxyz";
+        private const string CyrillicLetters = "абвгдежзийклмнопрстуфхцчшщъыьэюя";
+
+        /// <summary>
+        /// Replaces a letter with another letter from the SAME script (Cyrillic names get Cyrillic typos), preserving
+        /// case. The replacement always differs from the original so the misspelling is guaranteed to be visible.
+        /// </summary>
         private static char MutateLetterPreservingCase(char original, int seed)
         {
-            char replacement = (char)('a' + PositiveModulo(seed, 26));
+            char lower = char.ToLowerInvariant(original);
+            string alphabet = CyrillicLetters.IndexOf(lower) >= 0 || (lower >= '\u0400' && lower <= '\u04FF') ? CyrillicLetters : LatinLetters;
+            char replacement = alphabet[PositiveModulo(seed, alphabet.Length)];
+            if (replacement == lower)
+                replacement = alphabet[PositiveModulo(seed + 1, alphabet.Length)];
             return char.IsUpper(original) ? char.ToUpperInvariant(replacement) : replacement;
+        }
+
+        // ── Localized rendering of language-neutral values ───────────────────────────
+
+        /// <summary>
+        /// Re-renders an English document date ("19 NOV", "02 March 1990", "02/11/1961") with the local language's
+        /// month names (Names/Documents keys doc.month.short.N / doc.month.full.N), keeping the original casing style.
+        /// Numeric dates and unparseable text are returned unchanged.
+        /// </summary>
+        private static string LocalizeDocumentDate(string value)
+        {
+            if (!TryParseDocumentDate(value, out ParsedDocumentDate parsed) || !parsed.UsesMonthName)
+                return value;
+
+            int month = parsed.Date.Month;
+            string name = Loc.Get((parsed.UsesFullMonthName ? "doc.month.full." : "doc.month.short.") + month);
+            if (parsed.MonthIsUppercase)
+                name = name.ToUpper(Loc.Culture);
+
+            string day = parsed.Date.ToString("dd", CultureInfo.InvariantCulture);
+            return parsed.HasYear
+                ? $"{day} {name} {parsed.Date.ToString("yyyy", CultureInfo.InvariantCulture)}"
+                : $"{day} {name}";
+        }
+
+        /// <summary>Translates a sex value (doc.sex.*). Unknown values pass through; a trailing "?" is kept.</summary>
+        private static string LocalizeSex(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return value;
+            string trimmed = value.Trim();
+            bool question = trimmed.EndsWith("?", StringComparison.Ordinal);
+            string core = question ? trimmed.Substring(0, trimmed.Length - 1) : trimmed;
+            string key = "doc.sex." + core.ToLowerInvariant();
+            string translated = Loc.Has(key) ? Loc.Get(key) : core;
+            return question ? translated + "?" : translated;
         }
 
         private static readonly char[][] SimilarDigitReplacements =

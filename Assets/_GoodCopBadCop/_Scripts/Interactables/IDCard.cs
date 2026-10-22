@@ -34,6 +34,8 @@ public class IDCard : FolderItem
    private readonly NetworkVariable<bool> syncedIsResident = new(false);
    private readonly NetworkVariable<bool> syncedIsFakeId = new(false);
    private readonly NetworkVariable<NetworkObjectReference> syncedSuspectRef = new();
+   // Language-neutral paperwork description: each client rebuilds the card text in its own language from it.
+   private readonly NetworkVariable<PaperworkSpec> syncedSpec = new();
 
    private const string BaseMapProperty = "_BaseMap";
    private const string MainTexProperty = "_MainTex";
@@ -53,6 +55,8 @@ public class IDCard : FolderItem
       syncedIsResident.OnValueChanged += OnResidentChanged;
       syncedIsFakeId.OnValueChanged += OnFakeIdChanged;
       syncedSuspectRef.OnValueChanged += OnSuspectRefChanged;
+      syncedSpec.OnValueChanged += OnSpecChanged;
+      Loc.LanguageChanged += ApplySyncedTextState;
 
       ApplySyncedTextState();
       ApplyIdVisualState(syncedIsFakeId.Value, syncedIsResident.Value);
@@ -69,6 +73,8 @@ public class IDCard : FolderItem
       syncedIsResident.OnValueChanged -= OnResidentChanged;
       syncedIsFakeId.OnValueChanged -= OnFakeIdChanged;
       syncedSuspectRef.OnValueChanged -= OnSuspectRefChanged;
+      syncedSpec.OnValueChanged -= OnSpecChanged;
+      Loc.LanguageChanged -= ApplySyncedTextState;
 
       base.OnNetworkDespawn();
    }
@@ -100,7 +106,7 @@ public class IDCard : FolderItem
          suspectCharacter);
    }
 
-   public void SetPaperworkState(SuspectPaperworkState state, SuspectCharacter suspectCharacter)
+   public void SetPaperworkState(SuspectPaperworkState state, SuspectCharacter suspectCharacter, PaperworkSpec spec = default)
    {
       if (!IsServer)
          return;
@@ -112,6 +118,7 @@ public class IDCard : FolderItem
       syncedIdPhotoName.Value = ToFixedString(state.IdPhoto != null ? state.IdPhoto.name : string.Empty);
       syncedIsResident.Value = state.IsResident;
       syncedIsFakeId.Value = state.IsFakeId;
+      syncedSpec.Value = spec;
 
       if (suspectCharacter != null && suspectCharacter.TryGetComponent(out NetworkObject suspectNetworkObject))
          syncedSuspectRef.Value = new NetworkObjectReference(suspectNetworkObject);
@@ -135,21 +142,49 @@ public class IDCard : FolderItem
          SetIdPhotoTexture(state.IdPhoto);
    }
 
-   /// <summary>Applies all display values locally, resolving the ID photo from the suspect NetworkObject.</summary>
+   /// <summary>
+   /// Applies all display values locally. With a replicated <see cref="PaperworkSpec"/>, the text is rebuilt in the
+   /// local language (names, month names); otherwise the replicated English strings are shown.
+   /// </summary>
    private void ApplySyncedTextState()
    {
-      nameText.text = syncedFullName.Value.ToString();
-      birthDateText.text = syncedBirthDate.Value.ToString();
-      expDateText.text = syncedExpiry.Value.ToString();
-      idNoText.text = FormatIdNumber(syncedIdNumber.Value.ToString());
+      if (TryBuildLocalized(out SuspectPaperworkState local))
+      {
+         nameText.text = local.FullName;
+         birthDateText.text = local.BirthDate;
+         expDateText.text = local.ExpirationDate;
+         idNoText.text = FormatIdNumber(local.IdNumber);
+      }
+      else
+      {
+         nameText.text = syncedFullName.Value.ToString();
+         birthDateText.text = syncedBirthDate.Value.ToString();
+         expDateText.text = syncedExpiry.Value.ToString();
+         idNoText.text = FormatIdNumber(syncedIdNumber.Value.ToString());
+      }
       residentText.text = syncedIsResident.Value ? "* Resident of Saplavi *" : "Non-Resident";
       ApplyIdVisualState(syncedIsFakeId.Value, syncedIsResident.Value);
    }
 
-   private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => nameText.text = current.ToString();
-   private void OnBirthDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => birthDateText.text = current.ToString();
-   private void OnExpiryChanged(FixedString512Bytes previous, FixedString512Bytes current) => expDateText.text = current.ToString();
-   private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => idNoText.text = FormatIdNumber(current.ToString());
+   private bool TryBuildLocalized(out SuspectPaperworkState state)
+   {
+      state = default;
+      PaperworkSpec spec = syncedSpec.Value;
+      if (!spec.IsValid) return false;
+
+      SuspectCharacter live = syncedSuspectRef.Value.TryGet(out NetworkObject suspectNetObj) ? suspectNetObj.GetComponent<SuspectCharacter>() : null;
+      SuspectData data = SuspectDataLookup.Find(spec.DataName.ToString(), live);
+      if (data == null) return false;
+
+      state = SuspectPaperworkService.BuildFromSpec(data, spec);
+      return true;
+   }
+
+   private void OnSpecChanged(PaperworkSpec previous, PaperworkSpec current) => ApplySyncedTextState();
+   private void OnFullNameChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedTextState();
+   private void OnBirthDateChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedTextState();
+   private void OnExpiryChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedTextState();
+   private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedTextState();
 
    /// <summary>The ID number is printed in the card's top-right corner with its own label, since there is no separate "ID:" label object.</summary>
    private static string FormatIdNumber(string idNumber) => string.IsNullOrEmpty(idNumber) ? string.Empty : "ID: " + idNumber;
@@ -168,6 +203,7 @@ public class IDCard : FolderItem
    private void OnSuspectRefChanged(NetworkObjectReference previous, NetworkObjectReference current)
    {
       ApplyIdPhotoByNameOrFallback(syncedIdPhotoName.Value.ToString(), current);
+      ApplySyncedTextState();
    }
 
    private void ApplyIdPhotoByNameOrFallback(string photoName, NetworkObjectReference suspectRef)

@@ -1192,6 +1192,8 @@ public class SuspectController : NetworkBehaviour
         }
 
         SuspectPaperworkState paperworkState = BuildPaperworkState();
+        // Clients rebuild the document text in their own language from this spec; paperworkState (English) is the fallback.
+        PaperworkSpec paperworkSpec = SuspectPaperworkService.BuildSpec(suspectCharacter, ShiftManager.Instance.CurrentDay, suspectIndex.Value);
         if (!paperworkState.DocumentsVisible)
         {
             Debug.LogWarning($"[SuspectController] SpawnPaperwork: aborting — BuildPaperworkState() returned DocumentsVisible=false for '{suspectCharacter.Data.name}' (likely MissingDocumentAnomaly active).");
@@ -1207,7 +1209,7 @@ public class SuspectController : NetworkBehaviour
         Rigidbody idCardRb = newIDCard.GetComponent<Rigidbody>();
         if (idCardRb != null) idCardRb.isKinematic = true;
         IDCard newIDCardComponent = newIDCard.GetComponent<IDCard>();
-        newIDCardComponent.SetPaperworkState(paperworkState, suspectCharacter);
+        newIDCardComponent.SetPaperworkState(paperworkState, suspectCharacter, paperworkSpec);
         newIDCardComponent.SetPaperworkSuspectServer(suspectCharacter);
         spawnedDocuments.Add(newIDCard.GetComponent<PickableObject>());
             
@@ -1219,7 +1221,7 @@ public class SuspectController : NetworkBehaviour
         Rigidbody appFormRb = newApplicationForm.GetComponent<Rigidbody>();
         if (appFormRb != null) appFormRb.isKinematic = true;
         ApplicationLetter applicationLetter = newApplicationForm.GetComponent<ApplicationLetter>();
-        applicationLetter.SetPaperworkState(paperworkState, suspectCharacter.Data);
+        applicationLetter.SetPaperworkState(paperworkState, suspectCharacter.Data, paperworkSpec);
         applicationLetter.SetPaperworkSuspectServer(suspectCharacter);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
         OnApplicationFormSpawned?.Invoke(applicationLetter);
