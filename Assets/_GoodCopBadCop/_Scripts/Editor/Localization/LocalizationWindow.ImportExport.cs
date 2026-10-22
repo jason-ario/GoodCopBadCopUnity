@@ -20,7 +20,17 @@ public partial class LocalizationWindow
         public bool HasError { get { return issues.Any(i => i.severity == IssueSeverity.Error); } }
     }
 
+    /// <summary>How existing translations are written into handoff CSVs. English (source_en) is always exported.</summary>
+    private enum ExportTranslations { Include, BlankColumns, SourceOnly }
+    private static readonly string[] ExportTranslationsLabels =
+    {
+        "Include current translations",
+        "Empty language columns (headers kept for re-import)",
+        "English source only (no language columns)"
+    };
+
     private string _exportFolder = "";
+    private ExportTranslations _exportTranslations = ExportTranslations.Include;
     private string _importFolder = "";
     private readonly HashSet<string> _exportPseudo = new HashSet<string>();
     private List<ImportRow> _importRows;
@@ -40,6 +50,9 @@ public partial class LocalizationWindow
             _exportFolder = EditorGUILayout.TextField("Folder", _exportFolder);
             if (GUILayout.Button("...", GUILayout.Width(30))) _exportFolder = EditorUtility.OpenFolderPanel("Export folder", _exportFolder, "");
         }
+        _exportTranslations = (ExportTranslations)EditorGUILayout.Popup("Translations", (int)_exportTranslations, ExportTranslationsLabels);
+        if (_exportTranslations != ExportTranslations.Include)
+            EditorGUILayout.LabelField("Only the exported files change. Translations in the project sheets stay as they are.", EditorStyles.wordWrappedMiniLabel);
         using (new EditorGUILayout.HorizontalScope())
         {
             EditorGUILayout.LabelField("Include pseudolocale columns", GUILayout.Width(190));
@@ -120,7 +133,10 @@ public partial class LocalizationWindow
     {
         CommitPendingSource();
         SaveDirty();
-        var langs = LocalizationSheetIO.StoredLanguages(_table).ToList();
+        var langs = _exportTranslations == ExportTranslations.SourceOnly
+            ? new List<string>()
+            : LocalizationSheetIO.StoredLanguages(_table).ToList();
+        bool blankLangs = _exportTranslations == ExportTranslations.BlankColumns;
         string stamp = DateTime.Now.ToString("yyyyMMdd");
         int files = 0, rowsTotal = 0;
 
@@ -140,7 +156,7 @@ public partial class LocalizationWindow
             foreach (var e in entries)
             {
                 var row = new List<string> { e.key, e.notes, e.source };
-                foreach (var l in langs) row.Add(e.GetValue(l));
+                foreach (var l in langs) row.Add(blankLangs ? "" : e.GetValue(l));
                 foreach (var p in _exportPseudo) row.Add(PseudoLocalizer.Generate(p, e.source, e.key, _settings.pseudoExpansion));
                 if (delta) row.Add(string.IsNullOrEmpty(e.frozenHash) ? "new" : "changed");
                 rows.Add(row);
@@ -151,7 +167,8 @@ public partial class LocalizationWindow
             files++;
             rowsTotal += entries.Count;
         }
-        _status = "Exported " + files + " file(s), " + rowsTotal + " string(s) to " + folder + (delta ? " (delta)." : ".");
+        string mode = _exportTranslations == ExportTranslations.Include ? "" : _exportTranslations == ExportTranslations.BlankColumns ? ", empty language columns" : ", English only";
+        _status = "Exported " + files + " file(s), " + rowsTotal + " string(s) to " + folder + (delta ? " (delta" + mode + ")." : (mode.Length > 0 ? " (" + mode.Substring(2) + ")." : "."));
     }
 
     // ---------------------------------------------------------------- Import
@@ -256,6 +273,7 @@ public partial class LocalizationWindow
             if (GUILayout.Button("Export delta")) ExportSheets(_exportFolder, true);
             GUI.enabled = true;
         }
+        _exportTranslations = (ExportTranslations)EditorGUILayout.Popup("Delta translations", (int)_exportTranslations, ExportTranslationsLabels);
 
         _freezeScroll = EditorGUILayout.BeginScrollView(_freezeScroll);
         foreach (var e in _table.entries.Where(e => LocalizationSheetIO.Status(e) != "frozen").Take(300))

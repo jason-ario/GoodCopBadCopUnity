@@ -48,7 +48,8 @@ public class LocalizationGuideWindow : EditorWindow
             title = "4. Strings tab",
             body =
                 "Edit notes, English source and every language inline. Source edits are written back to the origin asset when you leave the field; translations are saved to the CSV.\n" +
-                "Filters: sheet, source group, search, untranslated, new/changed, frozen, pseudo overflow, language. <b>Ping source</b> selects the origin object. <b>Preview</b> jumps to the Preview tab. Add a language with the code box and Add language."
+                "Filters: sheet, source group, search, untranslated, new/changed, frozen, pseudo overflow, language. <b>Ping source</b> selects the origin object. <b>Preview</b> jumps to the Preview tab. Add a language with the code box and Add language.\n" +
+                "<b>Clear translations</b> empties one language (or all) across every sheet or only the filtered strings. Keys, English source and freeze hashes stay; run Build runtime table afterwards."
         },
         new Section
         {
@@ -62,7 +63,7 @@ public class LocalizationGuideWindow : EditorWindow
         {
             title = "6. Import / Export and Freeze",
             body =
-                "Export writes one CSV per sheet for the translators (optionally with pseudo columns). Import reads translated CSVs, shows a diff and validates placeholders, tags, forbidden characters and length before you apply.\n" +
+                "Export writes one CSV per sheet for the translators (optionally with pseudo columns). The <b>Translations</b> option exports current translations, empty language columns (best for a fresh handoff: translators fill them and Import maps them back), or English source only; project sheets are never changed by export. Import reads translated CSVs, shows a diff and validates placeholders, tags, forbidden characters and length before you apply.\n" +
                 "<b>Freeze handoff</b> after sending a table. Later edits to frozen text are flagged 'changed' and new strings are 'new'; <b>Export delta</b> sends only those."
         },
         new Section
