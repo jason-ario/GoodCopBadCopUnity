@@ -277,7 +277,8 @@ public class ReticleController : MonoBehaviour
             return;
         }
 
-        string tapLabel = showHint && !string.IsNullOrEmpty(text) ? text : actionVerb;
+        // Loc.Name only changes text made entirely of known character names (a suspect's interactText is their first name).
+        string tapLabel = showHint && !string.IsNullOrEmpty(text) ? Loc.Name(text) : actionVerb;
 
         // "[E] {verb}" above "[LMB] {useItemVerb}" above a text-only "Hold to {holdVerb}" row.
         SetPrompt(true, tapLabel, holdVerb, useItemVerb);

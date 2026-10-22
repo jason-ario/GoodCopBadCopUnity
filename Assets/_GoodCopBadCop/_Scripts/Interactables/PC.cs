@@ -48,7 +48,9 @@ public class PC : Interactable
         FilterLetters,
         ClearFilter,
         SetSearch,
-        Back
+        Back,
+        // Opens a profile chosen by the requesting client's own (language-sorted) list, without a history entry.
+        StepToProfile
     }
 
     /// <summary>
@@ -202,6 +204,7 @@ public class PC : Interactable
         SetComputerCameraActive(false);
         if (fileListView != null)
             fileListView.SearchQueryChanged += HandleSearchQueryChanged;
+        Loc.LanguageChanged += HandleLanguageChanged;
     }
 
     public override void OnDestroy()
@@ -209,7 +212,15 @@ public class PC : Interactable
         pcActive = false;
         if (fileListView != null)
             fileListView.SearchQueryChanged -= HandleSearchQueryChanged;
+        Loc.LanguageChanged -= HandleLanguageChanged;
         base.OnDestroy();
+    }
+
+    // Names, sort order and letter buckets depend on the local language: re-render the current screen.
+    private void HandleLanguageChanged()
+    {
+        if (_hasAppliedState && _navState.Value.IsActive)
+            ApplySyncedState(_navState.Value);
     }
 
     public override void OnNetworkSpawn()
@@ -327,11 +338,30 @@ public class PC : Interactable
         Navigate(NavAction.OpenNewsEntry, newsDay: newsEntry.Day);
     }
 
-    public void OpenNextProfile() => Navigate(NavAction.NextProfile);
-    public void OpenPreviousProfile() => Navigate(NavAction.PreviousProfile);
+    public void OpenNextProfile() => StepProfileLocal(1);
+    public void OpenPreviousProfile() => StepProfileLocal(-1);
 
-    public bool CanOpenNextProfile() => _navState.Value.Screen == TerminalScreen.Profile && _navState.Value.HasNext;
-    public bool CanOpenPreviousProfile() => _navState.Value.Screen == TerminalScreen.Profile && _navState.Value.HasPrevious;
+    public bool CanOpenNextProfile() => _navState.Value.Screen == TerminalScreen.Profile && ComputeHasNext(_navState.Value);
+    public bool CanOpenPreviousProfile() => _navState.Value.Screen == TerminalScreen.Profile && ComputeHasPrevious(_navState.Value);
+
+    /// <summary>
+    /// Next/previous profile in the LOCAL player's list order. Suspect lists are sorted by the local language
+    /// (<see cref="SortSuspects"/>), so clients can disagree on order; the requester resolves the target and the
+    /// server only opens that suspect index.
+    /// </summary>
+    private void StepProfileLocal(int direction)
+    {
+        NavSyncState current = _navState.Value;
+        if (current.Screen != TerminalScreen.Profile) return;
+
+        List<SuspectData> list = GetVisibleSuspects(current);
+        int pos = FindSuspectPosition(list, current.SuspectIndex);
+        if (pos < 0) return;
+
+        int newPos = Mathf.Clamp(pos + direction, 0, list.Count - 1);
+        if (newPos == pos) return;
+        Navigate(NavAction.StepToProfile, suspectIndex: GetSuspectIndex(list[newPos]));
+    }
 
     public string GetTerminalStatus(SuspectData suspectData)
     {
@@ -404,6 +434,7 @@ public class PC : Interactable
             case NavAction.ClearFilter: ServerApplyFilter(LetterFilter.None); break;
             case NavAction.SetSearch: ServerApplySearch(search); break;
             case NavAction.Back: ServerGoBack(); break;
+            case NavAction.StepToProfile: ServerOpenProfileInternal(suspectIndex, false); break;
         }
     }
 
@@ -713,7 +744,7 @@ public class PC : Interactable
         {
             SuspectData suspect = suspects[i];
             if (suspect == null) continue;
-            string displayName = suspect.LastName + ", " + suspect.FirstName;
+            string displayName = GetListDisplayName(suspect);
             string status = GetListStatus(suspect, section);
             string text = string.IsNullOrWhiteSpace(status) ? displayName : displayName + " - " + status;
             int index = GetSuspectIndex(suspect);
@@ -769,11 +800,12 @@ public class PC : Interactable
         bool profileScreen = state.Screen == TerminalScreen.Profile;
         bool newsScreen = state.Screen == TerminalScreen.NewsEntry;
 
-        bool showPrevious = state.IsActive && (profileScreen || newsScreen) && state.HasPrevious;
-        bool showNext = state.IsActive && (profileScreen || newsScreen) && state.HasNext;
+        // Profile order is per-client (language-sorted), so evaluate prev/next locally; news order is shared.
+        bool showPrevious = state.IsActive && (profileScreen ? ComputeHasPrevious(state) : newsScreen && state.HasPrevious);
+        bool showNext = state.IsActive && (profileScreen ? ComputeHasNext(state) : newsScreen && state.HasNext);
 
-        ConfigureButton(previousButton, showPrevious, () => Navigate(profileScreen ? NavAction.PreviousProfile : NavAction.PreviousNews));
-        ConfigureButton(nextButton, showNext, () => Navigate(profileScreen ? NavAction.NextProfile : NavAction.NextNews));
+        ConfigureButton(previousButton, showPrevious, profileScreen ? () => StepProfileLocal(-1) : () => Navigate(NavAction.PreviousNews));
+        ConfigureButton(nextButton, showNext, profileScreen ? () => StepProfileLocal(1) : () => Navigate(NavAction.NextNews));
     }
 
     private static void ConfigureButton(ClickablePCElement button, bool visible, Action onClick)
@@ -811,16 +843,30 @@ public class PC : Interactable
         if (baseList == null) return new List<SuspectData>();
         if (filter == LetterFilter.None) return baseList;
 
-        (char start, char end) = GetFilterRange(filter);
         return baseList
             .Where(s => s != null && !string.IsNullOrWhiteSpace(s.LastName))
-            .Where(s =>
-            {
-                char c = GetAlphabetFilterChar(s.LastName);
-                return c >= start && c <= end;
-            })
-            .OrderBy(s => NormalizeForAlphabet(s.LastName)).ThenBy(s => s.FirstName).ToList();
+            .Where(s => InFilterRange(GetAlphabetFilterChar(Loc.Name(s.LastName)), filter))
+            .ToList(); // baseList is already in local-language order (SortSuspects)
     }
+
+    /// <summary>
+    /// Letter buckets follow the script of the (localized) last name: Latin A–F / G–L / M–R / S–Z,
+    /// Cyrillic А–Е / Ж–Л / М–Р / С–Я. Other scripts only appear unfiltered.
+    /// </summary>
+    private static bool InFilterRange(char c, LetterFilter filter)
+    {
+        (char start, char end) = c >= '\u0400' && c <= '\u04FF' ? GetCyrillicFilterRange(filter) : GetFilterRange(filter);
+        return c >= start && c <= end;
+    }
+
+    private static (char, char) GetCyrillicFilterRange(LetterFilter filter) => filter switch
+    {
+        LetterFilter.AF => ('А', 'Е'),
+        LetterFilter.GL => ('Ж', 'Л'),
+        LetterFilter.MR => ('М', 'Р'),
+        LetterFilter.SZ => ('С', 'Я'),
+        _ => ('А', 'Я')
+    };
 
     private static (char, char) GetFilterRange(LetterFilter filter) => filter switch
     {
@@ -845,8 +891,10 @@ public class PC : Interactable
         string[] terms = GetSearchTerms(query);
         if (suspects == null || terms.Length == 0) return suspects ?? new List<SuspectData>();
 
+        // Names/status/headers are matched in English AND every translated language (Loc.*SearchText), not just the
+        // local one: the query is replicated, so every client must get the same result list regardless of language.
         return suspects.Where(s => s != null && MatchesAllTerms(
-            $"{s.LastName}, {s.FirstName} {s.FirstName} {s.LastName} {s.IDNumber} {GetListStatus(s, section)}", terms)).ToList();
+            $"{s.LastName}, {s.FirstName} {Loc.NameSearchText(s.LastName)} {Loc.NameSearchText(s.FirstName)} {s.IDNumber} {Loc.SourceSearchText(GetListStatus(s, section))}", terms)).ToList();
     }
 
     private static List<TerminalNewsEntry> FilterNewsBySearch(List<TerminalNewsEntry> entries, string query)
@@ -855,7 +903,7 @@ public class PC : Interactable
         if (entries == null || terms.Length == 0) return entries ?? new List<TerminalNewsEntry>();
 
         return entries.Where(e => e != null && MatchesAllTerms(
-            $"{e.Date} {e.Content?.headerText} {e.Content?.subheaderText}", terms)).ToList();
+            $"{e.Date} {Loc.SourceSearchText(e.Content?.headerText)} {Loc.SourceSearchText(e.Content?.subheaderText)}", terms)).ToList();
     }
 
     private static string[] GetSearchTerms(string query)
@@ -1127,10 +1175,25 @@ public class PC : Interactable
         return SuspectRunRecords.Instance != null && SuspectRunRecords.Instance.IsInActiveQuarantine(suspect, GetCurrentDay());
     }
 
+    /// <summary>
+    /// Alphabetical by last name, then first name, in the LOCAL player's language (names via <see cref="Loc.Name"/>).
+    /// Re-evaluated on every render, so a language change re-sorts. Order is per-client; navigation that depends on
+    /// it is resolved locally (<see cref="StepProfileLocal"/>). The source last name breaks ties deterministically.
+    /// </summary>
     private static List<SuspectData> SortSuspects(IEnumerable<SuspectData> suspects)
     {
-        return suspects.Where(HasTerminalName).OrderBy(s => NormalizeForAlphabet(s.LastName)).ThenBy(s => s.FirstName).ToList();
+        return suspects.Where(HasTerminalName)
+            .OrderBy(s => SortKey(s.LastName), StringComparer.Ordinal)
+            .ThenBy(s => SortKey(s.FirstName), StringComparer.Ordinal)
+            .ThenBy(s => s.LastName, StringComparer.Ordinal)
+            .ThenBy(s => s.FirstName, StringComparer.Ordinal)
+            .ToList();
     }
+
+    private static string SortKey(string name) => NormalizeForAlphabet(Loc.Name(name));
+
+    /// <summary>"Last, First" as shown in the terminal list, in the local language.</summary>
+    private static string GetListDisplayName(SuspectData suspect) => Loc.Name(suspect.LastName) + ", " + Loc.Name(suspect.FirstName);
 
     private string GetProfileEntryReason(SuspectData suspectData)
     {

@@ -401,6 +401,96 @@ public static class Loc
         }
     }
 
+    /// <summary>Sheet holding character names (keys <c>name.&lt;lowercase&gt;</c>). Excluded from source-text lookup.</summary>
+    public const string NamesSheet = "Names";
+
+    /// <summary>Key for a character name or name word: <c>name.</c> + lowercase, spaces as underscores.</summary>
+    public static string NameKey(string englishName)
+    {
+        return "name." + englishName.Trim().ToLowerInvariant().Replace(' ', '_');
+    }
+
+    /// <summary>
+    /// Translates a character / speaker name for display (name tag, dialogue history, interact prompt). Tries the
+    /// whole name first ("The Gambler"), then word by word ("Vladislav Syrnikov"). Returns the input unchanged unless
+    /// every word is a known name, so ordinary text never gets partially translated. The Names sheet is deliberately
+    /// excluded from render-time lookup: documents, paperwork mismatches and the PC terminal keep their source names.
+    /// </summary>
+    public static string Name(string english)
+    {
+        Init();
+        if (string.IsNullOrWhiteSpace(english) || _language == SourceLanguage) return english;
+        if (english.IndexOf(Marker, StringComparison.Ordinal) >= 0) return english;
+
+        if (_table.TryGet(NameKey(english), out var whole)) return Resolve(whole, false);
+
+        string[] words = english.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length < 2) return english;
+        var parts = new string[words.Length];
+        for (int i = 0; i < words.Length; i++)
+        {
+            if (!_table.TryGet(NameKey(words[i]), out var entry)) return english;
+            parts[i] = Resolve(entry, false);
+        }
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>
+    /// Search text for a character name: the English name plus its spelling in every table language (whole-name
+    /// entry, else word by word). Independent of the current language, so replicated searches give identical
+    /// results on every client.
+    /// </summary>
+    public static string NameSearchText(string english)
+    {
+        Init();
+        if (string.IsNullOrWhiteSpace(english)) return english ?? string.Empty;
+        var sb = new System.Text.StringBuilder(english);
+
+        if (_table.TryGet(NameKey(english), out var whole))
+        {
+            AppendAllLanguages(sb, whole);
+            return sb.ToString();
+        }
+
+        foreach (string word in english.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            if (_table.TryGet(NameKey(word), out var entry))
+                AppendAllLanguages(sb, entry);
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Search text for display copy shown through render-time localization (e.g. news headers): the English source
+    /// plus every table language's translation of it. Language-independent, like <see cref="NameSearchText"/>.
+    /// </summary>
+    public static string SourceSearchText(string english)
+    {
+        Init();
+        if (string.IsNullOrWhiteSpace(english)) return english ?? string.Empty;
+        EnsureSourceIndex();
+        var sb = new System.Text.StringBuilder(english);
+        if (_sourceIndex.TryGetValue(english, out var matches) || _sourceIndex.TryGetValue(english.Trim(), out matches))
+            if (matches.Count > 0) AppendAllLanguages(sb, matches[0]);
+        return sb.ToString();
+    }
+
+    private static void AppendAllLanguages(System.Text.StringBuilder sb, LocEntry entry)
+    {
+        foreach (var value in entry.values.Values)
+            if (!string.IsNullOrEmpty(value)) sb.Append(' ').Append(value);
+    }
+
+    private static void EnsureSourceIndex()
+    {
+        if (_sourceIndex != null) return;
+        _sourceIndex = new Dictionary<string, List<LocEntry>>();
+        foreach (var e in _table.entries)
+        {
+            if (string.IsNullOrEmpty(e.source) || e.sheet == NamesSheet) continue;
+            if (!_sourceIndex.TryGetValue(e.source, out var list)) _sourceIndex[e.source] = list = new List<LocEntry>();
+            list.Add(e);
+        }
+    }
+
     /// <summary>
     /// Looks up an English source string (used by <c>Subtitles.SetText</c>, before markup is applied).
     /// If several keys share the same source the first one wins. Unknown text is returned unchanged.
@@ -411,16 +501,7 @@ public static class Loc
         if (string.IsNullOrEmpty(english) || _language == SourceLanguage) return english;
         if (english.IndexOf(Marker, StringComparison.Ordinal) >= 0) return english; // already localized / verbatim
 
-        if (_sourceIndex == null)
-        {
-            _sourceIndex = new Dictionary<string, List<LocEntry>>();
-            foreach (var e in _table.entries)
-            {
-                if (string.IsNullOrEmpty(e.source)) continue;
-                if (!_sourceIndex.TryGetValue(e.source, out var list)) _sourceIndex[e.source] = list = new List<LocEntry>();
-                list.Add(e);
-            }
-        }
+        EnsureSourceIndex();
 
         if (_sourceIndex.TryGetValue(english, out var matches) && matches.Count > 0)
             return Resolve(matches[0], false);

@@ -168,7 +168,7 @@ public class DialogueHistoryUI : MonoBehaviour
         };
 
         string hex = ColorUtility.ToHtmlStringRGB(nameColor);
-        string displayName = string.IsNullOrEmpty(entry.SpeakerName) ? entry.SpeakerType.ToString() : entry.SpeakerName;
+        string displayName = string.IsNullOrEmpty(entry.SpeakerName) ? entry.SpeakerType.ToString() : Loc.Name(entry.SpeakerName);
 
         // Bold colour-coded speaker name, then plain white body text
         return $"<color=#{hex}><b>{displayName}:</b></color> <color=#FFFFFF>{entry.Text}</color>";

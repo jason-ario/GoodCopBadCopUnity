@@ -36,6 +36,8 @@ public class ConversationNameTag : MonoBehaviour
     private TMP_Text _label;
     private bool _inConversation;
     private string _shownName;
+    private string _shownRawName;
+    private Color _shownColor;
     private float _targetAlpha;
 
     private string _lastReportedName;
@@ -53,12 +55,20 @@ public class ConversationNameTag : MonoBehaviour
     {
         s_instance = this;
         BuildTag();
+        Loc.LanguageChanged += OnLanguageChanged;
     }
 
     private void OnDestroy()
     {
+        Loc.LanguageChanged -= OnLanguageChanged;
         if (s_instance == this) s_instance = null;
         if (_tag != null) Destroy(_tag.gameObject);
+    }
+
+    // Re-translate the visible name in place when the language changes mid-conversation.
+    private void OnLanguageChanged()
+    {
+        if (_shownName != null) Apply(_shownRawName, _shownColor);
     }
 
     private void BuildTag()
@@ -149,6 +159,8 @@ public class ConversationNameTag : MonoBehaviour
             _targetAlpha = 1f;
         }
         _shownName = display;
+        _shownRawName = rawName;
+        _shownColor = nameColor;
     }
 
     private void AnimateAlpha()
@@ -167,7 +179,8 @@ public class ConversationNameTag : MonoBehaviour
     private string FormatName(string rawName)
     {
         if (string.IsNullOrWhiteSpace(rawName)) return null;
-        string trimmed = rawName.Trim();
+        // Translate the full name first so titles ("The Gambler" -> "Игрок") resolve before first-word trimming.
+        string trimmed = Loc.Name(rawName.Trim()).Trim();
         if (!firstNameOnly) return trimmed;
         int space = trimmed.IndexOf(' ');
         return space > 0 ? trimmed.Substring(0, space) : trimmed;
