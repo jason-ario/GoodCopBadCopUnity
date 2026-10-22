@@ -12,13 +12,13 @@ using UnityEngine;
 /// <list type="number">
 ///   <item>Rule pages (How to play, Pass, Quarantine, Kill, …).</item>
 ///   <item>Scoring &amp; disposition page (Conversion Risk Protocol table).</item>
-///   <item>Checkpoint Integrity pages (HUD panel + payout effect, then illustrated chores).</item>
-///   <item>Survival pages (HUD health bar, then HUD Geiger counter).</item>
-///   <item>One section per category with ≥1 unlocked anomaly: intro page, then one page per anomaly.</item>
+///   <item>Checkpoint Integrity page (HUD panel + payout effect).</item>
+///   <item>Survival pages, if any are authored (none by default).</item>
+///   <item>One section per category with ≥1 unlocked anomaly: one page per anomaly (no intro page).</item>
 /// </list>
 ///
-/// Every section intro is placed on a sheet's BACK face, so jumping to a section shows the intro on
-/// the left and its first anomaly on the right. Blank "field notes" faces pad the gaps.
+/// Every section's first page is placed on a sheet's BACK face, so jumping to a section opens it as
+/// a spread. Blank "field notes" faces pad the gaps.
 ///
 /// Rebuilding happens in <see cref="OnEnable"/> (book opening) — never while the player is reading.
 /// The reading position is kept between opens unless the set of unlocked anomalies changed.
@@ -325,7 +325,6 @@ public class GuidebookBuilder : MonoBehaviour
 
     private void AddSections()
     {
-        int sectionNumber = 0;
         var sectionEntries = new List<GuidebookDatabase.AnomalyEntry>();
 
         foreach (GuidebookDatabase.CategoryStyle style in _database.Categories)
@@ -337,24 +336,18 @@ public class GuidebookBuilder : MonoBehaviour
 
             if (sectionEntries.Count == 0) continue;
 
-            // Intro must sit on a back face (odd index) so the section opens as a spread.
+            // First anomaly page sits on a back face (odd index) so the section opens as a spread.
             if (_faces.Count % 2 == 0) _faces.Add(NotesFace());
 
-            sectionNumber++;
             int   cost   = AnomalyController.GetAnomalyPointCost(style.Category);
             Color accent = Accent(style.TabColor);
             string costText = cost == 1 ? Loc.T("+1 POINT") : Loc.T("+{0} POINTS", cost);
 
-            int introIndex = _faces.Count;
             var sectionAnomalies = new List<string>(sectionEntries.Count);
-            _tabs.Add((introIndex, L(style.TabLabel), style.TabColor, sectionAnomalies));
-            _faces.Add(default); // filled below once anomaly page numbers are known
+            _tabs.Add((_faces.Count, L(style.TabLabel), style.TabColor, sectionAnomalies));
 
-            var contents = new StringBuilder();
             foreach (GuidebookDatabase.AnomalyEntry entry in sectionEntries)
             {
-                contents.Append(ListMarker).Append(L(entry.DisplayName)).Append(PosRight).Append(_faces.Count + 1).Append("</indent>\n");
-
                 string body = L(entry.Description);
                 if (!string.IsNullOrEmpty(entry.HowToDetect))
                     body += "\n\n<b>" + Loc.T("HOW TO DETECT") + "</b>\n" + L(entry.HowToDetect);
@@ -371,20 +364,6 @@ public class GuidebookBuilder : MonoBehaviour
                 });
                 sectionAnomalies.Add(entry.AnomalyTypeName);
             }
-
-            var intro = new StringBuilder();
-            if (!string.IsNullOrEmpty(style.Intro)) intro.Append(L(style.Intro)).Append("\n\n");
-            if (!string.IsNullOrEmpty(style.Tools)) intro.Append("<b>").Append(Loc.T("TOOLS")).Append("</b>\n").Append(L(style.Tools)).Append("\n\n");
-            intro.Append("<b>").Append(Loc.T("IN THIS SECTION")).Append("</b>").Append(PosRight).Append("<b>").Append(Loc.T("PAGE")).Append("</b>\n").Append(contents);
-
-            _faces[introIndex] = new GuidebookFaceContent
-            {
-                Header      = Loc.T("SECTION {0}", sectionNumber),
-                Title       = L(style.DisplayName).ToUpperInvariant(),
-                Badge       = Loc.T("{0} PER CONFIRMED ANOMALY", costText),
-                Body        = intro.ToString(),
-                AccentColor = accent,
-            };
         }
     }
 

@@ -69,19 +69,13 @@ public class GuidebookDatabase : ScriptableObject
     {
         public AnomalyCategory Category;
 
-        [Tooltip("Full section name shown on the section intro and anomaly page headers.")]
+        [Tooltip("Full section name shown on the anomaly page headers.")]
         public string DisplayName;
 
         [Tooltip("Short label printed on the physical tab.")]
         public string TabLabel;
 
         public Color TabColor = Color.white;
-
-        [TextArea(2, 6)]
-        public string Intro;
-
-        [Tooltip("Tools used to inspect this category (e.g. 'UV flashlight, Geiger scanner').")]
-        public string Tools;
     }
 
     [Serializable]
@@ -192,21 +186,7 @@ public class GuidebookDatabase : ScriptableObject
             Body   = IntegrityBody,
             ShowIntegrityPanel = true,
         },
-        new RulePage
-        {
-            Header = "CHECKPOINT INTEGRITY",
-            Title  = "CHORES",
-            Body   = IntegrityChoresBody,
-            IconList = new[]
-            {
-                new GuidebookIconItem { Label = "TRASH & GORE",     Text = "Bag it, then bin it in the dumpster." },
-                new GuidebookIconItem { Label = "GRAFFITI & BLOOD", Text = "Mop it away." },
-                new GuidebookIconItem { Label = "FENCES",           Text = "Fix them with the hammer." },
-            },
-        },
     };
-
-    public const string IntegrityChoresBody = "Keep integrity at 100%.";
 
     public const string IntegrityBody =
         "Your pay is multiplied by integrity. Messes cost up to " + IntegrityMaxDeductionToken + "%.\n\n" +
@@ -215,33 +195,9 @@ public class GuidebookDatabase : ScriptableObject
     /// <summary>
     /// Starting content for the Survival section. Only used while the asset has no serialized
     /// <c>_survivalPages</c> yet; after that the asset's (Inspector-edited) copy wins.
+    /// Empty by default: the section (and its tab) only appears if pages are authored.
     /// </summary>
-    private static RulePage[] DefaultSurvivalPages() => new[]
-    {
-        new RulePage
-        {
-            Header = "SURVIVAL",
-            Title  = "STAY ALIVE",
-            Body   = SurvivalHealthBody,
-            HudArt = GuidebookHudArt.HealthBar,
-        },
-        new RulePage
-        {
-            Header = "SURVIVAL",
-            Title  = "RADIATION",
-            Body   = SurvivalRadiationBody,
-            HudArt = GuidebookHudArt.GeigerCounter,
-        },
-    };
-
-    public const string SurvivalHealthBody =
-        "Injuries and radiation drain health. At 0%, you die.\n\n" +
-        "Food or a cigarette heals. Resets each day.";
-
-    public const string SurvivalRadiationBody =
-        "Needle: exposure rate. Meter: radiation absorbed.\n\n" +
-        "High radiation drains health.\n\n" +
-        "Pills lower it. Resets each day.";
+    private static RulePage[] DefaultSurvivalPages() => Array.Empty<RulePage>();
 
     /// <summary>
     /// Resolves the category of an anomaly entry from its C# base class.
