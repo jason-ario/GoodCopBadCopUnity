@@ -12,7 +12,7 @@ using UnityEngine;
 /// <list type="number">
 ///   <item>Rule pages (How to play, Pass, Quarantine, Kill, …).</item>
 ///   <item>Scoring &amp; disposition page (Conversion Risk Protocol table).</item>
-///   <item>Checkpoint Integrity page (HUD panel + payout effect).</item>
+///   <item>Checkpoint Integrity pages, if any are authored (none by default).</item>
 ///   <item>Survival pages, if any are authored (none by default).</item>
 ///   <item>One section per category with ≥1 unlocked anomaly: one page per anomaly (no intro page).</item>
 /// </list>

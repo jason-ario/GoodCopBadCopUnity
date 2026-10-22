@@ -176,21 +176,9 @@ public class GuidebookDatabase : ScriptableObject
     /// <summary>
     /// Starting content for the Checkpoint Integrity section. Only used while the asset has no
     /// serialized <c>_integrityPages</c> yet; after that the asset's (Inspector-edited) copy wins.
+    /// Empty by default: the section (and its tab) only appears if pages are authored.
     /// </summary>
-    private static RulePage[] DefaultIntegrityPages() => new[]
-    {
-        new RulePage
-        {
-            Header = "CHECKPOINT INTEGRITY",
-            Title  = "KEEP THE YARD CLEAN",
-            Body   = IntegrityBody,
-            ShowIntegrityPanel = true,
-        },
-    };
-
-    public const string IntegrityBody =
-        "Your pay is multiplied by integrity. Messes cost up to " + IntegrityMaxDeductionToken + "%.\n\n" +
-        "Your compass marks every mess.";
+    private static RulePage[] DefaultIntegrityPages() => Array.Empty<RulePage>();
 
     /// <summary>
     /// Starting content for the Survival section. Only used while the asset has no serialized

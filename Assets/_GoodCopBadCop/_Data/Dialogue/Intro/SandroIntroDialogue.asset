@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: People bring Ladas they can't replace and ask me to keep them running.
@@ -29,13 +30,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: Do you have parts?
       npcResponse: Rarely. There's something hopeful in fixing what shouldn't work anymore.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
     - playerChoiceText: Busy workshop?
       npcResponse: People bring everything in, or stop coming entirely.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 1
@@ -45,13 +49,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: Who's waiting at home?
-      npcResponse: Irakli. He works nights. We mostly meet on the stairs.
+      npcResponse: No one. Well, my flatmate, Irakli. I leave a lamp on when he works nights.
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
     - playerChoiceText: That's a strange habit.
-      npcResponse: Irakli says I make everything a poem. He's not wrong.
+      npcResponse: A friend says I make everything a poem. He's not wrong.
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
