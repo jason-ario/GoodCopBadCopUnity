@@ -85,6 +85,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3a08f4e544985784086528a341922bf0, type: 3}
+--- !u!4 &1034117253863724887 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8028729752870558221, guid: 3a08f4e544985784086528a341922bf0, type: 3}
+  m_PrefabInstance: {fileID: 2219664362613519012}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1065344845647566059 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8069032694317455793, guid: 3a08f4e544985784086528a341922bf0, type: 3}
@@ -643,6 +648,10 @@ MonoBehaviour:
       NameHash: -1318316133
       Synchronize: 1
       ParameterType: 9
+    - name: RunningHuman
+      NameHash: -600691554
+      Synchronize: 1
+      ParameterType: 4
   AnimatorParametersExpanded: 0
 --- !u!4 &4454907106642874737 stripped
 Transform:
@@ -1318,15 +1327,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1407042422611344756, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.547
+      value: -0.525
       objectReference: {fileID: 0}
     - target: {fileID: 1407042422611344756, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 2.218
+      value: 2.178
       objectReference: {fileID: 0}
     - target: {fileID: 1407042422611344756, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.007
+      value: -0.003
       objectReference: {fileID: 0}
     - target: {fileID: 1407042422611344756, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1415,7 +1424,7 @@ PrefabInstance:
     - target: {fileID: 2637578589128851314, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: 'parentBones.Array.data[5]'
       value: 
-      objectReference: {fileID: 1909497311774603717}
+      objectReference: {fileID: 1034117253863724887}
     - target: {fileID: 2637578589128851314, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: 'parentBones.Array.data[6]'
       value: 
@@ -1886,7 +1895,7 @@ PrefabInstance:
       objectReference: {fileID: 5739628078165692213}
     - target: {fileID: 6280671352970633788, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: AnimatorParameterEntries.ParameterEntries.Array.size
-      value: 35
+      value: 36
       objectReference: {fileID: 0}
     - target: {fileID: 6479156936672784102, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: GlobalObjectIdHash

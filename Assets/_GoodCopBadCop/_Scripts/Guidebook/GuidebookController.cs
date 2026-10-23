@@ -233,11 +233,13 @@ public class GuidebookController : MonoBehaviour
     }
 
     /// <summary>
-    /// True while the local player is using the PC terminal or a diegetic view (tool locker,
+    /// True while the local player is using the PC terminal, a purchase view (purchase stands such as
+    /// the booth PC / radio, shop item popup, guard purchase screen), or a diegetic view (tool locker,
     /// panels, etc.). Held-item zoom is excluded on purpose: Tab leaves the zoom and opens the book.
     /// </summary>
     private static bool IsBlockedByView =>
         PC.IsLocalPlayerUsingTerminal ||
+        (UIController.Instance != null && UIController.Instance.IsPurchaseViewOpen) ||
         (DiegeticViewController.IsAnyViewActive && !(DiegeticViewController.Current is HeldItemZoomView));
 
     /// <summary>Publishes the first-person book's target page so observers flip the body copy to match.</summary>

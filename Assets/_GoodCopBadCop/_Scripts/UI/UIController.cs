@@ -1061,6 +1061,15 @@ public class UIController : MonoBehaviour
         shopItemPurchasePopup.SetActive(true);
     }
 
+    /// <summary>
+    /// True while a purchase view is on screen: the shared Shop Item Purchase Popup (purchase stands
+    /// such as the booth PC / radio, and locker shop items) or the Guard Purchase Screen.
+    /// Used to block other first-person UI (e.g. the guidebook) from opening on top of it.
+    /// </summary>
+    public bool IsPurchaseViewOpen =>
+        (shopItemPurchasePopup != null && shopItemPurchasePopup.activeSelf) ||
+        (guardPurchaseScreen != null && guardPurchaseScreen.activeSelf);
+
     /// <summary>Closes the Shop Item Purchase Popup.</summary>
     public void CloseShopItemPurchasePopup()
     {
