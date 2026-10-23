@@ -1768,15 +1768,22 @@ public class Day_01 : DayBase
     {
         FolderController.OnFolderHandedOff -= OnQuarantineFolderHandedOff;
 
+        // Remove ONLY the quarantine hand-off row. This used to HideAndClear the whole shared
+        // list and then call ReshowSubjectCounter after the same 1.5s delay — but Destroy() is
+        // deferred to end-of-frame, so ReshowSubjectCounter still saw the counter row as "alive",
+        // skipped recreating it, and the "Process 3 subjects" row vanished mid-quota (while the
+        // count kept advancing in the background). Leaving the counter row untouched avoids that.
+        // The accuracy-payout overlay is now shown earlier, on the first checklist pickup
+        // (see OnExamPickedUpSync).
         if (_taskQuarantineHandOff != null)
         {
-            TutorialObjectiveList.Instance?.CompleteObjective(_taskQuarantineHandOff);
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskQuarantineHandOff, preHideDelay: 1.5f);
             _taskQuarantineHandOff = null;
         }
 
-        // Hide the task list, then restore the subject counter. The accuracy-payout overlay
-        // is now shown earlier, on the first checklist pickup (see OnExamPickedUpSync).
-        HideObjectiveListThenRun(1.5f, ReshowSubjectCounter);
+        // Safety net: if something else tore the counter row down, restore it once the removal
+        // above has fully resolved (runs on Day_01 so a closed Player HUD can't drop it).
+        StartCoroutine(DelayedInvoke(2f, ReshowSubjectCounter));
 
         // The documentation tutorial is now fully resolved. Persist the milestone on the server
         // while setting the local state on every client through this shared hand-off event.

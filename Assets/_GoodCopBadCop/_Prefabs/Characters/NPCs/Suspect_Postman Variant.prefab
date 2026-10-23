@@ -998,6 +998,10 @@ MonoBehaviour:
       NameHash: -1318316133
       Synchronize: 1
       ParameterType: 9
+    - name: RunningHuman
+      NameHash: -600691554
+      Synchronize: 1
+      ParameterType: 4
   AnimatorParametersExpanded: 0
 --- !u!4 &2352272139750497434 stripped
 Transform:
@@ -1420,6 +1424,10 @@ MonoBehaviour:
       NameHash: -1318316133
       Synchronize: 1
       ParameterType: 9
+    - name: RunningHuman
+      NameHash: -600691554
+      Synchronize: 1
+      ParameterType: 4
   AnimatorParametersExpanded: 0
 --- !u!4 &4375628828438105417 stripped
 Transform:
@@ -1822,6 +1830,10 @@ MonoBehaviour:
       NameHash: -1318316133
       Synchronize: 1
       ParameterType: 9
+    - name: RunningHuman
+      NameHash: -600691554
+      Synchronize: 1
+      ParameterType: 4
   AnimatorParametersExpanded: 0
 --- !u!1001 &6893938922145939883
 PrefabInstance:
@@ -2240,7 +2252,7 @@ PrefabInstance:
       objectReference: {fileID: 8418788349330575017}
     - target: {fileID: 6280671352970633788, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: AnimatorParameterEntries.ParameterEntries.Array.size
-      value: 35
+      value: 36
       objectReference: {fileID: 0}
     - target: {fileID: 6479156936672784102, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: m_InScenePlaced
@@ -2444,7 +2456,6 @@ MonoBehaviour:
   _finalPos: {fileID: 0}
   _dayStartArrivalDelay: 60
   _endOfShiftArrivalDay: 1
-  _stayDuration: 300
   _fadeInDuration: 1.5
   _fadeOutDuration: 1.5
   _turnSpeed: 240
@@ -2491,7 +2502,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DialogueCameraFraming
   _aimAtMeshTop: 1
   _lookTarget: {fileID: 835056725560103881}
-  _aimDropBelowTarget: 0.2
+  _aimDropBelowTarget: 0.6
   _cameraVerticalOffset: 0.3
   _standoffDistance: 2.6
 --- !u!4 &8351873636107583601 stripped

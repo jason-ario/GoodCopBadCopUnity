@@ -55,6 +55,33 @@ public class GuidebookFaceView : MonoBehaviour
     [SerializeField] private TMP_Text   _footer;
     [SerializeField] private GameObject _newStamp;
 
+    [Header("Materials")]
+    [Tooltip("Material for page photos (single image and image rows), e.g. Newspaper Halftone. " +
+             "HUD copies, icon lists and the integrity panel keep the image's authored lit material. " +
+             "Leave empty to draw photos with the lit material too.")]
+    [SerializeField] private Material _photoMaterial;
+
+    private Material _litImageMaterial;
+
+    /// <summary>The image's authored (lit) material, captured before any photo material is swapped in.</summary>
+    private Material LitImageMaterial
+    {
+        get
+        {
+            if (_litImageMaterial == null && _image != null) _litImageMaterial = _image.material;
+            return _litImageMaterial;
+        }
+    }
+
+    private Material PhotoMaterial => _photoMaterial != null ? _photoMaterial : LitImageMaterial;
+
+    private void UsePhotoMaterial(Image img)
+    {
+        _ = LitImageMaterial; // capture the lit material before the first swap
+        Material photo = PhotoMaterial;
+        if (img.material != photo) img.material = photo;
+    }
+
     [Header("Vertical Layout (Layout-space units, top = 0)")]
     [SerializeField] private float _contentTop     = -100f;
     [Tooltip("The image takes whatever space the body text doesn't need, clamped to this range.")]
@@ -178,7 +205,7 @@ public class GuidebookFaceView : MonoBehaviour
         rt.anchoredPosition = new Vector2(src.anchoredPosition.x, 0f);
 
         _hudArt = go.AddComponent<GuidebookHudArtView>();
-        _hudArt.Configure(_body, _image.material);
+        _hudArt.Configure(_body, LitImageMaterial);
         return _hudArt;
     }
 
@@ -201,7 +228,7 @@ public class GuidebookFaceView : MonoBehaviour
         rt.sizeDelta = new Vector2(bodyRect.rect.width, 0f);
 
         _iconList = go.AddComponent<GuidebookIconListView>();
-        _iconList.Configure(_body, _image.material, _body.color);
+        _iconList.Configure(_body, LitImageMaterial, _body.color);
         return _iconList;
     }
 
@@ -223,7 +250,7 @@ public class GuidebookFaceView : MonoBehaviour
         rt.anchoredPosition = new Vector2(src.anchoredPosition.x, 0f);
 
         _panel = go.AddComponent<GuidebookIntegrityPanelView>();
-        _panel.Configure(_body, _image.material);
+        _panel.Configure(_body, LitImageMaterial);
         return _panel;
     }
 
@@ -343,6 +370,7 @@ public class GuidebookFaceView : MonoBehaviour
                 }
                 else
                 {
+                    UsePhotoMaterial(_image);
                     _image.sprite = content.Image;
                     _image.preserveAspect = true;
                     PlaceTop(_image.rectTransform, cursor, imageHeight);
@@ -454,7 +482,7 @@ public class GuidebookFaceView : MonoBehaviour
 
     /// <summary>
     /// Lays the sprites out side by side across the image slot's width (equal cells, <see cref="_gap"/>
-    /// apart) using runtime copies of <see cref="_image"/>, so they share its lit material.
+    /// apart) using runtime copies of <see cref="_image"/>, drawn with the photo material.
     /// Returns the row height actually used (no taller than the sprites need at that cell width).
     /// </summary>
     private float LayoutImageRow(Sprite[] sprites, float top, float maxHeight)
@@ -486,6 +514,7 @@ public class GuidebookFaceView : MonoBehaviour
             img.gameObject.SetActive(used);
             if (!used) continue;
 
+            UsePhotoMaterial(img);
             img.sprite = sprites[i];
             img.preserveAspect = true;
             RectTransform rt = img.rectTransform;

@@ -487,6 +487,7 @@ MonoBehaviour:
   initialDelay: 3
   interval: 10
   intervalJitter: 2
+  postConversationDelay: 2
   vomitAnimTrigger: Vomit
 --- !u!1 &2740253640128778168
 GameObject:
@@ -1071,7 +1072,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1640259171
+  GlobalObjectIdHash: 1100751124
   InScenePlacedSourceGlobalObjectIdHash: 1640259171
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -1110,6 +1111,8 @@ MonoBehaviour:
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
   overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   suspectData: {fileID: 0}
   InfectionScore: 0
   lookAnimator: {fileID: 253971976340002767}
@@ -1858,6 +1861,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpeakingInteraction
   ShowTopMostFoldoutHeaderGroup: 1
   speakerName: Suspect
+  speakerNameOverride: 
   voiceAudioClips: []
   audioSource: {fileID: 1751970679333441786}
   _mutantDistortionLevel: 0.35
@@ -1890,6 +1894,8 @@ MonoBehaviour:
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
   overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   _destroyOnCollect: 1
   _kickable: 1
   _burnable: 0
@@ -2089,7 +2095,7 @@ MonoBehaviour:
   deathSound: {fileID: 0}
   _hurtSounds: []
   _chaseSounds:
-  - {fileID: 8300000, guid: 8092c5cd55ab6f24b8dceb547858e77b, type: 3}
+  - {fileID: 8300000, guid: 62d3d2553c2e5ff40b674e56a5868b77, type: 3}
   _chaseScreamIntervalMin: 3
   _chaseScreamIntervalMax: 6
   _chaseFirstGruntDelay: {x: 0.3, y: 1.2}
@@ -3546,7 +3552,7 @@ MonoBehaviour:
   baseTransform: {fileID: 9165884929875893673}
   Hips: {fileID: 8083501322154822045}
   ScaleReferenceMode: 3
-  finalScaleReference: 1.5121241
+  finalScaleReference: 1.5121138
   finalScaleReferenceSqrt: 0.1
   customScaleReferenceValue: 0.5
   DelayedInitialization: 0
