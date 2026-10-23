@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using GoodCopBadCop.Input;
 using GoodCopBadCop.Settings;
@@ -143,6 +144,26 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField] private float groundCheckDistance = 0.08f;
     [Tooltip("Layers treated as ground. Exclude the Player layer to avoid self-detection.")]
     [SerializeField] private LayerMask groundMask = ~0;
+
+    [Header("Co-op Player Separation")]
+    [Tooltip("Horizontal distance (m) between two living players' centres below which they softly push apart. Living players never physically block each other (pairwise Physics.IgnoreCollision); this only stops them standing inside one another.")]
+    [SerializeField, Min(0.01f)] private float separationDistance = 1.0f;
+    [Tooltip("Self-push speed (m/s) when fully overlapping another player, scaling linearly to 0 at separationDistance. Keep below walk speed so players can still squeeze past each other in tight spaces.")]
+    [SerializeField, Min(0f)] private float separationMaxSpeed = 3f;
+
+    /// <summary>All spawned player bodies on this machine (local + remote), for pairwise collision ignores and separation.</summary>
+    private static readonly List<PlayerMovementController> s_spawnedPlayers = new List<PlayerMovementController>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_spawnedPlayers.Clear();
+
+    /// <summary>
+    /// True for a living player body. Dead (ragdoll) and resurrected (mutant) corpses are excluded so they
+    /// keep normal collision with players and don't push them.
+    /// </summary>
+    private bool IsLivingPlayerBody =>
+        (_playerHealth == null || !_playerHealth.IsDead)
+        && (_corpseResurrection == null || !_corpseResurrection.IsResurrected);
 
     [Header("Crouch Settings")]
     [SerializeField] private Transform camCrouchPos;
@@ -308,6 +329,11 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         _standingControllerHeight = _characterController.height;
         _standingControllerCenterY = _characterController.center.y;
         _baseMouseSensitivity = mouseSensitivity;
+
+        // Players pass through each other, so another player's head must never count as ground.
+        int playerLayer = LayerMask.NameToLayer("Player");
+        if (playerLayer >= 0)
+            groundMask &= ~(1 << playerLayer);
     }
 
     private void Start()
@@ -325,6 +351,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        if (!s_spawnedPlayers.Contains(this))
+            s_spawnedPlayers.Add(this);
+
         if (!IsLocalPlayer)
         {
             // Deactivate the VCam so it doesn't influence any client's CinemachineBrain.
@@ -373,10 +402,86 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
+        s_spawnedPlayers.Remove(this);
         GoodCopBadCop.EnvironmentSystem.UnderwaterZone.UnregisterPlayerBody(transform);
         GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnUnderwaterStateChanged -= HandleCameraUnderwaterChanged;
         GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged -= HandleBodyUnderwaterChanged;
         CampaignManager.OnDayChanged -= HandleDayChanged;
+    }
+
+    public override void OnDestroy()
+    {
+        s_spawnedPlayers.Remove(this);
+        base.OnDestroy();
+    }
+
+    /// <summary>
+    /// Local player only. Ignores CharacterController-vs-CharacterController collision with every other
+    /// living player so remote (interpolated, lagging) bodies never act as walls. Re-checked every frame
+    /// because Unity drops an ignore pair whenever either collider is disabled (death, ragdoll, revive),
+    /// and resurrected corpses must collide again.
+    /// </summary>
+    private void UpdatePlayerCollisionIgnores()
+    {
+        for (int i = 0; i < s_spawnedPlayers.Count; i++)
+        {
+            PlayerMovementController other = s_spawnedPlayers[i];
+            if (other == null || other == this) continue;
+
+            CharacterController otherController = other._characterController;
+            if (otherController == null || !otherController.enabled) continue;
+
+            bool shouldIgnore = other.IsLivingPlayerBody;
+            if (Physics.GetIgnoreCollision(_characterController, otherController) != shouldIgnore)
+                Physics.IgnoreCollision(_characterController, otherController, shouldIgnore);
+        }
+    }
+
+    /// <summary>
+    /// Local player only. Horizontal self-push away from overlapping living players. Each owner only
+    /// moves itself, so it stays owner-authoritative and needs no RPCs. Routed through
+    /// CharacterController.Move, so it can never push a player into walls.
+    /// </summary>
+    private Vector3 ComputePlayerSeparationVelocity()
+    {
+        if (separationMaxSpeed <= 0f || _isSitting) return Vector3.zero;
+
+        Bounds myBounds = _characterController.bounds;
+        Vector3 myPosition = transform.position;
+        Vector3 push = Vector3.zero;
+
+        for (int i = 0; i < s_spawnedPlayers.Count; i++)
+        {
+            PlayerMovementController other = s_spawnedPlayers[i];
+            if (other == null || other == this || !other.IsLivingPlayerBody) continue;
+
+            CharacterController otherController = other._characterController;
+            if (otherController == null || !otherController.enabled) continue;
+
+            // Only push when the capsules overlap vertically (not when one player is on a floor above).
+            Bounds otherBounds = otherController.bounds;
+            if (myBounds.min.y > otherBounds.max.y || myBounds.max.y < otherBounds.min.y) continue;
+
+            Vector3 away = myPosition - other.transform.position;
+            away.y = 0f;
+            float distance = away.magnitude;
+            if (distance >= separationDistance) continue;
+
+            if (distance < 0.0001f)
+            {
+                // Exactly stacked: pick opposite world directions on each machine by object id.
+                away = NetworkObjectId < other.NetworkObjectId ? Vector3.right : Vector3.left;
+            }
+            else
+            {
+                away /= distance;
+            }
+
+            push += away * (1f - distance / separationDistance);
+        }
+
+        if (push.sqrMagnitude > 1f) push.Normalize();
+        return push * separationMaxSpeed;
     }
 
     // Ensures the player animator never carries the "Sitting" pose across a day boundary.
@@ -425,6 +530,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         // "CharacterController.Move called on inactive controller". Nothing here should drive it.
         if (_playerHealth != null && _playerHealth.IsDead) return;
         if (_characterController == null || !_characterController.enabled) return;
+
+        UpdatePlayerCollisionIgnores();
 
         if (canControl == false)
         {
@@ -614,7 +721,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         bool jumpAnimActive = _playerAnimationController != null && _playerAnimationController.IsJumpAnimPlaying;
         IsGrounded = isGrounded && !jumpAnimActive && !_isUnderwater;
 
-        Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity + _externalVelocity;
+        Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity + _externalVelocity
+            + ComputePlayerSeparationVelocity();
 
         // Apply movement
         CollisionFlags collisionFlags = _characterController.Move(moveVector * Time.deltaTime);
