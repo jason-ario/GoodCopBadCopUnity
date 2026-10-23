@@ -25,6 +25,10 @@ public class VomitAnomaly : VitalsAnomaly
     [Tooltip("Random +/- variation (seconds) applied to each interval so it doesn't feel mechanical.")]
     [SerializeField] private float intervalJitter = 2f;
 
+    [Header("Conversation")]
+    [Tooltip("Grace period (seconds) after a conversation with this suspect ends before a held-back vomit event can play.")]
+    [SerializeField] private float postConversationDelay = 2f;
+
     [Header("Animation")]
     [Tooltip("Animator trigger fired on the suspect each time a vomit event plays.")]
     [SerializeField] private string vomitAnimTrigger = "Vomit";
@@ -117,6 +121,17 @@ public class VomitAnomaly : VitalsAnomaly
 
         while (_isActive)
         {
+            // Never vomit mid-conversation: hold the event until the conversation ends,
+            // then allow a short grace period before re-checking.
+            if (IsSuspectInConversation())
+            {
+                yield return new WaitWhile(() => _isActive && IsSuspectInConversation());
+                if (!_isActive) break;
+
+                yield return new WaitForSeconds(Mathf.Max(0f, postConversationDelay));
+                continue;
+            }
+
             PlayVomitEvent();
 
             float wait = interval + Random.Range(-intervalJitter, intervalJitter);
@@ -124,6 +139,24 @@ public class VomitAnomaly : VitalsAnomaly
         }
 
         _activeCoroutine = null;
+    }
+
+    /// <summary>
+    /// True while this suspect is in any conversation. Uses only state replicated to every
+    /// machine so the per-machine vomit loops gate identically:
+    /// world/booth question dialogue (<see cref="SpeakingInteraction.IsEngaged"/>, a NetworkVariable)
+    /// and scripted sequences (<see cref="ScriptedDialogueRunner.ActiveDialogueSpeakerNetId"/>, broadcast to all clients).
+    /// </summary>
+    private bool IsSuspectInConversation()
+    {
+        if (_suspect == null) return false;
+
+        SpeakingInteraction speaking = _suspect.Speaking;
+        if (speaking != null && speaking.IsSpawned && speaking.IsEngaged)
+            return true;
+
+        ulong activeSpeaker = ScriptedDialogueRunner.ActiveDialogueSpeakerNetId;
+        return activeSpeaker != 0 && _suspect.IsSpawned && _suspect.NetworkObjectId == activeSpeaker;
     }
 
     private void PlayVomitEvent()

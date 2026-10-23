@@ -66,6 +66,7 @@ public class Radio : Interactable
 
         _isOn.OnValueChanged             += OnIsOnChanged;
         _currentSongIndex.OnValueChanged += OnSongIndexChanged;
+        ShiftManager.OnDayTransitionBlackout += HandleDayTransitionBlackout;
 
         // Sync late-joining clients: start playing at the correct position, then
         // apply the mute state so off-clients still hear nothing.
@@ -80,6 +81,17 @@ public class Radio : Interactable
     {
         _isOn.OnValueChanged             -= OnIsOnChanged;
         _currentSongIndex.OnValueChanged -= OnSongIndexChanged;
+        ShiftManager.OnDayTransitionBlackout -= HandleDayTransitionBlackout;
+    }
+
+    /// <summary>
+    /// Switches the radio off between days (server write; the station itself keeps running,
+    /// so the next interaction turns it back on at the live position).
+    /// </summary>
+    private void HandleDayTransitionBlackout()
+    {
+        if (!IsServer || !_isOn.Value) return;
+        _isOn.Value = false;
     }
 
     // -------------------------------------------------------------------------
@@ -207,7 +219,10 @@ public class Radio : Interactable
 
     private void OnIsOnChanged(bool oldValue, bool newValue)
     {
-        PlayClickSound();
+        // The automatic between-days switch-off happens behind the blackout — stay silent.
+        bool autoOff = !newValue && ShiftManager.Instance != null && ShiftManager.Instance.IsDayTransitionRunningLocally;
+        if (!autoOff)
+            PlayClickSound();
 
         if (newValue)
         {

@@ -43,6 +43,26 @@ namespace GoodCopBadCop.EnvironmentSystem
         [Tooltip("The camera to track. Falls back to Camera.main if not assigned.")]
         [SerializeField] private Camera targetCamera;
 
+        [Header("Powered Lighting (optional)")]
+        [Tooltip("When assigned, the zone blends from the dark interior look toward the powered look below as this " +
+                 "source's light fixtures turn on (PowerStationPowerVisuals.LitFraction). Leave empty to always use the dark look.")]
+        [SerializeField] private PowerStationPowerVisuals poweredLightsSource;
+
+        [Tooltip("RenderSettings fog color used while the lights are on.")]
+        [SerializeField, ColorUsage(false)] private Color poweredFogColor = new Color(0.62f, 0.64f, 0.66f, 1f);
+
+        [Tooltip("RenderSettings fog density used while the lights are on. Negative keeps the day/night preset's density.")]
+        [SerializeField] private float poweredFogDensity = 0.015f;
+
+        [Tooltip("Optional explicit Volumetric Fog 2 profile used while the lights are on. Leave empty to use a light-tinted, thinned copy of the current preset's profile.")]
+        [SerializeField] private VolumetricFogProfile poweredVolumetricFogProfile;
+
+        [Tooltip("Volumetric fog albedo/gradient color used while the lights are on (when no explicit powered profile is assigned).")]
+        [SerializeField, ColorUsage(false)] private Color poweredVolumetricFogColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+
+        [Tooltip("Multiplier applied to the preset's volumetric fog density while the lights are on (when no explicit powered profile is assigned).")]
+        [SerializeField, Range(0f, 1f)] private float poweredVolumetricDensityMultiplier = 0.35f;
+
         private IEnvironmentModel _model;
         private VolumetricFog _volumetricFog;
         private BoxCollider[] _colliders;
@@ -56,8 +76,18 @@ namespace GoodCopBadCop.EnvironmentSystem
         private VolumetricFogProfile _darkVolumetricProfile;
         private VolumetricFogProfile _darkVolumetricSource;
 
+        // Runtime copy of the current preset's volumetric profile, light-tinted and thinned for the powered look.
+        private VolumetricFogProfile _litVolumetricProfile;
+        private VolumetricFogProfile _litVolumetricSource;
+
+        // Scratch instance holding the dark ↔ powered zone target before it is blended with the preset.
+        private VolumetricFogProfile _zoneTargetProfile;
+
         // 0 = fully outside (day/night preset owns the fog look), 1 = fully inside (bunkerFogColor).
         private float _blend;
+
+        // 0 = dark interior look, 1 = powered (lights on) look. Follows poweredLightsSource.LitFraction.
+        private float _poweredBlend;
 
         [Inject]
         public void Construct(IEnvironmentModel model, VolumetricFog volumetricFog)
@@ -127,6 +157,9 @@ namespace GoodCopBadCop.EnvironmentSystem
             float step = Time.deltaTime / transitionSeconds;
             _blend = Mathf.MoveTowards(_blend, target, step);
 
+            float poweredTarget = poweredLightsSource != null ? poweredLightsSource.LitFraction : 0f;
+            _poweredBlend = Mathf.MoveTowards(_poweredBlend, poweredTarget, step);
+
             ApplyBlendedFog();
         }
 
@@ -151,10 +184,14 @@ namespace GoodCopBadCop.EnvironmentSystem
                 baseDensity = preset.fogDensity;
             }
 
-            RenderSettings.fogColor = Color.Lerp(baseColor, bunkerFogColor, _blend);
+            Color zoneColor = Color.Lerp(bunkerFogColor, poweredFogColor, _poweredBlend);
+            RenderSettings.fogColor = Color.Lerp(baseColor, zoneColor, _blend);
 
-            if (bunkerFogDensity >= 0f)
-                RenderSettings.fogDensity = Mathf.Lerp(baseDensity, bunkerFogDensity, _blend);
+            float darkDensity = bunkerFogDensity >= 0f ? bunkerFogDensity : baseDensity;
+            float litDensity = poweredFogDensity >= 0f ? poweredFogDensity : baseDensity;
+            float zoneDensity = Mathf.Lerp(darkDensity, litDensity, _poweredBlend);
+            if (bunkerFogDensity >= 0f || _poweredBlend > 0f)
+                RenderSettings.fogDensity = Mathf.Lerp(baseDensity, zoneDensity, _blend);
 
             ApplyBlendedVolumetricFog(preset);
         }
@@ -183,6 +220,49 @@ namespace GoodCopBadCop.EnvironmentSystem
         }
 
         private VolumetricFogProfile ResolveTargetVolumetricProfile(VolumetricFogProfile baseProfile)
+        {
+            VolumetricFogProfile dark = ResolveDarkVolumetricProfile(baseProfile);
+            if (_poweredBlend <= 0f)
+                return dark;
+
+            VolumetricFogProfile lit = ResolveLitVolumetricProfile(baseProfile);
+            if (_poweredBlend >= 1f)
+                return lit;
+
+            if (_zoneTargetProfile == null)
+                _zoneTargetProfile = ScriptableObject.CreateInstance<VolumetricFogProfile>();
+
+            _zoneTargetProfile.Lerp(dark != null ? dark : baseProfile, lit, _poweredBlend);
+            return _zoneTargetProfile;
+        }
+
+        private VolumetricFogProfile ResolveLitVolumetricProfile(VolumetricFogProfile baseProfile)
+        {
+            if (poweredVolumetricFogProfile != null)
+                return poweredVolumetricFogProfile;
+
+            if (_litVolumetricProfile == null || _litVolumetricSource != baseProfile)
+            {
+                if (_litVolumetricProfile != null)
+                    Destroy(_litVolumetricProfile);
+
+                _litVolumetricProfile = Instantiate(baseProfile);
+                _litVolumetricProfile.hideFlags = HideFlags.DontSave;
+
+                // Light, thin fog: recolor but keep the preset's light scattering so it reacts to the interior lights.
+                _litVolumetricProfile.albedo = poweredVolumetricFogColor;
+                _litVolumetricProfile.distantFogColor = poweredVolumetricFogColor;
+                _litVolumetricProfile.density = baseProfile.density * poweredVolumetricDensityMultiplier;
+                TintGradient(_litVolumetricProfile.depthGradient, poweredVolumetricFogColor);
+                TintGradient(_litVolumetricProfile.heightGradient, poweredVolumetricFogColor);
+
+                _litVolumetricSource = baseProfile;
+            }
+
+            return _litVolumetricProfile;
+        }
+
+        private VolumetricFogProfile ResolveDarkVolumetricProfile(VolumetricFogProfile baseProfile)
         {
             if (bunkerVolumetricFogProfile != null)
                 return bunkerVolumetricFogProfile;
@@ -257,6 +337,12 @@ namespace GoodCopBadCop.EnvironmentSystem
 
             if (_darkVolumetricProfile != null)
                 Destroy(_darkVolumetricProfile);
+
+            if (_litVolumetricProfile != null)
+                Destroy(_litVolumetricProfile);
+
+            if (_zoneTargetProfile != null)
+                Destroy(_zoneTargetProfile);
         }
 
 #if UNITY_EDITOR

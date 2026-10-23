@@ -1,16 +1,17 @@
 using DG.Tweening;
 using System.Collections;
-using GoodCopBadCop.Input;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// A lever-style power switch located at the power station.
 ///
-/// Interaction rules:
-///   – The player holds Interact (E / gamepad West) to grab the handle and drags Mouse Y to pull it down.
-///   – On release the handle snaps to the nearest end (up or down).
+/// Interaction rules (same as the booth shutter <see cref="Lever"/>):
+///   – Pressing Interact opens the switch's diegetic view (<see cref="LeverDiegeticController"/>).
+///   – Inside the view, click (LMB / RT) on the switch and drag up/down — or push the gamepad
+///     vertical axis — to move the handle; the player's free hand grips it via arm IK.
+///   – On release the handle snaps to the nearest end (up or down). The view stays open until
+///     the player exits with the exit key / Back button.
 ///   – When committed to the DOWN position with <see cref="FuseBoxPuzzleController.IsReady"/>
 ///     and power off, the server plays a loud activation sound on all clients (once)
 ///     and calls <see cref="ElectricityController.PowerOn"/> to restore electricity.
@@ -21,9 +22,9 @@ using UnityEngine.InputSystem;
 ///   - Requires a <see cref="NetworkObject"/> on the same prefab root.
 ///   - Assign <see cref="_fuseBoxController"/> and <see cref="_electricityController"/>.
 ///   - Assign the handle child to <see cref="_handle"/> (rotates on drag).
-///   - Optionally add child Transforms for camera, IK targets, and look target.
+///   - Assign a <see cref="LeverDiegeticController"/> (with its own CinemachineCamera) to <see cref="_diegeticView"/>.
 /// </summary>
-public class PowerSwitch : Interactable
+public class PowerSwitch : Interactable, IDiegeticLever
 {
     // ── Inspector ─────────────────────────────────────────────────────────────
 
@@ -44,17 +45,22 @@ public class PowerSwitch : Interactable
     [SerializeField] private float _creepyLaughDelay = 1.5f;
     [SerializeField] private float _creepyLaughVolume = 1f;
     [SerializeField] private float _creepyLaughMaxDistance = 30f;
-    [Header("Camera & IK")]
-    [Tooltip("Child Transform the camera DOTweens to during the interaction. Optional.")]
-    [SerializeField] private Transform _camPos;
-    [Tooltip("Right-arm IK target while the player holds the switch. Optional.")]
+
+    [Header("Diegetic View")]
+    [Tooltip("The close-up view opened when the player presses Interact on the switch.")]
+    [SerializeField] private LeverDiegeticController _diegeticView;
+    [Tooltip("Optional. Prevents a second player entering the switch view while someone is using it.")]
+    [SerializeField] private DiegeticOccupancy _occupancy;
+
+    [Header("Hand IK")]
+    [Tooltip("Right-arm IK target while the player grips the switch.")]
     [SerializeField] private Transform _rightIkTarget;
-    [Tooltip("Left-arm IK target while the player holds the switch. Optional.")]
+    [Tooltip("Left-arm IK target while the player grips the switch (used when the right hand holds an item).")]
     [SerializeField] private Transform _leftIkTarget;
-    [Tooltip("Head look-at pin during the interaction. Falls back to this transform if unset.")]
+    [Tooltip("Head look-at pin while gripping. Falls back to this transform if unset.")]
     [SerializeField] private Transform _lookTarget;
-    [SerializeField] private float _cameraMoveDuration   = 0.5f;
-    [SerializeField] private float _cameraReturnDuration = 0.25f;
+    [Tooltip("Seconds the arm IK takes to blend onto / off the switch.")]
+    [SerializeField] private float _handReachDuration = 0.2f;
 
     [Header("Handle")]
     [Tooltip("The child Transform that visually represents the switch handle.")]
@@ -63,8 +69,10 @@ public class PowerSwitch : Interactable
     [SerializeField] private Vector3 _upRot    = new Vector3( 60f, -180f, 0f);
     [Tooltip("Local euler angles when the switch is fully DOWN (activated position).")]
     [SerializeField] private Vector3 _downRot  = new Vector3(-60f, -180f, 0f);
-    [Tooltip("Mouse Y sensitivity multiplier during dragging.")]
+    [Tooltip("Multiplier applied to raw Mouse Y while dragging. Higher = faster handle travel.")]
     [SerializeField] private float _dragSensitivity = 0.05f;
+    [Tooltip("Units per second the handle travels at full stick deflection (controller only).")]
+    [SerializeField] private float _controllerDragSpeed = 1.5f;
     [Tooltip("Duration of the snap tween when committing to an end position.")]
     [SerializeField] private float _snapDuration = 0.1f;
 
@@ -82,16 +90,28 @@ public class PowerSwitch : Interactable
     /// <summary>Normalised handle position: 0 = up, 1 = down.</summary>
     private float _dragT = 0f;
     private bool _localIsDown;
-    private bool _inControl     = false;
+    private bool _isDragging;
     private bool _isInteractable = true;
-    private bool _usingRightArm  = true;
-    private PlayerInteractionController _currentPlayer;
-    private Coroutine _exitCoroutine;
+
+    private PlayerAnimationController _grabAnim;
+    private bool _grabRightArm;
 
     private const string RightGripBool = "RightGrip";
     private const string LeftGripBool  = "LeftGrip";
 
+    /// <summary>Whether the switch currently accepts player input (see <see cref="SetInteractable"/>).</summary>
+    public bool IsUsable => _isInteractable;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    protected override void Awake()
+    {
+        base.Awake();
+
+        // Fall back to the conventional layout: a child "Diegetic View" and occupancy on this root.
+        if (_diegeticView == null) _diegeticView = GetComponentInChildren<LeverDiegeticController>(true);
+        if (_occupancy == null)    _occupancy    = GetComponent<DiegeticOccupancy>();
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -125,36 +145,6 @@ public class PowerSwitch : Interactable
         SetForceHighlight(_fuseBoxController != null && _fuseBoxController.IsReady);
     }
 
-    // Interact key (E / ButtonWest) starts the grab (see Interact) and must stay held to keep it.
-    // LMB / RT is reserved for held-item use, so it plays no part here.
-    private bool GrabHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || RebindableInput.GetGamepadHeld(GameAction.Interact);
-
-    // ── Update ────────────────────────────────────────────────────────────────
-
-    private void Update()
-    {
-        if (!_inControl) return;
-        if (_currentPlayer == null || !_currentPlayer.IsLocalPlayer) return;
-
-        // See Lever.Update: pause must not allow this interaction's delayed restore to race
-        // against the pause menu's saved control state.
-        if (UIController.Instance != null && UIController.Instance.IsPaused) return;
-
-        // Use current button state so a release consumed by pause/focus changes is recovered
-        // on the first gameplay frame instead of leaving this interaction latched forever.
-        if (!GrabHeld)
-        {
-            CommitSwitch();
-            _exitCoroutine = StartCoroutine(ExitSwitchView());
-            return;
-        }
-
-        // Dragging down = positive Mouse Y maps to negative because "down" is visually pulling.
-        _dragT = Mathf.Clamp01(_dragT - Input.GetAxis("Mouse Y") * _dragSensitivity);
-        ApplyDragRotation();
-        CheckAudioThreshold();
-    }
-
     // ── Interact ──────────────────────────────────────────────────────────────
 
     protected override string DefaultInteractVerb => Loc.N("Flip");
@@ -163,127 +153,127 @@ public class PowerSwitch : Interactable
     {
         base.Interact(player);
         if (!_isInteractable) return;
-        if (_inControl) return;
-
-        if (_exitCoroutine != null)
+        if (_diegeticView == null)
         {
-            StopCoroutine(_exitCoroutine);
-            _exitCoroutine = null;
-            player.playerMovementController.CameraTransform.DOKill();
+            Debug.LogWarning($"[PowerSwitch] '{name}' has no LeverDiegeticController assigned — Interact does nothing.", this);
+            return;
         }
+        if (DiegeticViewController.IsAnyViewActive) return;
+        if (_occupancy != null && !_occupancy.TryClaim(player)) return;
+
+        _diegeticView.Open(player);
+    }
+
+    // ── Drag API (driven by LeverDiegeticController) ─────────────────────────
+
+    public void BeginDrag()
+    {
+        if (_isDragging) return;
+        _isDragging = true;
+
+        _handle?.DOKill();
+        _dragT       = _isDown.Value ? 1f : 0f;
+        _localIsDown = _isDown.Value;
+    }
+
+    // Input is "positive = up"; _dragT runs 0 (up) → 1 (down), hence the sign flip.
+    public void DragByMouse(float mouseYDelta) => DragBy(-mouseYDelta * _dragSensitivity);
+
+    public void DragByStick(float stickY) => DragBy(-stickY * _controllerDragSpeed * Time.deltaTime);
+
+    public void EndDrag()
+    {
+        if (!_isDragging) return;
+        _isDragging = false;
+        CommitSwitch();
+    }
+
+    public void EndDragToward(bool up)
+    {
+        if (!_isDragging) return;
+        _isDragging = false;
+        _dragT = up ? 0f : 1f;
+        CommitSwitch();
+    }
+
+    private void DragBy(float deltaT)
+    {
+        if (!_isDragging) return;
+        _dragT = Mathf.Clamp01(_dragT + deltaT);
+        ApplyDragRotation();
+        CheckAudioThreshold();
+    }
+
+    // ── Hand grab (driven by LeverDiegeticController) ────────────────────────
+
+    /// <summary>
+    /// Reaches the player's free hand onto the handle (grip pose + arm IK). Uses the right
+    /// arm unless it is busy (IK-active or holding an item), in which case the left arm is used.
+    /// </summary>
+    public void BeginHandGrab(PlayerInteractionController player)
+    {
+        if (_grabAnim != null || player == null) return;
 
         PlayerAnimationController anim   = player.playerAnimationController;
         PlayerPickupController    pickup = player.GetComponent<PlayerPickupController>();
+        if (anim == null) return;
 
         bool rightArmBusy = anim.RightArmRig.weight > 0.5f || (pickup != null && pickup.HeldObject != null);
         bool leftArmBusy  = anim.LeftArmRig.weight  > 0.5f;
         if (rightArmBusy && leftArmBusy) return;
 
-        _usingRightArm = !rightArmBusy;
-        _dragT         = _isDown.Value ? 1f : 0f;
-        _localIsDown   = _isDown.Value;
-        _currentPlayer = player;
-        _inControl     = true;
+        _grabRightArm = !rightArmBusy;
+        Transform ikTarget = _grabRightArm ? _rightIkTarget : _leftIkTarget;
+        if (ikTarget == null) return;
 
-        StartCoroutine(EnterSwitchSequence(player));
-    }
-
-    // ── Camera / IK enter & exit ──────────────────────────────────────────────
-
-    private IEnumerator EnterSwitchSequence(PlayerInteractionController player)
-    {
-        PlayerMovementController  movement = player.playerMovementController;
-        PlayerAnimationController anim     = player.playerAnimationController;
-
-        movement.SetCanControl(false);
-        movement.LookAtTarget(transform);
+        _grabAnim = anim;
 
         Transform lookPoint = _lookTarget != null ? _lookTarget : transform;
         anim.OverrideHeadLookAt(lookPoint.position);
 
-        Transform ikTarget = _usingRightArm ? _rightIkTarget : _leftIkTarget;
-        if (ikTarget != null)
+        anim.SetAnimBool(_grabRightArm ? RightGripBool : LeftGripBool, true);
+
+        if (_grabRightArm)
         {
-            if (_usingRightArm)
-            {
-                anim.RightArmIKTarget       = ikTarget;
-                anim.CamRightArmRigIKTarget = ikTarget;
-            }
-            else
-            {
-                anim.LeftArmIKTarget       = ikTarget;
-                anim.CamLeftArmRigIKTarget = ikTarget;
-            }
-        }
-
-        if (_camPos != null)
-        {
-            movement.CameraTransform.DOMove(_camPos.position, _cameraMoveDuration);
-            movement.CameraTransform.DORotate(_camPos.rotation.eulerAngles, _cameraMoveDuration)
-                .OnUpdate(movement.SyncPitch);
-        }
-
-        yield return new WaitForSeconds(0.1f);
-        if (!_inControl) yield break;
-
-        anim.SetAnimBool(_usingRightArm ? RightGripBool : LeftGripBool, true);
-
-        if (_usingRightArm)
-        {
+            anim.RightArmIKTarget       = ikTarget;
+            anim.CamRightArmRigIKTarget = ikTarget;
             anim.EnableRightArmMask();
-            anim.SetRightArmRigWeightSmooth(1f, 0.2f);
+            anim.SetRightArmRigWeightSmooth(1f, _handReachDuration);
         }
         else
         {
+            anim.LeftArmIKTarget       = ikTarget;
+            anim.CamLeftArmRigIKTarget = ikTarget;
             anim.EnableLeftArmMask();
-            anim.SetLeftArmRigWeightSmooth(1f, 0.2f);
+            anim.SetLeftArmRigWeightSmooth(1f, _handReachDuration);
         }
     }
 
-    private IEnumerator ExitSwitchView()
+    /// <summary>Releases the hand grab started by <see cref="BeginHandGrab"/>.</summary>
+    public void EndHandGrab()
     {
-        if (!_inControl) yield break;
-        _inControl = false;
+        PlayerAnimationController anim = _grabAnim;
+        if (anim == null) return;
+        _grabAnim = null;
 
-        PlayerInteractionController player = _currentPlayer;
-        _currentPlayer = null;
-        if (player == null) yield break;
+        anim.SetAnimBool(_grabRightArm ? RightGripBool : LeftGripBool, false);
 
-        PlayerMovementController  movement = player.playerMovementController;
-        PlayerAnimationController anim     = player.playerAnimationController;
-
-        movement.CameraTransform.DOKill();
-
-        anim.SetAnimBool(_usingRightArm ? RightGripBool : LeftGripBool, false);
-
-        if (_usingRightArm)
+        if (_grabRightArm)
         {
             anim.RightArmIKTarget       = null;
             anim.CamRightArmRigIKTarget = null;
-            anim.SetRightArmRigWeightSmooth(0f, 0.2f);
+            anim.SetRightArmRigWeightSmooth(0f, _handReachDuration);
             anim.DisableRightArmMask();
         }
         else
         {
             anim.LeftArmIKTarget       = null;
             anim.CamLeftArmRigIKTarget = null;
-            anim.SetLeftArmRigWeightSmooth(0f, 0.2f);
+            anim.SetLeftArmRigWeightSmooth(0f, _handReachDuration);
             anim.DisableLeftArmMask();
         }
 
         anim.OverrideHeadLookAt(null);
-        anim.SetBodyLeanDirect(0f);
-        movement.ResetCameraPos(false, _cameraReturnDuration);
-
-        yield return new WaitForSeconds(_cameraReturnDuration);
-
-        // Let the pause menu restore its captured state before this interaction releases the
-        // player; otherwise ClosePauseMenu can overwrite this restore with its stale lock.
-        while (UIController.Instance != null && UIController.Instance.IsPaused)
-            yield return null;
-
-        movement.SetCanControl(true);
-        _exitCoroutine = null;
     }
 
     // ── Drag helpers ──────────────────────────────────────────────────────────
@@ -351,6 +341,8 @@ public class PowerSwitch : Interactable
     private void SnapHandleToState(bool isDown)
     {
         if (_handle == null) return;
+        if (_isDragging) return; // local player is driving — don't fight the input
+        _handle.DOKill();
         _handle.localRotation = Quaternion.Euler(isDown ? _downRot : _upRot);
     }
 
@@ -420,8 +412,9 @@ public class PowerSwitch : Interactable
 
     private void OnSwitchStateChanged(bool oldValue, bool newValue)
     {
-        // Late-join catch-up.
-        SnapHandleToState(newValue);
+        // Late-join catch-up. Don't cut short a commit tween already easing the handle into place.
+        if (_handle == null || !DOTween.IsTweening(_handle))
+            SnapHandleToState(newValue);
         if (newValue) SetForceHighlight(false);
     }
 

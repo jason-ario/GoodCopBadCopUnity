@@ -2,9 +2,11 @@ using DG.Tweening;
 using GoodCopBadCop.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 /// <summary>
-/// Diegetic view for the shutter <see cref="Lever"/>. Opened by pressing Interact on the lever.
+/// Diegetic view for any <see cref="IDiegeticLever"/> (booth shutter <see cref="Lever"/>, power
+/// station <see cref="PowerSwitch"/>). Opened by pressing Interact on the lever.
 /// Inside the view, clicking on the lever (LMB / RT) and dragging the mouse up/down (or right stick)
 /// moves it; releasing commits it to the nearest end. With a gamepad, pushing up/down on the vertical
 /// axis (left stick, D-pad or right stick) grabs and moves the lever directly, and letting go commits it
@@ -18,8 +20,11 @@ using UnityEngine.InputSystem;
 public class LeverDiegeticController : DiegeticViewController
 {
     [Header("Lever")]
-    [Tooltip("The lever this view drives.")]
-    [SerializeField] private Lever _lever;
+    [Tooltip("The lever this view drives. Must implement IDiegeticLever (Lever, PowerSwitch).")]
+    [FormerlySerializedAs("_lever")]
+    [SerializeField] private Interactable _leverComponent;
+
+    private IDiegeticLever _lever => _leverComponent as IDiegeticLever;
 
     [Tooltip("The lever arm's collider — clicking and dragging on it (while the view is open) moves the lever.")]
     [SerializeField] private Collider _leverCollider;
@@ -63,6 +68,18 @@ public class LeverDiegeticController : DiegeticViewController
 
     private bool GrabDown => Input.GetMouseButtonDown(0) || RebindableInput.GetGamepadDown(GameAction.UseItem);
     private bool GrabHeld => Input.GetMouseButton(0)     || RebindableInput.GetGamepadHeld(GameAction.UseItem);
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (_leverComponent != null && !(_leverComponent is IDiegeticLever))
+        {
+            Debug.LogWarning($"[LeverDiegeticController] '{_leverComponent.name}' ({_leverComponent.GetType().Name}) " +
+                             "does not implement IDiegeticLever — clearing the reference.", this);
+            _leverComponent = null;
+        }
+    }
+#endif
 
     protected override void OnOpened()
     {

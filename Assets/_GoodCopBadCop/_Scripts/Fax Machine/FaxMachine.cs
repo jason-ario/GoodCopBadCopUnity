@@ -31,6 +31,50 @@ public class FaxMachine : NetworkBehaviour
     // only ever plays the first time, not every subsequent day's fax pickup.
     private bool _hasShownDailyFaxTutorial;
 
+    public static FaxMachine Instance { get; private set; }
+
+    /// <summary>
+    /// Server-only. When set to the current day, the clock-in punch does NOT deliver the daily
+    /// fax; it's held until <see cref="ReleaseDeferredDailyFax"/> is called (e.g. Day 4 waits for
+    /// its new-voice megaphone announcement to finish). Mirrors
+    /// <see cref="SortMailTask.DeferAutoTriggerForDay"/>. -1 = no deferral.
+    /// </summary>
+    public static int DeferDailyFaxForDay = -1;
+
+    // True once a clock-in fax delivery was swallowed by DeferDailyFaxForDay and is waiting
+    // on ReleaseDeferredDailyFax.
+    private bool _dailyFaxPending;
+
+    private void Awake() => Instance = this;
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
+    /// <summary>
+    /// Server-only. Releases a daily fax deferred via <see cref="DeferDailyFaxForDay"/>. If the
+    /// clock-in hasn't happened yet, the deferral is simply cleared so the normal clock-in
+    /// delivery runs; otherwise the held fax is delivered now.
+    /// </summary>
+    public static void ReleaseDeferredDailyFax(int day)
+    {
+        if (DeferDailyFaxForDay == day)
+        {
+            DeferDailyFaxForDay = -1;
+            return;
+        }
+        Instance?.TriggerDeferredDailyFax();
+    }
+
+    private void TriggerDeferredDailyFax()
+    {
+        if (this == null || !IsServer || !_dailyFaxPending) return;
+        _dailyFaxPending = false;
+        Debug.Log("[FaxMachine] Releasing deferred daily fax.");
+        StartCoroutine(WaitAndSpawnFax());
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -79,6 +123,15 @@ public class FaxMachine : NetworkBehaviour
             Debug.Log("[FaxMachine] Day 1 — skipping daily fax spawn.");
             return;
         }
+
+        if (ShiftManager.Instance.CurrentDay == DeferDailyFaxForDay)
+        {
+            DeferDailyFaxForDay = -1;
+            _dailyFaxPending = true;
+            Debug.Log($"[FaxMachine] Day {ShiftManager.Instance.CurrentDay} daily fax deferred — waiting for ReleaseDeferredDailyFax().");
+            return;
+        }
+
         StartCoroutine(WaitAndSpawnFax());
     }
 

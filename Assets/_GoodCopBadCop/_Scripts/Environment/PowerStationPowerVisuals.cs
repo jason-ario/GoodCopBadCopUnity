@@ -74,6 +74,25 @@ public class PowerStationPowerVisuals : MonoBehaviour
     private bool _turbinesAtRest = true;
     private Coroutine _sequence;
 
+    /// <summary>
+    /// 0..1 share of light fixtures currently switched on (follows the power state and the
+    /// one-by-one turn-on sequence; independent of proximity). Used e.g. by the power station
+    /// fog zone to swap the black interior fog for a light fog while the lights are on.
+    /// </summary>
+    public float LitFraction
+    {
+        get
+        {
+            if (_fixtureOn == null || _fixtureOn.Length == 0)
+                return _powered ? 1f : 0f;
+
+            int on = 0;
+            for (int i = 0; i < _fixtureOn.Length; i++)
+                if (_fixtureOn[i]) on++;
+            return (float)on / _fixtureOn.Length;
+        }
+    }
+
     private void Awake()
     {
         _fixtureOn = new bool[_fixtures != null ? _fixtures.Length : 0];

@@ -227,13 +227,46 @@ public class PC : Interactable
     {
         base.OnNetworkSpawn();
         _navState.OnValueChanged += HandleNavStateChanged;
+        ShiftManager.OnDayTransitionBlackout += HandleDayTransitionBlackout;
         ApplySyncedState(_navState.Value);
     }
 
     public override void OnNetworkDespawn()
     {
         _navState.OnValueChanged -= HandleNavStateChanged;
+        ShiftManager.OnDayTransitionBlackout -= HandleDayTransitionBlackout;
         base.OnNetworkDespawn();
+    }
+
+    /// <summary>
+    /// Powers the terminal down between days. Runs on every peer: the server resets the
+    /// replicated nav state to off, and any peer still operating the terminal is kicked out
+    /// of the PC view locally so the new day starts with it idle until someone interacts.
+    /// </summary>
+    private void HandleDayTransitionBlackout()
+    {
+        if (pcActive)
+            ForceExitPCForDayTransition();
+
+        if (IsServer && _navState.Value.IsActive)
+            ServerExitTerminal();
+    }
+
+    private void ForceExitPCForDayTransition()
+    {
+        pcActive = false;
+        SetComputerCameraActive(false);
+        if (UIController.Instance != null) UIController.Instance.HideBackButton();
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        if (_virtualCanvasCursor != null) _virtualCanvasCursor.enabled = false;
+        RefreshSearchField(_navState.Value);
+        UIController.Instance?.ShowPlayerUI();
+        if (_player == null) return;
+        _player.SetCanInteract(true, "");
+        // Screen is black: snap the camera back instead of tweening it.
+        _player.playerMovementController.ResetCameraPos(true, 0f, () => _player.playerMovementController.SetCanControl(true));
+        _player = null;
     }
 
     private void HandleNavStateChanged(NavSyncState previous, NavSyncState current) => ApplySyncedState(current);

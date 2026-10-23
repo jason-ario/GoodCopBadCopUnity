@@ -121,6 +121,17 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     private bool _transitionRunningLocally;
 
+    /// <summary>True on this peer while the in-between-shift (day-to-day) transition is running.</summary>
+    public bool IsDayTransitionRunningLocally => _transitionRunningLocally;
+
+    /// <summary>
+    /// Fired on EVERY peer during the in-between-shift transition, once the screen is fully black
+    /// and before the campaign day advances / <see cref="OnDayStart"/>. Use it to switch world
+    /// devices (radio, PC terminal, ...) back to their idle/off state for the new day.
+    /// Handlers must do their own server-side writes behind an <c>IsServer</c> check.
+    /// </summary>
+    public static event Action OnDayTransitionBlackout;
+
     [Header("Environment Set Up")]
     [SerializeField] private SwitchButton _switchButton;
     [Tooltip("Tabletop anchor where items recovered from a saved player inventory are released on load.")]
@@ -1082,8 +1093,8 @@ public class ShiftManager : NetworkBehaviour
         // Reset the shift flag so the bed interaction becomes available.
         shiftStarted.Value = false;
 
-        // Open the booth door so the player can leave.
-        _doorController?.ForceOpen();
+        // The booth door is only unlocked at shift end (via OnDoorUnlock below) — it is NOT
+        // force-opened; the player opens it themselves.
 
         // Notify all clients: shift is over, booth door is unlocked.
         SignalShiftEndClientRpc();
@@ -1091,7 +1102,8 @@ public class ShiftManager : NetworkBehaviour
 
     /// <summary>
     /// Runs on all clients when the shift ends. Fires <see cref="OnShiftEnd"/> and
-    /// <see cref="OnDoorUnlock"/> so the bed becomes usable and the booth door opens.
+    /// <see cref="OnDoorUnlock"/> so the bed becomes usable and the booth door unlocks (it is
+    /// not opened automatically).
     /// Night phase has been removed — the player walks to bed to end the day.
     /// </summary>
     [ClientRpc]
@@ -1417,6 +1429,9 @@ public class ShiftManager : NetworkBehaviour
         // No blood carries into the next day. Runs on every peer while the screen is black and
         // before OnDayStart, so it can't remove blood that day-start systems spawn for the new day.
         BloodSplatterCleanup.ClearAllForDayTransition();
+
+        // Switch world devices (radio, PC terminal) off for the new day while nobody can see it.
+        OnDayTransitionBlackout?.Invoke();
 
         // Advance the campaign day — server-only; propagates to all clients via NetworkVariable.
         // Usually this already happened before the report was shown so "Dead Overnight" can

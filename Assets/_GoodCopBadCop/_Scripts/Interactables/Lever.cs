@@ -7,7 +7,7 @@ using UnityEngine;
 /// where the player clicks and drags the lever up/down. Shutter open/close fires at the 90 % / 10 %
 /// drag thresholds; releasing commits the lever to the nearest end and syncs it over the network.
 /// </summary>
-public class Lever : Interactable
+public class Lever : Interactable, IDiegeticLever
 {
     [SerializeField] private AudioSource leverAudio;
     [SerializeField] private AudioClip leverOnSound;

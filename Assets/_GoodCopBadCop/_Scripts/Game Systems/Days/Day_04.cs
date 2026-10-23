@@ -78,6 +78,10 @@ public class Day_04 : DayBase
         // since CampaignManager calls DayActivated before OnDayChanged.
         SortMailTask.DeferAutoTriggerForDay = 4;
 
+        // Day 4 exception: hold the daily fax (normally delivered on clock-in) until the new
+        // voice's megaphone announcement has finished. Released in OnNewVoiceAnnouncementComplete.
+        FaxMachine.DeferDailyFaxForDay = 4;
+
         // Fires on ALL clients the instant Day 4's breach alarm starts (see
         // MutantBreachManager.OnBreachStartedAllClients) — only Day 4 reacts to it, since only
         // Day_04 is subscribed while Day 4 is active.
@@ -89,6 +93,10 @@ public class Day_04 : DayBase
         base.DayDeactivated();
         TimecardMachine.OnClockInServer -= OnPlayerClockedInServer;
         MutantBreachManager.OnBreachStartedAllClients -= OnMutantBreachStarted;
+
+        // Never let an unconsumed Day 4 fax deferral leak past this day.
+        if (FaxMachine.DeferDailyFaxForDay == 4)
+            FaxMachine.DeferDailyFaxForDay = -1;
     }
 
     public override void ShiftEnded()        => base.ShiftEnded();
@@ -125,12 +133,14 @@ public class Day_04 : DayBase
         if (_newVoiceAnnouncementDialogue == null)
         {
             Debug.LogWarning("[Day_04] _newVoiceAnnouncementDialogue is not assigned — skipping new voice announcement.");
+            OnNewVoiceAnnouncementComplete();
             return;
         }
 
         if (ScriptedDialogueRunner.Instance == null)
         {
             Debug.LogWarning("[Day_04] ScriptedDialogueRunner.Instance is null — skipping new voice announcement.");
+            OnNewVoiceAnnouncementComplete();
             return;
         }
 
@@ -141,12 +151,21 @@ public class Day_04 : DayBase
         // bark the player can walk away from.
         ScriptedDialogueRunner.Instance.PlayMegaphoneDialogue(
             _newVoiceAnnouncementDialogue,
-            onComplete: null,
+            onComplete: OnNewVoiceAnnouncementComplete,
             speakerNameOverride: _newVoiceSpeakerName,
             speakerColorOverride: _newVoiceSpeakerColor,
             useAlternateVoice: true);
 
         Debug.Log("[Day_04] New voice megaphone announcement started.");
+    }
+
+    /// <summary>
+    /// Server-only. Runs once the new voice announcement finishes (or is skipped) and releases
+    /// the daily fax deferred in <see cref="DayActivated"/>.
+    /// </summary>
+    private void OnNewVoiceAnnouncementComplete()
+    {
+        FaxMachine.ReleaseDeferredDailyFax(4);
     }
 
     // -------------------------------------------------------------------------
