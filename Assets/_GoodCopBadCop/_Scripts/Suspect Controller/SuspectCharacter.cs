@@ -202,8 +202,19 @@ public class SuspectCharacter : Interactable
 
     private bool IsJunkCollectible => _junkItem != null && _junkItem.IsCollectible.Value;
 
+    /// <summary>
+    /// True on any machine while this character is the speaker of the active scripted dialogue.
+    /// A player not in that conversation joins it by interacting with the speaker (no proximity
+    /// pull-in mid-conversation), so this bypasses <see cref="_interactionLocked"/> — e.g. Day 1's
+    /// hard-locked tutorial Vlad — for the join only. Verdict/mutant/walk-in gates still apply.
+    /// </summary>
+    private bool IsActiveScriptedSpeaker =>
+        IsSpawned && ScriptedDialogueRunner.Instance != null &&
+        ScriptedDialogueRunner.ActiveDialogueSpeakerNetId != 0 &&
+        ScriptedDialogueRunner.ActiveDialogueSpeakerNetId == NetworkObjectId;
+
     public override bool IsInteractable => base.IsInteractable
-        && ((!_interactionLocked.Value && !_verdictClosed.Value && !_mutantInteractionClosed.Value && !_walkingToBooth.Value) || IsJunkCollectible);
+        && (((!_interactionLocked.Value || IsActiveScriptedSpeaker) && !_verdictClosed.Value && !_mutantInteractionClosed.Value && !_walkingToBooth.Value) || IsJunkCollectible);
 
     [SerializeField] private GameObject bloodExplosion;
     public Transform lookPos;
@@ -1856,13 +1867,13 @@ public class SuspectCharacter : Interactable
     /// </summary>
     private bool CanStartTalk()
     {
-        if (_interactionLocked.Value || _verdictClosed.Value || _mutantInteractionClosed.Value) return false;
+        if (_interactionLocked.Value && !IsActiveScriptedSpeaker) return false;
+        if (_verdictClosed.Value || _mutantInteractionClosed.Value) return false;
         if (_walkingToBooth.Value) return false;
         if (Time.unscaledTime < _dialogueInteractionBlockedUntil) return false;
 
-        // Rejoining this suspect's in-progress scripted dialogue.
-        ulong activeSpeaker = ScriptedDialogueRunner.ActiveDialogueSpeakerNetId;
-        if (ScriptedDialogueRunner.Instance != null && IsSpawned && activeSpeaker != 0 && activeSpeaker == NetworkObjectId)
+        // Joining/rejoining this suspect's in-progress scripted dialogue.
+        if (IsActiveScriptedSpeaker)
             return true;
 
         if (_dialogueInteractionDisabled) return false;
@@ -1902,8 +1913,9 @@ public class SuspectCharacter : Interactable
             return;
         }
 
-        // Hard-locked suspects (e.g. Day 1 tutorial Vlad) ignore every direct interaction path.
-        if (_interactionLocked.Value)
+        // Hard-locked suspects (e.g. Day 1 tutorial Vlad) ignore every direct interaction path,
+        // except joining their own in-progress scripted dialogue (see IsActiveScriptedSpeaker).
+        if (_interactionLocked.Value && !IsActiveScriptedSpeaker)
             return;
 
         // A delivered verdict permanently closes this suspect out from every dialogue path.
@@ -1924,17 +1936,13 @@ public class SuspectCharacter : Interactable
             return;
 
         // A player who backed out of (or never joined) an active scripted dialogue with this
-        // suspect can rejoin by interacting with them again — resumes wherever the dialogue
-        // presently is, rather than restarting it.
+        // suspect joins by interacting with them — resumes wherever the dialogue presently is,
+        // rather than restarting it. Mid-conversation arrivals are never pulled in by proximity.
         var runner = ScriptedDialogueRunner.Instance;
-        if (runner != null)
+        if (runner != null && IsActiveScriptedSpeaker)
         {
-            var netObj = GetComponent<NetworkObject>();
-            if (netObj != null && ScriptedDialogueRunner.ActiveDialogueSpeakerNetId == netObj.NetworkObjectId)
-            {
-                runner.RequestRejoinScriptedDialogueServerRpc();
-                return;
-            }
+            runner.RequestRejoinScriptedDialogueServerRpc();
+            return;
         }
 
         // Suspects flagged silent (see _dialogueInteractionDisabled) consume the click as a

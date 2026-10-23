@@ -684,7 +684,9 @@ public class Day_02 : DayBase, IDailyTask
         else
         {
             bool introDone = false;
-            _spawnedVlad.SetCanInteractNetworked(false);
+            // Vlad stays interactable during the talk: a player who arrives mid-conversation
+            // joins it by interacting with him (SuspectCharacter routes that to a rejoin).
+            _spawnedVlad.SetCanInteractNetworked(true);
             ScriptedDialogueRunner.Instance.PlayDialogue(
                 _spawnedVlad,
                 _vladIntroDialogue,
@@ -692,7 +694,6 @@ public class Day_02 : DayBase, IDailyTask
                 lockOutsidePlayers: true,
                 participantRadius: _introProximityRadius);
             yield return new WaitUntil(() => introDone);
-            _spawnedVlad.SetCanInteractNetworked(true);
         }
 
         // Short beat after dialogue before Vlad starts moving.
@@ -760,7 +761,8 @@ public class Day_02 : DayBase, IDailyTask
         if (_vladToolLockerDialogue != null)
         {
             bool lockerDone = false;
-            _spawnedVlad.SetCanInteractNetworked(false);
+            // Interactable during the talk so a late arrival can join by interacting.
+            _spawnedVlad.SetCanInteractNetworked(true);
             ScriptedDialogueRunner.Instance.PlayDialogue(
                 _spawnedVlad,
                 _vladToolLockerDialogue,
@@ -768,7 +770,6 @@ public class Day_02 : DayBase, IDailyTask
                 lockOutsidePlayers: true,
                 participantRadius: _toolLockerProximityRadius);
             yield return new WaitUntil(() => lockerDone);
-            _spawnedVlad.SetCanInteractNetworked(true);
         }
 
         // Now that Vlad has unlocked the tool locker, trigger the Day 2 mail delivery (deferred

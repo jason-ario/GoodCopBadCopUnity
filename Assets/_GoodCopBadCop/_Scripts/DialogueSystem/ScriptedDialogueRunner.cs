@@ -102,10 +102,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [SerializeField] private float _advanceTimeoutSeconds = 1.5f;
 
     [Header("Proximity Join")]
-    [Tooltip("Distance (world units) from the speaker within which a player is automatically " +
-             "included as a required participant in standard scripted dialogue. Optional suspect " +
-             "intros disable proximity joining: the other player joins only by interacting with the suspect.")]
+    [Tooltip("Distance (world units) from the speaker within which a player is included as a " +
+             "required participant when a standard scripted dialogue STARTS. Optional suspect " +
+             "intros seed only the interacting player.")]
     [SerializeField] private float _joinRadius = 5f;
+
+    [Tooltip("When false (default), proximity only decides who is pulled in when a conversation " +
+             "starts. A player who arrives mid-conversation is NOT forced in — they overhear the " +
+             "subtitles and join by interacting with the speaker. When true, walking within the " +
+             "join radius mid-conversation pulls the player in automatically (legacy behaviour).")]
+    [SerializeField] private bool _proximityJoinMidSequence = false;
 
     [Header("Glass Bang")]
     [Tooltip("Animator trigger that, when used as a node/choice animationTrigger, also lands a real " +
@@ -203,9 +209,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private bool _abandonWhenEmpty;
     private bool _abandoned;
 
-    // Per-sequence proximity radius. Forced outside conversations (lockOutsidePlayers) seed and
-    // late-join strictly by distance so an out-of-range co-op partner is never pulled in; they
-    // join once they walk within _activeJoinRadius (callers pass their trigger radius here).
+    // Per-sequence proximity radius. Forced outside conversations (lockOutsidePlayers) seed
+    // strictly by distance so an out-of-range co-op partner is never pulled in; they join later
+    // by interacting with the speaker (callers pass their trigger radius here).
     private float _activeJoinRadius = -1f;
     private float EffectiveJoinRadius => _activeJoinRadius > 0f ? _activeJoinRadius : _joinRadius;
 
@@ -366,7 +372,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// <paramref name="participantRadius"/> overrides the inspector join radius for this
     /// sequence only (&lt;= 0 keeps the default). With <paramref name="lockOutsidePlayers"/>,
     /// only players within that radius are locked in at the start; others join (and are
-    /// locked) when they walk into range.
+    /// locked) by interacting with the speaker mid-conversation.
     /// </para>
     /// <para>
     /// <paramref name="useWorldDialogueCamera"/> makes every participant use the world-dialogue
@@ -537,11 +543,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     private void Update()
     {
-        // Server: detect players who have walked into proximity of the active speaker and
-        // late-join them so they are counted in the advance / choice gates going forward.
-        // For a 2-player session with a single distance check per non-participant this is
-        // negligible per-frame cost, so no throttle is needed.
-        if (IsServer && _serverSequenceActive && _currentSpeakerTransform != null)
+        // Server (legacy, opt-in): late-join players who walk into proximity of the active
+        // speaker. Off by default — mid-conversation arrivals join by interacting with the
+        // speaker instead (SuspectCharacter.Interact -> RequestRejoinScriptedDialogueServerRpc).
+        if (IsServer && _proximityJoinMidSequence && _serverSequenceActive && _currentSpeakerTransform != null)
             CheckProximityJoins();
 
         // _clientIsWaitingForInput is set on ALL clients via ClientRpc, so both the
@@ -921,7 +926,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Vector3 speakerPos = _currentSpeakerTransform.position;
 
         // Forced outside conversations: lock in only players within range. An out-of-range
-        // partner stays free and is pulled in by CheckProximityJoins once they arrive.
+        // partner stays free (overhearing subtitles) and joins by interacting with the speaker.
         if (lockOutsidePlayers)
         {
             foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
@@ -966,7 +971,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     ///   <item>A targeted <see cref="LateJoinClientRpc"/> to lock their controls, activate
     ///         the suspect camera, and set their input-waiting state.</item>
     /// </list>
-    /// Called every frame on the server while a dialogue is active.
+    /// Called every frame on the server while a dialogue is active, only when
+    /// <see cref="_proximityJoinMidSequence"/> is enabled.
     /// </summary>
     private void CheckProximityJoins()
     {
