@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
+using Netcode.Transports.Facepunch;
 using Steamworks;
 using Steamworks.Data;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -22,7 +25,8 @@ public static class DevSpectatorConfig
     /// </summary>
     public static readonly HashSet<ulong> DevSteamIds = new HashSet<ulong>
     {
-        // 7656119XXXXXXXXXX,
+        76561199767732659, // SpiralTrapStudio (jasonario)
+        76561198101322955, // nosajtevol
     };
 
     /// <summary>Maximum number of real (visible) players per session.</summary>
@@ -77,6 +81,46 @@ public static class DevSpectatorConfig
             return false;
 
         return ulong.TryParse(text.Substring(SpectatorPayloadPrefix.Length), out steamId) && IsDevSteamId(steamId);
+    }
+
+    private static FieldInfo _connectionManagerField;
+    private static MethodInfo _clientIdToTransportIdMethod;
+
+    /// <summary>
+    /// SERVER: true only if the NGO client's Steam-authenticated identity (from the Steam
+    /// networking connection, not the self-reported payload) matches <paramref name="claimedSteamId"/>.
+    /// Fails closed: any lookup failure rejects the spectator request.
+    /// </summary>
+    public static bool VerifyConnectionSteamId(NetworkManager networkManager, ulong clientNetworkId, ulong claimedSteamId)
+    {
+        if (networkManager == null || !(networkManager.NetworkConfig.NetworkTransport is FacepunchTransport transport))
+            return false;
+
+        try
+        {
+            // NGO 2.x keeps the NGO-clientId -> transport-clientId map internal.
+            _connectionManagerField ??= typeof(NetworkManager).GetField("ConnectionManager",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            if (_connectionManagerField == null) return false;
+
+            object connectionManager = _connectionManagerField.GetValue(networkManager);
+            if (connectionManager == null) return false;
+
+            _clientIdToTransportIdMethod ??= connectionManager.GetType().GetMethod("ClientIdToTransportId",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            if (_clientIdToTransportIdMethod == null) return false;
+
+            var (transportId, found) = ((ulong, bool))_clientIdToTransportIdMethod.Invoke(connectionManager, new object[] { clientNetworkId });
+            if (!found) return false;
+
+            return transport.TryGetSteamIdForTransportClient(transportId, out ulong actualSteamId)
+                   && actualSteamId == claimedSteamId;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[DevSpectator] Could not verify spectator identity: {e}");
+            return false;
+        }
     }
 
     /// <summary>
