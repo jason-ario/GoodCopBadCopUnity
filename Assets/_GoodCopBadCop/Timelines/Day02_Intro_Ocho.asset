@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 0
     npcLine: Relax. Just enjoying the view from this side of the glass, for once.
@@ -29,6 +30,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 1
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: Your first kill. How'd it feel? Go on, humor me.
@@ -37,13 +39,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: Like doing my job.
-      npcResponse: Your job. Sure. Keep telling yourself that, officer.
+      npcResponse: Your job. Sure. Keep telling yourself that, Officer.
+      npcFollowUp: 
       animationTrigger: TalkBigLaugh
       playLaughSfx: 1
     - playerChoiceText: It felt terrible.
       npcResponse: Terrible. And yet here you are, back for another shift.
+      npcFollowUp: 
       animationTrigger: TalkSarcasticNod
       playLaughSfx: 0
   - type: 0
@@ -53,6 +58,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: If I told you I was infected, would you even check? Or just... stamp?
@@ -61,13 +67,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: I'd check.
       npcResponse: Adorable. You almost believe that.
+      npcFollowUp: 
       animationTrigger: TalkBigCocky
       playLaughSfx: 0
     - playerChoiceText: Depends on my mood.
       npcResponse: NOW we're being honest. I like you already.
+      npcFollowUp: 
       animationTrigger: TalkBigLaugh
       playLaughSfx: 1
   - type: 0
@@ -77,6 +86,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 1
+    unskippable: 0
     choices: []
   - type: 0
     npcLine: Papers are in order. Take a good look.
@@ -85,4 +95,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

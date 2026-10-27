@@ -9,7 +9,7 @@ using UnityEngine;
 /// </summary>
 public partial class LocalizationWindow : EditorWindow
 {
-    private static readonly string[] TabNames = { "Scan", "Strings", "Preview", "Import / Export", "Findings", "Freeze / Delta", "Fonts", "Stats", "Text Fit" };
+    private static readonly string[] TabNames = { "Scan", "Strings", "Preview", "Import / Export", "Findings", "Freeze / Delta", "Fonts", "Stats", "Text Fit", "Fit Review" };
 
     private LocalizationTable _table;
     private LocalizationSettings _settings;
@@ -39,6 +39,7 @@ public partial class LocalizationWindow : EditorWindow
         CommitPendingSource();
         SaveDirty();
         DisposePreview();
+        DisposeFitReview();
     }
 
     private void OnLostFocus()
@@ -97,6 +98,7 @@ public partial class LocalizationWindow : EditorWindow
                 case 6: DrawFontsTab(); break;
                 case 7: DrawStatsTab(); break;
                 case 8: DrawTextFitTab(); break;
+                case 9: DrawFitReviewTab(); break;
             }
         }
 
@@ -155,7 +157,7 @@ public partial class LocalizationWindow : EditorWindow
 
     // ================================================================ Scan tab
 
-    private bool _scanScenes = true, _scanPrefabs = true, _scanSOs = true, _scanSuspectObjects = true, _scanCode = true, _showLocalized;
+    private bool _scanScenes = true, _scanPrefabs = true, _scanSOs = true, _scanSuspectObjects = true, _scanCode = true, _showLocalized, _showRuntime;
     private string _scanGroup = LocGroups.FilterAll;
     private List<ScanItem> _scan;
     private Vector2 _scanScroll;

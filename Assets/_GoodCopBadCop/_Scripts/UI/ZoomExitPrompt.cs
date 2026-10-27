@@ -5,7 +5,7 @@ using UnityEngine;
 namespace GoodCopBadCop.UI
 {
     /// <summary>
-    /// "[key] Exit" prompt shown next to the Back button while a view that has its own toggle key
+    /// "{0} Exit" prompt ({0} = key icon) shown next to the Back button while a view that has its own toggle key
     /// is open:
     /// <list type="bullet">
     ///   <item>Zoom mode (<see cref="HeldItemZoomView"/>) - <see cref="GameAction.ZoomHeldItem"/>.</item>
@@ -18,26 +18,43 @@ namespace GoodCopBadCop.UI
     /// hidden and moves with the Back button's HUD avoidance. This object must stay active so
     /// polling keeps running; it toggles <see cref="_root"/>.
     /// </summary>
-    public class ZoomExitPrompt : MonoBehaviour
+    public class ZoomExitPrompt : MonoBehaviour, IIconPromptDriver
     {
+        public System.Collections.Generic.IEnumerable<TMP_Text> DrivenLabels => new TMP_Text[] { _label };
+
         [Tooltip("Visual root toggled while a supported view is open. Must be a child of this object so polling keeps running.")]
         [SerializeField] private GameObject _root;
 
         [Tooltip("Key icon display; switched to the open view's toggle action.")]
         [SerializeField] private HelperIconKeyDisplay _keyDisplay;
 
-        [Tooltip("Optional label next to the icon.")]
+        [Tooltip("Label right of the icon. A label for text left of the icon is cloned from it when a translation needs one.")]
         [SerializeField] private TextMeshProUGUI _label;
 
-        [SerializeField, LocalizeField] private string _text = "Exit";
+        [Tooltip("Prompt sentence; {0} is the toggle key icon, e.g. \"{0} Exit\".")]
+        [SerializeField, LocalizeField] private string _text = "{0} Exit";
 
         private GameAction? _shownAction;
+        private IconPromptLabels _labels;
 
         private void OnEnable()
         {
-            if (_label != null) _label.text = _text;
+            Loc.LanguageChanged += ApplyText;
+            ApplyText();
             _shownAction = null;
             Refresh();
+        }
+
+        private void OnDisable()
+        {
+            Loc.LanguageChanged -= ApplyText;
+        }
+
+        private void ApplyText()
+        {
+            if (_label == null) return;
+            _labels ??= new IconPromptLabels(_label, _keyDisplay);
+            _labels.Apply(IconPrompt.Localize(_text));
         }
 
         private void Update() => Refresh();

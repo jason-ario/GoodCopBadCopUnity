@@ -42,19 +42,19 @@ MonoBehaviour:
   - Collecting my pension. Retired last year.
   - Hosting a block party tonight. Can't wait!
   entryDialogues:
-  - "Here\u2019s my ID and the form. Filled them out in the bread line."
+  - Here's my ID and the form. Filled them out in the bread line.
   - Is your stamp working? Everything else in this city seems to be broken.
   uncannyEntryDialogues: []
   exitDialoguesPassed:
-  - Cool. Have a fun time in your little box, officer.
+  - Cool. Have a fun time in your little box, Officer.
   exitDialoguesQuarantined: []
   exitDialoguesKilled: []
   quarantineExitLines:
   - A holding cell? Does it have a bed? I could use a nap.
-  - "Sure. Lock me up. Add it to the list of things that don\u2019t matter."
+  - Sure. Lock me up. Add it to the list of things that don't matter.
   killExitLines:
-  - "Hm. Didn\u2019t even need to think about it, did you."
-  - "Finally\u2026 I can stop\u2026 waiting\u2026 in lines\u2026"
+  - Hm. Didn't even need to think about it, did you.
+  - Finally... I can stop... waiting... in lines...
   voiceAudioClips:
   - {fileID: 8300000, guid: 942af6f9e8eade54bb2d84e533a8c131, type: 3}
   - {fileID: 8300000, guid: 5f053379fe67afa45954572bf5ee7b62, type: 3}
@@ -74,8 +74,13 @@ MonoBehaviour:
     uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
-    answer: No. Tired. I'm always tired. That's not new, officer.
+    answer: No. Tired. I'm always tired. That's not new, Officer.
     mismatchAnswer: Never tired. I sleep ten hours a night. The shop's always full.
+    uncannyAnswer: 
+    cameraTrigger: 
+  - question: Has your neighbor answered yet?
+    answer: No. I hear him walking at night. Back and forth. He never sleeps.
+    mismatchAnswer: Yes. He's fine. We had tea together yesterday.
     uncannyAnswer: 
     cameraTrigger: 
   idleBarks:

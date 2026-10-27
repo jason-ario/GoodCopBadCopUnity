@@ -397,7 +397,7 @@ public class Day_01 : DayBase
 
     [Tooltip("First megaphone bark played the instant the first breach begins.")]
     [TextArea(2, 4)]
-    [SerializeField, LocalizeField] private string _breachWarningBark1 = "Ah shit, not again. The mutants are coming.";
+    [SerializeField, LocalizeField] private string _breachWarningBark1 = "Ugh, not again. The mutants are coming.";
 
     [Tooltip("Second megaphone bark played shortly after the first breach-warning bark.")]
     [TextArea(2, 4)]
@@ -2316,7 +2316,7 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnClosingDialogueComplete()
     {
-        // Silence Vlad's generic exit bark — his story ends with "Don't fuck it up."
+        // Silence Vlad's generic exit bark — his story ends with "Don't mess it up."
         SuspectController.ForceNextSuspectSkipExitDialogue = true;
 
         // Index 1 is always a random clean civilian — no forced-spawn intercept needed.

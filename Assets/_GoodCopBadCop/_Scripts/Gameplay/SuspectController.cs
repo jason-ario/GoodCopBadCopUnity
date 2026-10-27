@@ -820,6 +820,13 @@ public class SuspectController : NetworkBehaviour
         suspectCharacter.SetIsAtBooth(false);
         // Not interactable (talk/item use/reticle) until they reach the booth.
         suspectCharacter.SetWalkingToBoothServer(true);
+        // A suspect whose forced intro will start on arrival offers no "[E] Talk" (and can't open
+        // the question conversation) until that intro is running. Cleared in SayEntryDialogue
+        // when no forced intro ends up intercepting.
+        suspectCharacter.SetForcedIntroStateServer(
+            SuspectEncounterManager.HasUnplayedForcedIntro(suspectCharacter)
+                ? SuspectCharacter.ForcedIntroState.Pending
+                : SuspectCharacter.ForcedIntroState.None);
 
         suspectCharacter.SetLocomotionState(true);
         // Walk straight to the booth stand position via DOTween rather than NavMeshAgent
@@ -894,9 +901,9 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
-        // Now standing at the window — shootable/woundable from here on.
+        // Now standing at the window — shootable/woundable from here on. Talk/interaction opens
+        // once they've finished turning to face the window (OnRotationComplete).
         suspectCharacter.SetIsAtBooth(true);
-        suspectCharacter.SetWalkingToBoothServer(false);
 
         // Leg animators (procedural IK) stay disabled here — they are only ever re-enabled for
         // a full-mutant's window climb-through (see MutantSuspectBehaviour), never for a normal
@@ -933,10 +940,14 @@ public class SuspectController : NetworkBehaviour
     {
         if (suspectCharacter == null) return;
 
+        // Walk-in (and the turn to face the window) finished — ready to be interacted with.
+        suspectCharacter.SetWalkingToBoothServer(false);
+
         // Returning full mutant: attack the window straight away, whether or not anyone is in
         // the booth or the shutter is open — same as a regular mutant intruder.
         if (_currentSuspectIsReturningFullMutant)
         {
+            suspectCharacter.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.None);
             _currentSuspectIsReturningFullMutant = false;
             _currentSuspectIsFullMutant = false;
             ForceNextSuspectSkipEntryDialogue = false;
@@ -1026,6 +1037,9 @@ public class SuspectController : NetworkBehaviour
             ForceNextSuspectNoPaperwork = false; // consumed by the intercept
             return;
         }
+
+        // No forced intro this visit — release the Pending gate set in InitiateSuspect.
+        suspectCharacter.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.None);
 
         // Suspect cam is activated exclusively by ScriptedDialogueRunner for scripted sequences.
 

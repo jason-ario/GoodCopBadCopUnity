@@ -38,10 +38,22 @@ public partial class LocalizationWindow
             {
                 _scanScenes = LocUI.Chip(_scanScenes, "Loaded scenes");
                 _scanPrefabs = LocUI.Chip(_scanPrefabs, "Prefabs");
+                if (_settings != null)
+                {
+                    using (new EditorGUI.DisabledScope(!_scanPrefabs))
+                    {
+                        bool onlyUsedPrefabs = LocUI.Chip(_settings.onlyUsedPrefabs, "Used prefabs only");
+                        if (onlyUsedPrefabs != _settings.onlyUsedPrefabs)
+                        {
+                            _settings.onlyUsedPrefabs = onlyUsedPrefabs;
+                            EditorUtility.SetDirty(_settings);
+                        }
+                    }
+                }
                 _scanSOs = LocUI.Chip(_scanSOs, "Dialogue data assets");
                 if (_settings != null)
                 {
-                    bool onlyUsed = LocUI.Chip(_settings.onlyUsedDialogueAssets, "Used in game only");
+                    bool onlyUsed = LocUI.Chip(_settings.onlyUsedDialogueAssets, "Used dialogue only");
                     if (onlyUsed != _settings.onlyUsedDialogueAssets)
                     {
                         _settings.onlyUsedDialogueAssets = onlyUsed;
@@ -51,6 +63,11 @@ public partial class LocalizationWindow
                 _scanSuspectObjects = LocUI.Chip(_scanSuspectObjects, "Suspect objects", LocUI.Violet);
                 _scanCode = LocUI.Chip(_scanCode, "Code strings");
                 GUILayout.FlexibleSpace();
+                using (new EditorGUI.DisabledScope(_scan == null))
+                {
+                    if (GUILayout.Button(new GUIContent("Clear results", "Discards the current scan review list (selections and edited keys). Sheets and assets are not touched."), GUILayout.Width(100)))
+                        ClearScanResults();
+                }
                 if (LocUI.Button("Scan project", true, GUILayout.Width(110)))
                 {
                     _scan = LocalizationScanner.Scan(_settings, _table, _scanScenes, _scanPrefabs, _scanSOs, _scanSuspectObjects, _scanCode);
@@ -62,7 +79,7 @@ public partial class LocalizationWindow
                 var types = _settings != null && _settings.dialogueAssetTypes != null ? string.Join(", ", _settings.dialogueAssetTypes) : "";
                 LocUI.Muted_("Data assets scanned: " + types + " (SuspectData: entry reasons, dialogues, answers, barks only). Edit in Fonts > All localization settings.");
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button(new GUIContent("List unused dialogue", "Logs dialogue assets that no enabled build scene or Resources asset references. These are skipped while 'Used in game only' is on."), GUILayout.Width(150)))
+                if (GUILayout.Button(new GUIContent("List unused dialogue", "Logs dialogue assets that no enabled build scene or Resources asset references. These are skipped while 'Used dialogue only' is on."), GUILayout.Width(150)))
                 {
                     var unused = LocalizationScanner.UnusedDialogueAssets(_settings);
                     Debug.Log("[Localization] Unused dialogue assets (" + unused.Count + "):\n" + string.Join("\n", unused));
@@ -86,14 +103,19 @@ public partial class LocalizationWindow
 
         if (_scan == null) { LocUI.Hint("Press <b>Scan project</b> to build the review list."); return; }
 
-        int unloc = _scan.Count(i => i.state == ScanState.Unlocalized);
-        int tmpUnloc = _scan.Count(i => i.state == ScanState.Unlocalized && i.binding.kind == "TMP");
+        int unloc = _scan.Count(i => i.state == ScanState.Unlocalized && !i.runtime);
+        int tmpUnloc = _scan.Count(i => i.state == ScanState.Unlocalized && !i.runtime && i.binding.kind == "TMP");
+        int runtimeCount = _scan.Count(i => i.runtime);
+        int deletedCount = _scan.Count(i => i.state == ScanState.Deleted);
+        int deletedSelected = _scan.Count(i => i.state == ScanState.Deleted && i.selected);
         using (new EditorGUILayout.HorizontalScope())
         {
             LocUI.StatTile("candidates", _scan.Count.ToString("N0"), LocUI.Accent, 130);
             LocUI.StatTile("not localized", unloc.ToString("N0"), LocUI.Warn, 130);
             LocUI.StatTile("hardcoded TMP labels", tmpUnloc.ToString("N0"), LocUI.Bad, 160);
-            LocUI.StatTile("selected", _scan.Count(i => i.selected).ToString("N0"), LocUI.Ok, 130);
+            LocUI.StatTile("runtime-filled", runtimeCount.ToString("N0"), LocUI.Violet, 130);
+            LocUI.StatTile("deleted", deletedCount.ToString("N0"), LocUI.Bad, 130);
+            LocUI.StatTile("selected", _scan.Count(i => i.selected && i.state != ScanState.Deleted).ToString("N0"), LocUI.Ok, 130);
             GUILayout.FlexibleSpace();
         }
 
@@ -104,11 +126,25 @@ public partial class LocalizationWindow
                 _scanFilter = EditorGUILayout.TextField(_scanFilter, EditorStyles.toolbarSearchField);
                 _scanGroup = LocGroups.FilterOptions[EditorGUILayout.Popup(GroupIndex(_scanGroup), LocGroups.FilterOptions, GUILayout.Width(170))];
                 _showLocalized = LocUI.Chip(_showLocalized, "Show localized", LocUI.Ok);
+                _showRuntime = LocUI.Chip(_showRuntime, "Show runtime-filled", LocUI.Violet);
             }
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Select all new (visible)", GUILayout.Width(160))) foreach (var i in VisibleScan()) i.selected = i.state != ScanState.Localized;
+                if (GUILayout.Button("Select all new (visible)", GUILayout.Width(160))) foreach (var i in VisibleScan()) if (i.state != ScanState.Deleted) i.selected = i.state != ScanState.Localized && !i.runtime;
                 if (GUILayout.Button("Select none", GUILayout.Width(100))) foreach (var i in _scan) i.selected = false;
+                using (new EditorGUI.DisabledScope(runtimeCount == 0))
+                {
+                    if (GUILayout.Button(new GUIContent("Remove runtime placeholders...", "Deletes sheet rows that only runtime-filled labels use and clears the LocalizedText key on those labels (the component stays for language fonts)."), GUILayout.Width(200)))
+                        EditorApplication.delayCall += () => { ConfirmRemoveRuntimePlaceholders(); Repaint(); };
+                }
+                using (new EditorGUI.DisabledScope(deletedSelected == 0))
+                {
+                    if (GUILayout.Button(new GUIContent("Remove selected deleted (" + deletedSelected + ")...", "Deletes the ticked DELETED rows from the sheets, with their translations and bindings."), GUILayout.Width(210)))
+                    {
+                        var gone = _scan.Where(i => i.state == ScanState.Deleted && i.selected).ToList();
+                        EditorApplication.delayCall += () => { ConfirmRemoveDeleted(gone); Repaint(); };
+                    }
+                }
                 GUILayout.FlexibleSpace();
                 if (LocUI.Button("Apply selected", true, GUILayout.Width(130)))
                 {
@@ -125,22 +161,47 @@ public partial class LocalizationWindow
         _scanScroll = EditorGUILayout.BeginScrollView(_scanScroll);
         foreach (var item in shown)
         {
-            Color accent = item.state == ScanState.Unlocalized ? LocUI.Accent : item.state == ScanState.SourceChanged ? LocUI.Warn : LocUI.Ok;
+            bool deleted = item.state == ScanState.Deleted;
+            Color accent = deleted ? LocUI.Bad : item.runtime ? LocUI.Violet : item.state == ScanState.Unlocalized ? LocUI.Accent : item.state == ScanState.SourceChanged ? LocUI.Warn : LocUI.Ok;
             using (LocUI.Card(accent))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    item.selected = EditorGUILayout.Toggle(item.selected, GUILayout.Width(18));
-                    LocUI.Pill(item.state == ScanState.Unlocalized ? "NEW" : item.state == ScanState.SourceChanged ? "CHANGED" : "OK", accent);
+                    using (new EditorGUI.DisabledScope(item.runtime))
+                        item.selected = EditorGUILayout.Toggle(item.selected && !item.runtime, GUILayout.Width(18));
+                    if (deleted) LocUI.Pill("DELETED", LocUI.Bad);
+                    else if (item.runtime) LocUI.Pill("RUNTIME", LocUI.Violet);
+                    else LocUI.Pill(item.state == ScanState.Unlocalized ? "NEW" : item.state == ScanState.SourceChanged ? "CHANGED" : "OK", accent);
                     LocUI.Pill(item.group, GroupColor(item.group));
                     LocUI.Pill(item.sheet, LocUI.Neutral);
                     GUILayout.FlexibleSpace();
+                    if (deleted)
+                    {
+                        if (GUILayout.Button(new GUIContent("Remove", "Delete this row from its sheet, with its translations and binding."), EditorStyles.miniButton, GUILayout.Width(65)))
+                        {
+                            var one = new List<ScanItem> { item };
+                            EditorApplication.delayCall += () => { ConfirmRemoveDeleted(one); Repaint(); };
+                        }
+                    }
+                    else if (item.binding.kind == "TMP")
+                    {
+                        if (item.runtime)
+                        {
+                            if (GUILayout.Button(new GUIContent("Not runtime", "The authored text is real copy: scan it as normal and remember this label."), EditorStyles.miniButton, GUILayout.Width(80)))
+                                SetRuntimeOverride(item, false);
+                        }
+                        else if (GUILayout.Button(new GUIContent("Runtime", "Code fills this label at runtime: treat the authored text as a placeholder and remember this label."), EditorStyles.miniButton, GUILayout.Width(65)))
+                            SetRuntimeOverride(item, true);
+                    }
                 }
-                if (item.state == ScanState.Unlocalized) item.key = EditorGUILayout.TextField(item.key);
+                if (deleted) LocUI.Muted_(item.deletedReason);
+                else if (item.runtime) LocUI.Muted_("Filled at runtime by " + item.runtimeReason + ". The placeholder text is not localized.");
+                else if (item.runtimeOverridden) LocUI.Muted_("Detected as runtime-filled, kept as copy (Not runtime).");
+                if (item.state == ScanState.Unlocalized && !item.runtime) item.key = EditorGUILayout.TextField(item.key);
                 else EditorGUILayout.LabelField(item.key, EditorStyles.boldLabel);
                 EditorGUILayout.LabelField(item.text.Replace("\n", "  \u21B5  "), EditorStyles.wordWrappedLabel);
                 LocUI.Muted_(item.notes);
-                if (item.reuseKey != null)
+                if (item.reuseKey != null && !item.runtime && !deleted)
                     item.reuse = EditorGUILayout.ToggleLeft("Same text and context as '" + item.reuseKey + "': reuse that key (true duplicate)", item.reuse);
             }
         }
@@ -148,14 +209,90 @@ public partial class LocalizationWindow
         if (_scan.Count > shown.Count && shown.Count >= 300) LocUI.Muted_("Showing the first 300. Use the filters to narrow.");
     }
 
+    private void ClearScanResults()
+    {
+        if (_scan == null) return;
+        int selected = _scan.Count(i => i.selected && i.state != ScanState.Deleted);
+        if (selected > 0 && !EditorUtility.DisplayDialog("Clear scan results",
+                "Discard the scan list? " + selected + " selected item(s) have not been applied.\n\nSheets and assets are not changed.",
+                "Clear", "Cancel"))
+            return;
+        _scan = null;
+        _scanScroll = Vector2.zero;
+        _status = "Scan results cleared.";
+        GUIUtility.ExitGUI();
+    }
+
+    /// <summary>Remembers the label as runtime-filled (or as real copy) in LocalizationSettings and updates the item in place.</summary>
+    private void SetRuntimeOverride(ScanItem item, bool runtime)
+    {
+        if (_settings == null) return;
+        string id = LocalizationScanner.RuntimeTextId(item.binding);
+        Undo.RecordObject(_settings, runtime ? "Mark label runtime" : "Mark label as copy");
+        _settings.runtimeTextLabels.Remove(id);
+        _settings.staticTextLabels.Remove(id);
+        if (runtime) _settings.runtimeTextLabels.Add(id);
+        else _settings.staticTextLabels.Add(id);
+        EditorUtility.SetDirty(_settings);
+        AssetDatabase.SaveAssetIfDirty(_settings);
+
+        item.runtimeOverridden = !runtime && item.runtime && item.runtimeReason != "marked runtime";
+        item.runtime = runtime;
+        item.runtimeReason = runtime ? "marked runtime" : null;
+        item.selected = !runtime && item.state != ScanState.Localized;
+        _stats = null;
+    }
+
+    private void ConfirmRemoveRuntimePlaceholders()
+    {
+        if (_scan == null) return;
+        var keys = LocalizationScanner.RuntimePlaceholderKeys(_scan, _table);
+        var labels = LocalizationScanner.RuntimeBoundLabels(_scan);
+        if (keys.Count == 0 && labels.Count == 0) { _status = "No runtime placeholder text in the sheets or on LocalizedText keys."; return; }
+        if (!EditorUtility.DisplayDialog("Remove runtime placeholders?",
+                "Deletes " + keys.Count + " sheet row(s) used only by runtime-filled labels (with their translations and bindings) and clears the LocalizedText key on "
+                + labels.Count + " label(s).\n\nLocalizedText stays on those labels so they keep their language font. The placeholder text in scenes and prefabs is not changed. "
+                + "Save open scenes afterwards, then run Build runtime table.\n\nThis cannot be undone from the editor (use version control).",
+                "Remove", "Cancel")) return;
+
+        if (keys.Count > 0) DeleteKeys(keys);
+        int cleared = LocalizationApply.ClearLocalizedTextKeys(labels);
+        AssetDatabase.SaveAssets();
+        _scan = null;
+        _stats = null;
+        _status = "Removed " + keys.Count + " runtime placeholder row(s), cleared " + cleared + " LocalizedText key(s). Save scenes, rescan, then Build runtime table.";
+    }
+
+    /// <summary>Deletes DELETED scan rows from the sheets and drops them from the review list (the rest of the scan stays).</summary>
+    private void ConfirmRemoveDeleted(List<ScanItem> gone)
+    {
+        if (_scan == null || gone.Count == 0) return;
+        var keys = gone.Select(i => i.key).Distinct().ToList();
+        int translated = keys.Count(k => _table.TryGet(k, out var e) && e.values.Any(v => !string.IsNullOrEmpty(v.Value)));
+        string what = keys.Count == 1 ? "'" + keys[0] + "'" : keys.Count + " deleted strings";
+        if (!EditorUtility.DisplayDialog("Remove " + what + "?",
+                "Removes " + what + " from the localization sheets, with their bindings"
+                + (translated > 0 ? " and the translations of " + translated + " row(s)" : "") + ".\n\n"
+                + "Run Build runtime table afterwards. This cannot be undone from the editor (use version control).",
+                "Remove", "Cancel")) return;
+
+        DeleteKeys(keys);
+        var set = new HashSet<string>(keys);
+        _scan.RemoveAll(i => i.state == ScanState.Deleted && set.Contains(i.key));
+        _stats = null;
+        _status = "Removed " + keys.Count + " deleted string(s) from the sheets. Run Build runtime table to update the game.";
+    }
+
     private IEnumerable<ScanItem> VisibleScan()
     {
         return _scan.Where(i => (_showLocalized || i.state != ScanState.Localized)
+                                && (_showRuntime || !i.runtime)
                                 && LocGroups.Matches(_scanGroup, i.group)
                                 && (string.IsNullOrEmpty(_scanFilter)
                                     || i.key.IndexOf(_scanFilter, System.StringComparison.OrdinalIgnoreCase) >= 0
                                     || i.text.IndexOf(_scanFilter, System.StringComparison.OrdinalIgnoreCase) >= 0
-                                    || i.sheet.IndexOf(_scanFilter, System.StringComparison.OrdinalIgnoreCase) >= 0));
+                                    || i.sheet.IndexOf(_scanFilter, System.StringComparison.OrdinalIgnoreCase) >= 0))
+            .OrderBy(i => i.state == ScanState.Deleted ? 0 : 1);
     }
 
     // ================================================================ Strings tab
@@ -248,6 +385,9 @@ public partial class LocalizationWindow
                         EditorGUI.BeginChangeCheck();
                         string notes = EditorGUILayout.TextArea(e.notes ?? "", GUILayout.MinHeight(38));
                         if (EditorGUI.EndChangeCheck()) { e.notes = notes; MarkDirty(e); }
+                        EditorGUI.BeginChangeCheck();
+                        int maxChars = EditorGUILayout.IntField(new GUIContent("Max chars", "Sheet column max_chars. 0 = no limit. Translations over it fail validation."), e.maxChars);
+                        if (EditorGUI.EndChangeCheck()) { e.maxChars = Mathf.Max(0, maxChars); MarkDirty(e); }
                     }
 
                     using (new EditorGUILayout.VerticalScope(GUILayout.MinWidth(170), GUILayout.ExpandWidth(true)))

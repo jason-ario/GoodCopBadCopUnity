@@ -567,6 +567,44 @@ public class MutantEnemy : NetworkBehaviour
     public bool IsActive => _isActive.Value;
 
     /// <summary>
+    /// True for a roaming, living mutant whose body the local player should not physically collide
+    /// with (see PlayerMovementController.UpdateMutantCollisionIgnores). Dormant suspects stay solid.
+    /// </summary>
+    public bool IsHostileBody => IsActive && !_isDead;
+
+    /// <summary>
+    /// The mutant's true body radius for player separation — the NavMeshAgent radius, not the root
+    /// CapsuleCollider, which on several prefabs is oversized (r 2.26) for hit detection.
+    /// </summary>
+    public float BodyRadius => _agent != null ? _agent.radius : 0.5f;
+
+    private Collider[] _bodyBlockers;
+
+    /// <summary>
+    /// Solid (non-trigger) colliders on the mutant root, excluding CharacterControllers (resurrected
+    /// corpses keep their player CC and must stay solid). These are moved by the NavMeshAgent with
+    /// no Rigidbody, so overlapping a player makes the CharacterController's overlap recovery pop the
+    /// player out — straight through a wall if one is behind them.
+    /// </summary>
+    public Collider[] BodyBlockers
+    {
+        get
+        {
+            if (_bodyBlockers == null)
+            {
+                var list = new List<Collider>();
+                foreach (Collider col in GetComponents<Collider>())
+                {
+                    if (col != null && !col.isTrigger && !(col is CharacterController))
+                        list.Add(col);
+                }
+                _bodyBlockers = list.ToArray();
+            }
+            return _bodyBlockers;
+        }
+    }
+
+    /// <summary>
     /// True when this mutant has been flagged as a boss (see <see cref="SetBossHealthBar"/>) and
     /// should drive the screen-top <see cref="BossHealthBarUI"/>. Replicated to every peer.
     /// </summary>

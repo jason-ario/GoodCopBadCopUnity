@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: Extended perimeter since the [[whisper:eastern incident]]. Clearance should be on file.
@@ -29,13 +30,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: What eastern incident?
       npcResponse: Above your clearance. Ask your commanding officer.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Your name, for the record?
+    - playerChoiceText: Your name, for the record.
       npcResponse: No. You get the badge number. Same thing.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 1
@@ -45,13 +49,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: We're thorough here.
-      npcResponse: Thorough and slow aren't the same. You'll learn. Or you won't.
+    - playerChoiceText: What's coming out of the east?
+      npcResponse: Officially, nothing. Unofficially, more goes in than comes back out.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Slower how?
-      npcResponse: Fifteen men, twelve-hour cycle. You're costing us minutes. Write that down.
+    - playerChoiceText: We're thorough here.
+      npcResponse: Thorough isn't slow. Learn that, or end up like the last one.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

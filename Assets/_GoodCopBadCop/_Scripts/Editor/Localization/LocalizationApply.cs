@@ -131,6 +131,37 @@ public static class LocalizationApply
     /// <summary>Adds / updates LocalizedText for all given bindings (TMP kind only). Returns the number applied.</summary>
     public static int AttachLocalizedText(IEnumerable<LocBinding> bindings)
     {
+        return EditTmpLabels(bindings, (tmp, b, inScene) =>
+        {
+            var lt = tmp.GetComponent<LocalizedText>();
+            if (lt == null) lt = inScene ? Undo.AddComponent<LocalizedText>(tmp.gameObject) : tmp.gameObject.AddComponent<LocalizedText>();
+            else if (inScene) Undo.RecordObject(lt, "Set localization key");
+            lt.key = b.key;
+            if (inScene) EditorUtility.SetDirty(lt);
+            return true;
+        });
+    }
+
+    /// <summary>
+    /// Empties the LocalizedText key on the given labels (runtime-filled text). The component stays so the label keeps its
+    /// per-language font and size scale. Returns the number of labels changed.
+    /// </summary>
+    public static int ClearLocalizedTextKeys(IEnumerable<LocBinding> bindings)
+    {
+        return EditTmpLabels(bindings, (tmp, b, inScene) =>
+        {
+            var lt = tmp.GetComponent<LocalizedText>();
+            if (lt == null || string.IsNullOrEmpty(lt.key)) return false;
+            if (inScene) Undo.RecordObject(lt, "Clear localization key");
+            lt.key = "";
+            if (inScene) EditorUtility.SetDirty(lt);
+            return true;
+        });
+    }
+
+    /// <summary>Resolves each TMP binding in its loaded scene or prefab and runs <paramref name="edit"/> (returns true when it changed something).</summary>
+    private static int EditTmpLabels(IEnumerable<LocBinding> bindings, System.Func<TMP_Text, LocBinding, bool, bool> edit)
+    {
         int applied = 0;
         foreach (var group in bindings.Where(b => b.kind == "TMP").GroupBy(b => b.assetPath))
         {
@@ -138,19 +169,16 @@ public static class LocalizationApply
             {
                 var scene = SceneManager.GetSceneByPath(group.Key);
                 if (!scene.IsValid() || !scene.isLoaded) { Debug.LogWarning("[Localization] Scene not loaded, skipped: " + group.Key); continue; }
+                bool changed = false;
                 foreach (var b in group)
                 {
                     var t = FindByPath(scene.GetRootGameObjects(), b.objectPath);
                     var tmp = t != null ? t.GetComponent<TMP_Text>() : null;
-                    if (tmp == null) continue;
-                    var lt = tmp.GetComponent<LocalizedText>();
-                    if (lt == null) lt = Undo.AddComponent<LocalizedText>(tmp.gameObject);
-                    else Undo.RecordObject(lt, "Set localization key");
-                    lt.key = b.key;
-                    EditorUtility.SetDirty(lt);
+                    if (tmp == null || !edit(tmp, b, true)) continue;
+                    changed = true;
                     applied++;
                 }
-                EditorSceneManager.MarkSceneDirty(scene);
+                if (changed) EditorSceneManager.MarkSceneDirty(scene);
             }
             else if (group.Key.EndsWith(".prefab"))
             {
@@ -162,10 +190,7 @@ public static class LocalizationApply
                     {
                         var t = FindByPath(new[] { root }, b.objectPath);
                         var tmp = t != null ? t.GetComponent<TMP_Text>() : null;
-                        if (tmp == null) continue;
-                        var lt = tmp.GetComponent<LocalizedText>();
-                        if (lt == null) lt = tmp.gameObject.AddComponent<LocalizedText>();
-                        lt.key = b.key;
+                        if (tmp == null || !edit(tmp, b, false)) continue;
                         changed = true;
                         applied++;
                     }

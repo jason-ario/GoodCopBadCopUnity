@@ -21,37 +21,44 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: I open the shop every morning. Check the empty shelves. Stand a while. Close.
+    npcLine: I open the shop each morning, look at the empty shelves, and close.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: Why keep opening?
       npcResponse: Habit. Routine feels more normal than the alternative.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
     - playerChoiceText: Any deliveries?
       npcResponse: Last truck came before the blast. I'm still selling its matches.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 1
-    npcLine: Quiet apartment. My neighbor [[whisper:stopped answering his door]]. I haven't knocked since.
+    npcLine: My neighbor [[whisper:stopped answering his door]]. I saw him in the bread line yesterday.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Why not knock?
-      npcResponse: If he answers, I have to see him. I'm fine.
+    - playerChoiceText: Did you speak to him?
+      npcResponse: He looked at me like we'd never met. Six years on the same landing.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: Doesn't the wait bother you?
-      npcResponse: No. Bread, then permits. I've stood in lines my whole life.
+    - playerChoiceText: Why not report it?
+      npcResponse: Report what? A man who doesn't answer? Half the block doesn't.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

@@ -15,43 +15,50 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: First shift? I can tell. Don't mention the face.
+    npcLine: Pavle Asatiani. Butcher, end of the market row. Don't stare at the face.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: Pavle Asatiani. The Butcher. My job, not a nickname.
+    npcLine: The bandages bother you? They bother me more. Ask, if you have to.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: What happened to your face?
-      npcResponse: Meat grinder. You feel it an hour later.
+      npcResponse: Meat grinder. You don't feel it until an hour later.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: Where's your stall?
-      npcResponse: End of the market row. Scared people eat.
+    - playerChoiceText: Take them off.
+      npcResponse: Not here. You'd lose your appetite, and you look underfed already.
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
   - type: 1
-    npcLine: Ration meat, mostly. Nobody asks what animal.
+    npcLine: My brother's old stall. Ration meat, mostly. Nobody asks what animal.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Does your brother help?
-      npcResponse: He cried for a week. I'm [[whisper:the one wearing it]].
+    - playerChoiceText: Where's your brother?
+      npcResponse: He cried for a week before he left. Now I'm [[whisper:the one wearing it]].
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
     - playerChoiceText: What animal?
-      npcResponse: Keep asking questions like that. You'll do fine here.
+      npcResponse: Whatever comes in. Keep asking like that and you'll outlast the last one.
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

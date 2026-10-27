@@ -8,7 +8,8 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public enum ScanState { Unlocalized, Localized, SourceChanged }
+/// <summary>Deleted: a sheet row whose recorded source was scanned this pass but no longer produces it (offered for removal, never applied).</summary>
+public enum ScanState { Unlocalized, Localized, SourceChanged, Deleted }
 
 public class ScanItem
 {
@@ -25,11 +26,26 @@ public class ScanItem
     /// <summary>Key of an existing item with identical text AND context. Reuse is offered, never automatic.</summary>
     public string reuseKey;
     public bool reuse;
+    /// <summary>The key comes from an existing LocalizedText and must not be renamed to make it unique.</summary>
+    public bool keyFixed;
     public string group = LocGroups.Other;
+
+    /// <summary>TMP label whose text is written by game code at runtime: the authored text is a placeholder and is not offered.</summary>
+    public bool runtime;
+    /// <summary>Why the label counts as runtime-filled, e.g. "ShiftReport.scoreLabel" or "marked runtime".</summary>
+    public string runtimeReason;
+    /// <summary>The detector flagged it, but the label is listed in LocalizationSettings.staticTextLabels.</summary>
+    public bool runtimeOverridden;
+    /// <summary>The scanned TMP component (TMP items only). Used to match runtime writers.</summary>
+    [NonSerialized] public TMP_Text source;
+    /// <summary>Deleted items only: why the row counts as gone, e.g. "Source asset deleted: Assets/.../Foo.prefab".</summary>
+    public string deletedReason;
+    /// <summary>TMP label without a LocalizedText key whose earlier binding still has a sheet row: apply re-attaches that key.</summary>
+    public bool reattach;
 }
 
 /// <summary>Finds every candidate string in loaded scenes, prefabs and ScriptableObjects and proposes a sheet and key.</summary>
-public static class LocalizationScanner
+public static partial class LocalizationScanner
 {
     private const string ProjectRoot = "Assets/_GoodCopBadCop";
 
@@ -38,7 +54,12 @@ public static class LocalizationScanner
         var items = new List<ScanItem>();
         GameScriptCache.Clear();
         LocalizeFieldTypeCache.Clear();
+        ResetRuntimeDetection(settings);
+        _boundTmpKeys = null;
         var deny = new HashSet<string>(settings.fieldDenyList ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+        HashSet<string> usedCache = null;
+        HashSet<string> Used() => usedCache ?? (usedCache = UsedAssetPaths());
+        bool cancelled = false;
 
         try
         {
@@ -50,6 +71,7 @@ public static class LocalizationScanner
                     if (!scene.isLoaded || string.IsNullOrEmpty(scene.path)) continue;
                     foreach (var root in scene.GetRootGameObjects())
                     {
+                        CollectRuntimeDriven(root);
                         ScanHierarchy(root, scene.path, table, items);
                         ScanLocalizeFields(root, scene.path, table, items);
                         if (suspectObjects) ScanSuspectComponents(root, scene.path, deny, table, items);
@@ -60,13 +82,16 @@ public static class LocalizationScanner
             if (prefabs)
             {
                 var guids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" });
+                var usedPrefabs = settings.onlyUsedPrefabs ? Used() : null;
                 for (int i = 0; i < guids.Length; i++)
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guids[i]);
                     if (IsExcluded(path)) continue;
-                    if (i % 25 == 0 && EditorUtility.DisplayCancelableProgressBar("Localization scan", path, (float)i / guids.Length * 0.6f)) break;
+                    if (usedPrefabs != null && !usedPrefabs.Contains(path)) continue;
+                    if (i % 25 == 0 && EditorUtility.DisplayCancelableProgressBar("Localization scan", path, (float)i / guids.Length * 0.6f)) { cancelled = true; break; }
                     var go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                     if (go == null) continue;
+                    CollectRuntimeDriven(go);
                     ScanHierarchy(go, path, table, items);
                     ScanLocalizeFields(go, path, table, items);
                     if (suspectObjects) ScanSuspectComponents(go, path, deny, table, items);
@@ -77,13 +102,13 @@ public static class LocalizationScanner
             {
                 var guids = AssetDatabase.FindAssets("t:ScriptableObject", new[] { ProjectRoot });
                 var assembly = typeof(ScriptedDialogue).Assembly;
-                var used = settings.onlyUsedDialogueAssets ? UsedAssetPaths() : null;
+                var used = settings.onlyUsedDialogueAssets ? Used() : null;
                 for (int i = 0; i < guids.Length; i++)
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guids[i]);
                     if (IsExcluded(path) || !path.EndsWith(".asset")) continue;
                     if (used != null && !used.Contains(path)) continue;
-                    if (i % 25 == 0 && EditorUtility.DisplayCancelableProgressBar("Localization scan", path, 0.6f + (float)i / guids.Length * 0.4f)) break;
+                    if (i % 25 == 0 && EditorUtility.DisplayCancelableProgressBar("Localization scan", path, 0.6f + (float)i / guids.Length * 0.4f)) { cancelled = true; break; }
                     var obj = AssetDatabase.LoadAssetAtPath<ScriptableObject>(path);
                     if (obj == null || obj.GetType().Assembly != assembly || obj is LocalizationSettings || !IsGameScript(obj)) continue;
                     bool dialogue = IsDialogueAssetType(obj.GetType(), settings);
@@ -96,8 +121,14 @@ public static class LocalizationScanner
         }
         finally { EditorUtility.ClearProgressBar(); }
 
+        MarkRuntimeItems(items, settings);
         AssignUniqueKeys(items, table);
         MarkDuplicates(items, table);
+        if (!cancelled)
+            AddDeletedItems(items, table, settings, new DeletedScope
+            {
+                scenes = scenes, prefabs = prefabs, scriptables = scriptables, suspectObjects = suspectObjects, code = code, used = Used
+            });
         return items;
     }
 
@@ -112,9 +143,16 @@ public static class LocalizationScanner
     private static void ScanHierarchy(GameObject root, string assetPath, LocalizationTable table, List<ScanItem> items)
     {
         string assetName = Path.GetFileNameWithoutExtension(assetPath);
+        // Labels written from IconPrompt templates at runtime: their authored text is a placeholder, the template field is localized.
+        var driven = new HashSet<TMP_Text>();
+        foreach (var driver in root.GetComponentsInChildren<IIconPromptDriver>(true))
+            foreach (var label in driver.DrivenLabels)
+                if (label != null) driven.Add(label);
+
         foreach (var tmp in root.GetComponentsInChildren<TMP_Text>(true))
         {
             if (PrefabUtility.IsPartOfPrefabInstance(tmp)) continue; // the source prefab is scanned on its own
+            if (driven.Contains(tmp)) continue;
             string text = tmp.text;
             if (!LooksLikeCopy(text)) continue;
 
@@ -130,13 +168,33 @@ public static class LocalizationScanner
                 category = category,
                 context = sheet + "|" + category + "|" + (tmp.transform.parent != null ? tmp.transform.parent.name : ""),
                 notes = category + " | " + assetName + " > " + objPath,
-                binding = new LocBinding { kind = "TMP", assetPath = assetPath, objectPath = objPath, category = category }
+                binding = new LocBinding { kind = "TMP", assetPath = assetPath, objectPath = objPath, category = category },
+                source = tmp
             };
 
             if (existing != null && !string.IsNullOrEmpty(existing.key))
             {
                 item.key = existing.key;
-                item.state = table.TryGet(existing.key, out var e) && e.source != text ? ScanState.SourceChanged : ScanState.Localized;
+                if (table.TryGet(existing.key, out var e))
+                    item.state = e.source != text ? ScanState.SourceChanged : ScanState.Localized;
+                else
+                {
+                    // Bound label whose key never reached the sheets: offer it under its own key.
+                    item.state = ScanState.Unlocalized;
+                    item.selected = true;
+                    item.keyFixed = true;
+                }
+            }
+            else if (BoundTmpKey(assetPath, objPath, table) is string bound)
+            {
+                // The label lost its LocalizedText (or its key) but the sheets still have its row: keep that key and re-attach on apply.
+                item.key = bound;
+                item.keyFixed = true;
+                item.reattach = true;
+                table.TryGet(bound, out var e);
+                item.state = e.source != text ? ScanState.SourceChanged : ScanState.Unlocalized;
+                item.selected = true;
+                item.notes += " | LocalizedText missing: applying re-attaches the existing key.";
             }
             else
             {
@@ -205,11 +263,22 @@ public static class LocalizationScanner
         return result;
     }
 
+    /// <summary>CamelCase suffixes that mark animator parameters, tags and pool/lookup ids (e.g. speedParameterName, playerTag, _mutantPoolId).</summary>
+    private static readonly string[] IdentifierSuffixes = { "ParameterName", "ParamName", "BoolName", "TriggerName", "StateName", "Tag", "Id", "ID" };
+
     private static bool IsIdentifierField(string fieldName, HashSet<string> deny)
     {
         if (deny.Contains(fieldName)) return true;
         string n = fieldName.ToLowerInvariant();
-        return n.Contains("trigger") || n.Contains("animation") || n.Contains("animator") || n.EndsWith("id") && n.Length <= 4;
+        if (n.Contains("trigger") || n.Contains("animation") || n.Contains("animator") || n.EndsWith("id") && n.Length <= 4) return true;
+        if (n.TrimStart('_') == "tag") return true;
+        foreach (var suffix in IdentifierSuffixes)
+        {
+            // Only a real camelCase word boundary counts: "playerTag" yes, "hashtag" / "paid" no.
+            int at = fieldName.Length - suffix.Length;
+            if (at > 0 && fieldName.EndsWith(suffix, StringComparison.Ordinal) && char.IsLower(fieldName[at - 1])) return true;
+        }
+        return false;
     }
 
     private static void ScanSuspectComponents(GameObject root, string assetPath, HashSet<string> deny, LocalizationTable table, List<ScanItem> items)
@@ -677,10 +746,10 @@ public static class LocalizationScanner
     private static void AssignUniqueKeys(List<ScanItem> items, LocalizationTable table)
     {
         var used = new HashSet<string>(table.entries.Select(e => e.key));
-        foreach (var item in items.Where(i => i.state == ScanState.Localized || i.state == ScanState.SourceChanged))
+        foreach (var item in items.Where(i => i.state == ScanState.Localized || i.state == ScanState.SourceChanged || i.keyFixed))
             used.Add(item.key);
 
-        foreach (var item in items.Where(i => i.state == ScanState.Unlocalized))
+        foreach (var item in items.Where(i => i.state == ScanState.Unlocalized && !i.keyFixed))
         {
             string key = item.key;
             int n = 2;
@@ -722,7 +791,7 @@ public static class LocalizationScanner
         var dirtySheets = new HashSet<string>();
         int applied = 0;
 
-        foreach (var item in items.Where(i => i.selected))
+        foreach (var item in items.Where(i => i.selected && !i.runtime && i.state != ScanState.Deleted))
         {
             string key = item.reuse && item.reuseKey != null ? item.reuseKey : item.key;
 
@@ -730,6 +799,12 @@ public static class LocalizationScanner
             {
                 existing.source = item.text;
                 dirtySheets.Add(existing.sheet);
+                if (item.reattach)
+                {
+                    item.binding.key = item.key;
+                    LocBindings.Upsert(item.binding);
+                    toBind.Add(item.binding);
+                }
                 applied++;
                 continue;
             }

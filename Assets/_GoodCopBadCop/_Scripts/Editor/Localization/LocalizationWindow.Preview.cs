@@ -230,11 +230,18 @@ public partial class LocalizationWindow
             if (missing.Length > 0) EditorGUILayout.HelpBox("Tofu risk, no glyph for: " + missing, MessageType.Warning);
         }
         if (_previewLang != LocalizationTable.SourceLanguage && !PseudoLocalizer.IsPseudo(_previewLang))
-            foreach (var issue in LocalizationValidator.Validate(entry.source, text, _settings))
+            foreach (var issue in LocalizationValidator.Validate(entry.source, text, _settings, null, entry.maxChars))
                 EditorGUILayout.HelpBox(issue.ToString(), issue.severity == IssueSeverity.Error ? MessageType.Error : MessageType.Warning);
         if (PseudoLocalizer.IsPseudo(_previewLang))
+        {
             foreach (var v in PseudoLocalizer.Get(_previewLang).Verify(entry.source, text, entry.key, _settings.pseudoExpansion))
                 EditorGUILayout.HelpBox("Pseudolocale self-check: " + v, MessageType.Error);
+            // Pseudo is not capped: show where it passes the key's limit so the overflow is easy to spot.
+            var over = LocalizationValidator.MaxCharsIssue(text, entry.maxChars);
+            if (over.HasValue) EditorGUILayout.HelpBox("Pseudo exceeds max_chars: " + over.Value.message, MessageType.Warning);
+        }
+        if (entry.maxChars > 0)
+            EditorGUILayout.LabelField("max_chars " + entry.maxChars + " | English " + LocalizationValidator.VisibleLength(entry.source), EditorStyles.miniLabel);
 
         // Preview image
         Rect r = GUILayoutUtility.GetRect(100, 260, GUILayout.ExpandWidth(true));

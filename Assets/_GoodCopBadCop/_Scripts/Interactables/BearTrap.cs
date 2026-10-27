@@ -38,8 +38,8 @@ public class BearTrap : PickableObject
 
     // Constants
 
-    private const string UnarmedInteractText = "Arm Trap";
-    private const string ArmedInteractText = "Pick Up";
+    private static readonly string UnarmedInteractText = Loc.N("Arm trap");
+    private static readonly string ArmedInteractText = Loc.N("Pick up");
     private const string PlayerLayerName = "Player";
 
 

@@ -15,50 +15,58 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Hello. ...You are new. I keep track of faces.
+    npcLine: Hello. ...You are new. Emzar Jalaghonia. I keep track of faces.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: Emzar Jalaghonia. Beekeeper's assistant, east side. The master runs the hives.
+    npcLine: I assist the beekeeper. East side. ...The master runs the hives.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Who is the master?
-      npcResponse: He does not use his name. Says names make people complicated.
+    - playerChoiceText: What's the master's name?
+      npcResponse: He does not use one. ...He says names make people complicated.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: What do you do?
-      npcResponse: Clean frames. Stand near the hives until they adjust. ...They adjust.
+    - playerChoiceText: East side. Near the blast?
+      npcResponse: Near. ...The bees stay inside since then. They are waiting for something.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 1
-    npcLine: My [[infected:chest's been tight]]. The dust, the foreman says. ...I also do construction.
+    npcLine: My [[infected:chest has been tight]]. Dust from the site, the foreman says.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: Have you seen a doctor?
-      npcResponse: ...The lines at the polyclinic are long. The master says urgency gets people stung.
+      npcResponse: The polyclinic line is long. ...The master says hurrying gets people stung.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: How are the bees?
-      npcResponse: Quiet. Since the blast they stay inside. ...Good day.
+    - playerChoiceText: What else are you hiding?
+      npcResponse: Stings, mostly. ...Some I do not remember getting.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
-    npcLine: ...Papers. Here.
+    npcLine: ...Papers. Here. ...I will remember your face.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

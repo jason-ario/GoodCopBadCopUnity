@@ -15,27 +15,31 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Papers. Here. Guram Kopaliani. Parking lot on Rustaveli, twenty-two years.
+    npcLine: Papers. Guram Kopaliani. Parking lot on Rustaveli, twenty-two years.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: New face. The last officer was faster. Doesn't matter.
+    npcLine: New face. The last officer was faster. He knew me.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: How long coming through?
-      npcResponse: Three months. Since the first barrier went up.
+    - playerChoiceText: What happened to him?
+      npcResponse: Stopped coming one day. Nobody explained, and nobody asked.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Still cars to park?
-      npcResponse: Two Volgas and a Party car. The rest stopped coming. I still log them.
+    - playerChoiceText: Why cross every day?
+      npcResponse: The lot is inside, home is outside. Two Volgas and a Party car still need me.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
   - type: 1
@@ -45,20 +49,24 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Anyone waiting at home?
-      npcResponse: Nobody. Wife died four years ago. House is quieter than the lot.
+    - playerChoiceText: Why not stay home?
+      npcResponse: Nobody there since my wife died. The house is quieter than the lot.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: What if it closes?
+    - playerChoiceText: And if they close it?
       npcResponse: Everything closes. I'll find something else to stand in front of.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
-    npcLine: Stamp it. I mind standing still.
+    npcLine: Stamp it. I don't like standing still.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

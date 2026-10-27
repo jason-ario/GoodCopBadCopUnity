@@ -12,6 +12,19 @@ public class Calendar : MonoBehaviour
     {
         ShiftManager.Instance.OnShiftReady += OnShiftReady;
         ShiftManager.Instance.OnShiftStart += OnShiftStart;
+        Loc.LanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnDestroy()
+    {
+        Loc.LanguageChanged -= OnLanguageChanged;
+    }
+
+    /// <summary>The month heading is localized, so refresh it when the language changes.</summary>
+    void OnLanguageChanged()
+    {
+        if (this != null && ShiftManager.Instance != null)
+            OnShiftReady();
     }
 
     void OnShiftReady()

@@ -45,6 +45,19 @@ public class NewspaperContentsController : MonoBehaviour
     {
         ShiftManager.Instance.OnShiftReady += PopulateNewspaperContents;
         ShiftManager.Instance.OnShiftStart += PopulateNewspaperContents;
+        Loc.LanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnDestroy()
+    {
+        Loc.LanguageChanged -= OnLanguageChanged;
+    }
+
+    /// <summary>Re-bakes the page so the date (and render-time localized text) follow a language change.</summary>
+    private void OnLanguageChanged()
+    {
+        if (this != null && ShiftManager.Instance != null)
+            PopulateNewspaperContents();
     }
 
     /// <summary>
@@ -83,7 +96,7 @@ public class NewspaperContentsController : MonoBehaviour
 
         Debug.Log("Populating Newspaper Contents");
         int index = day - 1;
-        string date = StartDate.AddDays(index).ToString("dd MMM yyyy");
+        string date = LocalizedDate.Format(StartDate.AddDays(index), LocalizedDate.Style.Named);
         Debug.Log(index);
 
         NewspaperContentScriptable newspaperContentScriptable = _newspaperContentScriptables[index];

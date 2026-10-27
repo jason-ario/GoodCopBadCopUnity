@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: Since the blast, the State needs to know who's left. Isn't it exciting?
@@ -29,13 +30,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Exciting?
-      npcResponse: Of course! Curfews, checkpoints, empty flats. Everything's finally in motion.
-      animationTrigger: TalkIdle
-      playLaughSfx: 0
     - playerChoiceText: What caused the blast?
       npcResponse: The State knows. Isn't that enough? Wanting more is how it starts.
+      npcFollowUp: 
+      animationTrigger: TalkIdle
+      playLaughSfx: 0
+    - playerChoiceText: Who's left in district eleven?
+      npcResponse: Fewer every week. Every name recorded, every empty flat reported.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 1
@@ -47,19 +51,22 @@ MonoBehaviour:
     playLaughSfx: 0
     unskippable: 1
     choices:
-    - playerChoiceText: Sacred?
-      npcResponse: You carry out its will. If you don't, {{I'll report you}}. Gladly.
+    - playerChoiceText: Step back from the glass.
+      npcResponse: Of course. Sorry. I simply admire people who do their duty.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: That's a little unusual.
-      npcResponse: So I'm told. Usually by people whose names I've since passed along.
+    - playerChoiceText: Did you know the last officer?
+      npcResponse: '{{I reported him}}. He waved people through, and now you''re here.'
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 0
-    npcLine: Thirty-one crossings, stricter every time. I love that. They're paying attention.
+    npcLine: Every crossing gets stricter. I love that; someone's paying attention.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

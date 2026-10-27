@@ -15,12 +15,13 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Sorry, here's the form. Luka Tsereteli. I'm ten.
+    npcLine: Sorry, here's the form. I did it twice. Luka Tsereteli. I'm ten.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: School stopped two weeks ago. My teacher [[whisper:never came back]].
@@ -29,13 +30,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Did they close it?
-      npcResponse: They locked the gates. I waited outside a while. Nobody came.
+    - playerChoiceText: Why are you crossing alone?
+      npcResponse: Mum sent me for bread. She can't stand in lines anymore.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: Where do you live?
-      npcResponse: Block C, fourth floor, with my mum.
+    - playerChoiceText: Where did your teacher go?
+      npcResponse: He took the bus east to see his sister. The bus came back empty.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 1
@@ -45,13 +49,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: What's wrong with your hands?
-      npcResponse: They keep shaking. Mum says it's the cold. It's not cold.
+    - playerChoiceText: Are you feeling sick?
+      npcResponse: My hands shake. Mum says it's the cold. It isn't cold.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: Are you sleeping?
-      npcResponse: No. My brain won't go quiet. I'm working on it.
+    - playerChoiceText: When did he last call?
+      npcResponse: A week ago. He said not to drink the tap water. Then the line cut.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

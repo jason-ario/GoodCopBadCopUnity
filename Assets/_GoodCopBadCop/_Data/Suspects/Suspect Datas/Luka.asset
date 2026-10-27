@@ -46,15 +46,15 @@ MonoBehaviour:
   - It's a lot quieter outside. I keep telling myself it's fine. Is it?
   uncannyEntryDialogues: []
   exitDialoguesPassed:
-  - Thank you. Sorry for the wait, officer. Sorry.
+  - Thank you. Sorry for the wait, Officer. Sorry.
   exitDialoguesQuarantined: []
   exitDialoguesKilled: []
   quarantineExitLines:
-  - "I\u2019m not infected. I\u2019ve been so careful. So incredibly careful."
-  - "Please don\u2019t tell my parents. They\u2019ll just worry more. Please."
+  - I'm not infected. I've been so careful. So incredibly careful.
+  - Please don't tell my parents. They'll just worry more. Please.
   killExitLines:
-  - "I wasn\u2019t ready\u2026 I still had things\u2026 I still had things\u2026"
-  - "I want my mom\u2026 I just\u2026 I want my mom\u2026"
+  - I wasn't ready... I still had things... I still had things...
+  - I want my mom... I just... I want my mom...
   voiceAudioClips:
   - {fileID: 8300000, guid: 7f9dea9e57c736c47b95fe6f22326607, type: 3}
   - {fileID: 8300000, guid: 75c9c1405d3feb444bc4026ddc7bbcf1, type: 3}
@@ -76,6 +76,11 @@ MonoBehaviour:
   - question: Are you experiencing any symptoms?
     answer: My hands shake sometimes. Mum says it's the cold. No fever, I checked.
     mismatchAnswer: No. My hands are totally still, look. I never get nervous about anything.
+    uncannyAnswer: 
+    cameraTrigger: 
+  - question: Has your father called?
+    answer: No. The phones still don't connect. Mum stopped trying.
+    mismatchAnswer: Yes, he called last night! He's coming home on Sunday.
     uncannyAnswer: 
     cameraTrigger: 
   idleBarks:

@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: I write poems. They go nowhere. I consider that a feature.
@@ -29,29 +30,35 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: What do you write about?
-      npcResponse: God. Mountains. The dog. Order depends on the week.
+    - playerChoiceText: Why come down from the ridge?
+      npcResponse: Candles and flour. And I needed something with more than two walls.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: Published anything?
-      npcResponse: Two volumes. One printed, one lent out and never returned.
+    - playerChoiceText: Who reads them?
+      npcResponse: God, I hope. The dog listens. Nobody else has asked.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 1
-    npcLine: A grey dog walks the ridge with me. My wife found it too quiet.
+    npcLine: A gray dog walks the ridge with me. Lately he won't come inside.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: And you?
-      npcResponse: The quiet doesn't bother me. I think that was the problem.
+    - playerChoiceText: Is the dog sick?
+      npcResponse: He stopped eating. He stands at the tree line and stares north.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: Why come down tonight?
-      npcResponse: I needed something with more than two walls.
+    - playerChoiceText: Anyone else up there?
+      npcResponse: My wife, once. She found the quiet too loud. I didn't.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

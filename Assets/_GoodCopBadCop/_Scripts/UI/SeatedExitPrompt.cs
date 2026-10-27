@@ -15,8 +15,10 @@ namespace GoodCopBadCop.UI
     ///
     /// Put this on an always-active HUD object; it toggles <see cref="_root"/> on and off.
     /// </summary>
-    public class SeatedExitPrompt : MonoBehaviour
+    public class SeatedExitPrompt : MonoBehaviour, IIconPromptDriver
     {
+        public System.Collections.Generic.IEnumerable<TMP_Text> DrivenLabels => new TMP_Text[] { _label };
+
         public enum PromptCondition
         {
             /// <summary>Shown while seated in a chair (Jump stands up).</summary>
@@ -34,10 +36,11 @@ namespace GoodCopBadCop.UI
         [Tooltip("Image that displays the jump key/button icon.")]
         [SerializeField] private Image _keyImage;
 
-        [Tooltip("Optional label next to the icon.")]
+        [Tooltip("Label right of the icon. A label for text left of the icon is cloned from it when a translation needs one.")]
         [SerializeField] private TextMeshProUGUI _label;
 
-        [SerializeField, LocalizeField] private string _text = "Stand Up";
+        [Tooltip("Prompt sentence; {0} is the jump key / button icon, e.g. \"{0} Stand Up\".")]
+        [SerializeField, LocalizeField] private string _text = "{0} Stand Up";
 
         [Tooltip("Icon for the keyboard Jump input (Space).")]
         [SerializeField] private Sprite _keyboardSprite;
@@ -46,12 +49,14 @@ namespace GoodCopBadCop.UI
         [SerializeField] private Sprite _gamepadSprite;
 
         private PlayerMovementController _localMovement;
+        private IconPromptLabels _labels;
 
         private void OnEnable()
         {
             ActiveInputDeviceTracker.EnsureSubscribed();
             ActiveInputDeviceTracker.DeviceChanged += OnDeviceChanged;
-            if (_label != null) _label.text = _text;
+            Loc.LanguageChanged += ApplyText;
+            ApplyText();
             RefreshIcon();
             SetVisible(false);
         }
@@ -59,6 +64,14 @@ namespace GoodCopBadCop.UI
         private void OnDisable()
         {
             ActiveInputDeviceTracker.DeviceChanged -= OnDeviceChanged;
+            Loc.LanguageChanged -= ApplyText;
+        }
+
+        private void ApplyText()
+        {
+            if (_label == null) return;
+            _labels ??= new IconPromptLabels(_label, _keyImage);
+            _labels.Apply(IconPrompt.Localize(_text));
         }
 
         private void OnDeviceChanged(bool isGamepad) => RefreshIcon();

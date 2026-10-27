@@ -907,10 +907,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 367920235
   InScenePlacedSourceGlobalObjectIdHash: 2697777458
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -932,8 +934,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
-  interactText: Open Panel
+  interactText: Open panel
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   _door: {fileID: 2071820733296136941}
   _doorClosedRef: {fileID: 2444540654327932820}
   _doorOpenRef: {fileID: 1241984376610649217}
@@ -955,6 +965,9 @@ MonoBehaviour:
   - {fileID: 2758185984345947098}
   _nob: {fileID: 7122842654448128560}
   _occupancy: {fileID: 3958071117419764181}
+  _arrowTarget: {fileID: 0}
+  _deadPanelSound: {fileID: 0}
+  _deadPanelInteractVerb: Inspect
 --- !u!114 &3600896625285902040
 MonoBehaviour:
   m_ObjectHideFlags: 0

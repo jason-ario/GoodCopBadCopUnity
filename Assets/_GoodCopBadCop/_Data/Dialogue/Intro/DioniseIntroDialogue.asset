@@ -15,50 +15,58 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Good. An officer who pays attention. Dionise Chkonia, professor of philosophy.
+    npcLine: Dionise Chkonia, professor of philosophy. Back from the archive again.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: From the archive. Texts worth saving before the dust gets in.
+    npcLine: The librarian lets me take whatever books are worth saving.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: What kind of texts?
-      npcResponse: First editions found nowhere else. I won't let another disappear.
+    - playerChoiceText: Taking State property?
+      npcResponse: Plato, Rustaveli, two banned Russians. Confiscate them if it makes you feel useful.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Is the dust getting worse?
-      npcResponse: Yes. The radio says otherwise. I stopped waiting for the full picture.
+    - playerChoiceText: Saving them from what?
+      npcResponse: The dust gets into the pages. Soon there'll be no one left to read them.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
   - type: 1
-    npcLine: I still lecture on schedule. Half the hall is empty.
+    npcLine: I still lecture on schedule. Half the hall is empty now.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: How are your children?
-      npcResponse: Children adapt. What frightens them is watching us pretend otherwise.
+    - playerChoiceText: Where did your students go?
+      npcResponse: Some left. Some cough at home, and the rest pretend nothing is wrong.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: You seem very calm.
-      npcResponse: Stoicism. The only rational response to what you can't control.
+    - playerChoiceText: Any of them from the east?
+      npcResponse: Three. They stopped coming after the blast, and I stopped asking.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 0
-    npcLine: Routine reassures. Even here.
+    npcLine: Routine reassures, Officer. Even yours. Especially yours.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

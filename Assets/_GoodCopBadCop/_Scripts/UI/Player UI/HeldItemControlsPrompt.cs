@@ -4,8 +4,8 @@ using UnityEngine;
 
 /// <summary>
 /// Bottom-right HUD "Held Item Controls" stack: one row per extra input that works with the held item,
-/// alongside the "[LMB] to {verb}" row (<see cref="HeldItemUsePrompt"/>) and the "[R] to reload" row
-/// (<see cref="HeldItemReloadPrompt"/>). Each row here is shown only while its input would do something:
+/// alongside the "{0} to {verb}" row (<see cref="HeldItemUsePrompt"/>) and the "{0} to reload" row
+/// (<see cref="HeldItemReloadPrompt"/>); {0} = key icon (<see cref="IconPrompt"/>). Each row here is shown only while its input would do something:
 ///  • Inspect (F / ZoomHeldItem): the item has a <see cref="HeldItemZoomable"/> that can open zoom mode.
 ///  • Place (RMB / PlaceObject): the item may use placement boards (<see cref="PickableItemData.cantUsePlacementBoard"/>).
 ///  • Throw (MMB / ThrowObject): the item can be thrown (<see cref="PickableItemData.canBeThrown"/>).
@@ -14,8 +14,10 @@ using UnityEngine;
 ///
 /// Attach to the always-active "Player HUD" root (not the rows, which are toggled).
 /// </summary>
-public class HeldItemControlsPrompt : MonoBehaviour
+public class HeldItemControlsPrompt : MonoBehaviour, IIconPromptDriver
 {
+    public System.Collections.Generic.IEnumerable<TMP_Text> DrivenLabels => System.Linq.Enumerable.Select(_rows, r => r.label);
+
     public enum Control
     {
         Inspect,
@@ -31,23 +33,49 @@ public class HeldItemControlsPrompt : MonoBehaviour
         [Tooltip("Prompt row toggled with this control's availability (child of Held Item Controls).")]
         public GameObject root;
 
-        [Tooltip("Label next to the icon.")]
+        [Tooltip("Label right of the icon. A label for text left of the icon is cloned from it when a translation needs one.")]
         public TMP_Text label;
 
-        [Tooltip("Label text, e.g. \"to inspect\".")]
-        public string text;
+        [Tooltip("Prompt sentence; {0} is the key icon, e.g. \"{0} to inspect\".")]
+        [LocalizeField] public string text;
     }
 
     [SerializeField] private Row[] _rows = Array.Empty<Row>();
 
+    private IconPromptLabels[] _labels;
+
     private void OnEnable()
     {
-        foreach (Row row in _rows)
-            if (row.label != null && !string.IsNullOrEmpty(row.text)) row.label.text = row.text;
+        Loc.LanguageChanged += ApplyTexts;
+        ApplyTexts();
         HideAll();
     }
 
-    private void OnDisable() => HideAll();
+    private void OnDisable()
+    {
+        Loc.LanguageChanged -= ApplyTexts;
+        HideAll();
+    }
+
+    private void ApplyTexts()
+    {
+        if (_labels == null || _labels.Length != _rows.Length)
+        {
+            _labels = new IconPromptLabels[_rows.Length];
+            for (int i = 0; i < _rows.Length; i++)
+            {
+                Row row = _rows[i];
+                if (row.label == null) continue;
+                // The row's icon is the HelperIconKeyDisplay inside the row root.
+                var icon = row.root != null ? row.root.GetComponentInChildren<GoodCopBadCop.UI.HelperIconKeyDisplay>(true) : null;
+                _labels[i] = new IconPromptLabels(row.label, icon);
+            }
+        }
+
+        for (int i = 0; i < _rows.Length; i++)
+            if (_labels[i] != null && !string.IsNullOrEmpty(_rows[i].text))
+                _labels[i].Apply(IconPrompt.Localize(_rows[i].text));
+    }
 
     private void Update()
     {

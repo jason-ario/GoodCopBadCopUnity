@@ -15,8 +15,8 @@ MonoBehaviour:
   FirstName: Tina
   LastName: Meskhi
   Nickname: 
-  Occupation: Accountant
-  CharacterDescription: Controlled, seductive, and carefully evasive. She wears a porcelain mask at all times, claiming it covers old scars -- though she volunteers this explanation so readily it feels rehearsed. An accountant with no recorded family and no traceable past. She deploys warmth and charm deliberately, and if you press her with too many questions, she will offer you something other than answers.
+  Occupation: Actress
+  CharacterDescription: Controlled, seductive, and carefully evasive. She wears a porcelain mask at all times, claiming it covers old scars -- though she volunteers this explanation so readily it feels rehearsed. A stage actress at the Rustaveli Theatre, with no recorded family and no traceable past offstage. She deploys warmth and charm deliberately, and if you press her with too many questions, she will offer you something other than answers.
   CharacterArc: Her arc traces a woman who has always worked behind two masks -- the literal porcelain one on her face, and the persona of harmless performer she uses as cover. As the crisis deepens and checkpoints grow harder to pass, her attempts to bribe shift from casual to desperate. In the end, the question of what the mask actually hides -- scars, identity, or something else entirely -- becomes the one thing she cannot charm her way past.
   DateOfBirth: 01/01/1966
   Sex: Female
@@ -34,12 +34,12 @@ MonoBehaviour:
   IDPhoto: {fileID: 2800000, guid: b95f411c45eb9a24c86202f9a0008a9f, type: 3}
   CharacterPrefab: {fileID: 1501177916931924578, guid: 572c6160c8045c14eb3dd93c39663819, type: 3}
   entryReasons:
-  - Client meeting, downtown finance office.
-  - Home after late-night bookkeeping.
-  - Delivering ledgers to the treasury district.
+  - Evening performance at the Rustaveli Theatre.
+  - Home after a late rehearsal.
+  - Costume fitting in the theatre district.
   invalidEntryReasons:
   - Sunday lunch with my parents.
-  - Typing course. Numbers confuse me.
+  - Typing pool shift. I could never act.
   - My husband's birthday, with his family.
   entryDialogues:
   - Don't mind the mask. Old scars. Nothing interesting.
@@ -48,15 +48,15 @@ MonoBehaviour:
   - My papers are ready. I was here yesterday. Remember?
   - The mask is part of my face. It stays.
   exitDialoguesPassed:
-  - Good instincts, officer. I will remember that.
+  - Good instincts, Officer. I will remember that.
   exitDialoguesQuarantined: []
   exitDialoguesKilled: []
   quarantineExitLines:
   - I will need to contact someone. One moment.
   - You will hear from people I know. I say that calmly.
   killExitLines:
-  - "The mask\u2026 stays on\u2026 even now\u2026"
-  - "You could have\u2026 just looked away\u2026"
+  - The mask... stays on... even now...
+  - You could have... just looked away...
   voiceAudioClips:
   - {fileID: 8300000, guid: ed0aecc20d639e84c98e1e28cac814cb, type: 3}
   - {fileID: 8300000, guid: dd97723be62d8794daa537acd49c6cb4, type: 3}
@@ -74,7 +74,7 @@ MonoBehaviour:
   introDialogue: {fileID: 11400000, guid: 5b17e3fdf6196354dad34cc70d2ac032, type: 2}
   questionResponses:
   - question: Where are you coming from?
-    answer: A client near the station. Ledgers. Nothing to interest you.
+    answer: Rehearsal at the Rustaveli. Three of us, playing to empty seats.
     mismatchAnswer: My mother's flat in Rustavi. She cooks for me every Sunday.
     uncannyAnswer: I was already here. Before you sat down.
     cameraTrigger: 
@@ -82,6 +82,11 @@ MonoBehaviour:
     answer: Nothing. The mask covers old scars, not fever. Stop staring.
     mismatchAnswer: Nothing. The mask is for show. At home, it's off.
     uncannyAnswer: No. Ask again. The answer will still be no.
+    cameraTrigger: 
+  - question: What was your understanding with him?
+    answer: Free seats, Officer. Front row, every premiere. Ask nicely and you'll get one.
+    mismatchAnswer: Which officer? I rarely cross. Sundays I'm at my mother's.
+    uncannyAnswer: He's still here. You just haven't checked behind you.
     cameraTrigger: 
   idleBarks:
   - You keep staring. Most people have manners.

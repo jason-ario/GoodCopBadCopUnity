@@ -84,6 +84,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1714768418629303660, guid: b54a94a055641f446a6481066e392152, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8851374814000260403}
+    - targetCorrespondingSourceObject: {fileID: 1714768418629303660, guid: b54a94a055641f446a6481066e392152, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2286958744267050261}
   m_SourcePrefab: {fileID: 100100000, guid: b54a94a055641f446a6481066e392152, type: 3}
 --- !u!1 &17031773595954187 stripped
 GameObject:
@@ -104,10 +107,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 2187062074
   InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 1
   SpawnWithObservers: 1
@@ -517,9 +522,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FusePickup
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
-  interactText: Pick Up Red Fuse
+  interactText: Pick up red fuse
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   itemData: {fileID: 11400000, guid: 3ef97d1ae85b28241a0453eadcb5cbcf, type: 2}
+  throwImpactSfxDuration: 3.5
+  throwImpactSfxCooldown: 0.5
   _fuseColor: 0
 --- !u!114 &8851374814000260403
 MonoBehaviour:
@@ -538,3 +553,15 @@ MonoBehaviour:
   UseRigidBodyForMotion: 0
   AutoUpdateKinematicState: 0
   AutoSetKinematicOnDespawn: 1
+--- !u!114 &2286958744267050261
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 17031773595954187}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21f5a2ba4234d1948943c60f08deabb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickableColliderController

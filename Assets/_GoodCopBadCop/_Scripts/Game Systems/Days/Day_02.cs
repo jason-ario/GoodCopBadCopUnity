@@ -1059,7 +1059,7 @@ public class Day_02 : DayBase, IDailyTask
     private IEnumerator UVLightRevealTutorialBeat()
     {
         // Task 1 — switch the flashlight to UV mode.
-        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVSwitchToUV, Loc.N("Switch the Flashlight to UV mode"));
+        Day02NetworkSync.Instance?.AddMutationTutorialObjective(TaskUVSwitchToUV, Loc.N("Switch the flashlight to UV mode"));
 
         bool switchedToUV = Flashlight.AnyFlashlightInUVMode;
         Action onUVEntered = () => switchedToUV = true;

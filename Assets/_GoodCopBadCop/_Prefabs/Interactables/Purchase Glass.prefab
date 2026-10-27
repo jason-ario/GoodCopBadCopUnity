@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 5517609543478759364}
   - component: {fileID: 4408854545017582808}
   - component: {fileID: 2417193768873936503}
+  - component: {fileID: 8284853323937979938}
   m_Layer: 0
   m_Name: Plane
   m_TagString: Untagged
@@ -113,6 +114,20 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &8284853323937979938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 429869375416971068}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e4f4b6a42418774bb393b4b2bbe0beb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableCollider
+  Interactable: {fileID: 6767904934117641138}
+  ShopItem: {fileID: 0}
 --- !u!1 &927928924656491757
 GameObject:
   m_ObjectHideFlags: 0
@@ -125,6 +140,7 @@ GameObject:
   - component: {fileID: 8559815554330540645}
   - component: {fileID: 5605318927172714553}
   - component: {fileID: 4099037046034876518}
+  - component: {fileID: 2122729141850909330}
   m_Layer: 0
   m_Name: Text (TMP)
   m_TagString: Untagged
@@ -149,7 +165,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: -0.005, y: -0.022}
-  m_SizeDelta: {x: 7.78007, y: 5}
+  m_SizeDelta: {x: 5.4508, y: 7.082}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!23 &8559815554330540645
 MeshRenderer:
@@ -176,7 +192,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: -9194075415797825371, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
+  - {fileID: -3209016869888496672, guid: f03e6ef1608e5cf45ad9de01ab63074d, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -220,14 +236,12 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Repair
+  m_text: 'Repair Glass
 
-    Glass
-
-    25'
+    15'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
-  m_sharedMaterial: {fileID: -9194075415797825371, guid: f8e89ead54f8523428cc2e34f005bb5e, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: f03e6ef1608e5cf45ad9de01ab63074d, type: 2}
+  m_sharedMaterial: {fileID: -3209016869888496672, guid: f03e6ef1608e5cf45ad9de01ab63074d, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -243,19 +257,19 @@ MonoBehaviour:
     bottomLeft: {r: 1, g: 1, b: 1, a: 1}
     bottomRight: {r: 1, g: 1, b: 1, a: 1}
   m_fontColorGradientPreset: {fileID: 0}
-  m_spriteAsset: {fileID: 0}
-  m_tintAllSprites: 0
+  m_spriteAsset: {fileID: 11400000, guid: 9b7370c44db546d4896b30e044c7b1f5, type: 2}
+  m_tintAllSprites: 1
   m_StyleSheet: {fileID: 0}
   m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 40.6
+  m_fontSize: 15.65
   m_fontSizeBase: 40.6
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 16.2
+  m_fontSizeMin: 10.1
   m_fontSizeMax: 40.6
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -266,11 +280,11 @@ MonoBehaviour:
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
-  m_paragraphSpacing: -55.81
+  m_paragraphSpacing: 37.2
   m_charWidthMaxAdj: 0
-  m_TextWrappingMode: 0
+  m_TextWrappingMode: 1
   m_wordWrappingRatios: 0.4
-  m_overflowMode: 1
+  m_overflowMode: 0
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
@@ -313,7 +327,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
   key: ui.purchase_glass.purchase_glass.text_tmp.text
   applyLanguageFont: 1
-  fontRole: Handwriting
+  fontRole: ID Card
+--- !u!114 &2122729141850909330
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927928924656491757}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87edec22f62174cf19f676410d6762b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedTextSuffix
+  suffix: ' <sprite=0>'
 --- !u!1 &1195900565394349662
 GameObject:
   m_ObjectHideFlags: 0
@@ -409,7 +436,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &7798034512273088265
 Transform:
   m_ObjectHideFlags: 0
@@ -463,7 +490,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 888380afc233049ce9e618f9f36c8ba8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: HighlightPlus.Runtime::HighlightPlus.HighlightEffect
-  profile: {fileID: 0}
+  profile: {fileID: 11400000, guid: 15bd2414447596b4e9aad2b416418371, type: 2}
   profileSync: 0
   camerasLayerMask:
     serializedVersion: 2
@@ -472,14 +499,14 @@ MonoBehaviour:
   effectTarget: {fileID: 0}
   effectGroupLayer:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 255
   effectNameFilter: 
   effectNameUseRegEx: 0
   excludeObjectsWithHighlightEffect: 0
   combineMeshes: 0
-  alphaCutOff: 0
+  alphaCutOff: 0.5
   alphaCutOffTextureName: 
-  cullBackFaces: 1
+  cullBackFaces: 0
   ignoreObjectVisibility: 0
   reflectionProbes: 0
   GPUInstancing: 1
@@ -511,7 +538,7 @@ MonoBehaviour:
   overlayMinIntensity: 0.5
   overlayBlending: 1
   overlayTexture: {fileID: 0}
-  overlayTextureUVSpace: 1
+  overlayTextureUVSpace: 0
   overlayTextureScale: 1
   overlayTextureScrolling: {x: 0, y: 0}
   overlayVisibility: 0
@@ -521,7 +548,7 @@ MonoBehaviour:
   overlayPatternSoftness: 0.02
   overlayPatternRotation: 0
   outline: 1
-  outlineColor: {r: 0, g: 0, b: 0, a: 1}
+  outlineColor: {r: 0.735849, g: 0.5425077, b: 0.47621924, a: 0.5019608}
   outlineColorStyle: 0
   outlineGradient:
     serializedVersion: 2
@@ -554,15 +581,15 @@ MonoBehaviour:
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
   outlineGradientInLocalSpace: 0
-  outlineWidth: 0.45
-  outlineBlurPasses: 2
-  outlineQuality: 3
+  outlineWidth: 0.1
+  outlineBlurPasses: 1
+  outlineQuality: 2
   outlineEdgeMode: 0
   outlineEdgeThreshold: 0.995
   outlineDistanceScaleBias: 25
   outlineSharpness: 1
   outlineDownsampling: 1
-  outlineVisibility: 0
+  outlineVisibility: 1
   glowBlendMode: 0
   outlineBlitDebug: 0
   outlineIndependent: 0
@@ -584,8 +611,8 @@ MonoBehaviour:
   outlineDashGap: 0.3
   outlineDashSpeed: 2
   glow: 0
-  glowWidth: 0.4
-  glowQuality: 3
+  glowWidth: 0.5
+  glowQuality: 2
   glowBlurMethod: 0
   glowHighPrecision: 1
   glowDistanceScaleBias: 25
@@ -596,7 +623,7 @@ MonoBehaviour:
   glowMagicNumber1: 0.75
   glowMagicNumber2: 0.5
   glowAnimationSpeed: 1
-  glowVisibility: 0
+  glowVisibility: 1
   glowBlitDebug: 0
   glowBlendPasses: 1
   glowPasses:
@@ -638,7 +665,7 @@ MonoBehaviour:
   targetFXRotationAngle: 0
   targetFXInitialScale: 4
   targetFXEndScale: 1.5
-  targetFXScaleToRenderBounds: 1
+  targetFXScaleToRenderBounds: 0
   targetFXUseEnclosingBounds: 0
   targetFXSquare: 1
   targetFXAlignToGround: 0
@@ -646,7 +673,7 @@ MonoBehaviour:
   targetFxCenterOnHitPosition: 0
   targetFxAlignToNormal: 0
   targetFXFadePower: 32
-  targetFXGroundMaxDistance: 10
+  targetFXGroundMaxDistance: 15
   targetFXGroundLayerMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -690,12 +717,12 @@ MonoBehaviour:
   labelScaleByDistance: 0
   labelScaleMin: 1
   labelScaleMax: 1
-  labelWorldSpaceScale: 0.005
+  labelWorldSpaceScale: 0.01
   seeThrough: 2
   seeThroughOccluderMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  seeThroughOccluderThreshold: 0.3
+  seeThroughOccluderThreshold: 0.4
   seeThroughOccluderMaskAccurate: 0
   seeThroughOccluderCheckInterval: 1
   seeThroughOccluderCheckIndividualObjects: 0
@@ -715,7 +742,7 @@ MonoBehaviour:
   seeThroughTextureUVSpace: 0
   seeThroughTextureScale: 1
   seeThroughChildrenSortingMode: 0
-  rmsCount: 3
+  rmsCount: 5
   hitFxInitialIntensity: 0
   hitFxMode: 0
   hitFXTriggerMode: 0
@@ -734,14 +761,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 951149610
-  InScenePlacedSourceGlobalObjectIdHash: 0
+  GlobalObjectIdHash: 1092257334
+  InScenePlacedSourceGlobalObjectIdHash: 951149610
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
-  m_InScenePlaced: 0
+  m_InScenePlaced: 1
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -791,7 +818,7 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-  _startAvailable: 1
+  _startAvailable: 0
   _persistentUnlockId: 
 --- !u!114 &128189181657322329
 MonoBehaviour:
@@ -807,7 +834,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ShopItem
   name: Repair Glass
   pickableItemData: {fileID: 0}
-  price: 50
+  price: 15
   rotationOffset: {x: 0, y: 0, z: 0}
   customPurchaseAction: {fileID: 0}
   _unlockedByDefault: 1

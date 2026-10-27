@@ -100,6 +100,10 @@ public class LocalizationSettings : ScriptableObject
              "build scene, or living in a Resources folder. Orphaned drafts are skipped.")]
     public bool onlyUsedDialogueAssets = true;
 
+    [Tooltip("Only scan prefabs the game can actually load: referenced (directly or indirectly) by an enabled build scene, " +
+             "or living in a Resources folder. Unused prefabs, samples and asset-pack demos are skipped.")]
+    public bool onlyUsedPrefabs = true;
+
     [Tooltip("Optional per-type field allowlist. When a dialogue asset type has a rule, only these top-level fields are scanned " +
              "(nested strings inside them included). Types without a rule scan every text field.")]
     public List<DialogueFieldRule> dialogueFieldRules = new List<DialogueFieldRule>
@@ -124,6 +128,18 @@ public class LocalizationSettings : ScriptableObject
         "m_Name", "animationTrigger", "cameraTrigger", "IDNumber", "idNumber", "id", "ID", "guid", "tag",
         "layer", "eventName", "trigger", "path", "address", "scene", "sceneName", "parameterName", "stateName"
     };
+
+    [Tooltip("TMP labels (\"assetPath|objectPath\") always treated as filled at runtime: their authored text is a placeholder and is never localized. " +
+             "Set from the Scan tab (Runtime button).")]
+    public List<string> runtimeTextLabels = new List<string>();
+
+    [Tooltip("TMP labels (\"assetPath|objectPath\") the runtime-text detector flagged by mistake; they are scanned as normal copy. " +
+             "Set from the Scan tab (Not runtime button).")]
+    public List<string> staticTextLabels = new List<string>();
+
+    [Tooltip("Text effect components (class names) that only re-display text handed to them, e.g. a typewriter reveal. Their own writes " +
+             "don't make a label runtime-filled; a script calling one of their string methods (RevealText(...)) does.")]
+    public List<string> textRelayTypes = new List<string> { "TMPTextReveal" };
 
     [Tooltip("Font roles. Each project font is assigned to one role; each language then picks one font per role.")]
     public List<FontRole> fontRoles = new List<FontRole>

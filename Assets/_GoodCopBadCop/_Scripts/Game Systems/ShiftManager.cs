@@ -448,9 +448,10 @@ public class ShiftManager : NetworkBehaviour
     public Action OnNightPhaseBegin { get; set; }
 
     private DateTime CurrentGameDateTime => _startDate.AddDays(_currentDay - 1);
-    public string currentMonth => CurrentGameDateTime.ToString("MMMM");
-    public string currentDay => CurrentGameDateTime.ToString("dd");
-    public string currentYear => CurrentGameDateTime.ToString("yyyy");
+    /// <summary>Wall-calendar month heading in the local language (nominative, e.g. "October", "Октябрь").</summary>
+    public string currentMonth => LocalizedDate.StandaloneMonthName(CurrentGameDateTime.Month);
+    public string currentDay => CurrentGameDateTime.ToString("dd", System.Globalization.CultureInfo.InvariantCulture);
+    public string currentYear => CurrentGameDateTime.ToString("yyyy", System.Globalization.CultureInfo.InvariantCulture);
     public bool IsEarlyDays => CurrentDay < 11;
     public bool IsMidDays => CurrentDay is >= 11 and < 21;
     public bool IsEndDays => CurrentDay >= 21;
@@ -776,6 +777,7 @@ public class ShiftManager : NetworkBehaviour
         Instance = this;
         InitializeDateSystem();
         OnDayStart += HandleDayStartCheckpoint;
+        OnShiftReady += ClearIntroCutsceneInProgress;
     }
 
     private void OnEnable()
@@ -790,6 +792,7 @@ public class ShiftManager : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         _networkCurrentDay.OnValueChanged += OnCurrentDayChanged;
+        ClearIntroCutsceneInProgress();
 
         if (IsServer && DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady)
             SkipToBoothReady();
@@ -804,6 +807,7 @@ public class ShiftManager : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         _networkCurrentDay.OnValueChanged -= OnCurrentDayChanged;
+        ClearIntroCutsceneInProgress();
     }
 
     private void OnCurrentDayChanged(int oldValue, int newValue)
@@ -1365,6 +1369,11 @@ public class ShiftManager : NetworkBehaviour
 
     private void BroadcastEndOfShiftReport(int day)
     {
+        // The day is over — no conversation may carry over under the report. End any scripted
+        // sequence for every client first; its exit RPC is sent before the report RPC below,
+        // so participants are released before the report takes over control and cursor.
+        ForceExitSoldierDialogueBeforeCutscene();
+
         ShowEndOfShiftReportClientRpc(
             day,
             _subjectResults.ToArray(),
@@ -1380,7 +1389,26 @@ public class ShiftManager : NetworkBehaviour
         int populationAlive, int deadOvernight, int mutatedOvernight)
     {
         var reportData = new ShiftReportData(day, subjects, populationAlive, deadOvernight, mutatedOvernight);
+
+        // Kick the local player out of any conversation BEFORE the report opens, so the report's
+        // control/cursor lock is applied last and wins over the dialogue teardown's restore.
+        KickLocalPlayerOutOfDialogueForDayEnd();
+
         UIController.Instance.ShowEndShiftReport(reportData);
+    }
+
+    /// <summary>
+    /// Local, per-client. Ends every kind of dialogue the local player may be in when the day
+    /// ends: world/booth question conversations (<see cref="SuspectWorldDialogue"/>, which also
+    /// drops this player from the NPC's server-side participant set), old-style booth dialogue
+    /// mode (<see cref="DialogueChoiceSystem"/>), and any lingering subtitle. Scripted sequences
+    /// are ended server-side in <see cref="BroadcastEndOfShiftReport"/>.
+    /// </summary>
+    private static void KickLocalPlayerOutOfDialogueForDayEnd()
+    {
+        SuspectWorldDialogue.EndAllLocalConversations();
+        DialogueChoiceSystem.Instance?.ForceExitDialogue("the day ended (end-of-shift report)");
+        DialogueManager.Instance?.ClearHistory();
     }
 
     private IEnumerator InBetweenShiftSequence()
@@ -1744,11 +1772,7 @@ public class ShiftManager : NetworkBehaviour
     public void InitiateIntroCutscene()
     {
         if (IsServer)
-        {
-            ForceExitSoldierDialogueBeforeCutscene();
-            GameManager.Instance.SetIntroCutsceneStarted();
-            InitiateIntroCutsceneClientRpc();
-        }
+            InitiateIntroCutsceneServer();
         else
             RequestInitiateIntroCutsceneServerRpc();
     }
@@ -1756,10 +1780,36 @@ public class ShiftManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void RequestInitiateIntroCutsceneServerRpc()
     {
+        InitiateIntroCutsceneServer();
+    }
+
+    /// <summary>
+    /// Server-only. Each player gets their own start-shift screen, so both players can press
+    /// Start Shift before either one's screen closes (the close only lands once
+    /// <see cref="InitiateIntroCutsceneClientRpc"/> arrives). Only the first request may start
+    /// the intro. Any later request is dropped until the intro finishes
+    /// (<see cref="OnShiftReady"/>), so the cutscene can never run twice.
+    /// </summary>
+    private void InitiateIntroCutsceneServer()
+    {
+        if (!IsServer) return;
+        if (_introCutsceneInProgress)
+        {
+            Debug.Log("[ShiftManager] Ignoring duplicate intro cutscene request — intro already in progress.");
+            return;
+        }
+
+        _introCutsceneInProgress = true;
         ForceExitSoldierDialogueBeforeCutscene();
         GameManager.Instance.SetIntroCutsceneStarted();
         InitiateIntroCutsceneClientRpc();
     }
+
+    // Server-only latch for InitiateIntroCutsceneServer. Cleared when the intro completes
+    // (OnShiftReady) and whenever this object spawns/despawns for a new session.
+    private bool _introCutsceneInProgress;
+
+    private void ClearIntroCutsceneInProgress() => _introCutsceneInProgress = false;
 
     /// <summary>
     /// Server-only. If a player is still mid-conversation with the outside Soldier (or any
@@ -1768,6 +1818,7 @@ public class ShiftManager : NetworkBehaviour
     /// player's dialogue lock (movement/look/cursor) never gets released, and the on-screen
     /// subtitle box is never told to clear for any client — including a bystander player who
     /// was merely seeing the soldier's lines from a distance and never entered dialogue mode.
+    /// Also used when the end-of-shift report is broadcast (<see cref="BroadcastEndOfShiftReport"/>).
     /// </summary>
     private void ForceExitSoldierDialogueBeforeCutscene()
     {
@@ -1784,8 +1835,19 @@ public class ShiftManager : NetworkBehaviour
 
     private void RunInitiateIntroCutscene()
     {
+        // Close the start-shift screen the instant this RPC lands, before the PlayerInstance
+        // wait below, so a second player can't keep pressing Start Shift during that wait. The
+        // screen can only be open with a live local player, so ClosedUIPanel() is safe here.
+        if (UIController.Instance != null && UIController.Instance.IsStartShiftScreenOpen)
+            UIController.Instance.CloseStartShiftScreenForShiftStart();
+
         StartCoroutine(RunInitiateIntroCutsceneSequence());
     }
+
+    /// <summary>
+    /// True on the server from the first accepted Start Shift until the intro completes.
+    /// </summary>
+    public bool IsIntroCutsceneInProgress => _introCutsceneInProgress;
 
     /// <summary>
     /// Waits for <see cref="PlayerInstance.Instance"/> to be available before touching it.

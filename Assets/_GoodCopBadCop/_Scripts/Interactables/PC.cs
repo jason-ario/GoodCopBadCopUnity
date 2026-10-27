@@ -807,8 +807,19 @@ public class PC : Interactable
     {
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspect);
         return record != null && record.killedOnDay > 0
-            ? NewspaperStartDate.AddDays(record.killedOnDay - 1).ToString("MM/dd/yy")
+            ? FormatTerminalNumericDate(NewspaperStartDate.AddDays(record.killedOnDay - 1))
             : "unknown";
+    }
+
+    /// <summary>
+    /// Short numeric terminal date (death / last entry). English keeps the original "MM/dd/yy"; other languages use
+    /// their lockit numeric form via <see cref="LocalizedDate"/>.
+    /// </summary>
+    private static string FormatTerminalNumericDate(DateTime date)
+    {
+        return Loc.CurrentLanguage == Loc.SourceLanguage
+            ? date.ToString("MM/dd/yy", System.Globalization.CultureInfo.InvariantCulture)
+            : LocalizedDate.Format(date, LocalizedDate.Style.Numeric);
     }
 
     private List<PCListItemModel> BuildNewsItems(List<TerminalNewsEntry> entries)
@@ -1181,7 +1192,7 @@ public class PC : Interactable
         {
             NewspaperContentScriptable content = _newspaperContentScriptables[day - 1];
             if (content == null) continue;
-            string date = NewspaperStartDate.AddDays(day - 1).ToString("dd MMM yyyy").ToUpperInvariant();
+            string date = LocalizedDate.Format(NewspaperStartDate.AddDays(day - 1), LocalizedDate.Style.Named, uppercase: true);
             entries.Add(new TerminalNewsEntry(day, date, content));
         }
         return entries;
@@ -1249,7 +1260,7 @@ public class PC : Interactable
     {
         SuspectRecord record = SuspectRunRecords.Instance?.GetRecord(suspectData);
         if (record == null || record.lastDayShown <= 0) return "unknown";
-        return NewspaperStartDate.AddDays(record.lastDayShown - 1).ToString("MM/dd/yy");
+        return FormatTerminalNumericDate(NewspaperStartDate.AddDays(record.lastDayShown - 1));
     }
 
     private int GetPaperworkDay()

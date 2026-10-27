@@ -233,13 +233,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
-  interactText: Pick Up
+  interactText: Pick up
   interactVerb: 
   highlightNameFilter: 
   holdHighlightVisibleRange: 50
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
   holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   itemData: {fileID: 11400000, guid: 9702efa9c91aa7e4da5d898cc5f7fa61, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
@@ -248,10 +251,13 @@ MonoBehaviour:
   _hitDelay: 0.5
   _swingCooldown: 0.7
   _inputBuffer: 0.3
-  _swingAnimBool: UsingTool
+  _swingAnimTrigger: MeleeSwing
+  _swingStateTag: MeleeSwing
+  _swingGuardBool: UsingTool
   _swingSound: {fileID: 8300000, guid: f4c1a64f2e736154c8898d25ab413cbc, type: 3}
   _impactSound: {fileID: 8300000, guid: 86e73908818788443aa1712feff1ecb5, type: 3}
   _environmentHitSound: {fileID: 8300000, guid: c3ff52586c2e6774893696a1b5c847f1, type: 3}
+  _worldSoundMaxDistance: 20
 --- !u!1773428102 &7759325571883448781
 ParentConstraint:
   m_ObjectHideFlags: 0

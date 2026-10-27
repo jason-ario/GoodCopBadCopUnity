@@ -121,9 +121,14 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [Header("Knockback Settings")]
     [Tooltip("How quickly (units/sec^2) a horizontal knockback shove decays back to zero.")]
     [SerializeField] private float knockbackRecoveryRate = 20f;
+    [Tooltip("Upper bound (m/s) on the accumulated horizontal knockback speed. Repeated hits stack, " +
+             "and an uncapped shove can drive the CharacterController through thin/mesh walls.")]
+    [SerializeField] private float maxKnockbackSpeed = 12f;
 
     /// <summary>Extra horizontal velocity from knockback impulses (e.g. HazardHitbox), decays over time.</summary>
     private Vector3 _externalVelocity;
+
+    private static readonly RaycastHit[] KnockbackCastBuffer = new RaycastHit[8];
 
     /// <summary>
     /// Vertical knockback speed waiting to be applied on the next <see cref="Move"/> call.
@@ -150,6 +155,10 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [SerializeField, Min(0.01f)] private float separationDistance = 1.0f;
     [Tooltip("Self-push speed (m/s) when fully overlapping another player, scaling linearly to 0 at separationDistance. Keep below walk speed so players can still squeeze past each other in tight spaces.")]
     [SerializeField, Min(0f)] private float separationMaxSpeed = 3f;
+
+    [Header("Mutant Body Separation")]
+    [Tooltip("Self-push speed (m/s) out of a hostile mutant's body (NavMeshAgent radius + own radius). Replaces hard collision with mutant root colliders, which shoved players through walls via CharacterController overlap recovery.")]
+    [SerializeField, Min(0f)] private float mutantSeparationMaxSpeed = 5f;
 
     /// <summary>All spawned player bodies on this machine (local + remote), for pairwise collision ignores and separation.</summary>
     private static readonly List<PlayerMovementController> s_spawnedPlayers = new List<PlayerMovementController>();
@@ -484,6 +493,74 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         return push * separationMaxSpeed;
     }
 
+    /// <summary>
+    /// Local player only. Ignores collision between this CharacterController and the root body
+    /// colliders of every hostile (active, living) mutant. Those colliders have no Rigidbody and are
+    /// teleported by the NavMeshAgent; when a mutant closes in to attack, they overlap the player and
+    /// the CharacterController's overlap recovery shoves the player out — through walls when one is
+    /// behind them. Separation is handled softly by <see cref="ComputeMutantSeparationVelocity"/>.
+    /// Re-checked every frame since Unity drops ignore pairs when a collider is disabled, and dormant
+    /// suspects / dead mutants must collide normally. Raycasts and overlap queries are unaffected.
+    /// </summary>
+    private void UpdateMutantCollisionIgnores()
+    {
+        IReadOnlyList<MutantEnemy> mutants = MutantEnemy.ActiveInstances;
+        for (int i = 0; i < mutants.Count; i++)
+        {
+            MutantEnemy mutant = mutants[i];
+            if (mutant == null) continue;
+
+            bool shouldIgnore = mutant.IsHostileBody;
+            Collider[] blockers = mutant.BodyBlockers;
+            for (int j = 0; j < blockers.Length; j++)
+            {
+                Collider blocker = blockers[j];
+                if (blocker == null || !blocker.enabled || !blocker.gameObject.activeInHierarchy) continue;
+
+                if (Physics.GetIgnoreCollision(_characterController, blocker) != shouldIgnore)
+                    Physics.IgnoreCollision(_characterController, blocker, shouldIgnore);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Local player only. Horizontal self-push out of hostile mutants' bodies (NavMeshAgent radius +
+    /// own radius), replacing their hard collision. Routed through CharacterController.Move, so it
+    /// slides along walls instead of ever pushing the player through them.
+    /// </summary>
+    private Vector3 ComputeMutantSeparationVelocity()
+    {
+        if (mutantSeparationMaxSpeed <= 0f || _isSitting) return Vector3.zero;
+
+        Bounds myBounds = _characterController.bounds;
+        Vector3 myPosition = transform.position;
+        float myRadius = _characterController.radius;
+        Vector3 push = Vector3.zero;
+
+        IReadOnlyList<MutantEnemy> mutants = MutantEnemy.ActiveInstances;
+        for (int i = 0; i < mutants.Count; i++)
+        {
+            MutantEnemy mutant = mutants[i];
+            if (mutant == null || !mutant.IsHostileBody) continue;
+
+            Vector3 mutantPosition = mutant.transform.position;
+            // Skip mutants on a different floor (roughly: their feet above our head or far below our feet).
+            if (mutantPosition.y > myBounds.max.y || mutantPosition.y < myBounds.min.y - 2f) continue;
+
+            float contactDistance = mutant.BodyRadius + myRadius;
+            Vector3 away = myPosition - mutantPosition;
+            away.y = 0f;
+            float distance = away.magnitude;
+            if (distance >= contactDistance) continue;
+
+            away = distance < 0.0001f ? -transform.forward : away / distance;
+            push += away * (1f - distance / contactDistance);
+        }
+
+        if (push.sqrMagnitude > 1f) push.Normalize();
+        return push * mutantSeparationMaxSpeed;
+    }
+
     // Ensures the player animator never carries the "Sitting" pose across a day boundary.
     private void HandleDayChanged(int newDay)
     {
@@ -532,6 +609,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         if (_characterController == null || !_characterController.enabled) return;
 
         UpdatePlayerCollisionIgnores();
+        UpdateMutantCollisionIgnores();
 
         if (canControl == false)
         {
@@ -721,8 +799,12 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         bool jumpAnimActive = _playerAnimationController != null && _playerAnimationController.IsJumpAnimPlaying;
         IsGrounded = isGrounded && !jumpAnimActive && !_isUnderwater;
 
+        // Strip any knockback component that would drive the capsule into a wall this frame, so
+        // the shove slides along geometry instead of ramming (and tunnelling) through it.
+        ClipKnockbackAgainstObstacles();
+
         Vector3 moveVector = inputDir * currentSpeed + Vector3.up * _verticalVelocity + _externalVelocity
-            + ComputePlayerSeparationVelocity();
+            + ComputePlayerSeparationVelocity() + ComputeMutantSeparationVelocity();
 
         // Apply movement
         CollisionFlags collisionFlags = _characterController.Move(moveVector * Time.deltaTime);
@@ -736,6 +818,85 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         // of repeatedly pushing into (or clipping through) the overhead collider.
         if (_verticalVelocity > 0f && (collisionFlags & CollisionFlags.Above) != 0)
             _verticalVelocity = 0f;
+    }
+
+    /// <summary>
+    /// Sweeps the capsule along the current knockback shove and removes the part of
+    /// <see cref="_externalVelocity"/> pointing into whatever it would hit this frame. The bottom
+    /// of the cast is lifted by stepOffset so kerbs/steps/floor don't cancel the shove.
+    /// </summary>
+    private void ClipKnockbackAgainstObstacles()
+    {
+        float speed = _externalVelocity.magnitude;
+        if (speed < 0.01f) return;
+
+        Vector3 direction = _externalVelocity / speed;
+        float radius = _characterController.radius;
+        float halfSegment = Mathf.Max(_characterController.height * 0.5f - radius, 0f);
+        Vector3 center = transform.position + _characterController.center;
+        Vector3 top = center + Vector3.up * halfSegment;
+        Vector3 bottom = center + Vector3.down * halfSegment
+            + Vector3.up * Mathf.Min(_characterController.stepOffset, halfSegment * 2f);
+
+        int mask = GetKnockbackCollisionMask();
+        float castDistance = speed * Time.deltaTime + _characterController.skinWidth * 2f;
+
+        int hitCount = Physics.CapsuleCastNonAlloc(
+            bottom, top, radius, direction, KnockbackCastBuffer, castDistance, mask,
+            QueryTriggerInteraction.Ignore);
+
+        Transform root = transform.root;
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = KnockbackCastBuffer[i];
+            if (hit.collider == null || hit.collider.transform.IsChildOf(root)) continue;
+
+            // A zero-distance hit means we already start in contact; treat it as a head-on wall.
+            Vector3 normal = hit.distance <= 0f ? -direction : hit.normal;
+            RemoveKnockbackIntoNormal(normal);
+        }
+    }
+
+    private int _knockbackMaskLayer = -1;
+    private int _knockbackMask;
+
+    /// <summary>Layers the CharacterController collides with (layer matrix minus excludeLayers), cached per layer.</summary>
+    private int GetKnockbackCollisionMask()
+    {
+        int layer = _characterController.gameObject.layer;
+        if (layer != _knockbackMaskLayer)
+        {
+            int mask = 0;
+            for (int i = 0; i < 32; i++)
+            {
+                if (!Physics.GetIgnoreLayerCollision(layer, i))
+                    mask |= 1 << i;
+            }
+            _knockbackMask = mask & ~_characterController.excludeLayers.value;
+            _knockbackMaskLayer = layer;
+        }
+        return _knockbackMask;
+    }
+
+    /// <summary>Removes the component of the knockback shove that points into a surface's (horizontal) normal.</summary>
+    private void RemoveKnockbackIntoNormal(Vector3 normal)
+    {
+        normal.y = 0f;
+        if (normal.sqrMagnitude < 0.0001f) return;
+        normal.Normalize();
+
+        float into = Vector3.Dot(_externalVelocity, normal);
+        if (into < 0f)
+            _externalVelocity -= normal * into;
+    }
+
+    // Safety net for contacts the pre-sweep missed: once the controller actually touches a wall,
+    // stop the knockback pushing into it for the rest of its decay.
+    private void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        if (_externalVelocity.sqrMagnitude < 0.0001f) return;
+        if (Mathf.Abs(hit.normal.y) > 0.7f) return; // floor / ceiling
+        RemoveKnockbackIntoNormal(hit.normal);
     }
 
     /// <summary>
@@ -1397,7 +1558,8 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     {
         if (!IsOwner) return;
 
-        _externalVelocity += horizontalVelocity;
+        horizontalVelocity.y = 0f;
+        _externalVelocity = Vector3.ClampMagnitude(_externalVelocity + horizontalVelocity, maxKnockbackSpeed);
         _pendingKnockbackVerticalVelocity = Mathf.Max(_pendingKnockbackVerticalVelocity, verticalVelocity);
     }
 

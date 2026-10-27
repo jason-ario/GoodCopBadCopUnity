@@ -34,15 +34,24 @@ public class DailyFaxContentsController : MonoBehaviour
     {
         ShiftManager.Instance.OnShiftReady += PopulateFaxContents;
         ShiftManager.Instance.OnShiftStart += PopulateFaxContents;
+        Loc.LanguageChanged += OnLanguageChanged;
     }
 
     private void OnDestroy()
     {
+        Loc.LanguageChanged -= OnLanguageChanged;
         if (ShiftManager.Instance != null)
         {
             ShiftManager.Instance.OnShiftReady -= PopulateFaxContents;
             ShiftManager.Instance.OnShiftStart -= PopulateFaxContents;
         }
+    }
+
+    /// <summary>Re-bakes the fax so the date follows a language change.</summary>
+    private void OnLanguageChanged()
+    {
+        if (this != null && ShiftManager.Instance != null)
+            PopulateFaxContents();
     }
 
     /// <summary>Refreshes the fax using the current day from ShiftManager.</summary>
@@ -61,7 +70,7 @@ public class DailyFaxContentsController : MonoBehaviour
         Debug.Log($"[DailyFaxContentsController] Populating fax for day {day}.");
 
         int index = day - 1;
-        string date = StartDate.AddDays(index).ToString("dd MMM yyyy").ToUpper();
+        string date = LocalizedDate.Format(StartDate.AddDays(index), LocalizedDate.Style.Named, uppercase: true);
         dateText.text = date;
 
         headerText.text = "DAILY INTELLIGENCE BRIEFING";

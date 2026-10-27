@@ -33,10 +33,18 @@ public static class LocalizationPaths
     public static string SheetPath(string sheet) { return Sheets + "/" + sheet + ".csv"; }
 }
 
-/// <summary>CSV per sheet: key, notes, source_en, language columns..., status, frozen_hash.</summary>
+/// <summary>CSV per sheet: key, notes, max_chars, source_en, language columns..., status, frozen_hash.</summary>
 public static class LocalizationSheetIO
 {
-    private static readonly HashSet<string> FixedColumns = new HashSet<string> { "key", "notes", "source_en", "status", "frozen_hash" };
+    public const string MaxCharsColumn = "max_chars";
+    public static readonly HashSet<string> FixedColumns = new HashSet<string> { "key", "notes", MaxCharsColumn, "source_en", "status", "frozen_hash" };
+
+    public static int ParseMaxChars(string cell)
+    {
+        return int.TryParse((cell ?? "").Trim(), out int n) && n > 0 ? n : 0;
+    }
+
+    public static string FormatMaxChars(int n) { return n > 0 ? n.ToString() : ""; }
 
     public static LocalizationSettings LoadOrCreateSettings()
     {
@@ -80,6 +88,7 @@ public static class LocalizationSheetIO
         int keyCol = header.IndexOf("key");
         if (keyCol < 0) return 0;
         int notesCol = header.IndexOf("notes");
+        int maxCol = header.IndexOf(MaxCharsColumn);
         int srcCol = header.IndexOf("source_en");
         int statusCol = header.IndexOf("status");
         int hashCol = header.IndexOf("frozen_hash");
@@ -105,6 +114,7 @@ public static class LocalizationSheetIO
                 sheet = sheetName,
                 key = key,
                 notes = Cell(notesCol),
+                maxChars = ParseMaxChars(Cell(maxCol)),
                 source = Cell(srcCol),
                 status = Cell(statusCol),
                 frozenHash = Cell(hashCol)
@@ -130,13 +140,13 @@ public static class LocalizationSheetIO
     {
         var langs = languages.ToList();
         var rows = new List<IList<string>>();
-        var header = new List<string> { "key", "notes", "source_en" };
+        var header = new List<string> { "key", "notes", MaxCharsColumn, "source_en" };
         header.AddRange(langs);
         if (includeStatus) { header.Add("status"); header.Add("frozen_hash"); }
         rows.Add(header);
         foreach (var e in entries)
         {
-            var row = new List<string> { e.key, e.notes, e.source };
+            var row = new List<string> { e.key, e.notes, FormatMaxChars(e.maxChars), e.source };
             foreach (var l in langs) row.Add(e.GetValue(l));
             if (includeStatus) { row.Add(Status(e)); row.Add(e.frozenHash); }
             rows.Add(row);

@@ -114,7 +114,7 @@ public class TimecardMachine : Interactable
 
     [Header("Interact Text")]
     [Tooltip("Text shown on the reticle while the machine is primed for clock-in.")]
-    [SerializeField, LocalizeField] private string _clockInInteractText = "Clock In";
+    [SerializeField, LocalizeField] private string _clockInInteractText = "Clock in";
 
     [Header("Tutorial Objective List")]
     [Tooltip("Text shown in the tutorial objective overlay while clock-in is available. " +

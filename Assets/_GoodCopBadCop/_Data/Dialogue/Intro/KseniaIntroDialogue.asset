@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: School on Lenina Street is quiet now. Lots of empty desks.
@@ -29,13 +30,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Where did everyone go?
-      npcResponse: Away. Or sick. I like the quiet days best.
+    - playerChoiceText: Why are you out alone?
+      npcResponse: Mom's working. I know the way, and I don't talk to anyone.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: Who's at home?
-      npcResponse: Just me and my mom. She's kind.
+    - playerChoiceText: Where did the others go?
+      npcResponse: Away. Or sick. Teacher says we pretend they're on holiday.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 1
@@ -45,13 +49,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Can I see it?
+    - playerChoiceText: Hand it over.
       npcResponse: No. It's warm. It likes my pocket.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: Are you alright?
-      npcResponse: I think so. When I hold very still, the loud parts go past me.
+    - playerChoiceText: Where did you find it?
+      npcResponse: By the old fence on the east road. There were lots. I only took one.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

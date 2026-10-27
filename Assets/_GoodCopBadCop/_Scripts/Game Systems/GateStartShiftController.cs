@@ -165,7 +165,9 @@ public class GateStartShiftController : Interactable
     }
 
     private bool CanOfferDayOneStartShift() =>
-        HasCampaignStarted && IsDayOneIntroPending();
+        HasCampaignStarted && IsDayOneIntroPending() &&
+        // Server-side: once a player has started the intro, don't hand out new start-shift screens.
+        (ShiftManager.Instance == null || !ShiftManager.Instance.IsIntroCutsceneInProgress);
 
     private bool CanToggleGate() =>
         HasCampaignStarted && !IsDayOneIntroPending();

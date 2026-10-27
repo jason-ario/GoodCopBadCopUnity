@@ -15,50 +15,58 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Greetings, officer. Tina Meskhi, accountant. Terribly dull, I promise.
+    npcLine: Greetings, Officer. Tina Meskhi, actress, Rustaveli Theatre. You may applaud later.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: Before you ask, the mask covers old scars. Everyone asks.
+    npcLine: Yes, the mask. It covers old scars. Everyone asks, so I answer first.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Do you ever take it off?
-      npcResponse: Not for strangers. Though you asked so nicely, officer.
+    - playerChoiceText: You're hiding something.
+      npcResponse: Every actress hides something, Officer. Mine just happens to be the face.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Do you sleep in it?
-      npcResponse: It protects the face beneath. Think of it as very committed skincare.
+    - playerChoiceText: Scars from what?
+      npcResponse: A fire backstage, long ago. Nothing contagious. Stop leaning back.
+      npcFollowUp: 
       animationTrigger: TalkCocky
       playLaughSfx: 0
   - type: 1
-    npcLine: You play the stern gatekeeper well. My ink is from the office.
+    npcLine: The last officer and I had an understanding. He adored a good performance.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: I'm just checking papers.
-      npcResponse: Of course. If it grows tiresome, I'm very good with numbers. Discreet ones.
+    - playerChoiceText: Are you offering a bribe?
+      npcResponse: I'm offering tickets. Front row. What you do with them is your business.
+      npcFollowUp: 
       animationTrigger: TalkCocky
       playLaughSfx: 0
-    - playerChoiceText: Everything's a performance?
-      npcResponse: Everything. The difference is whether you're aware of it.
+    - playerChoiceText: What happened to him?
+      npcResponse: He got greedy, then careless. Someone reported him. Not me.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
-    npcLine: Ledgers are better company. They never ask questions.
+    npcLine: The house is half empty these days. The show goes on anyway.
     animationTrigger: TalkCocky
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

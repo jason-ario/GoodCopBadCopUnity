@@ -34,7 +34,7 @@ public class ProfilePage : MonoBehaviour
     public void SetProfileData(SuspectData suspectData, string entryReason = "unknown", string lastEntryDate = "unknown", string displayStatus = "Alive")
     {
         nameText.text = "Name: " + suspectData.FirstName + " " + suspectData.LastName;
-        dateOfBirthText.text =  "DoB: " + suspectData.DateOfBirth;
+        dateOfBirthText.text =  "DoB: " + GoodCopBadCop.SuspectPaperwork.SuspectPaperworkService.LocalizeDocumentDate(suspectData.DateOfBirth);
         genderText.text = "Sex: " + suspectData.Sex;
         lastExitText.text = "Last Entry: " + NormalizeUnknown(lastEntryDate);
         if (reasonText != null)

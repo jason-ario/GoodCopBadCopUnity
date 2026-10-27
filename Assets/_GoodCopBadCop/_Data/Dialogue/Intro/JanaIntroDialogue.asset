@@ -15,43 +15,50 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: My documents, I had them ready. Jana Sokolova, second residential row.
+    npcLine: My documents, ready. Jana Sokolova, flower stall, residential row.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: You noticed the dress. It's for a ceremony later.
+    npcLine: You're looking at the dress. It's for a ceremony later.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
     - playerChoiceText: What ceremony?
       npcResponse: A wedding. The date keeps moving. [[whisper:I don't remember]] when it started.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: How long have you worn it?
-      npcResponse: It holds its shape. The seamstress on my floor mends it.
+    - playerChoiceText: Who's the groom?
+      npcResponse: He works late now, later every week. I'm good at waiting.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 1
-    npcLine: I sell flowers on the residential row. Funerals, mostly, lately.
+    npcLine: I sell flowers on the row. Funerals, mostly, lately.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Who's buying flowers now?
-      npcResponse: Widows. They pay in ration coupons. I take them.
+    - playerChoiceText: How many funerals?
+      npcResponse: Six this week. The lilies run out first.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: Who waits at home?
-      npcResponse: He does. He gets home later now. I wait. I'm good at that.
+    - playerChoiceText: Did you know any of them?
+      npcResponse: One. I made her bouquet years ago. Or it might have been mine.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

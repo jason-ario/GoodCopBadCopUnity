@@ -43,7 +43,7 @@ public class BunkBedInteractable : Interactable
     [SerializeField] private float _objectiveCompletedLingerDuration = 1f;
 
     private static readonly string InteractTextReady    = Loc.N("Sleep");
-    private static readonly string InteractTextNotReady = Loc.N("Finish remaining tasks to end the day  ");
+    private static readonly string InteractTextNotReady = Loc.N("Finish remaining tasks to end the day");
 
     /// <summary>
     /// Fired locally when the player confirms ending the day at the bunk bed.

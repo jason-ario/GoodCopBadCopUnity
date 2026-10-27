@@ -42,7 +42,7 @@ MonoBehaviour:
   - Visiting for the week. I live in Batumi.
   - Handing in my pension papers.
   entryDialogues:
-  - Heads or tails, officer? Kidding. Here are my documents.
+  - Heads or tails, Officer? Kidding. Here are my documents.
   - I'm betting on the city's quick recovery. The spread looks good.
   uncannyEntryDialogues: []
   exitDialoguesPassed:
@@ -53,8 +53,8 @@ MonoBehaviour:
   - Corner pocket. Fine. I've bluffed out of worse hands.
   - Two-to-one I'm out by morning. I like those odds.
   killExitLines:
-  - "Funny\u2026 three aces\u2026 and still not enough\u2026"
-  - "House always wins\u2026 should have\u2026 bet on that\u2026"
+  - Funny... three aces... and still not enough...
+  - House always wins... should have... bet on that...
   voiceAudioClips:
   - {fileID: 8300000, guid: 39c10d8c4538a3a4b806d526044c2f2a, type: 3}
   - {fileID: 8300000, guid: eb71ee4c9f5538b49a8c1cad75e1149e, type: 3}
@@ -69,12 +69,17 @@ MonoBehaviour:
   questionResponses:
   - question: Where are you coming from?
     answer: The Metropol back room. Cards till dawn. Now home to sleep it off.
-    mismatchAnswer: The evening train from Kutaisi. First time in your town, officer.
+    mismatchAnswer: The evening train from Kutaisi. First time in your town, Officer.
     uncannyAnswer: 
     cameraTrigger: 
   - question: Are you experiencing any symptoms?
     answer: Sweaty palms, as always. Bad for holding cards, good for bluffing.
     mismatchAnswer: Nothing. Dry hands, steady as a surgeon. Always have been.
+    uncannyAnswer: 
+    cameraTrigger: 
+  - question: What are the odds on me?
+    answer: Better than the last one. Not by much. I've moved my money twice.
+    mismatchAnswer: Odds? I don't gamble, Officer. Never been through here before.
     uncannyAnswer: 
     cameraTrigger: 
   idleBarks:

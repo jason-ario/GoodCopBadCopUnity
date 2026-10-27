@@ -83,6 +83,8 @@ public class LocEntry
     public string sheet = "";
     public string key = "";
     public string notes = "";
+    /// <summary>Optional max visible characters for any language (sheet column max_chars). 0 = no limit.</summary>
+    public int maxChars;
     public string source = "";
     public string status = "";
     public string frozenHash = "";
