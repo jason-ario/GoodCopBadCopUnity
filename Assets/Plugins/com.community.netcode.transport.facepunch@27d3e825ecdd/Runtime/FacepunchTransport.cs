@@ -295,6 +295,21 @@ namespace Netcode.Transports.Facepunch
 
         #region Utility Methods
 
+        /// <summary>
+        /// SERVER: returns the Steam-authenticated SteamID of a connected remote client, keyed by
+        /// its transport client ID (Steam networking sockets verify this identity — unlike any
+        /// SteamID a client writes into its own connection payload).
+        /// </summary>
+        public bool TryGetSteamIdForTransportClient(ulong transportClientId, out ulong steamId)
+        {
+            steamId = 0;
+            if (connectedClients == null || !connectedClients.TryGetValue(transportClientId, out Client client))
+                return false;
+
+            steamId = client.steamId.Value;
+            return steamId != 0;
+        }
+
         private IEnumerator InitSteamworks()
         {
             yield return new WaitUntil(() => SteamClient.IsValid);

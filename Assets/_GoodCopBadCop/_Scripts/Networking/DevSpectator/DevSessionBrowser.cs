@@ -96,6 +96,13 @@ public class DevSessionBrowser : MonoBehaviour
         UpdateSpectatorSession();
     }
 
+    /// <summary>Opens/closes the console (same access rule as Ctrl+Shift+O). Used by the editor guide.</summary>
+    public void Toggle()
+    {
+        if (CanOpen)
+            SetOpen(!_isOpen);
+    }
+
     private void SetOpen(bool open)
     {
         if (_isOpen == open) return;

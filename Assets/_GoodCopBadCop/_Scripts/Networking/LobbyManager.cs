@@ -1059,6 +1059,14 @@ public class LobbyManager : MonoBehaviour
 
         if (DevSpectatorConfig.TryParseSpectatorPayload(request.Payload, out ulong devSteamId))
         {
+            if (!DevSpectatorConfig.VerifyConnectionSteamId(NetworkManager.Singleton, request.ClientNetworkId, devSteamId))
+            {
+                response.Approved = false;
+                response.Reason = "SpectatorIdentityMismatch";
+                Debug.LogWarning($"[DevSpectator] Rejected spectator request clientId={request.ClientNetworkId} — claimed steamId={devSteamId} does not match the Steam connection.");
+                return;
+            }
+
             DevSpectatorRegistry.RegisterSpectator(request.ClientNetworkId);
             response.Approved = true;
             Debug.Log($"[DevSpectator] Approved hidden spectator clientId={request.ClientNetworkId} steamId={devSteamId}.");
