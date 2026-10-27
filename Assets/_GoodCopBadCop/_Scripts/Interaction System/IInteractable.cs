@@ -194,7 +194,7 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     private bool _pulseApplied;
 
     // ── Overlay-pulse hold style ───────────────────────────────────────────────
-    // Subclasses that return true from UseOverlayPulseForHold (JunkItem: trash + gore) render their
+    // Subclasses that return true from UseOverlayPulseForHold (JunkItem: trash + gore; MailPackageItem) render their
     // persistent objective highlight as the faint pulsing overlay from the shared
     // Resources/Highlight/ObjectivePulse.asset (same look as broken fences) instead of the pulsing
     // outline. Hover always switches back to the authored outline so targeting reads the same as

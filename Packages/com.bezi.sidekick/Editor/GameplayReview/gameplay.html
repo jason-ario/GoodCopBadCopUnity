@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bezi gameplay</title>
+<style>
+  :root {
+    --bg: #0d0f13; --panel: #151820; --panel-2: #1b1f29; --line: #262b38; --text: #e7e9ee; --muted: #8a91a3;
+    --accent: #6c8cff; --good: #3ecf8e; --bad: #ff5d6c; --warn: #f5b84b; --planner: #a48cff; --tuner: #f0b24a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme='dark']) { --bg: #f5f6f9; --panel: #ffffff; --panel-2: #f0f2f7; --line: #e2e5ee; --text: #151821; --muted: #6a7184; --planner: #6c4cd6; --tuner: #b26a00; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--sans); display: flex; flex-direction: column; }
+  header { padding: 18px 24px 12px; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-size: 19px; font-weight: 650; min-width: 0; flex: 1 1 320px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  header span { color: var(--muted); font-size: 13px; }
+  .shell { flex: 1; min-height: 0; display: flex; }
+  nav { width: 240px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--line); padding: 10px 8px 20px; }
+  nav h3 { margin: 14px 10px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  nav button { display: flex; width: 100%; align-items: baseline; gap: 8px; font: inherit; text-align: left; color: var(--text); background: none; border: 0; border-radius: 7px; padding: 6px 10px; cursor: pointer; }
+  nav button:hover { background: var(--panel-2); }
+  nav button[aria-current='page'] { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }
+  nav button .n { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 18px; }
+  nav button .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  nav button small { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+  nav button small.bad { color: var(--bad); }
+  nav button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .bar { display: none; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+  .bar select { flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  .step { display: flex; gap: 6px; margin-left: auto; }
+  .step button { font: inherit; font-size: 12.5px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+  .step button:disabled { opacity: .4; cursor: default; }
+  @media (max-width: 800px) { nav { display: none; } .bar { display: flex; } }
+  main { flex: 1; min-width: 0; min-height: 0; display: flex; }
+  iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
+  .page { flex: 1; overflow: auto; padding: 18px 24px 40px; }
+  .page > section { max-width: 1100px; margin: 0 auto 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .page h2 { margin: 0; padding: 12px 18px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .body { padding: 6px 18px 14px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: break-word; }
+  a.part { white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .who { font-weight: 600; white-space: nowrap; }
+  .who.planner { color: var(--planner); } .who.tuner { color: var(--tuner); }
+  .bad { color: var(--bad); }
+  .empty { color: var(--muted); }
+  a.ts, a.part { color: var(--accent); cursor: pointer; text-decoration: none; }
+  a.ts:hover, a.part:hover { text-decoration: underline; }
+  .md { padding: 4px 22px 18px; font-size: 14px; line-height: 1.65; }
+  .md h1 { font-size: 19px; margin: 16px 0 6px; } .md h2 { font-size: 16px; margin: 18px 0 6px; padding: 0; border: 0; text-transform: none; letter-spacing: 0; color: var(--text); } .md h3 { font-size: 14px; margin: 14px 0 4px; }
+  .md p { margin: 8px 0; } .md ul, .md ol { margin: 6px 0; padding-left: 22px; } .md li { margin: 3px 0; }
+  .md code { font-family: var(--mono); font-size: 12.5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  .md pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .md pre code { background: none; border: 0; padding: 0; }
+  .md table { margin: 8px 0; }
+  code.v { font-family: var(--mono); font-size: 12px; }
+  a.file { color: var(--accent); font-family: var(--mono); font-size: 12px; text-decoration: none; overflow-wrap: anywhere; }
+  a.file:hover { text-decoration: underline; }
+  .sheets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .sheets img { height: 56px; border-radius: 4px; border: 1px solid var(--line); display: block; }
+  .tiles { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 18px; }
+  .tile { min-width: 130px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .tile b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .tile span { color: var(--muted); font-size: 12px; }
+  .steps { display: flex; align-items: flex-end; gap: 1px; height: 90px; padding: 10px 18px 4px; }
+  .steps div { flex: 1; min-width: 2px; background: var(--planner); border-radius: 2px 2px 0 0; opacity: .85; }
+  .note { color: var(--muted); font-size: 12.5px; padding: 0 18px 12px; }
+</style>
+</head>
+<body>
+<header><h1 id="title"></h1><span id="summary"></span><span class="step"><button id="prev" title="Previous (←)">← Prev</button><button id="next" title="Next (→)">Next →</button></span></header>
+<div class="bar"><select id="picker" aria-label="Page"></select></div>
+<div class="shell"><nav id="tabs" aria-label="Gameplay pages"></nav><main id="main"></main></div>
+<script>
+const data = /*__DATA__*/null;
+const embedded = /*__EMBEDDED__*/null;
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\'': '&#39;' }[c]));
+const fmt = (s) => s == null ? '–' : s >= 60 ? Math.floor(s / 60) + 'm ' + Math.round(s % 60) + 's' : (Math.round(s * 10) / 10).toFixed(1) + 's';
+const tabs = document.getElementById('tabs'), main = document.getElementById('main');
+document.title = data.title + ' · Bezi gameplay';
+document.getElementById('title').textContent = document.getElementById('title').title = data.title;
+const total = data.parts.reduce((t, p) => t + (p.seconds || 0), 0);
+const money = (v) => v == null ? '–' : v < 0.01 && v > 0 ? '<$0.01' : '$' + v.toFixed(v < 1 ? 3 : 2);
+const count = (v) => v == null ? '–' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e4 ? Math.round(v / 1e3) + 'k' : String(v);
+const tokensOf = (u) => u.inputTokens + u.cachedInputTokens + u.cacheWriteTokens + u.outputTokens;
+document.getElementById('summary').textContent = `${data.parts.length} part${data.parts.length === 1 ? '' : 's'} · ${fmt(total)} of play` +
+  (data.usage ? ` · ${money(data.usage.totals.costUSD)} · ${count(tokensOf(data.usage.totals))} tokens` : '');
+
+const ROOT = '';
+// Markdown links. The agent links artifact files by absolute path, which only works on the machine that played;
+// a path inside this gameplay run's folder becomes relative so it works from a copy too.
+function mdLink(text, url) {
+  const inside = /\/Library\/BeziGameplayRuns\/[^/]+\/(.*)$/.exec(url);
+  const href = inside ? ROOT + inside[1] : /^(https?:|#|\.)/.test(url) ? url : null;
+  return href == null ? text : `<a class='file' href='${href.replace(/'/g, '%27')}' target='_blank' rel='noopener'>${text}</a>`;
+}
+function renderMarkdown(md) {
+  md = md.trim();
+  const link = (a, b) => `<a class='ts' data-t='${a}'>${a}${b ? '–' + b : ''} s</a>`;
+  const inline = (text) => esc(text)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, text, url) => mdLink(text, url))
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
+    .replace(/\[(\d+(?:\.\d+)?)(?:\s?[–-]\s?(\d+(?:\.\d+)?))?\s?s\]/g, (m, a, b) => link(a, b));
+  const lines = md.split('\n'), out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^```/.test(line)) {
+      const code = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) code.push(lines[i++]);
+      out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`); continue;
+    }
+    const h = /^(#{1,4})\s+(.*)/.exec(line);
+    if (h) { out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); continue; }
+    if (/^\s*\|/.test(line)) {
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+      i--;
+      const cells = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      const body = rows.filter((r) => !/^\s*\|?\s*:?-{2,}/.test(r));
+      const head = body.shift();
+      out.push(`<table><tr>${cells(head).map((c) => `<th>${inline(c)}</th>`).join('')}</tr>${body.map((r) => `<tr>${cells(r).map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</table>`);
+      continue;
+    }
+    const li = /^\s*([-*]|\d+\.)\s+(.*)/.exec(line);
+    if (li) {
+      const ordered = /\d/.test(li[1]), items = [];
+      while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, ''));
+      i--;
+      out.push(`<${ordered ? 'ol' : 'ul'}>${items.map((x) => `<li>${inline(x)}</li>`).join('')}</${ordered ? 'ol' : 'ul'}>`);
+      continue;
+    }
+    if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+  }
+  return out.join('\n');
+}
+
+const decode = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+const value = (v) => typeof v === 'string' ? v : JSON.stringify(v);
+
+function overview() {
+  const sections = [];
+  const watched = [...new Set(data.parts.flatMap((p) => Object.keys(p.finalValues || {})))].slice(0, 6);
+  sections.push(`<section><h2>Results by part</h2><div class='body'><table>
+    <tr><th>Part</th><th>Length</th><th>Outcome</th><th>Choices</th><th>Overruled the rule</th><th>Planner changes</th><th>Tuner changes</th><th>Problems</th>${watched.map((w) => `<th>${esc(w.split('.').pop())} at end</th>`).join('')}</tr>
+    ${data.parts.map((p, i) => `<tr>
+      <td><a class='part' data-i='${i}'>${esc(p.label)}</a></td>
+      <td class='num'>${fmt(p.seconds)}</td>
+      <td>${esc(p.outcome || '–')}</td>
+      <td class='num'>${p.decisions}${Object.keys(p.byChooser).length ? `<br><span class='empty'>${Object.entries(p.byChooser).map(([k, v]) => `${esc(k)} ${v}`).join(', ')}</span>` : ''}</td>
+      <td class='num'>${p.disagreed}</td>
+      <td class='num'>${p.plannerChanges}</td>
+      <td class='num'>${p.tunerChanges}</td>
+      <td>${p.problems.length ? `<span class='bad'>${p.problems.map(esc).join('<br>')}</span>` : '<span class="empty">none</span>'}</td>
+      ${watched.map((w) => `<td class='num'>${esc(p.finalValues?.[w] ?? '–')}</td>`).join('')}
+    </tr>`).join('')}
+  </table></div></section>`);
+  if (data.changes.length) {
+    sections.push(`<section><h2>Changes during play</h2><div class='body'><table>
+      <tr><th>Part</th><th>Time</th><th>Who</th><th>What changed</th><th>Why</th></tr>
+      ${data.changes.map((c) => `<tr>
+        <td><a class='part' data-i='${data.parts.findIndex((p) => p.folder === c.partFolder)}'>${esc(c.partLabel)}</a></td>
+        <td class='num'><a class='ts' data-part='${esc(c.partFolder)}' data-t='${c.videoTime}'>${fmt(c.videoTime)}</a></td>
+        <td class='who ${c.who}'>${c.who}</td>
+        <td>${Object.entries(c.changes || {}).map(([k, v]) => `<code class='v'>${esc(k)}</code> → ${esc(value(v)).slice(0, 160)}`).join('<br>') || (c.controllerReplaced ? 'rewrote the controller' : '–')}</td>
+        <td>${esc(c.reason || '–')}</td>
+      </tr>`).join('')}
+    </table></div></section>`);
+  }
+  sections.push(filesSection());
+  const page = document.createElement('div');
+  page.className = 'page';
+  page.innerHTML = sections.join('');
+  page.addEventListener('click', (ev) => {
+    const part = ev.target.closest('a.part');
+    if (part) { openPart(+part.dataset.i); return; }
+    const ts = ev.target.closest('a.ts');
+    if (ts) {
+      const folder = ts.dataset.part || ts.closest('[data-part]')?.dataset.part;
+      const i = data.parts.findIndex((p) => p.folder === folder);
+      if (i >= 0) openPart(i, +ts.dataset.t);
+    }
+  });
+  return page;
+}
+
+const SOURCES = { planner: 'Planner', 'action-agent': 'Action agent', ask: 'Ask', tuner: 'Tuner' };
+const PRICING = { rates: "Bezi's per-model rates", reported: "the provider's reported cost", unpriced: 'no price known', mixed: 'mixed' };
+
+function usageRows(rows, first) {
+  const all = data.usage.totals.costUSD || 0;
+  return rows.map((u) => `<tr>
+    ${first(u)}
+    <td class='num'>${u.calls}</td>
+    <td class='num'>${count(u.inputTokens)}</td>
+    <td class='num'>${count(u.cachedInputTokens)}</td>
+    <td class='num'>${count(u.cacheWriteTokens)}</td>
+    <td class='num'>${count(u.outputTokens)}${u.reasoningTokens ? `<br><span class='empty'>${count(u.reasoningTokens)} reasoning</span>` : ''}</td>
+    <td class='num'>${u.unpricedCalls === u.calls ? '–' : money(u.costUSD)}${u.unpricedCalls ? `<br><span class='empty'>${u.unpricedCalls} unpriced</span>` : ''}</td>
+    <td class='num'>${all && u.unpricedCalls !== u.calls ? Math.round((u.costUSD / all) * 100) + '%' : '–'}</td>
+  </tr>`).join('');
+}
+
+function usagePage() {
+  const u = data.usage, t = u.totals;
+  const head = (first) => `<tr>${first}<th>Calls</th><th>Input</th><th>Cached input</th><th>Cache write</th><th>Output</th><th>Cost</th><th>Share</th></tr>`;
+  const sections = [`<section><h2>Usage</h2><div class='tiles'>
+    <div class='tile'><b>${money(t.costUSD)}</b><span>total cost</span></div>
+    <div class='tile'><b>${count(tokensOf(t))}</b><span>tokens</span></div>
+    <div class='tile'><b>${t.calls}</b><span>model calls</span></div>
+    <div class='tile'><b>${count(t.inputTokens)}</b><span>input, uncached</span></div>
+    <div class='tile'><b>${count(t.cachedInputTokens)}</b><span>input, from cache</span></div>
+    <div class='tile'><b>${count(t.outputTokens)}</b><span>output${t.reasoningTokens ? `, ${count(t.reasoningTokens)} reasoning` : ''}</span></div>
+  </div>${t.unpricedCalls || t.unreportedCalls ? `<p class='note'>${[
+    t.unpricedCalls ? `${t.unpricedCalls} calls have no known price, so the cost is a lower bound.` : '',
+    t.unreportedCalls ? `${t.unreportedCalls} calls came back without token counts; they are counted as calls only.` : '',
+  ].join(' ')}</p>` : ''}</section>`];
+  sections.push(`<section><h2>By model</h2><div class='body'><table>
+    ${head('<th>Who</th><th>Model</th>')}
+    ${usageRows(u.bySource, (r) => `<td class='who ${r.source === 'planner' ? 'planner' : r.source === 'tuner' ? 'tuner' : ''}'>${esc(SOURCES[r.source] || r.source)}</td><td><code class='v'>${esc(r.model)}</code><br><span class='empty'>${esc(PRICING[r.pricing] || r.pricing)}</span></td>`)}
+  </table></div></section>`);
+  if (u.byPart.length) {
+    const label = (folder) => data.parts.find((p) => p.folder.endsWith(folder))?.label || folder;
+    sections.push(`<section><h2>Fast models by recording</h2><div class='body'><table>
+      ${head('<th>Recording</th>')}
+      ${usageRows(u.byPart, (r) => `<td>${esc(label(r.part))}</td>`)}
+    </table></div><p class='note'>The action agent, Ask and the tuner, by the Play Mode session they ran in. The planner works across recordings, so it is counted above only.</p></section>`);
+  }
+  if (u.plannerSteps.length) {
+    const cost = (step) => step[5] || 0, most = Math.max(...u.plannerSteps.map(cost), 1e-9);
+    sections.push(`<section><h2>Planner steps</h2>
+      <div class='steps'>${u.plannerSteps.map((step, i) => `<div style='height:${Math.max(2, (cost(step) / most) * 100)}%' title='step ${i + 1}: ${money(step[5])} · ${count(step[0])} input, ${count(step[1])} cached, ${count(step[3])} output'></div>`).join('')}</div>
+      <p class='note'>${u.plannerSteps.length} steps, cost per step. Hover a bar for its tokens.</p></section>`);
+  }
+  const page = document.createElement('div');
+  page.className = 'page';
+  page.innerHTML = sections.join('');
+  return page;
+}
+
+function reportPage() {
+  const page = document.createElement('div');
+  page.className = 'page';
+  page.innerHTML = `<section><h2>Report</h2><div class='md' data-part='${esc(data.report.partFolder)}'>${renderMarkdown(data.report.markdown)}</div></section>`;
+  page.addEventListener('click', (ev) => {
+    const ts = ev.target.closest('a.ts');
+    if (!ts) return;
+    const i = data.parts.findIndex((p) => p.folder === (ts.dataset.part || data.report.partFolder));
+    if (i >= 0) openPart(i, +ts.dataset.t);
+  });
+  return page;
+}
+
+// Every file the gameplay run saved, so nothing on disk is only findable by browsing the folder.
+function filesSection() {
+  const file = (path, label) => `<a class='file' href='${encodeURI(path)}' target='_blank' rel='noopener'>${esc(label || path.split('/').pop())}</a>`;
+  const rows = data.parts.map((p, i) => `<tr>
+    <td><a class='part' data-i='${i}'>${esc(p.label)}</a></td>
+    <td>${[p.video ? file(p.video) : '<span class="empty">no video</span>', file(p.folder + '/review.html'), file(p.folder + '/session.json'), p.video ? file(p.folder + '/video.vtt') : ''].filter(Boolean).join(' · ')}
+      ${(p.controllers || []).length ? `<br><span class='empty'>Controllers:</span> ${p.controllers.map((c) => file(c)).join(' · ')}` : ''}
+      ${(p.contactSheets || []).length ? `<div class='sheets'>${p.contactSheets.map((c) => `<a href='${encodeURI(c)}' target='_blank' rel='noopener' title='${esc(c.split('/').pop())}'><img src='${encodeURI(c)}' alt='Contact sheet ${esc(c.split('/').pop())}' loading='lazy'></a>`).join('')}</div>` : ''}</td>
+  </tr>`).join('');
+  const attempts = (data.attempts || []).map((a) => `<tr><td>Attempt ${esc(a.index)}</td><td>${file(a.timeline)} · ${file(a.outline)}</td></tr>`).join('');
+  const shared = ['report.md', 'gameplay.json', ...(data.usage ? ['usage.jsonl'] : []), ...data.docs.map((d) => 'docs/' + d.title + '.md')];
+  return `<section><h2>Files</h2><div class='body'>${embedded ? `<p class='note' style='padding:8px 0'>This copy carries the videos and pages; the files below are in the gameplay folder on the machine that played.</p>` : ''}<table>
+    <tr><th>What</th><th>Files</th></tr>
+    <tr><td>Gameplay</td><td>${shared.map((f) => file(f)).join(' · ')}</td></tr>
+    ${rows}${attempts}
+  </table></div></section>`;
+}
+
+function doc(d) {
+  const page = document.createElement('div');
+  page.className = 'page';
+  page.innerHTML = `<section><h2>${esc(d.title)}</h2><div class='md'>${renderMarkdown(d.markdown)}</div></section>`;
+  return page;
+}
+
+function partView(i, time) {
+  const frame = document.createElement('iframe');
+  frame.title = data.parts[i].label;
+  // The shareable page keeps each review and its video apart so the video is encoded once; put it back here.
+  if (embedded) frame.srcdoc = decode(embedded[i].page).replace('/*__VIDEO__*/null', () => JSON.stringify(embedded[i].video));
+  else frame.src = data.parts[i].folder + '/review.html' + (time != null ? '#t=' + time : '');
+  return frame;
+}
+
+// One list of pages: report, overview, documents, then every recording in order.
+const pages = [];
+const picker = document.getElementById('picker');
+let currentPage = -1;
+function addPage(group, label, opts, view) {
+  if (!tabs.querySelector(`h3[data-group='${group}']`)) {
+    const h = document.createElement('h3'); h.dataset.group = group; h.textContent = group; tabs.appendChild(h);
+    const g = document.createElement('optgroup'); g.label = group; picker.appendChild(g);
+  }
+  const index = pages.length;
+  const b = document.createElement('button');
+  b.innerHTML = `${opts.n ? `<span class='n'>${esc(opts.n)}</span>` : ''}<span class='label'>${esc(label)}</span>${opts.note ? `<small class='${opts.bad ? 'bad' : ''}'>${esc(opts.note)}</small>` : ''}`;
+  b.title = label;
+  b.addEventListener('click', () => show(index));
+  tabs.appendChild(b);
+  const o = document.createElement('option'); o.value = index; o.textContent = [opts.n, label, opts.note].filter(Boolean).join(' · ');
+  picker.lastElementChild.appendChild(o);
+  pages.push({ button: b, view });
+  return index;
+}
+function show(index, viewOverride) {
+  currentPage = index;
+  for (const p of pages) p.button.setAttribute('aria-current', p === pages[index] ? 'page' : 'false');
+  picker.value = String(index);
+  main.replaceChildren((viewOverride || pages[index].view)());
+  document.getElementById('prev').disabled = index <= 0;
+  document.getElementById('next').disabled = index >= pages.length - 1;
+}
+picker.addEventListener('change', () => show(+picker.value));
+document.getElementById('prev').addEventListener('click', () => currentPage > 0 && show(currentPage - 1));
+document.getElementById('next').addEventListener('click', () => currentPage < pages.length - 1 && show(currentPage + 1));
+document.addEventListener('keydown', (ev) => {
+  if (ev.target.closest('input, select, textarea')) return;
+  if (ev.key === 'ArrowLeft' && currentPage > 0) show(currentPage - 1);
+  if (ev.key === 'ArrowRight' && currentPage < pages.length - 1) show(currentPage + 1);
+});
+
+const partPage = [];
+function openPart(i, time) { show(partPage[i], () => partView(i, time)); }
+
+const reportIndex = data.report ? addPage('Results', 'Report', {}, reportPage) : -1;
+const overviewIndex = addPage('Results', 'Overview', { note: `${data.parts.length} recordings` }, overview);
+if (data.usage) addPage('Results', 'Usage', { note: money(data.usage.totals.costUSD) }, usagePage);
+for (const d of data.docs) addPage('Documents', d.title, {}, () => doc(d));
+data.parts.forEach((p, i) => {
+  const number = (p.folder.match(/^\d+/) || [String(i + 1)])[0];
+  const note = [fmt(p.seconds), p.problems.length ? p.problems.length + ' problem' + (p.problems.length > 1 ? 's' : '') : null].filter((x) => x && x !== '–').join(' · ');
+  partPage[i] = addPage('Recordings', p.label, { n: number, note, bad: p.problems.length > 0 }, () => partView(i));
+});
+show(reportIndex >= 0 ? reportIndex : overviewIndex);
+</script>
+</body>
+</html>

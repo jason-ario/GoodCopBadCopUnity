@@ -11,7 +11,7 @@ PrefabInstance:
     - target: {fileID: -9165797768001435688, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 839f2b58250a1d644aba953d579265fa, type: 2}
+      objectReference: {fileID: 2100000, guid: 57f169edf8db6f9458e3910c1e41ebf2, type: 2}
     - target: {fileID: -8679921383154817045, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.21511
@@ -64,6 +64,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7146521406498821007, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
+      propertyPath: m_Name
+      value: Mask_Not Mutant
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
       propertyPath: m_Name
       value: T-Pose
@@ -75,6 +79,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7422562918391612246}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5127734098716253301}
   m_SourcePrefab: {fileID: 100100000, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
 --- !u!4 &83069302902769311 stripped
 Transform:
@@ -108,6 +115,31 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &5127734098716253301
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 402869503830908338}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2394466ad4406ea479ccab79540571de, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DialogueExpressionMaterial
+  _targetRenderer: {fileID: 692046921125340987}
+  _materialIndex: 0
+  _defaultMaterial: {fileID: 2100000, guid: 57f169edf8db6f9458e3910c1e41ebf2, type: 2}
+  _expressions:
+  - key: Concerned
+    material: {fileID: 2100000, guid: 839f2b58250a1d644aba953d579265fa, type: 2}
+  - key: Angry
+    material: {fileID: 2100000, guid: 81c9eb30dd8bfb44b82523afb126599b, type: 2}
+--- !u!137 &692046921125340987 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -9165797768001435688, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
+  m_PrefabInstance: {fileID: 672776304560496867}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &883484101645742220 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 366175167995203695, guid: 4a22030d2420cfc43bfaf0cbc5589c4f, type: 3}
@@ -1504,6 +1536,10 @@ PrefabInstance:
       propertyPath: Legs.Array.data[1].Owner
       value: 
       objectReference: {fileID: 3504066064815319844}
+    - target: {fileID: 8318376949120846684, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
+      propertyPath: _Editor_OnValidateTrigger
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8318376949120846684, guid: 3eeff3dda4d3aa5489d2bd461760f99d, type: 3}
       propertyPath: Legs.Array.data[0].BoneEnd
       value: 

@@ -12,10 +12,8 @@ using Unity.Netcode;
 /// Encounter state is persisted per campaign save slot via <see cref="SaveDataManager"/>
 /// (see <see cref="SaveSlot.EncounteredSuspectNames"/>), keyed by each suspect's Unity asset
 /// name (e.g. <c>"Ivan"</c>). Forced intros suppress the normal entry bark and paperwork
-/// hand-off, then hand off paperwork themselves once the dialogue completes. Participants may
-/// leave a forced intro via Back; once everyone has left it is abandoned and restarts from the
-/// top when a player talks to the suspect again (a partner still in it keeps it running and can
-/// be joined mid-way). Optional intros leave the normal entry bark and paperwork
+/// hand-off, then hand off paperwork themselves once the dialogue completes. Forced intros
+/// cannot be exited (no Back button). Optional intros leave the normal entry bark and paperwork
 /// untouched; interacting starts the intro as a separate, skippable conversation.
 /// </summary>
 public class SuspectEncounterManager : MonoBehaviour
@@ -112,21 +110,11 @@ public class SuspectEncounterManager : MonoBehaviour
     public bool TryInterceptForcedIntroDialogue(SuspectCharacter suspect)
     {
         if (!HasUnplayedForcedIntro(suspect)) return false;
-        if (_forcedIntroGivesPaperwork.ContainsKey(suspect)) return false; // already intercepted
 
-        // Mark immediately so a re-entrant call cannot double-trigger (same persistence as
-        // before: the intro counts as encountered once it has started). Restarting after an
-        // early exit is tracked in memory below, not through the save slot.
+        // Mark immediately so a re-entrant call cannot double-trigger.
         MarkEncountered(suspect.Data);
 
-        PruneDestroyedSuspects();
-
-        // Capture and clear the no-paperwork flag now — it is a one-shot for this arrival.
-        bool givesPaperwork = suspect.Data.GivesPaperwork && !SuspectController.ForceNextSuspectNoPaperwork;
-        SuspectController.ForceNextSuspectNoPaperwork = false;
-        _forcedIntroGivesPaperwork[suspect] = givesPaperwork;
-
-        // No talk prompt / interaction until the intro itself is running.
+        // No talk prompt / interaction during the settle beat — the intro starts on its own.
         suspect.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.Pending);
 
         StartCoroutine(PlayForcedIntroDialogue(suspect));
@@ -142,23 +130,15 @@ public class SuspectEncounterManager : MonoBehaviour
         suspect.Data.introDialogue != null && suspect.Data.introDialogue.isForced &&
         !HasEncountered(suspect.Data);
 
-    // Server-only: suspects whose forced intro was intercepted this visit and has not completed
-    // yet, mapped to whether they hand over paperwork once it does.
-    private readonly System.Collections.Generic.Dictionary<SuspectCharacter, bool> _forcedIntroGivesPaperwork = new();
-
-    private void PruneDestroyedSuspects()
-    {
-        var dead = new System.Collections.Generic.List<SuspectCharacter>();
-        foreach (var key in _forcedIntroGivesPaperwork.Keys)
-            if (key == null) dead.Add(key);
-        foreach (var key in dead) _forcedIntroGivesPaperwork.Remove(key);
-    }
-
     private IEnumerator PlayForcedIntroDialogue(SuspectCharacter suspect)
     {
         if (suspect == null) yield break;
 
         SuspectData data = suspect.Data;
+
+        // Capture and clear the no-paperwork flag before the async gap.
+        bool givesPaperwork = data.GivesPaperwork && !SuspectController.ForceNextSuspectNoPaperwork;
+        SuspectController.ForceNextSuspectNoPaperwork = false;
 
         // Natural settle beat — suspect finishes their rotation and faces the player.
         yield return new WaitForSeconds(1.0f);
@@ -172,65 +152,26 @@ public class SuspectEncounterManager : MonoBehaviour
         if (ScriptedDialogueRunner.Instance == null)
         {
             Debug.LogWarning("[SuspectEncounterManager] ScriptedDialogueRunner not found — skipping intro dialogue.");
-            CompleteForcedIntro(suspect, data);
+            suspect.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.None);
+            if (givesPaperwork) suspect.GivePaperwork();
+            OnFirstEncounterDialogueComplete?.Invoke(data);
             yield break;
         }
 
-        // Arrival: pull in every player within range (inside-booth players always), exactly as
-        // before — but they may now leave via Back like a world conversation.
-        StartForcedIntroRun(suspect, ulong.MaxValue);
-    }
-
-    /// <summary>
-    /// Starts (or restarts from the top) a forced intro. <paramref name="initiatingClientId"/> is
-    /// <c>ulong.MaxValue</c> on arrival (proximity seeding pulls everyone nearby in) or the client
-    /// who re-talked to the suspect after everyone left (only they are pulled in; a partner joins
-    /// the in-progress conversation by interacting). Either way participants can back out; when
-    /// all of them have, the sequence is abandoned and the suspect waits for a re-talk.
-    /// </summary>
-    private void StartForcedIntroRun(SuspectCharacter suspect, ulong initiatingClientId)
-    {
-        SuspectData data = suspect.Data;
-        bool isRestart = initiatingClientId != ulong.MaxValue;
-
+        // Forced intros pull in every player in range and cannot be exited (no Back button) —
+        // they run to completion. A partner who arrives mid-way joins by interacting.
         suspect.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.None);
 
-        ScriptedDialogueRunner.Instance.PlayDialogue(
-            suspect,
-            data.introDialogue,
-            onComplete: () => CompleteForcedIntro(suspect, data),
-            initialParticipantClientId: initiatingClientId,
-            joinByInteractionOnly: isRestart,
-            allowParticipantExit: true,
-            hideNonParticipantUI: !isRestart,
-            onAbandoned: () => OnForcedIntroAbandoned(suspect, data),
-            allowExitFromForcedDialogue: true);
-    }
-
-    private void OnForcedIntroAbandoned(SuspectCharacter suspect, SuspectData data)
-    {
-        if (suspect == null) return;
-        if (suspect.IsVerdictClosed || suspect.IsMutantInteractionClosed) return;
-
-        suspect.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.AwaitingRestart);
-        Debug.Log($"[SuspectEncounterManager] Forced intro for '{data.name}' abandoned — restarts from the top when a player talks to them.");
-    }
-
-    private void CompleteForcedIntro(SuspectCharacter suspect, SuspectData data)
-    {
-        bool givesPaperwork = false;
-        if (suspect != null && _forcedIntroGivesPaperwork.TryGetValue(suspect, out bool gives))
-            givesPaperwork = gives;
-        if (suspect != null) _forcedIntroGivesPaperwork.Remove(suspect);
+        bool done = false;
+        ScriptedDialogueRunner.Instance.PlayDialogue(suspect, data.introDialogue, () => done = true);
+        yield return new WaitUntil(() => done);
 
         if (suspect == null)
         {
-            Debug.LogWarning($"[SuspectEncounterManager] Forced intro: '{data.name}' was destroyed before GivePaperwork could be called.");
+            Debug.LogWarning($"[SuspectEncounterManager] PlayForcedIntroDialogue: '{data.name}' was destroyed before GivePaperwork could be called.");
             OnFirstEncounterDialogueComplete?.Invoke(data);
-            return;
+            yield break;
         }
-
-        suspect.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.None);
 
         // Hand off paperwork now that the intro has finished (plays the "Give" animation
         // before the documents spawn, matching the normal SuspectController.SayEntryDialogue
@@ -240,34 +181,6 @@ public class SuspectEncounterManager : MonoBehaviour
 
         OnFirstEncounterDialogueComplete?.Invoke(data);
         Debug.Log($"[SuspectEncounterManager] Forced first-encounter intro complete for '{data.name}'.");
-    }
-
-    /// <summary>
-    /// Server-only. Restarts an abandoned forced intro from the beginning for the player who
-    /// talked to the suspect. If the intro is already running again (the other player restarted
-    /// it first), the requester joins that in-progress conversation instead. Returns false when
-    /// there is nothing to restart or join.
-    /// </summary>
-    public bool TryRestartForcedIntro(SuspectCharacter suspect, ulong initiatingClientId)
-    {
-        if (suspect == null || suspect.Data == null || suspect.Data.introDialogue == null) return false;
-        if (!_forcedIntroGivesPaperwork.ContainsKey(suspect)) return false;
-        if (suspect.IsVerdictClosed || suspect.IsMutantInteractionClosed) return false;
-
-        var runner = ScriptedDialogueRunner.Instance;
-        if (runner == null) return false;
-        if (!NetworkManager.Singleton.ConnectedClients.ContainsKey(initiatingClientId)) return false;
-
-        // Lost a race: the other player already restarted it — join rather than restart.
-        if (runner.TryJoinActiveDialogueServer(suspect, initiatingClientId))
-            return true;
-
-        if (suspect.CurrentForcedIntroState != SuspectCharacter.ForcedIntroState.AwaitingRestart) return false;
-        if (runner.IsServerSequenceActive) return false; // another scripted sequence owns the runner
-
-        StartForcedIntroRun(suspect, initiatingClientId);
-        Debug.Log($"[SuspectEncounterManager] Forced intro for '{suspect.Data.name}' restarted by client {initiatingClientId}.");
-        return true;
     }
 
     // -------------------------------------------------------------------------

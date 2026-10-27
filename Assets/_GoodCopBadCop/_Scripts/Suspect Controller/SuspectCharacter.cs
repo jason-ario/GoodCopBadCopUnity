@@ -209,8 +209,6 @@ public class SuspectCharacter : Interactable
         None = 0,
         /// <summary>A forced intro will start on its own (walking in / waiting for the booth / settle beat): no talk prompt, Interact is a no-op.</summary>
         Pending = 1,
-        /// <summary>Every participant left the forced intro: "[E] Talk" restarts it from the top.</summary>
-        AwaitingRestart = 2,
     }
 
     /// <summary>
@@ -1905,9 +1903,8 @@ public class SuspectCharacter : Interactable
 
         if (_dialogueInteractionDisabled) return false;
 
-        // Forced intro still to come (no prompt) or abandoned (prompt restarts it).
+        // Forced intro still to come — no prompt until it is running (then IsActiveScriptedSpeaker).
         if (_forcedIntroState.Value == ForcedIntroState.Pending) return false;
-        if (_forcedIntroState.Value == ForcedIntroState.AwaitingRestart) return true;
 
         if (IsIntroCandidate() && (IsServer ? !SuspectEncounterManager.HasEncountered(Data) : !_clientKnowsIntroPlayed))
             return true;
@@ -1983,20 +1980,14 @@ public class SuspectCharacter : Interactable
         if (_dialogueInteractionDisabled)
             return;
 
-        // Forced booth intro: nothing to do until it starts on its own; once every participant
-        // has backed out of it, talking restarts it from the top (or joins a partner's restart).
+        // Forced booth intro still to come — it starts on its own; nothing to do yet.
         if (_forcedIntroState.Value == ForcedIntroState.Pending)
             return;
-        if (_forcedIntroState.Value == ForcedIntroState.AwaitingRestart)
-        {
-            RequestForcedIntroRestart(player);
-            return;
-        }
 
         // Booth suspects with an unplayed, non-forced authored intro start that conversation
         // only when a player deliberately interacts with them. Forced intros already started
-        // automatically on arrival (see SuspectController.SayEntryDialogue) and are only
-        // restarted here after being abandoned (see _forcedIntroState above).
+        // automatically on arrival (see SuspectController.SayEntryDialogue) and are not
+        // re-triggerable here.
         //
         // Encounter history lives in the HOST's save slot (SaveDataManager is local, not
         // networked), so only the server can answer "has this intro played?". A non-host
@@ -2068,26 +2059,6 @@ public class SuspectCharacter : Interactable
         }
 
         RequestIntroDialogueServerRpc();
-    }
-
-    private void RequestForcedIntroRestart(PlayerInteractionController player)
-    {
-        if (player == null) return;
-
-        if (IsServer)
-        {
-            SuspectEncounterManager.Instance?.TryRestartForcedIntro(this, player.OwnerClientId);
-            return;
-        }
-
-        RequestForcedIntroRestartServerRpc();
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestForcedIntroRestartServerRpc(ServerRpcParams rpcParams = default)
-    {
-        if (_verdictClosed.Value || _mutantInteractionClosed.Value) return;
-        SuspectEncounterManager.Instance?.TryRestartForcedIntro(this, rpcParams.Receive.SenderClientId);
     }
 
     [ServerRpc(RequireOwnership = false)]

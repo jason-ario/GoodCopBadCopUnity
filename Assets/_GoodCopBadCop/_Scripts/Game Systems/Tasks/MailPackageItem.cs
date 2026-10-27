@@ -148,6 +148,13 @@ public class MailPackageItem : PickableObject
 
     public override bool IsInteractable => base.IsInteractable && !IsSorted;
 
+    /// <summary>
+    /// Unsorted packages show their delivery call-out (<see cref="HighlightHold.MailDelivery"/>) with
+    /// the same faint pulsing overlay as junk (Resources/Highlight/ObjectivePulse.asset) instead of
+    /// the pulsing outline. Hover still uses the authored outline.
+    /// </summary>
+    protected override bool UseOverlayPulseForHold => true;
+
     /// <summary>True once this package has been correctly sorted and is pending despawn. Server-only guard against double-counting.</summary>
     public bool IsResolved { get; private set; }
 

@@ -385,19 +385,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// <paramref name="onComplete"/>, so the caller can restart the dialogue from the beginning.
     /// When null, an emptied sequence keeps auto-advancing to the end as before.
     /// </para>
-    /// <para>
-    /// <paramref name="allowExitFromForcedDialogue"/>: an explicit opt-in that lets
-    /// <paramref name="allowParticipantExit"/> apply to a <see cref="ScriptedDialogue.isForced"/>
-    /// asset (forced booth intros, see <see cref="SuspectEncounterManager"/>). Without it a
-    /// forced asset never shows the leave/Back button.
-    /// </para>
     /// </summary>
     public void PlayDialogue(SuspectCharacter speaker, ScriptedDialogue dialogue,
         Action onComplete = null, bool deferExit = false, bool lockOutsidePlayers = false,
         ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
         bool allowParticipantExit = false, bool hideNonParticipantUI = true,
-        float participantRadius = -1f, bool useWorldDialogueCamera = false, Action onAbandoned = null,
-        bool allowExitFromForcedDialogue = false)
+        float participantRadius = -1f, bool useWorldDialogueCamera = false, Action onAbandoned = null)
     {
         if (!IsServer) return;
 
@@ -421,8 +414,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             hideNonParticipantUI,
             participantRadius,
             useWorldDialogueCamera,
-            onAbandoned,
-            allowExitFromForcedDialogue));
+            onAbandoned));
     }
 
     /// <summary>
@@ -671,8 +663,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Action onComplete, bool deferExit = false, bool lockOutsidePlayers = false,
         ulong initialParticipantClientId = ulong.MaxValue, bool joinByInteractionOnly = false,
         bool allowParticipantExit = false, bool hideNonParticipantUI = true,
-        float participantRadius = -1f, bool useWorldDialogueCamera = false, Action onAbandoned = null,
-        bool allowExitFromForcedDialogue = false)
+        float participantRadius = -1f, bool useWorldDialogueCamera = false, Action onAbandoned = null)
     {
         ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
         _activeJoinRadius = participantRadius;
@@ -684,9 +675,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _lastAnimTrigger = string.Empty;
         _joinByInteractionOnly = joinByInteractionOnly;
         // A forced conversation asset must never let the player back out via the escape/Back
-        // button, even if a caller mistakenly passes allowParticipantExit: true for it — unless
-        // the caller explicitly opts in (forced booth intros are exitable and restart on re-talk).
-        _allowParticipantExit = allowParticipantExit && (allowExitFromForcedDialogue || !dialogue.isForced);
+        // button, even if a caller mistakenly passes allowParticipantExit: true for it.
+        _allowParticipantExit = allowParticipantExit && !dialogue.isForced;
         _abandonWhenEmpty = _allowParticipantExit && onAbandoned != null;
         // hideNonParticipantUI is retained for API compatibility only: non-participants never
         // lose their HUD any more (see the EnterScriptedModeClientRpc call below).
@@ -731,6 +721,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Reset the previous trigger and force idle before firing the next animation.
             // This prevents a skipped trigger from continuing to play into the new line.
             TriggerSpeakerAnimationServer(speakerNetId, node.animationTrigger);
+            SetSpeakerExpressionClientRpc(speakerNetId, node.expression ?? string.Empty);
 
             yield return StartCoroutine(SayAndWait(speaker, node.npcLine, node.playLaughSfx, node.unskippable));
 
@@ -1126,21 +1117,6 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     /// <summary>
-    /// Server-only equivalent of <see cref="RequestRejoinScriptedDialogueServerRpc"/> for a known
-    /// client: joins <paramref name="clientId"/> into the running sequence spoken by
-    /// <paramref name="speaker"/>. Returns false when no such sequence is running (or it is
-    /// shutting down). Used when a restart request lost a race to another player's restart.
-    /// </summary>
-    public bool TryJoinActiveDialogueServer(SuspectCharacter speaker, ulong clientId)
-    {
-        if (!IsServer || !_serverSequenceActive || _abandoned) return false;
-        if (speaker == null || _currentSpeakerTransform != speaker.transform) return false;
-        if (!_participants.Contains(clientId))
-            JoinParticipant(clientId);
-        return true;
-    }
-
-    /// <summary>
     /// Restores normal gameplay state for a single client that left the dialogue, without
     /// disturbing <see cref="IsScriptedModeActive"/> or camera state for anyone else.
     /// </summary>
@@ -1489,6 +1465,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         yield return null; // flush the RPC before playing the NPC response
 
         TriggerSpeakerAnimationServer(speakerNetId, chosen.animationTrigger);
+        SetSpeakerExpressionClientRpc(speakerNetId, chosen.expression ?? string.Empty);
 
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse, chosen.playLaughSfx));
 
@@ -2321,6 +2298,22 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(newTrigger))
             anim.SetTrigger(newTrigger);
+    }
+
+    /// <summary>
+    /// Applies a node/choice expression key on the speaker's <see cref="DialogueExpressionMaterial"/>
+    /// (if any). Broadcast to every client so overhearing players see the same face. Empty restores
+    /// the default; the component also reverts on its own when the sequence ends.
+    /// </summary>
+    [ClientRpc]
+    private void SetSpeakerExpressionClientRpc(ulong speakerNetId, string expression)
+    {
+        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
+            return;
+
+        var expressions = netObj.GetComponentInChildren<DialogueExpressionMaterial>(true);
+        if (expressions != null)
+            expressions.SetExpression(expression);
     }
 
     /// <summary>
