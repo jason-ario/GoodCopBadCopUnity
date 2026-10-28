@@ -73,6 +73,9 @@ public class GameSettings : ScriptableObject
         set => _buildChannel = value;
     }
 
+    /// <summary>True when this build targets the Steam demo (<see cref="BuildChannel.Demo"/>).</summary>
+    public bool IsDemo => _buildChannel == BuildChannel.Demo;
+
     /// <summary>Steam App ID for the current <see cref="Channel"/>.</summary>
     public uint SteamAppId => GetSteamAppId(_buildChannel);
 
@@ -143,7 +146,8 @@ public class GameSettings : ScriptableObject
     }
 
     [Header("Survey")]
-    [Tooltip("When enabled, the playtest survey opens in the default browser when the application exits.")]
+    [Tooltip("When enabled, the playtest survey opens in the default browser when the application exits. " +
+             "Always skipped in Demo builds (Build Channel = Demo).")]
     [SerializeField] private bool _openSurveyOnGameExit = true;
 
     /// <summary>Whether the playtest survey opens automatically when the application exits.</summary>

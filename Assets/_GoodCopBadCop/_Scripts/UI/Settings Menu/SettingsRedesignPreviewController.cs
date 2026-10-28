@@ -1292,6 +1292,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 label.color = i == setting.Index ? Color.white : new Color(.75f, .77f, .75f, 1f);
                 label.raycastTarget = false;
                 label.text = setting.OptionText(i);
+                if (setting == LanguageSetting && i < languageCodes.Count)
+                    ApplyLanguageOptionFont(label, languageCodes[i], openDropdownRow.Value);
 
                 dropdownOptionImages.Add(optionImage);
                 dropdownOptionLabels.Add(label);
@@ -1299,6 +1301,24 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             // Gamepad highlight starts on the current value, which matches the pointer styling above.
             dropdownHighlightIndex = Mathf.Clamp(setting.Index, 0, setting.Options.Length - 1);
+        }
+
+        // Each language name is drawn in the font that language uses for the value label's role (Secondary UI), so
+        // 日本語 / 한국어 / ქართული stay readable while another language is active. The runtime must not swap it back.
+        private static void ApplyLanguageOptionFont(TMP_Text label, string code, TMP_Text valueLabel)
+        {
+            LocalizationTextRuntime.KeepOwnFont(label);
+            var settings = LocalizationSettings.Instance;
+            var lang = settings != null ? settings.FontLanguage(code) : null;
+            if (lang == null || valueLabel == null) return;
+
+            var localized = valueLabel.GetComponent<LocalizedText>();
+            TMP_FontAsset source = localized != null && localized.OriginalFont != null ? localized.OriginalFont : valueLabel.font;
+            TMP_FontAsset font = settings.ResolveFont(lang, source, localized != null ? localized.fontRole : null);
+            if (font == null) return;
+
+            label.font = font;
+            label.fontSharedMaterial = font.material;
         }
 
         private void SelectDropdownOption(int settingIndex, int optionIndex)
