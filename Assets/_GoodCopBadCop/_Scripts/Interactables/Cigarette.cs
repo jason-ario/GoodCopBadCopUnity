@@ -27,10 +27,15 @@ public class Cigarette : PickableObject
    private Color _emissionOnColor;
    private float _currentEmissionT;
 
+   private ParticleSystem[] _smokeSystems;
+   private bool _isSmokeEmitting;
+   private bool _isLocallyEquipped;
+
    protected override void Awake()
    {
       base.Awake();
       CacheEmissiveColor();
+      InitSmoke();
    }
 
    /// <summary>LMB (held) smokes the cigarette.</summary>
@@ -47,13 +52,15 @@ public class Cigarette : PickableObject
    public override void OnEquipped(PlayerPickupController player)
    {
       base.OnEquipped(player);
-      particles.SetActive(true);
+      _isLocallyEquipped = true;
+      RefreshSmoke();
    }
 
    public override void OnUnequip(PlayerPickupController player)
    {
       base.OnUnequip(player);
-      particles.SetActive(false);
+      _isLocallyEquipped = false;
+      RefreshSmoke();
       StopSmokingSound();
       SnapLightOff();
       SnapEmissionOff();
@@ -62,6 +69,7 @@ public class Cigarette : PickableObject
 
    void Update()
    {
+      RefreshSmoke();
       UpdateEmberLight();
       UpdateEmissiveFade();
 
@@ -80,7 +88,52 @@ public class Cigarette : PickableObject
 
       _skinnedMeshRenderer.SetBlendShapeWeight(0, blendShapeWeight);
 
-      particles.transform.position = Vector3.Lerp(particlePos1.position, particlePos2.position, (100 / blendShapeWeight));
+      if (particles != null && particlePos1 != null && particlePos2 != null)
+         particles.transform.position = Vector3.Lerp(particlePos1.position, particlePos2.position, blendShapeWeight / 100f);
+   }
+
+   /// <summary>
+   /// Smoke must start off on every peer. Before this, the emitter played on awake, so remote
+   /// clients (which never get OnEquipped/OnUnequip for someone else's cigarette) smoked forever.
+   /// </summary>
+   private void InitSmoke()
+   {
+      if (particles == null) return;
+
+      _smokeSystems = particles.GetComponentsInChildren<ParticleSystem>(true);
+      foreach (ParticleSystem ps in _smokeSystems)
+      {
+         ParticleSystem.MainModule main = ps.main;
+         main.playOnAwake = false;
+         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+      }
+
+      _isSmokeEmitting = false;
+   }
+
+   /// <summary>
+   /// Smoke while held. Uses the replicated holder (IsHeld) so every peer agrees, plus the
+   /// local equip flag so the holder sees it instantly. Runs every frame, so it also recovers
+   /// after stow/unstow and late joins.
+   /// </summary>
+   private void RefreshSmoke()
+   {
+      if (_smokeSystems == null || _smokeSystems.Length == 0) return;
+
+      bool shouldEmit = _isLocallyEquipped || (IsSpawned && IsHeld);
+      if (shouldEmit == _isSmokeEmitting) return;
+      _isSmokeEmitting = shouldEmit;
+
+      if (shouldEmit)
+      {
+         if (!particles.activeSelf) particles.SetActive(true);
+         foreach (ParticleSystem ps in _smokeSystems) ps.Play(false);
+      }
+      else
+      {
+         // Stop emitting but let live puffs fade out over their short lifetime.
+         foreach (ParticleSystem ps in _smokeSystems) ps.Stop(false, ParticleSystemStopBehavior.StopEmitting);
+      }
    }
 
    public override void OnStopUse()
