@@ -1133,6 +1133,7 @@ public class PickableObject : Interactable
             if (placeNt != null) placeNt.enabled = true;
 
             DropBroadcastClientRpc(groundPos, transform.rotation);
+            StartForcedDropSettleSync();
             return;
         }
 
@@ -1150,6 +1151,66 @@ public class PickableObject : Interactable
         _rb.WakeUp();
 
         ThrowBroadcastClientRpc(position, velocity);
+        StartForcedDropSettleSync();
+    }
+
+    private const float ForcedDropSettleMinWait = 0.5f;
+    private const float ForcedDropSettleMaxWait = 8f;
+    private Coroutine _forcedDropSettleRoutine;
+
+    private void StartForcedDropSettleSync()
+    {
+        if (_forcedDropSettleRoutine != null) StopCoroutine(_forcedDropSettleRoutine);
+        _forcedDropSettleRoutine = StartCoroutine(ForcedDropSettleSyncRoutine());
+    }
+
+    /// <summary>
+    /// Server-only. After a <see cref="ForceDropWithPhysicsServer"/> drop comes to rest, teleports
+    /// the item to its final pose through <see cref="NetworkTransform"/>. NT only sends deltas while
+    /// the body moves, so a peer whose copy was inactive/disabled during the fall (e.g. the dying
+    /// client's stowed hotbar items, re-shown only when its local death teardown runs) would
+    /// otherwise keep the item hanging at the drop origin forever. Aborts if anyone grabs it.
+    /// </summary>
+    private IEnumerator ForcedDropSettleSyncRoutine()
+    {
+        yield return new WaitForSeconds(ForcedDropSettleMinWait);
+
+        float elapsed = ForcedDropSettleMinWait;
+        while (_rb != null && !_rb.isKinematic && !_rb.IsSleeping() && elapsed < ForcedDropSettleMaxWait)
+        {
+            yield return null;
+            elapsed += Time.deltaTime;
+        }
+
+        _forcedDropSettleRoutine = null;
+
+        if (!IsServer || !IsSpawned || IsHeld || _isStowed.Value.Stowed) yield break;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt == null || !nt.enabled || !nt.CanCommitToTransform) yield break;
+
+        nt.Teleport(transform.position, transform.rotation, transform.localScale);
+    }
+
+    /// <summary>
+    /// Local (non-server) half of a server-forced drop for the peer that was holding the item:
+    /// detaches it from any hand/slot follow and hands its pose back to <see cref="NetworkTransform"/>,
+    /// kinematic like every other observer. Idempotent with <see cref="ThrowBroadcastClientRpc"/> /
+    /// <see cref="DropBroadcastClientRpc"/>, and covers the case where those arrived while this
+    /// copy was inactive (stowed) and didn't fully take effect.
+    /// </summary>
+    public void PrepareForServerDropLocal()
+    {
+        RemoveParent();
+        ClearSocketFollow();
+
+        if (IsServer) return;
+
+        NetworkObject.AutoObjectParentSync = true;
+        if (_rb != null) _rb.isKinematic = true;
+
+        NetworkTransform nt = GetComponent<NetworkTransform>();
+        if (nt != null) nt.enabled = true;
     }
 
     /// <summary>

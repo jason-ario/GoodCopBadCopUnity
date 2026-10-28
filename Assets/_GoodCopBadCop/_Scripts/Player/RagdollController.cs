@@ -21,6 +21,18 @@ public class RagdollController : MonoBehaviour
              "can't tunnel through thin walls.")]
     [SerializeField] private bool continuousCollisionOnActivate = true;
 
+    [Header("Settle Freeze (Performance)")]
+    [Tooltip("After the ragdoll activates and comes to rest, switch every bone Rigidbody to kinematic so the " +
+             "corpse stops costing physics simulation. Colliders stay enabled so the body can still be hit/interacted with.")]
+    [SerializeField] private bool freezeWhenSettled = true;
+    [Tooltip("Minimum seconds of live ragdoll simulation before the body may be frozen.")]
+    [SerializeField, Min(0f)] private float freezeDelay = 3f;
+    [Tooltip("The body is considered settled once every bone moves slower than this (m/s).")]
+    [SerializeField, Min(0f)] private float settleSpeedThreshold = 0.2f;
+    [Tooltip("Seconds after Freeze Delay to wait for the body to settle; after this it is frozen regardless " +
+             "(handles ragdolls that jitter forever and never sleep).")]
+    [SerializeField, Min(0f)] private float maxSettleWait = 5f;
+
     [Header("Death Visuals")]
     [SerializeField] private Transform headTransform;
     [SerializeField] private GameObject bodyArmsMesh;
@@ -43,7 +55,15 @@ public class RagdollController : MonoBehaviour
     private float[] _originalAngularDamping;
     private bool _isUnderwater;
 
+    private CollisionDetectionMode[] _originalCollisionModes;
+    private Coroutine _freezeRoutine;
+    private bool _isFrozen;
+
     private const int DefaultLayer = 0;
+    private const float SettleCheckInterval = 0.25f;
+
+    /// <summary>True once an active ragdoll has settled and its bodies were switched to kinematic.</summary>
+    public bool IsFrozen => _isFrozen;
 
     /// <summary>Bone rigidbodies driven by this ragdoll (resolved in Awake when not assigned).</summary>
     public System.Collections.Generic.IReadOnlyList<Rigidbody> RagdollRigidbodies => ragdollRigidbodies;
@@ -71,11 +91,13 @@ public class RagdollController : MonoBehaviour
         // Cache original damping values so they can be restored on zone exit
         _originalLinearDamping = new float[ragdollRigidbodies.Length];
         _originalAngularDamping = new float[ragdollRigidbodies.Length];
+        _originalCollisionModes = new CollisionDetectionMode[ragdollRigidbodies.Length];
         for (int i = 0; i < ragdollRigidbodies.Length; i++)
         {
             if (ragdollRigidbodies[i] == null) continue;
             _originalLinearDamping[i] = ragdollRigidbodies[i].linearDamping;
             _originalAngularDamping[i] = ragdollRigidbodies[i].angularDamping;
+            _originalCollisionModes[i] = ragdollRigidbodies[i].collisionDetectionMode;
         }
 
         SetRagdollActive(activateOnAwake);
@@ -89,6 +111,9 @@ public class RagdollController : MonoBehaviour
     private void OnDisable()
     {
         GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged -= HandleUnderwaterStateChanged;
+
+        // Coroutines die with the component; clear the handle so a later activation restarts it.
+        _freezeRoutine = null;
     }
 
     private void OnDestroy()
@@ -197,13 +222,85 @@ public class RagdollController : MonoBehaviour
     /// </summary>
     private void ApplyActivationStability()
     {
-        foreach (var rb in ragdollRigidbodies)
+        for (int i = 0; i < ragdollRigidbodies.Length; i++)
         {
+            var rb = ragdollRigidbodies[i];
             if (rb == null) continue;
             rb.maxDepenetrationVelocity = maxDepenetrationVelocity;
-            if (continuousCollisionOnActivate)
-                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            rb.collisionDetectionMode = continuousCollisionOnActivate
+                ? CollisionDetectionMode.ContinuousSpeculative
+                : _originalCollisionModes[i];
         }
+    }
+
+    private void StartFreezeTimer()
+    {
+        StopFreezeTimer();
+        _isFrozen = false;
+        if (freezeWhenSettled && isActiveAndEnabled)
+            _freezeRoutine = StartCoroutine(FreezeWhenSettledRoutine());
+    }
+
+    private void StopFreezeTimer()
+    {
+        if (_freezeRoutine != null)
+        {
+            StopCoroutine(_freezeRoutine);
+            _freezeRoutine = null;
+        }
+    }
+
+    /// <summary>
+    /// Waits <see cref="freezeDelay"/>, then until every bone is slower than <see cref="settleSpeedThreshold"/>
+    /// (or <see cref="maxSettleWait"/> elapses), then freezes the ragdoll in its current pose.
+    /// </summary>
+    private System.Collections.IEnumerator FreezeWhenSettledRoutine()
+    {
+        if (freezeDelay > 0f)
+            yield return new WaitForSeconds(freezeDelay);
+
+        var wait = new WaitForSeconds(SettleCheckInterval);
+        float waited = 0f;
+        while (waited < maxSettleWait && !IsSettled())
+        {
+            yield return wait;
+            waited += SettleCheckInterval;
+        }
+
+        _freezeRoutine = null;
+        FreezeRagdoll();
+    }
+
+    private bool IsSettled()
+    {
+        float sqrThreshold = settleSpeedThreshold * settleSpeedThreshold;
+        foreach (var rb in ragdollRigidbodies)
+        {
+            if (rb == null || rb.isKinematic || rb.IsSleeping()) continue;
+            if (rb.linearVelocity.sqrMagnitude > sqrThreshold) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Locks the ragdoll in its current pose: every bone Rigidbody becomes kinematic (removed from
+    /// the physics solver), joints stop solving, and colliders stay enabled as static-ish geometry so
+    /// raycasts, interaction and corpse pickup still hit the body. Animator stays disabled, so the
+    /// pose holds. Re-running <see cref="ActivateRagdoll"/> / <see cref="SetRagdollActive"/> unfreezes it.
+    /// </summary>
+    public void FreezeRagdoll()
+    {
+        StopFreezeTimer();
+        foreach (var rb in ragdollRigidbodies)
+        {
+            if (rb == null || rb.isKinematic) continue;
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            // Continuous/ContinuousDynamic aren't valid on kinematic bodies; Discrete is also cheapest.
+            rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            rb.isKinematic = true;
+        }
+        _isFrozen = true;
     }
 
     /// <summary>
@@ -242,8 +339,20 @@ public class RagdollController : MonoBehaviour
         if (_characterController != null)
             _characterController.enabled = !active;
 
+        // Leaving ragdoll mode or (re-)entering it always cancels a pending/finished settle freeze.
+        StopFreezeTimer();
+        _isFrozen = false;
+
         foreach (var rb in ragdollRigidbodies)
+        {
+            // Restore the authored detection mode before toggling kinematic (a frozen body is Discrete).
+            if (!active && rb.collisionDetectionMode != CollisionDetectionMode.Discrete)
+                rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
             rb.isKinematic = !active;
+        }
+
+        if (active)
+            StartFreezeTimer();
 
         foreach (var col in ragdollColliders)
         {

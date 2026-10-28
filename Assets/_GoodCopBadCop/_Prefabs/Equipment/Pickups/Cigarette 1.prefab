@@ -117,12 +117,20 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Cigarette
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   itemData: {fileID: 11400000, guid: 73921f34c84b9a442abb0f9e5090653b, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
   healAmount: 1
-  radiationAmount: 0.1
+  radiationPerSecond: 0.1
   particles: {fileID: 7383824713724405170}
   _skinnedMeshRenderer: {fileID: 2253686276440834385}
   reductionAmountPerFrame: 10
@@ -705,6 +713,14 @@ PrefabInstance:
       propertyPath: outlineQuality
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 1098537966638624184, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
+      propertyPath: InitialModule.startSizeY.minMaxState
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 1098537966638624184, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
+      propertyPath: InitialModule.startSizeZ.minMaxState
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 3313248620757194958, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 3279643533
@@ -760,6 +776,22 @@ PrefabInstance:
     - target: {fileID: 4130439383890482563, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
       propertyPath: m_IsActive
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5620465331429856163, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5641704990800847333, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.13099293
+      objectReference: {fileID: 0}
+    - target: {fileID: 5641704990800847333, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.03711379
+      objectReference: {fileID: 0}
+    - target: {fileID: 5641704990800847333, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.5738143
       objectReference: {fileID: 0}
     - target: {fileID: 5641704990800847333, guid: eee659b7384729f4ba436b2fb44d714e, type: 3}
       propertyPath: m_LocalPosition.y

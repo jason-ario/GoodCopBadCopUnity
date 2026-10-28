@@ -331,7 +331,12 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// Multiplier applied to the rolled number of fences to break (e.g. Day 3 passes ~0.33 to
     /// break a third as many). 1 = unchanged. Always breaks at least one fence if any exist.
     /// </param>
-    public void TriggerTask(float amountScale = 1f)
+    /// <param name="skipBreakingIfBrokenAtLeast">
+    /// If &gt; 0 and at least this many fences are already broken (e.g. smashed by mutants during
+    /// a breach), no extra fences are broken — the task just tracks the existing damage.
+    /// 0 = always break the rolled amount.
+    /// </param>
+    public void TriggerTask(float amountScale = 1f, int skipBreakingIfBrokenAtLeast = 0)
     {
         if (!IsServer) return;
 
@@ -341,9 +346,15 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         _isComplete.Value     = false;
         _fencesRepaired.Value = 0;
 
-        int count = PickBrokenFenceCount();
+        int alreadyBroken = BrokenFenceCount;
+        bool skipBreaking = skipBreakingIfBrokenAtLeast > 0 && alreadyBroken >= skipBreakingIfBrokenAtLeast;
+
+        int count = skipBreaking ? 0 : PickBrokenFenceCount();
         if (count > 0 && !Mathf.Approximately(amountScale, 1f))
             count = Mathf.Max(1, Mathf.RoundToInt(count * Mathf.Max(0f, amountScale)));
+        if (skipBreaking)
+            Debug.Log($"[FenceRepairTask] {alreadyBroken} fence(s) already broken (threshold " +
+                      $"{skipBreakingIfBrokenAtLeast}) — skipping extra breaks.");
         PerimiterFence[] shuffled = ShuffleCopy(_allFences);
 
         for (int i = 0; i < count && i < shuffled.Length; i++)
