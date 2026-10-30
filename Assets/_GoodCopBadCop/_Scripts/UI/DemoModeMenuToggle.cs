@@ -2,8 +2,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Swaps main menu content when the build targets the Steam demo
+/// Swaps UI content when the build targets the Steam demo
 /// (<see cref="GameSettings.IsDemo"/>, i.e. Game Settings > Build Channel = Demo).
+/// Used on the main menu and on the Thanks For Playing end screen (demo title/body, no survey button).
+/// Re-applies on every enable, so screens that start inactive pick up the current channel when shown.
 /// In demo builds every object in <see cref="_hideInDemo"/> is deactivated, every object in
 /// <see cref="_showInDemo"/> is activated, and each <see cref="OpenWebLink"/> in
 /// <see cref="_redirectLinks"/> is pointed at <see cref="_demoUrl"/>. Non-demo builds get the
