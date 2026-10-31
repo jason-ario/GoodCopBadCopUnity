@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: I keep a list of every officer I meet. You're number nine!
@@ -29,36 +30,43 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: What kind of list?
-      npcResponse: Names, faces, shifts. Very thorough.
-      animationTrigger: TalkIdle
-      playLaughSfx: 0
-    - playerChoiceText: That's an odd hobby.
-      npcResponse: I have many! Collecting, counting, arranging. You have lovely cheekbones.
+    - playerChoiceText: What happened to number eight?
+      npcResponse: Oh, he stopped showing up. They do that! I still have his page.
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
+    - playerChoiceText: Why keep a list?
+      npcResponse: Names, faces, shifts. I like to know who's watching the gate.
+      npcFollowUp: 
+      animationTrigger: TalkIdle
+      playLaughSfx: 0
   - type: 1
-    npcLine: The alleys by the factory are so quiet since curfew.
+    npcLine: I take my bag for walks by the factory. So quiet since curfew!
     animationTrigger: TalkSmile
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: With that bag?
-      npcResponse: Oh, always the bag! You never know what you'll find.
+    - playerChoiceText: What's in the bag?
+      npcResponse: Oh, just my things! You never know what you'll find out there.
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
-    - playerChoiceText: Alone, after curfew?
-      npcResponse: I'm never alone! I'm very good company.
+    - playerChoiceText: Why out after curfew?
+      npcResponse: Somebody has to be! The alleys get lonely. I'm very good company.
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
   - type: 0
-    npcLine: Papers! All in order. I'll see you soon.
+    npcLine: Papers, all in order! I'll see you soon. Very soon.
     animationTrigger: TalkSmile
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

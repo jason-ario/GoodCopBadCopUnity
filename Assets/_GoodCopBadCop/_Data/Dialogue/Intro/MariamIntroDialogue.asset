@@ -21,21 +21,25 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: Mother sent me alone. Says I need responsibility.
+    npcLine: Mother sent me alone. She says I need responsibility.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Isn't that a lot?
-      npcResponse: She thinks it's the minimum. I try not to disagree.
+    - playerChoiceText: Where's your mother?
+      npcResponse: Counting people for the census. She'll know I crossed before you file it.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: She trusts you.
-      npcResponse: It isn't trust. It's a test. I don't fail tests.
+    - playerChoiceText: Why the polyclinic, at your age?
+      npcResponse: They need hands. They let me watch now. Nobody else volunteers.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 1
@@ -45,13 +49,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Why so serious?
-      npcResponse: Someone in my family should be excellent at something. It might as well be me.
+    - playerChoiceText: Seen any of the sick?
+      npcResponse: Every day. Gray skin, black under the nails. The doctors stopped writing it down.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: Plenty to study lately?
-      npcResponse: The polyclinic needs hands. They let me watch now. Nobody else volunteers.
+    - playerChoiceText: Why so cold about it?
+      npcResponse: Someone in my family should be excellent at something. It might as well be me.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

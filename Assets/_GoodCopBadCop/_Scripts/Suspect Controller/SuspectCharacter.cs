@@ -202,6 +202,31 @@ public class SuspectCharacter : Interactable
 
     private bool IsJunkCollectible => _junkItem != null && _junkItem.IsCollectible.Value;
 
+    /// <summary>Booth forced-intro gate, see <see cref="_forcedIntroState"/>.</summary>
+    public enum ForcedIntroState : byte
+    {
+        /// <summary>No forced intro gating — normal talk rules (running intros are covered by IsActiveScriptedSpeaker).</summary>
+        None = 0,
+        /// <summary>A forced intro will start on its own (walking in / waiting for the booth / settle beat): no talk prompt, Interact is a no-op.</summary>
+        Pending = 1,
+    }
+
+    /// <summary>
+    /// Server-written by <see cref="SuspectController"/> / <see cref="SuspectEncounterManager"/>.
+    /// Keeps a booth suspect with an unplayed forced intro from opening the question
+    /// conversation before that intro has been completed.
+    /// </summary>
+    private readonly NetworkVariable<ForcedIntroState> _forcedIntroState = new NetworkVariable<ForcedIntroState>(ForcedIntroState.None);
+
+    public ForcedIntroState CurrentForcedIntroState => _forcedIntroState.Value;
+
+    /// <summary>Server-only. See <see cref="_forcedIntroState"/>.</summary>
+    public void SetForcedIntroStateServer(ForcedIntroState state)
+    {
+        if (!IsServer) return;
+        _forcedIntroState.Value = state;
+    }
+
     /// <summary>
     /// True on any machine while this character is the speaker of the active scripted dialogue.
     /// A player not in that conversation joins it by interacting with the speaker (no proximity
@@ -1878,6 +1903,9 @@ public class SuspectCharacter : Interactable
 
         if (_dialogueInteractionDisabled) return false;
 
+        // Forced intro still to come — no prompt until it is running (then IsActiveScriptedSpeaker).
+        if (_forcedIntroState.Value == ForcedIntroState.Pending) return false;
+
         if (IsIntroCandidate() && (IsServer ? !SuspectEncounterManager.HasEncountered(Data) : !_clientKnowsIntroPlayed))
             return true;
 
@@ -1950,6 +1978,10 @@ public class SuspectCharacter : Interactable
         // sequence instead of this component's own intro/question dialogue (e.g. Vlad during
         // Day 1's tutorial, where Day_01 plays his dialogue directly).
         if (_dialogueInteractionDisabled)
+            return;
+
+        // Forced booth intro still to come — it starts on its own; nothing to do yet.
+        if (_forcedIntroState.Value == ForcedIntroState.Pending)
             return;
 
         // Booth suspects with an unplayed, non-forced authored intro start that conversation

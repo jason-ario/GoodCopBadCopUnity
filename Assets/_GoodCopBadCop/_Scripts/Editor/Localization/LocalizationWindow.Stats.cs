@@ -125,7 +125,7 @@ public partial class LocalizationWindow
 
         if (_scan != null)
             foreach (var i in _scan)
-                if (i.state == ScanState.Unlocalized) { s.pending++; s.pendingWords += CountWords(i.text); }
+                if (i.state == ScanState.Unlocalized && !i.runtime) { s.pending++; s.pendingWords += CountWords(i.text); }
 
         // The HashSets are only needed while counting.
         s.all.seen.Clear(); s.dialogue.seen.Clear();

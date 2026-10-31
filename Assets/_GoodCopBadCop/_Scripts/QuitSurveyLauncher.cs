@@ -26,7 +26,8 @@ public class QuitSurveyLauncher : MonoBehaviour
 
     private void OnApplicationQuit()
     {
-        if (GameSettings.Instance.OpenSurveyOnGameExit)
+        // Demo builds never show survey content.
+        if (GameSettings.Instance.OpenSurveyOnGameExit && !GameSettings.Instance.IsDemo)
         {
             OpenSurveyOnce();
         }

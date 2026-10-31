@@ -1037,6 +1037,7 @@ public class PlayerPickupController : NetworkBehaviour
         released.AbortUse();
         released.RemoveParent();
         released.OnDropped();
+        released.PrepareForServerDropLocal();
 
         rightArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();
         leftArmBodyObjectContainer.CurrentlyEquippedItem?.OnDroppedFromBody();

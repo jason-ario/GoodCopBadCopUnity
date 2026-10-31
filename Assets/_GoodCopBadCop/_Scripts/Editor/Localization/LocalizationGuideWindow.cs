@@ -40,6 +40,9 @@ public class LocalizationGuideWindow : EditorWindow
             body =
                 "Tick what to scan (loaded scenes, prefabs, ScriptableObjects, suspect objects). Scenes must be open to be scanned.\n" +
                 "Status: NEW = not localized yet, CHANGED = text differs from the sheet, OK = already localized (hidden unless 'Show already localized').\n" +
+                    "<b>Clear results</b> discards the review list without touching sheets or assets (asks first if items are selected).\n" +
+                    "RUNTIME = a game script writes this label's text (field.text = / SetText), so its authored text is a placeholder: it is never applied and is hidden unless 'Show runtime-filled'. " +
+                    "Use <b>Not runtime</b> / <b>Runtime</b> on a card to correct the detector (saved in the settings). <b>Remove runtime placeholders</b> deletes rows only those labels use and clears their LocalizedText key (the component stays for fonts).\n" +
                 "Identical text in different places gets separate keys. If text AND context match, you are offered 'reuse that key'; it is never automatic.\n" +
                 "Field names such as animationTrigger, cameraTrigger and IDs are skipped (see the deny list in the Fonts tab)."
         },

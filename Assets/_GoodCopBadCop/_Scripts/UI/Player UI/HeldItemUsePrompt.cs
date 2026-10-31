@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Bottom-right HUD prompt "[LMB] to {verb}" naming what LMB / RT does with the held item right now —
+/// Bottom-right HUD prompt "{0} to {verb}" ({0} = use button icon) naming what LMB / RT does with the held item right now —
 /// LMB / RT is reserved for using the held item (see the input convention in IInteractable.cs).
 /// The verb is the held item's tool action on the targeted object when there is one
 /// (<see cref="PlayerInteractionController.TargetItemUseVerb"/>, e.g. "Stamp"), otherwise its own
@@ -16,15 +16,17 @@ using UnityEngine.UI;
 ///
 /// Attach to the always-active "Player UI" root (not the prompt row itself, which is toggled).
 /// </summary>
-public class HeldItemUsePrompt : MonoBehaviour
+public class HeldItemUsePrompt : MonoBehaviour, IIconPromptDriver
 {
+    public System.Collections.Generic.IEnumerable<TMP_Text> DrivenLabels => new[] { _label };
+
     [Tooltip("Prompt row toggled while the held item has an LMB action (child of the Right HUD Stack).")]
     [SerializeField] private GameObject _root;
 
     [Tooltip("Image that displays the use button icon.")]
     [SerializeField] private Image _keyImage;
 
-    [Tooltip("Label next to the icon: the current action verb.")]
+    [Tooltip("Label right of the icon. A label for text left of the icon is cloned from it when a translation needs one.")]
     [SerializeField] private TMP_Text _label;
 
     [Tooltip("Icon for left mouse button.")]
@@ -35,6 +37,9 @@ public class HeldItemUsePrompt : MonoBehaviour
 
     [Tooltip("When assigned, the gamepad icon follows the rebindable Use Item binding.")]
     [SerializeField] private InputIconDatabase _iconDatabase;
+
+    private IconPromptLabels _labels;
+    private string _shownTemplate;
 
     private void OnEnable()
     {
@@ -67,23 +72,30 @@ public class HeldItemUsePrompt : MonoBehaviour
 
         if (visible && _label != null)
         {
-            string text = FormatLabel(verb);
-            if (_label.text != text) _label.text = text;
+            string template = FormatTemplate(verb);
+            if (template != _shownTemplate)
+            {
+                _labels ??= new IconPromptLabels(_label, _keyImage);
+                _labels.Apply(template);
+                _shownTemplate = template;
+            }
         }
         SetVisible(visible);
     }
 
     /// <summary>
-    /// "Take photo" → "to take photo" (French "Prendre une photo" → "pour prendre une photo"). The verb is translated
-    /// before composing, since the render-time lookup can't match the combined string. Only the first letter is lowered
-    /// so acronyms ("UV") survive.
+    /// "Take photo" → "{0} to take photo" (French "Prendre une photo" → "{0} pour prendre une photo"), {0} = icon.
+    /// The verb is translated before composing, since the render-time lookup can't match the combined string. Only
+    /// the first letter is lowered so acronyms ("UV") survive.
     /// </summary>
-    private static string FormatLabel(string verb)
+    private static string FormatTemplate(string verb)
     {
         string translated = Loc.TranslateSource(verb);
         if (string.IsNullOrEmpty(translated)) return translated;
+        translated = translated.Replace(Loc.Marker, string.Empty);
         string lowered = char.ToLowerInvariant(translated[0]) + translated.Substring(1);
-        return Loc.Verbatim(Loc.T("to {0}", lowered));
+        // {0} = use button icon, {1} = verb.
+        return IconPrompt.Format(Loc.T("{0} to {1}"), lowered);
     }
 
     private static string ResolveVerb()

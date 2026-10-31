@@ -67,8 +67,9 @@ public class KickablePhysicsBody : MonoBehaviour
     [SerializeField, Min(0f)] private float _settleHoldSeconds = 0.35f;
     [Tooltip("Minimum awake time before a freeze is allowed.")]
     [SerializeField, Min(0f)] private float _minActiveSeconds = 0.6f;
-    [Tooltip("Hard cap on awake time — freezes wherever it is after this, so nothing simulates forever.")]
-    [SerializeField, Min(0.1f)] private float _maxActiveSeconds = 5f;
+    [Tooltip("Hard cap on awake time since the last kick/wake — freezes wherever it is after this, so " +
+             "nothing simulates forever. Applies to both limb ragdolls and root-only pieces.")]
+    [SerializeField, Min(0.1f)] private float _maxActiveSeconds = 3f;
 
     [Header("Pose Sync")]
     [Tooltip("Limb pose messages per second sent to clients while the ragdoll is awake.")]
@@ -226,7 +227,7 @@ public class KickablePhysicsBody : MonoBehaviour
         _rootAwakeTime += dt;
         _restTime = AllBodiesAtRest(includeBones: false) ? _restTime + dt : 0f;
 
-        if ((_rootAwakeTime >= _minActiveSeconds && _restTime >= _settleHoldSeconds) || _rootAwakeTime >= _maxActiveSeconds * 2f)
+        if ((_rootAwakeTime >= _minActiveSeconds && _restTime >= _settleHoldSeconds) || _rootAwakeTime >= _maxActiveSeconds)
             SettleServer();
     }
 
@@ -659,9 +660,16 @@ public class KickablePhysicsBody : MonoBehaviour
             return;
         }
 
+        // Every pose (streamed or final) re-arms a short blend window, so the client stops
+        // writing bones shortly after the last message. Streamed poses used to set 0 (= blend
+        // forever); a late unreliable pose arriving after the final one left the client lerping
+        // every bone every frame for the rest of the session.
         _hasClientTarget = true;
-        _clientBlendRemaining = isFinal ? 0.5f : 0f;
+        _clientBlendRemaining = isFinal ? ClientFinalBlendSeconds : ClientStreamBlendSeconds;
     }
+
+    private const float ClientFinalBlendSeconds = 0.5f;
+    private const float ClientStreamBlendSeconds = 0.75f;
 
     private void SnapToTarget()
     {

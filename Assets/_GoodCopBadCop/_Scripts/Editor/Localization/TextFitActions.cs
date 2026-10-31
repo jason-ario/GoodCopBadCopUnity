@@ -101,8 +101,8 @@ public static class TextFitActions
 
     // ---------------------------------------------------------------- measurement
 
-    private static readonly Regex Letters = new Regex("[A-Za-z]");
-    private static readonly Regex Tags = new Regex("<[^>]*>");
+    internal static readonly Regex Letters = new Regex("[A-Za-z]");
+    internal static readonly Regex Tags = new Regex("<[^>]*>");
 
     private class Measure
     {
@@ -255,7 +255,7 @@ public static class TextFitActions
     }
 
     /// <summary>Binary search for the smallest font scale (0.05..1) at which the text fits the rect.</summary>
-    private static float SmallestScale(TMP_Text t, string text, float design, float width, float height, bool wrap)
+    internal static float SmallestScale(TMP_Text t, string text, float design, float width, float height, bool wrap)
     {
         bool Fits(float k)
         {
@@ -275,7 +275,7 @@ public static class TextFitActions
     }
 
     /// <summary>Same rule as the Text Fit tab, plus the width the layout gives the text to grow into.</summary>
-    private static bool LayoutDriven(TMP_Text t, out float available)
+    internal static bool LayoutDriven(TMP_Text t, out float available)
     {
         available = 0f;
         bool fitter = t.GetComponent<ContentSizeFitter>() != null || t.GetComponent<TMPWidthFitter>() != null;
@@ -308,7 +308,7 @@ public static class TextFitActions
         return t.text;
     }
 
-    private static string PathOf(Transform t)
+    internal static string PathOf(Transform t)
     {
         string p = t.name;
         while (t.parent != null) { t = t.parent; p = t.name + "/" + p; }

@@ -209,7 +209,7 @@ public abstract class DiegeticViewController : MonoBehaviour
 
         OnOpened();
 
-        // "[LMB / RT] {text}" prompt on the shared ControlHintsOverlay (outside the hidden Player HUD).
+        // "{0} {text}" prompt ({0} = LMB / RT icon) on the shared ControlHintsOverlay (outside the hidden Player HUD).
         string prompt = ActionPromptText;
         if (!string.IsNullOrEmpty(prompt))
         {
@@ -217,13 +217,11 @@ public abstract class DiegeticViewController : MonoBehaviour
             _actionPromptHint.text = prompt;
             _actionPromptHint.gamepadText = GamepadActionPromptText;
             _actionPromptHint.gamepadSprite = GamepadActionPromptSprite;
-            _actionPromptHint.prefix = ActionPromptPrefix;
-            _actionPromptHint.gamepadPrefix = GamepadActionPromptPrefix;
             ControlHintsOverlay.Show(this, _actionPromptHint);
         }
     }
 
-    /// <summary>Reused hint for the view's "[LMB / RT] {text}" prompt (Use Item, rebind-aware on both devices).</summary>
+    /// <summary>Reused hint for the view's LMB / RT prompt (Use Item, rebind-aware on both devices).</summary>
     private ControlHint _actionPromptHint;
 
     /// <summary>
@@ -473,15 +471,16 @@ public abstract class DiegeticViewController : MonoBehaviour
     protected virtual bool ForcePlayerLightOn => true;
 
     /// <summary>
-    /// Text shown next to the LMB / RT icon (a <see cref="ControlHintsOverlay"/> row) while this view is open,
-    /// e.g. "to interact". Return null for look-only views where LMB does nothing.
+    /// Full prompt sentence for the LMB / RT row (a <see cref="ControlHintsOverlay"/> row) while this view is open,
+    /// with "{0}" where the icon goes (<see cref="IconPrompt"/>), e.g. "{0} to interact" or "Hold {0} to rotate".
+    /// Return null for look-only views where LMB does nothing.
     /// Read once inside <see cref="Open"/>; the prompt is hidden on <see cref="Close"/>.
     /// </summary>
-    protected virtual string ActionPromptText => Loc.N("to interact");
+    protected virtual string ActionPromptText => Loc.N("{0} to interact");
 
     /// <summary>
-    /// Optional label used instead of <see cref="ActionPromptText"/> while a gamepad is active
-    /// (e.g. "to pull" for the lever's stick control). Null = same text as keyboard/mouse.
+    /// Optional sentence used instead of <see cref="ActionPromptText"/> while a gamepad is active
+    /// (e.g. "{0} to pull" for the lever's stick control). Null = same text as keyboard/mouse.
     /// </summary>
     protected virtual string GamepadActionPromptText => null;
 
@@ -490,18 +489,6 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// (e.g. the left stick for the lever). Null = rebind-aware Use Item icon.
     /// </summary>
     protected virtual Sprite GamepadActionPromptSprite => null;
-
-    /// <summary>
-    /// Optional word(s) shown BEFORE the icon, e.g. "Hold" → "Hold [LMB] to rotate".
-    /// Null = no prefix (the default "[LMB] {text}" layout).
-    /// </summary>
-    protected virtual string ActionPromptPrefix => null;
-
-    /// <summary>
-    /// Optional prefix used instead of <see cref="ActionPromptPrefix"/> while a gamepad is active.
-    /// Null = same prefix as keyboard/mouse.
-    /// </summary>
-    protected virtual string GamepadActionPromptPrefix => null;
 
     /// <summary>
     /// Called when the player presses the exit key. Defaults to <see cref="Close"/>.

@@ -12,8 +12,8 @@ using Unity.Netcode;
 /// Encounter state is persisted per campaign save slot via <see cref="SaveDataManager"/>
 /// (see <see cref="SaveSlot.EncounteredSuspectNames"/>), keyed by each suspect's Unity asset
 /// name (e.g. <c>"Ivan"</c>). Forced intros suppress the normal entry bark and paperwork
-/// hand-off, then hand off paperwork themselves once the dialogue completes — matching the
-/// original always-forced behaviour. Optional intros leave the normal entry bark and paperwork
+/// hand-off, then hand off paperwork themselves once the dialogue completes. Forced intros
+/// cannot be exited (no Back button). Optional intros leave the normal entry bark and paperwork
 /// untouched; interacting starts the intro as a separate, skippable conversation.
 /// </summary>
 public class SuspectEncounterManager : MonoBehaviour
@@ -109,16 +109,26 @@ public class SuspectEncounterManager : MonoBehaviour
     /// </summary>
     public bool TryInterceptForcedIntroDialogue(SuspectCharacter suspect)
     {
-        if (suspect == null || suspect.Data == null) return false;
-        if (suspect.Data.introDialogue == null || !suspect.Data.introDialogue.isForced) return false;
-        if (HasEncountered(suspect.Data)) return false;
+        if (!HasUnplayedForcedIntro(suspect)) return false;
 
         // Mark immediately so a re-entrant call cannot double-trigger.
         MarkEncountered(suspect.Data);
 
+        // No talk prompt / interaction during the settle beat — the intro starts on its own.
+        suspect.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.Pending);
+
         StartCoroutine(PlayForcedIntroDialogue(suspect));
         return true;
     }
+
+    /// <summary>
+    /// True when <paramref name="suspect"/> has an authored forced intro that has not been
+    /// played in the active save slot. Server-only authority (reads the host's save slot).
+    /// </summary>
+    public static bool HasUnplayedForcedIntro(SuspectCharacter suspect) =>
+        suspect != null && suspect.Data != null &&
+        suspect.Data.introDialogue != null && suspect.Data.introDialogue.isForced &&
+        !HasEncountered(suspect.Data);
 
     private IEnumerator PlayForcedIntroDialogue(SuspectCharacter suspect)
     {
@@ -142,10 +152,15 @@ public class SuspectEncounterManager : MonoBehaviour
         if (ScriptedDialogueRunner.Instance == null)
         {
             Debug.LogWarning("[SuspectEncounterManager] ScriptedDialogueRunner not found — skipping intro dialogue.");
+            suspect.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.None);
             if (givesPaperwork) suspect.GivePaperwork();
             OnFirstEncounterDialogueComplete?.Invoke(data);
             yield break;
         }
+
+        // Forced intros pull in every player in range and cannot be exited (no Back button) —
+        // they run to completion. A partner who arrives mid-way joins by interacting.
+        suspect.SetForcedIntroStateServer(SuspectCharacter.ForcedIntroState.None);
 
         bool done = false;
         ScriptedDialogueRunner.Instance.PlayDialogue(suspect, data.introDialogue, () => done = true);

@@ -40,7 +40,7 @@ public partial class LocalizationWindow
     }
 
     private int _findTab;
-    private static readonly string[] FindTabNames = { "Max length", "Placeholders", "Restricted chars", "Player address", "Numbers / dates", "Pseudo self-check", "Checklist", "Summary" };
+    private static readonly string[] FindTabNames = { "Max length", "Placeholders", "Restricted chars", "Player address", "Numbers / dates", "Pseudo self-check", "Source lint", "Checklist", "Summary" };
     private Vector2 _findScroll;
 
     private List<LenResult> _lenResults = new List<LenResult>();
@@ -71,8 +71,9 @@ public partial class LocalizationWindow
             case 3: DrawAddress(); break;
             case 4: DrawNumbers(); break;
             case 5: DrawPseudoCheck(); break;
-            case 6: DrawChecklist(); break;
-            case 7: DrawSummary(); break;
+            case 6: DrawSourceLint(); break;
+            case 7: DrawChecklist(); break;
+            case 8: DrawSummary(); break;
         }
         EditorGUILayout.EndScrollView();
     }
@@ -401,7 +402,27 @@ public partial class LocalizationWindow
         foreach (var v in _pseudoViolations.Take(150)) EditorGUILayout.LabelField(v, EditorStyles.wordWrappedMiniLabel);
     }
 
-    // ---------------------------------------------------------------- 7. checklist
+    // ---------------------------------------------------------------- 7. source lint
+
+    private List<string> _lintHits;
+    private string _lintFilter = "";
+
+    private void DrawSourceLint()
+    {
+        LocUI.Hint("Checks the English source before export: leading/trailing whitespace, double spaces, '\u2026' and curly quotes (use '...' and '), " +
+                   "confirmed terminology (Kill, Behavior / Physical Exam, Disposition Chart, postbox, Mutant Sample, ', Officer') and US spelling (Luka's 'Mum' is allowed).");
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("Run source lint", GUILayout.Width(140))) { CommitPendingSource(); _lintHits = LocalizationValidator.LintAll(_table.entries); }
+            _lintFilter = EditorGUILayout.TextField(_lintFilter, EditorStyles.toolbarSearchField);
+        }
+        if (_lintHits == null) return;
+        var shown = string.IsNullOrEmpty(_lintFilter) ? _lintHits : _lintHits.Where(h => h.IndexOf(_lintFilter, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+        EditorGUILayout.LabelField(_lintHits.Count == 0 ? "No warnings across " + _table.entries.Count + " strings." : shown.Count + " of " + _lintHits.Count + " warning(s)");
+        foreach (var h in shown.Take(300)) EditorGUILayout.LabelField(h, EditorStyles.wordWrappedMiniLabel);
+    }
+
+    // ---------------------------------------------------------------- 8. checklist
 
     private static readonly string[] AreaNames =
     {

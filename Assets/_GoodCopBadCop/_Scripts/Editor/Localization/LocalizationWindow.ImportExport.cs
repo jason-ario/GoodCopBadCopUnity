@@ -147,7 +147,7 @@ public partial class LocalizationWindow
             if (entries.Count == 0) continue;
 
             var rows = new List<IList<string>>();
-            var header = new List<string> { "key", "notes", "source_en" };
+            var header = new List<string> { "key", "notes", LocalizationSheetIO.MaxCharsColumn, "source_en" };
             header.AddRange(langs);
             header.AddRange(_exportPseudo);
             if (delta) header.Add("change");
@@ -155,7 +155,7 @@ public partial class LocalizationWindow
 
             foreach (var e in entries)
             {
-                var row = new List<string> { e.key, e.notes, e.source };
+                var row = new List<string> { e.key, e.notes, LocalizationSheetIO.FormatMaxChars(e.maxChars), e.source };
                 foreach (var l in langs) row.Add(blankLangs ? "" : e.GetValue(l));
                 foreach (var p in _exportPseudo) row.Add(PseudoLocalizer.Generate(p, e.source, e.key, _settings.pseudoExpansion));
                 if (delta) row.Add(string.IsNullOrEmpty(e.frozenHash) ? "new" : "changed");
@@ -193,7 +193,7 @@ public partial class LocalizationWindow
             int deltaIdx = sheetName.IndexOf("_delta_", StringComparison.Ordinal);
             if (deltaIdx > 0) sheetName = sheetName.Substring(0, deltaIdx);
 
-            var fixedCols = new HashSet<string> { "key", "notes", "source_en", "status", "frozen_hash", "change" };
+            var fixedCols = new HashSet<string>(LocalizationSheetIO.FixedColumns) { "change" };
             var langCols = new List<KeyValuePair<int, string>>();
             for (int c = 0; c < header.Count; c++)
                 if (!fixedCols.Contains(header[c]) && !PseudoLocalizer.IsPseudo(header[c]) && !string.IsNullOrEmpty(header[c]))
@@ -220,7 +220,7 @@ public partial class LocalizationWindow
                     if (nv == ov) continue;
 
                     var ir = new ImportRow { key = key, lang = kv.Value, oldValue = ov, newValue = nv, file = Path.GetFileName(file) };
-                    ir.issues = LocalizationValidator.Validate(entry.source, nv, _settings, FontFor(kv.Value, null));
+                    ir.issues = LocalizationValidator.Validate(entry.source, nv, _settings, FontFor(kv.Value, null), entry.maxChars);
                     ir.apply = !ir.HasError;
                     _importRows.Add(ir);
                 }

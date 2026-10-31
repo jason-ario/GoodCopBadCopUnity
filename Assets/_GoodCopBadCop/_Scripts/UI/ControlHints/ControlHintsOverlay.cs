@@ -3,7 +3,8 @@ using GoodCopBadCop.Input;
 using UnityEngine;
 
 /// <summary>
-/// Shared on-screen control hints ("[LMB] to check / uncheck", "Hold [LMB] to rotate") for modes that hide the
+/// Shared on-screen control hints ("{0} to check / uncheck", "Hold {0} to rotate"; {0} = icon, see
+/// <see cref="IconPrompt"/>) for modes that hide the
 /// Player HUD: diegetic views (lever, bunker door wheel, ...), the exam page draw mode, and anything new.
 ///
 /// Usage: <c>ControlHintsOverlay.Show(this, hints)</c> on enter, <c>ControlHintsOverlay.Hide(this)</c> on exit.
@@ -114,6 +115,7 @@ public class ControlHintsOverlay : MonoBehaviour
         ActiveInputDeviceTracker.EnsureSubscribed();
         ActiveInputDeviceTracker.DeviceChanged += OnDeviceChanged;
         RebindableInput.BindingChanged += OnBindingChanged;
+        Loc.LanguageChanged += OnLanguageChanged;
         _dirty = true;
     }
 
@@ -121,12 +123,16 @@ public class ControlHintsOverlay : MonoBehaviour
     {
         ActiveInputDeviceTracker.DeviceChanged -= OnDeviceChanged;
         RebindableInput.BindingChanged -= OnBindingChanged;
+        Loc.LanguageChanged -= OnLanguageChanged;
         SetActive(_root, false);
     }
 
     private void OnDeviceChanged(bool isGamepad) => _dirty = true;
 
     private void OnBindingChanged(GameAction action) => _dirty = true;
+
+    // Row text is localized when built, so a language switch needs a rebuild.
+    private static void OnLanguageChanged() => _dirty = true;
 
     private void Update()
     {
@@ -152,8 +158,7 @@ public class ControlHintsOverlay : MonoBehaviour
 
             ControlHintRow row = GetRow(used++);
             if (row == null) break;
-            row.Apply(Loc.TranslateSource(hint.PrefixFor(gamepad)), hint.ResolveIcon(gamepad, _iconDatabase),
-                      Loc.TranslateSource(hint.TextFor(gamepad)));
+            row.Apply(IconPrompt.Localize(hint.TextFor(gamepad)), hint.ResolveIcon(gamepad, _iconDatabase));
             SetActive(row.gameObject, true);
         }
 

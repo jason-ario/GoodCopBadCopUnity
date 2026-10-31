@@ -442,10 +442,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
   GlobalObjectIdHash: 119256988
   InScenePlacedSourceGlobalObjectIdHash: 119256988
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -467,8 +469,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WorldShopItemInteractable
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
-  interactText: Mutations Exam
+  interactText: Physical Exam
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   _itemZoomCamera: {fileID: 3081382436764165398}
   _despawnOnPurchase: 0
   _drawerToLock: {fileID: 0}

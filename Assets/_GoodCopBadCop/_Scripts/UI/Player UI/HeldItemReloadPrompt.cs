@@ -13,18 +13,23 @@ using UnityEngine;
 ///
 /// Attach to the always-active "Player HUD" root (not the prompt row itself, which is toggled).
 /// </summary>
-public class HeldItemReloadPrompt : MonoBehaviour
+public class HeldItemReloadPrompt : MonoBehaviour, IIconPromptDriver
 {
+    public System.Collections.Generic.IEnumerable<TMP_Text> DrivenLabels => new[] { _label };
+
     [Tooltip("Prompt row toggled while a non-full weapon is held (child of the Right HUD Stack).")]
     [SerializeField] private GameObject _root;
 
     [Tooltip("Key icon driven by HelperIconKeyDisplay (forced to GameAction.Reload).")]
     [SerializeField] private HelperIconKeyDisplay _keyDisplay;
 
-    [Tooltip("Label next to the icon.")]
+    [Tooltip("Label right of the icon. A label for text left of the icon is cloned from it when a translation needs one.")]
     [SerializeField] private TMP_Text _label;
 
-    [SerializeField, LocalizeField] private string _text = "to reload";
+    [Tooltip("Prompt sentence; {0} is the reload key icon.")]
+    [SerializeField, LocalizeField] private string _text = "{0} to reload";
+
+    private IconPromptLabels _labels;
 
     private void Awake()
     {
@@ -33,13 +38,22 @@ public class HeldItemReloadPrompt : MonoBehaviour
 
     private void OnEnable()
     {
-        if (_label != null) _label.text = _text;
+        Loc.LanguageChanged += ApplyText;
+        ApplyText();
         SetVisible(false);
     }
 
     private void OnDisable()
     {
+        Loc.LanguageChanged -= ApplyText;
         SetVisible(false);
+    }
+
+    private void ApplyText()
+    {
+        if (_label == null) return;
+        _labels ??= new IconPromptLabels(_label, _keyDisplay);
+        _labels.Apply(IconPrompt.Localize(_text));
     }
 
     private void Update()

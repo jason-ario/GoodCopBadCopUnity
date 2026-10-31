@@ -7999,12 +7999,14 @@ MonoBehaviour:
   landSoundLeadTime: 0
   minFallSpeedForLandSound: 4
   knockbackRecoveryRate: 20
+  maxKnockbackSpeed: 12
   groundCheckDistance: 0.15
   groundMask:
     serializedVersion: 2
     m_Bits: 262127
   separationDistance: 1
   separationMaxSpeed: 3
+  mutantSeparationMaxSpeed: 5
   camCrouchPos: {fileID: 8889495156939584957}
   camCrouchLookDownPos: {fileID: 4628353955597244318}
   crouchSpeed: 2
@@ -8345,6 +8347,10 @@ MonoBehaviour:
   activateOnAwake: 0
   maxDepenetrationVelocity: 1
   continuousCollisionOnActivate: 1
+  freezeWhenSettled: 1
+  freezeDelay: 3
+  settleSpeedThreshold: 0.2
+  maxSettleWait: 5
   headTransform: {fileID: 6616138626675467207}
   bodyArmsMesh: {fileID: 6203034436640246515}
   firstPersonArms: {fileID: 2112641185356085190}

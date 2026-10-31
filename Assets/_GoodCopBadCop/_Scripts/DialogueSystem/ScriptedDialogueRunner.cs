@@ -721,6 +721,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Reset the previous trigger and force idle before firing the next animation.
             // This prevents a skipped trigger from continuing to play into the new line.
             TriggerSpeakerAnimationServer(speakerNetId, node.animationTrigger);
+            SetSpeakerExpressionClientRpc(speakerNetId, node.expression ?? string.Empty);
 
             yield return StartCoroutine(SayAndWait(speaker, node.npcLine, node.playLaughSfx, node.unskippable));
 
@@ -1464,6 +1465,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         yield return null; // flush the RPC before playing the NPC response
 
         TriggerSpeakerAnimationServer(speakerNetId, chosen.animationTrigger);
+        SetSpeakerExpressionClientRpc(speakerNetId, chosen.expression ?? string.Empty);
 
         yield return StartCoroutine(SayAndWait(speaker, chosen.npcResponse, chosen.playLaughSfx));
 
@@ -2296,6 +2298,22 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(newTrigger))
             anim.SetTrigger(newTrigger);
+    }
+
+    /// <summary>
+    /// Applies a node/choice expression key on the speaker's <see cref="DialogueExpressionMaterial"/>
+    /// (if any). Broadcast to every client so overhearing players see the same face. Empty restores
+    /// the default; the component also reverts on its own when the sequence ends.
+    /// </summary>
+    [ClientRpc]
+    private void SetSpeakerExpressionClientRpc(ulong speakerNetId, string expression)
+    {
+        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
+            return;
+
+        var expressions = netObj.GetComponentInChildren<DialogueExpressionMaterial>(true);
+        if (expressions != null)
+            expressions.SetExpression(expression);
     }
 
     /// <summary>

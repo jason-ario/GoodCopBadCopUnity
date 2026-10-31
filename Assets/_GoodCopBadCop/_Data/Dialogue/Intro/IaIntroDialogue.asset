@@ -21,21 +21,25 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
-    npcLine: Fewer readers every day. They all ask what happens next.
+    npcLine: Fewer readers every day. They all ask me what happens next.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Do you tell them?
-      npcResponse: Endings are written long before anyone reads them. I tell them that.
+    - playerChoiceText: What do you tell them?
+      npcResponse: That endings are written long before anyone reads them.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Is the archive open?
-      npcResponse: Every morning. The smog gets in the pages. I open it anyway.
+    - playerChoiceText: Who still comes?
+      npcResponse: A professor, taking books he thinks will outlive us. They won't.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
   - type: 1
@@ -45,13 +49,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: What happens next?
-      npcResponse: To you? I wouldn't say. Some things are better as a surprise.
+    - playerChoiceText: Are you threatening me?
+      npcResponse: No. Threats are for people who can change the ending.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: Odd thing to say here.
-      npcResponse: Everything odd feels ordinary when the plot requires it.
+    - playerChoiceText: Did you know the last officer?
+      npcResponse: He asked me that too. About the one before him.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

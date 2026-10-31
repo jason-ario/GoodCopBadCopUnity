@@ -373,24 +373,23 @@ namespace GoodCopBadCop.SuspectPaperwork
         // ── Localized rendering of language-neutral values ───────────────────────────
 
         /// <summary>
-        /// Re-renders an English document date ("19 NOV", "02 March 1990", "02/11/1961") with the local language's
-        /// month names (Names/Documents keys doc.month.short.N / doc.month.full.N), keeping the original casing style.
-        /// Numeric dates and unparseable text are returned unchanged.
+        /// Re-renders an English document date ("19 NOV", "02 March 1990", "02/11/1961") in the current language's
+        /// date format (<see cref="LocalizedDate"/>): numeric dates use the language's numeric form, month-name dates
+        /// its written-month form, keeping the year/no-year, full/short and upper-case style of the source.
+        /// English and unparseable text are returned unchanged. Public so other views of the same data (PC profile)
+        /// show dates exactly as the documents do.
         /// </summary>
-        private static string LocalizeDocumentDate(string value)
+        public static string LocalizeDocumentDate(string value)
         {
-            if (!TryParseDocumentDate(value, out ParsedDocumentDate parsed) || !parsed.UsesMonthName)
+            if (Loc.CurrentLanguage == Loc.SourceLanguage || !TryParseDocumentDate(value, out ParsedDocumentDate parsed))
                 return value;
 
-            int month = parsed.Date.Month;
-            string name = Loc.Get((parsed.UsesFullMonthName ? "doc.month.full." : "doc.month.short.") + month);
-            if (parsed.MonthIsUppercase)
-                name = name.ToUpper(Loc.Culture);
-
-            string day = parsed.Date.ToString("dd", CultureInfo.InvariantCulture);
-            return parsed.HasYear
-                ? $"{day} {name} {parsed.Date.ToString("yyyy", CultureInfo.InvariantCulture)}"
-                : $"{day} {name}";
+            return LocalizedDate.Format(
+                parsed.Date,
+                parsed.UsesMonthName ? LocalizedDate.Style.Named : LocalizedDate.Style.Numeric,
+                parsed.HasYear,
+                parsed.UsesFullMonthName,
+                parsed.MonthIsUppercase);
         }
 
         /// <summary>Translates a sex value (doc.sex.*). Unknown values pass through; a trailing "?" is kept.</summary>

@@ -353,10 +353,19 @@ public class DialogueChoiceSystem : NetworkBehaviour
     /// </summary>
     public void ForceExitDialogueForVerdict()
     {
+        ForceExitDialogue("another player delivered the verdict while the local player was still " +
+                          "in dialogue with this suspect");
+    }
+
+    /// <summary>
+    /// Local, per-client forced exit from dialogue mode for a global event that takes over the
+    /// screen (verdict, end-of-shift report). No-op if the local player is not in dialogue mode.
+    /// </summary>
+    public void ForceExitDialogue(string reason)
+    {
         if (!IsInDialogueMode) return;
 
-        Debug.Log("[DialogueChoiceSystem] ForceExitDialogueForVerdict — another player delivered the " +
-                  "verdict while the local player was still in dialogue with this suspect; forcing exit.");
+        Debug.Log($"[DialogueChoiceSystem] ForceExitDialogue — {reason}; forcing exit.");
 
         ExitDialogueMode();
     }

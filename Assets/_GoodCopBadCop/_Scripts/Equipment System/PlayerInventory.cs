@@ -676,6 +676,10 @@ public class PlayerInventory : NetworkBehaviour
                 item.OnDropped();
             }
 
+            // The server's drop broadcast may have landed while this copy was hidden; make sure
+            // NetworkTransform (not a stale stow/hand follow) drives it from here on.
+            item.PrepareForServerDropLocal();
+
             ClearSlot(i);
         }
 

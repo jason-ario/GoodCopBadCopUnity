@@ -314,6 +314,7 @@ public partial class LocalizationWindow
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("forbiddenCharacters"));
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("dialogueAssetTypes"), true);
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("onlyUsedDialogueAssets"));
+            EditorGUILayout.PropertyField(_settingsSO.FindProperty("onlyUsedPrefabs"));
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("dialogueFieldRules"), true);
             EditorGUILayout.PropertyField(_settingsSO.FindProperty("fieldDenyList"), true);
             if (_settingsSO.ApplyModifiedProperties()) EditorUtility.SetDirty(_settings);

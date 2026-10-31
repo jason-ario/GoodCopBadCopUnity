@@ -3,8 +3,10 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class ReticleController : MonoBehaviour
+public class ReticleController : MonoBehaviour, IIconPromptDriver
 {
+    public System.Collections.Generic.IEnumerable<TMP_Text> DrivenLabels => new TMP_Text[] { _hintLabel };
+
     public Image reticle;
 
     [Header("Colors")]
@@ -79,9 +81,12 @@ public class ReticleController : MonoBehaviour
     [Tooltip("Gap (in the reticle's local UI units) between the hold ring and the left edge of the \"Hold to …\" row it sits beside.")]
     [SerializeField] private float _holdRingTextGap = 10f;
 
-    // True when the hold prompt lives on the tap row ("[E] Hold to {verb}", hold is the only action);
+    // True when the hold prompt lives on the tap row ("Hold [E] to {verb}", hold is the only action);
     // false when it is the separate "Hold to {verb}" row beneath the tap row.
     private bool _holdOnTapRow;
+
+    // Splits localized "Hold {0} to {1}" around the tap row's key icon (left label cloned on first use).
+    private IconPromptLabels _tapLabels;
     private readonly Vector3[] _cornerBuffer = new Vector3[4];
 
     private bool canInteract = false;
@@ -271,9 +276,9 @@ public class ReticleController : MonoBehaviour
 
         if (!keyVisible)
         {
-            // Hold is the only Interact action: one "[E] Hold to {verb}" row, so the key icon is still shown.
+            // Hold is the only Interact action: one "Hold {0} to {verb}" row ({0} = Interact key icon).
             _holdOnTapRow = hasHold;
-            SetPrompt(hasHold, hasHold ? HoldLabel(holdVerb) : null, useVerb: useItemVerb);
+            SetPrompt(hasHold, hasHold ? HoldWithIconTemplate(holdVerb) : null, useVerb: useItemVerb, labelIsTemplate: true);
             return;
         }
 
@@ -284,7 +289,12 @@ public class ReticleController : MonoBehaviour
         SetPrompt(true, tapLabel, holdVerb, useItemVerb);
     }
 
+    // Text-only row beneath the tap row (the key icon is already shown above it).
     private static string HoldLabel(string holdVerb) => Loc.T("Hold to {0}", Loc.TranslateSource(holdVerb));
+
+    // Tap row when hold is the only action: {0} = Interact key icon, {1} = verb.
+    private static string HoldWithIconTemplate(string holdVerb) =>
+        IconPrompt.Format(Loc.T("Hold {0} to {1}"), Loc.TranslateSource(holdVerb).Replace(Loc.Marker, string.Empty));
 
     /// <summary>
     /// Fills the hold ring around the reticle. 0 (or less) hides it; 1 is a full ring.
@@ -389,14 +399,19 @@ public class ReticleController : MonoBehaviour
     /// <summary>
     /// Shows/hides the tap row (key icon + label; null/empty label hides the label), the
     /// "[LMB] {useVerb}" row (null/empty useVerb hides it) and the "Hold to {holdVerb}" row
-    /// (null/empty holdVerb hides it).
+    /// (null/empty holdVerb hides it). With <paramref name="labelIsTemplate"/>, <paramref name="label"/> is an
+    /// already-localized <see cref="IconPrompt"/> sentence split around the key icon.
     /// </summary>
-    private void SetPrompt(bool keyIconVisible, string label, string holdVerb = null, string useVerb = null)
+    private void SetPrompt(bool keyIconVisible, string label, string holdVerb = null, string useVerb = null, bool labelIsTemplate = false)
     {
         // Verbs / interact texts arrive as English (Loc.N literals or [LocalizeField] values) and are looked up by source.
-        label = Loc.TranslateSource(label);
+        string before = null;
+        if (labelIsTemplate)
+            IconPrompt.Split(label, out before, out label);
+        else
+            label = Loc.TranslateSource(label);
         useVerb = Loc.TranslateSource(useVerb);
-        bool labelVisible = !string.IsNullOrEmpty(label);
+        bool labelVisible = !string.IsNullOrEmpty(label) || !string.IsNullOrEmpty(before);
 
         if (_useRow != null)
         {
@@ -412,10 +427,20 @@ public class ReticleController : MonoBehaviour
 
         if (_hintLabel != null)
         {
-            if (_hintLabel.gameObject.activeSelf != labelVisible)
-                _hintLabel.gameObject.SetActive(labelVisible);
-            if (labelVisible && _hintLabel.text != label)
-                _hintLabel.text = label;
+            // Text left of the icon only exists for templates; the label clone is created on first use.
+            if (!string.IsNullOrEmpty(before) || (_tapLabels != null && _tapLabels.Before != null))
+            {
+                _tapLabels ??= new IconPromptLabels(_hintLabel, _hintKeyIcon);
+                _tapLabels.Set(before, label);
+            }
+            else
+            {
+                bool afterVisible = !string.IsNullOrEmpty(label);
+                if (_hintLabel.gameObject.activeSelf != afterVisible)
+                    _hintLabel.gameObject.SetActive(afterVisible);
+                if (afterVisible && _hintLabel.text != label)
+                    _hintLabel.text = label;
+            }
         }
 
         if (_hintKeyIcon != null && _hintKeyIcon.activeSelf != keyIconVisible)

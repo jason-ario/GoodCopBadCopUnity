@@ -103,6 +103,50 @@ public class SpeakingInteraction : NetworkBehaviour
 
     public AudioSource AudioSource => audioSource;
 
+    [Header("Voice Range")]
+    [Tooltip("When enabled, a 3D voice AudioSource is reconfigured on Awake so it stays audible across " +
+             "the whole overhear range (GameSettings.OverhearSubtitleProximity): anyone close enough to " +
+             "see this speaker's subtitles can also hear them, and the voice fades to silence right at " +
+             "the edge of that range.")]
+    [SerializeField] private bool matchVoiceToOverhearRange = true;
+
+    [Tooltip("Distance (m) within which the voice plays at full volume before it starts to fall off.")]
+    [SerializeField, Min(0.1f)] private float voiceFullVolumeDistance = 2f;
+
+    [Tooltip("Volume (Y, 0-1) over normalized distance (X, 0 = speaker, 1 = overhear range edge). " +
+             "Should reach 0 at X = 1 so the voice ends where subtitles stop.")]
+    [SerializeField] private AnimationCurve voiceRolloff = new AnimationCurve(
+        new Keyframe(0f, 1f),
+        new Keyframe(0.1f, 1f),
+        new Keyframe(0.35f, 0.6f),
+        new Keyframe(0.7f, 0.25f),
+        new Keyframe(1f, 0f));
+
+    private void Awake()
+    {
+        ApplyOverhearVoiceRange();
+    }
+
+    /// <summary>
+    /// Stretches the voice AudioSource's attenuation to <see cref="OverhearRange.Distance"/>.
+    /// The prefab default (Logarithmic, 1-10 m) made voices nearly silent for overhearing
+    /// players while their subtitles still showed out to the full overhear range.
+    /// 2D sources (spatialBlend 0) are left alone.
+    /// </summary>
+    private void ApplyOverhearVoiceRange()
+    {
+        if (!matchVoiceToOverhearRange || audioSource == null || audioSource.spatialBlend <= 0f) return;
+
+        float range = GameSettings.Instance != null ? OverhearRange.Distance : 0f;
+        if (range <= 0f) return;
+
+        audioSource.rolloffMode = AudioRolloffMode.Custom;
+        audioSource.maxDistance = range;
+        audioSource.minDistance = Mathf.Min(voiceFullVolumeDistance, range);
+        if (voiceRolloff != null && voiceRolloff.length > 0)
+            audioSource.SetCustomCurve(AudioSourceCurveType.CustomRolloff, voiceRolloff);
+    }
+
     [Header("Laugh SFX")]
     [Tooltip("Optional laugh sound effect(s). One is chosen at random and played on this " +
              "speaker's AudioSource when a ScriptedDialogueNode/Choice has playLaughSfx enabled.")]

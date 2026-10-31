@@ -15,12 +15,13 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Sorry, I look tired. Irina Kakulia, student nurse. The ward energy's heavy.
+    npcLine: Sorry, I look tired. Irina Kakulia, student nurse at the care home.
     animationTrigger: TalkLookDown
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: I live with my grandmother now. Mzia, the seamstress, southern block.
@@ -29,36 +30,43 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Is she doing well?
-      npcResponse: She says she's fine, the way she talks about her sewing. I mostly believe her.
+    - playerChoiceText: Why move in with her?
+      npcResponse: My brother went east for work. Someone had to stay with her.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Isn't that a lot?
-      npcResponse: The universe keeps handing us more than we think we can hold.
+    - playerChoiceText: Is she sick?
+      npcResponse: Old, not sick. She says she's fine, the way she says her stitches are straight.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 1
-    npcLine: My [[infected:hands shake a little]]. The air, I think. Or mercury retrograde.
+    npcLine: My [[infected:hands shake a little]]. The air, I think. Or bad energy on the ward.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: What's wrong with the air?
-      npcResponse: Ask the polyclinic. They say smog. They also say stay calm and queue.
+    - playerChoiceText: Hold your hands still.
+      npcResponse: I'm trying. ...There. It passes if I breathe through it.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
-    - playerChoiceText: How are your patients?
-      npcResponse: They ask what's happening. I tell them to breathe through it.
+    - playerChoiceText: What are you taking?
+      npcResponse: Something from the ward cabinet, to sleep. Nobody counts the bottles anymore.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
-    npcLine: Breathe, officer. You're holding it in.
+    npcLine: Breathe, Officer. You're holding it in.
     animationTrigger: TalkIdle
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

@@ -158,8 +158,8 @@ public class ExamNotebook : PickableObject
     [Header("Draw Mode Control Hints")]
     [SerializeField] private ControlHint[] _drawModeHints =
     {
-        new ControlHint { text = "to check / uncheck", mouseButton = 0, gamepadControlPath = "buttonSouth" },
-        new ControlHint { text = "to select", showFor = ControlHintDevice.GamepadOnly, gamepadControlPath = "dpad/vertical" },
+        new ControlHint { text = "{0} to check / uncheck", mouseButton = 0, gamepadControlPath = "buttonSouth" },
+        new ControlHint { text = "{0} to select", showFor = ControlHintDevice.GamepadOnly, gamepadControlPath = "dpad/vertical" },
     };
     // ─────────────────────────────────────────────────────────────────────────────
 

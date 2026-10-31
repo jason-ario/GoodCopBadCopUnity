@@ -36,8 +36,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private const float GamepadCellWidth = 190f;
         private const float GamepadDividerX = 535f;
         private const float ScrollPadding = 8f;
-        private static string KeyRebindPrompt => Loc.T("Press any key/button…");
-        private static string GamepadRebindPrompt => Loc.T("Press a button…");
+        private static string KeyRebindPrompt => Loc.T("Press any key/button...");
+        private static string GamepadRebindPrompt => Loc.T("Press a button...");
         private static string GamepadCellPrefix => "<size=65%><color=#8A8F8A>" + Loc.T("PAD") + "</color></size>  ";
 
         private static readonly Color LockedBindingTextColor = new Color(.42f, .44f, .42f, .55f);

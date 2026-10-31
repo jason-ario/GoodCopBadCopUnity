@@ -332,6 +332,21 @@ public static class Loc
         return true;
     }
 
+    /// <summary>
+    /// True only when the current language's own column has text for <paramref name="key"/> — no English fallback,
+    /// no pseudolocalization. Lets callers (e.g. <see cref="LocalizedDate"/>) use built-in data when a language
+    /// has no translation yet.
+    /// </summary>
+    public static bool TryGetTranslated(string key, out string text)
+    {
+        Init();
+        text = null;
+        if (string.IsNullOrEmpty(key) || _language == SourceLanguage || PseudoLocalizer.IsPseudo(_language)) return false;
+        if (!_table.languages.Contains(_language) || !_table.TryGet(key, out var entry)) return false;
+        text = entry.GetValue(_language);
+        return !string.IsNullOrEmpty(text);
+    }
+
     private static string Resolve(LocEntry entry, bool warn)
     {
         if (_language == SourceLanguage) return entry.source;

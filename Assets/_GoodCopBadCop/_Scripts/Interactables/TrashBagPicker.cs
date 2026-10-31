@@ -31,7 +31,7 @@ public class TrashBagPicker : Interactable
     [SerializeField] private Transform _spawnPoint;
 
     [Tooltip("Reticle tooltip shown while this dispenser is targeted.")]
-    [SerializeField, LocalizeField] private string _interactLabel = "Grab a Trash Bag";
+    [SerializeField, LocalizeField] private string _interactLabel = "Grab a trash bag";
 
     [Tooltip("Sound played on every successful dispense (optional).")]
     [SerializeField] private AudioClip _dispenseSound;

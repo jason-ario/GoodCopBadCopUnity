@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: I've been timing this checkpoint. The variance is bigger than you'd think.
@@ -29,29 +30,35 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Why time it?
-      npcResponse: Probability needs data. You're one of my steadier variables.
+    - playerChoiceText: Why time my checkpoint?
+      npcResponse: There's a book on how long new officers last. I hold a position.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
     - playerChoiceText: Where do you play?
-      npcResponse: The Metropol, before it closed. Now a basement. Lower stakes.
+      npcResponse: The Metropol, before it closed. Now a basement. Lower stakes, worse people.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
   - type: 1
-    npcLine: You have a tell, officer. I won't say [[whisper:which eye]]. But I'd bet on it.
+    npcLine: You have a tell, Officer. I won't say [[whisper:which eye]]. But I'd bet on it.
     animationTrigger: TalkLookAway
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: I don't have tells.
-      npcResponse: Everybody has tells. Twenty years reading them. It's data, not an insult.
+    - playerChoiceText: How long did the last one last?
+      npcResponse: Nineteen days. I had him at twenty. Cost me a good watch.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Does that help at cards?
-      npcResponse: More than the cards. Cards are mathematics. People are the game.
+    - playerChoiceText: Gambling's illegal.
+      npcResponse: So is half this city now. You'll want to pick which half you enforce.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

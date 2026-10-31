@@ -46,7 +46,7 @@ public class OchoBoothEncounter : NetworkBehaviour
     [SerializeField, LocalizeField] private string _quarantineRejectedLine = "Quarantine? Adorable. Like a cage was ever going to hold me.";
 
     [Tooltip("Line Ocho delivers after reappearing, when the player used the red (Kill) stamp.")]
-    [SerializeField, LocalizeField] private string _killRejectedLine = "Ahh, interesting choice! I bet you would love to kill again wouldn't you?";
+    [SerializeField, LocalizeField] private string _killRejectedLine = "Ahh, interesting choice! I bet you would love to kill again, wouldn't you?";
 
     [Tooltip("Seconds between Ocho taking the folder and vanishing.")]
     [SerializeField] private float _takeFolderDelay = 0.6f;

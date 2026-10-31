@@ -258,7 +258,7 @@ MonoBehaviour:
   m_fontSizeBase: 37
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 24
+  m_fontSizeMin: 20
   m_fontSizeMax: 37
   m_fontStyle: 0
   m_HorizontalAlignment: 1
@@ -630,6 +630,7 @@ GameObject:
   - component: {fileID: 6193475282773343462}
   - component: {fileID: 7948499299086489177}
   - component: {fileID: 5704056634089727192}
+  - component: {fileID: 6627890375088254197}
   m_Layer: 0
   m_Name: To Close Label
   m_TagString: Untagged
@@ -684,7 +685,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: To Close
+  m_text: to close
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
   m_sharedMaterial: {fileID: 2716936894919801193, guid: d12b4ed1e5a6cae41bd08f6fc148e665, type: 2}
@@ -769,7 +770,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
-  key: ui.tutorial_overlay.hold_to_close.close_prompt.to_close_label.text
+  key: 
   applyLanguageFont: 1
   fontRole: Secondary UI
 --- !u!114 &5704056634089727192
@@ -785,6 +786,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TMPWidthFitter
   horizontalPadding: 0
+--- !u!114 &6627890375088254197
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 723039115748683820}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43bdc01124e2fbb4abbdbfb862bb57a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IconPromptText
+  _template: Hold {0} to close
+  _icon: {fileID: 9171426536636386419}
+  _prefixLabel: {fileID: 5241491616919182152}
 --- !u!1 &771780097399060634
 GameObject:
   m_ObjectHideFlags: 0
@@ -1540,7 +1556,7 @@ MonoBehaviour:
   m_fontSizeBase: 38.1
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 22.9
+  m_fontSizeMin: 25
   m_fontSizeMax: 38.1
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -2297,7 +2313,7 @@ MonoBehaviour:
   m_fontSizeBase: 48.4
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 29
+  m_fontSizeMin: 20
   m_fontSizeMax: 48.4
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -2312,7 +2328,7 @@ MonoBehaviour:
   m_charWidthMaxAdj: 0
   m_TextWrappingMode: 1
   m_wordWrappingRatios: 0.4
-  m_overflowMode: 1
+  m_overflowMode: 0
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
@@ -3230,7 +3246,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
-  key: ui.tutorial_overlay.hold_to_close.close_prompt.hold_label.text
+  key: 
   applyLanguageFont: 1
   fontRole: Secondary UI
 --- !u!114 &1823338077763845109
@@ -4106,6 +4122,7 @@ GameObject:
   - component: {fileID: 6295395279051450657}
   - component: {fileID: 3550440166189012733}
   - component: {fileID: 5761425242899830850}
+  - component: {fileID: 6493287796811068697}
   m_Layer: 5
   m_Name: To move (3)
   m_TagString: Untagged
@@ -4244,9 +4261,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
-  key: ui.tutorial_overlay.screens.movement_tutorial.to_move_3.text
+  key: 
   applyLanguageFont: 1
   fontRole: Secondary UI
+--- !u!114 &6493287796811068697
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4122219087667930433}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43bdc01124e2fbb4abbdbfb862bb57a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IconPromptText
+  _template: '{0} to sprint'
+  _icon: {fileID: 0}
+  _prefixLabel: {fileID: 0}
 --- !u!1 &4540078133238674391
 GameObject:
   m_ObjectHideFlags: 0
@@ -5783,7 +5815,7 @@ MonoBehaviour:
   m_fontSizeBase: 37
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 20.4
+  m_fontSizeMin: 20
   m_fontSizeMax: 37
   m_fontStyle: 0
   m_HorizontalAlignment: 1
@@ -6610,7 +6642,7 @@ MonoBehaviour:
   m_fontSizeBase: 48.4
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 29
+  m_fontSizeMin: 25
   m_fontSizeMax: 48.4
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -6942,6 +6974,7 @@ GameObject:
   - component: {fileID: 5354920212141270034}
   - component: {fileID: 1466924683238559175}
   - component: {fileID: 8253072844578903028}
+  - component: {fileID: 2865958946765942405}
   m_Layer: 5
   m_Name: To move
   m_TagString: Untagged
@@ -7080,9 +7113,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
-  key: ui.tutorial_overlay.screens.movement_tutorial.to_move.text
+  key: 
   applyLanguageFont: 1
   fontRole: Secondary UI
+--- !u!114 &2865958946765942405
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6930618386587330759}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43bdc01124e2fbb4abbdbfb862bb57a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IconPromptText
+  _template: '{0} to move'
+  _icon: {fileID: 0}
+  _prefixLabel: {fileID: 0}
 --- !u!1 &7284721480736051292
 GameObject:
   m_ObjectHideFlags: 0
@@ -7333,7 +7381,7 @@ MonoBehaviour:
   m_fontSizeBase: 42
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 21
+  m_fontSizeMin: 18
   m_fontSizeMax: 42
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -7348,7 +7396,7 @@ MonoBehaviour:
   m_charWidthMaxAdj: 0
   m_TextWrappingMode: 1
   m_wordWrappingRatios: 0.4
-  m_overflowMode: 1
+  m_overflowMode: 0
   m_linkedTextComponent: {fileID: 0}
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
@@ -7486,7 +7534,7 @@ MonoBehaviour:
   m_fontSizeBase: 38.1
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 38.1
+  m_fontSizeMin: 25
   m_fontSizeMax: 38.1
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -7630,6 +7678,7 @@ GameObject:
   - component: {fileID: 1925687052766470284}
   - component: {fileID: 5142879067020511075}
   - component: {fileID: 5568743472087649979}
+  - component: {fileID: 2857634742416489220}
   m_Layer: 5
   m_Name: To move (2)
   m_TagString: Untagged
@@ -7768,9 +7817,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
-  key: ui.tutorial_overlay.screens.movement_tutorial.to_move_2.text
+  key: 
   applyLanguageFont: 1
   fontRole: Secondary UI
+--- !u!114 &2857634742416489220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7671134602476246020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43bdc01124e2fbb4abbdbfb862bb57a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IconPromptText
+  _template: '{0} to crouch'
+  _icon: {fileID: 0}
+  _prefixLabel: {fileID: 0}
 --- !u!1 &7781378165589078523
 GameObject:
   m_ObjectHideFlags: 0
@@ -8096,7 +8160,7 @@ MonoBehaviour:
   m_fontSizeBase: 37
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 25.9
+  m_fontSizeMin: 20
   m_fontSizeMax: 37
   m_fontStyle: 0
   m_HorizontalAlignment: 1
@@ -8514,7 +8578,7 @@ MonoBehaviour:
   m_fontSizeBase: 38.1
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 38.1
+  m_fontSizeMin: 25
   m_fontSizeMax: 38.1
   m_fontStyle: 0
   m_HorizontalAlignment: 2
@@ -8582,6 +8646,7 @@ GameObject:
   - component: {fileID: 862119404591177666}
   - component: {fileID: 6290526684359080271}
   - component: {fileID: 1882388415903217700}
+  - component: {fileID: 5109615631563639001}
   m_Layer: 5
   m_Name: To move (1)
   m_TagString: Untagged
@@ -8720,9 +8785,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: da877c865a4d642619aa95cc93c21946, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
-  key: ui.tutorial_overlay.screens.movement_tutorial.to_move_1.text
+  key: 
   applyLanguageFont: 1
   fontRole: Secondary UI
+--- !u!114 &5109615631563639001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8739903967184127637}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43bdc01124e2fbb4abbdbfb862bb57a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IconPromptText
+  _template: '{0} to jump'
+  _icon: {fileID: 0}
+  _prefixLabel: {fileID: 0}
 --- !u!1 &9012214556175241724
 GameObject:
   m_ObjectHideFlags: 0
@@ -8820,7 +8900,7 @@ MonoBehaviour:
   m_fontSizeBase: 37
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 25.9
+  m_fontSizeMin: 20
   m_fontSizeMax: 37
   m_fontStyle: 0
   m_HorizontalAlignment: 1

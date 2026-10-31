@@ -79,7 +79,7 @@ public class CameraPickup : PickableObject
 
     private const string UsingToolBool = "UsingTool";
     private static readonly string InteractTextDefault = Loc.N("Camera");
-    private static readonly string InteractTextHasPhoto = Loc.N("to grab photo");
+    private static readonly string InteractTextHasPhoto = Loc.N("Grab photo");
 
     /// <summary>
     /// Brief window after entering camera mode during which LMB does not fire the shutter,

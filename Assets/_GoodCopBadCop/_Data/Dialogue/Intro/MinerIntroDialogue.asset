@@ -21,6 +21,7 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: I know I'm dirty. Showers at the shaft are out three days.
@@ -29,13 +30,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Will they fix them?
-      npcResponse: Used to. Now they tell us to manage. We manage.
+    - playerChoiceText: East shaft. Near the blast?
+      npcResponse: Under it. The air tastes like pennies down there now. We keep digging.
+      npcFollowUp: 
       animationTrigger: TalkIdle
       playLaughSfx: 0
-    - playerChoiceText: Is the work worse now?
-      npcResponse: Always hard. Air tastes different down there since the blast.
+    - playerChoiceText: Cough for me.
+      npcResponse: ...Every miner coughs. Mine's no worse. Maybe a little.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 1
@@ -45,13 +49,16 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Why stay?
+    - playerChoiceText: Why not leave?
       npcResponse: My wife. The coal. I don't know anything else.
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
-    - playerChoiceText: Doesn't it wear you down?
-      npcResponse: It does. Standing still is harder.
+    - playerChoiceText: Who's in charge down there?
+      npcResponse: Nobody, since the foreman went up the east road. We run ourselves now.
+      npcFollowUp: 
       animationTrigger: TalkLookDown
       playLaughSfx: 0
   - type: 0
@@ -61,4 +68,5 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

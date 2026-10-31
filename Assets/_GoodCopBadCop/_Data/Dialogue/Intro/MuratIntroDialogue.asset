@@ -15,12 +15,13 @@ MonoBehaviour:
   isForced: 1
   nodes:
   - type: 0
-    npcLine: Merhaba, officer! Grim day, no? Murat Celik, trader. Textiles, mostly.
+    npcLine: Merhaba, Officer! Grim day, no? Murat, trader. Textiles, mostly.
     animationTrigger: TalkSmile
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []
   - type: 1
     npcLine: Papers, ID, and my lucky chestnut. The bazaar never fully closes.
@@ -29,36 +30,43 @@ MonoBehaviour:
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: People still trade?
-      npcResponse: More than ever! Less silk, more batteries and candles.
+    - playerChoiceText: Where does your stock come from?
+      npcResponse: Friends on the road. Ask fewer questions and the candles get cheaper, eh?
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
-    - playerChoiceText: Isn't the road dangerous?
-      npcResponse: Every road is dangerous. The dangerous ones lead somewhere interesting.
+    - playerChoiceText: What else are you carrying?
+      npcResponse: Chestnut, string, a photo of my grandchildren. Dangerous man, Murat!
+      npcFollowUp: 
       animationTrigger: TalkLookAway
       playLaughSfx: 0
   - type: 1
-    npcLine: I live with my son. Three noisy grandchildren.
+    npcLine: After the bazaar, Samuil's tea house. People talk there. I listen.
     animationTrigger: TalkSmile
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices:
-    - playerChoiceText: Is the tea house open?
-      npcResponse: Yesterday it was! Samuil's tea is still strong. Some things don't end.
+    - playerChoiceText: What are they saying?
+      npcResponse: That the last officer took money. That the next one won't. We'll see!
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
     - playerChoiceText: You seem very calm.
       npcResponse: Three market crashes, two floods, one very aggressive goat. Perspective!
+      npcFollowUp: 
       animationTrigger: TalkSmile
       playLaughSfx: 0
   - type: 0
-    npcLine: Keep the chestnut in mind, officer. Luck is rationed too.
+    npcLine: Keep the chestnut in mind, Officer. Luck is rationed too.
     animationTrigger: TalkSmile
     cameraTrigger: 
     wobbleProfileOverride: {fileID: 0}
     fontOverride: {fileID: 0}
     playLaughSfx: 0
+    unskippable: 0
     choices: []

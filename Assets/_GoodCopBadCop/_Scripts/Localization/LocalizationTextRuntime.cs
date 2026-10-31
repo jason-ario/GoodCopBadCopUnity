@@ -52,6 +52,17 @@ public sealed class LocalizationTextRuntime : MonoBehaviour, ITextPreprocessor
         if (_instance != null) _instance._rescan = true;
     }
 
+    /// <summary>
+    /// Leaves <paramref name="t"/>'s font alone: no language font swap, text preprocessing still applies. For labels
+    /// whose font is chosen per item by code, e.g. Settings language names drawn in their own language's font.
+    /// </summary>
+    public static void KeepOwnFont(TMP_Text t)
+    {
+        if (_instance == null || t == null) return;
+        if (_instance._tracked.TryGetValue(t, out var entry)) entry.Font = null;
+        else _instance._tracked[t] = _instance.CreateEntry(t, keepFont: true);
+    }
+
     public string PreprocessText(string text) { return Loc.LocalizeRendered(text); }
 
     private void OnEnable()
@@ -113,7 +124,7 @@ public sealed class LocalizationTextRuntime : MonoBehaviour, ITextPreprocessor
         if (rerender && entry.Localize) t.havePropertiesChanged = true;
     }
 
-    private Entry CreateEntry(TMP_Text t)
+    private Entry CreateEntry(TMP_Text t, bool keepFont = false)
     {
         var entry = new Entry();
         var input = t.GetComponentInParent<TMP_InputField>(true);
@@ -125,7 +136,7 @@ public sealed class LocalizationTextRuntime : MonoBehaviour, ITextPreprocessor
             entry.Localize = ReferenceEquals(t.textPreprocessor, this);
         }
 
-        bool ownsFont = playerTyped || t.GetComponent<LocalizedText>() != null || t.GetComponentInParent<Subtitles>(true) != null;
+        bool ownsFont = keepFont || playerTyped || t.GetComponent<LocalizedText>() != null || t.GetComponentInParent<Subtitles>(true) != null;
         if (!ownsFont) entry.Font = new LocalizedFontSwap();
         return entry;
     }

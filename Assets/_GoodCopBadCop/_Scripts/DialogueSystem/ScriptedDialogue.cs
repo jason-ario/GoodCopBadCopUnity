@@ -43,6 +43,10 @@ public class ScriptedDialogueChoice
              "Leave empty for no animation.")]
     public string animationTrigger;
 
+    [Tooltip("Optional expression key (e.g. Concerned, Angry) applied through the speaker's " +
+             "DialogueExpressionMaterial for the response and its follow-up. Leave empty for the default face.")]
+    public string expression;
+
     [Tooltip("If true, plays a random clip from the speaker's SpeakingInteraction laugh clips " +
              "when this response starts. Requires laugh clips to be assigned on the speaker.")]
     public bool playLaughSfx;
@@ -65,6 +69,11 @@ public class ScriptedDialogueNode
     [Tooltip("Optional Animator trigger fired on the NPC at the start of this node's NPC line. " +
              "Leave empty for no animation.")]
     public string animationTrigger;
+
+    [Tooltip("Optional expression key (e.g. Concerned, Angry) applied through the speaker's " +
+             "DialogueExpressionMaterial for this node's NPC line. Leave empty for the default face. " +
+             "Ignored by speakers without that component.")]
+    public string expression;
 
     [Tooltip("Optional key matching a ScriptedCameraEntry in ScriptedDialogueRunner. " +
              "When set, the named camera is activated before this line plays. " +

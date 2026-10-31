@@ -397,7 +397,7 @@ public class Day_01 : DayBase
 
     [Tooltip("First megaphone bark played the instant the first breach begins.")]
     [TextArea(2, 4)]
-    [SerializeField, LocalizeField] private string _breachWarningBark1 = "Ah shit, not again. The mutants are coming.";
+    [SerializeField, LocalizeField] private string _breachWarningBark1 = "Ugh, not again. The mutants are coming.";
 
     [Tooltip("Second megaphone bark played shortly after the first breach-warning bark.")]
     [TextArea(2, 4)]
@@ -423,6 +423,10 @@ public class Day_01 : DayBase
     [Tooltip("Base objective text shown in the tutorial list for the post-breach fence-repair " +
              "task. The repaired/total count is appended automatically, e.g. 'Fix Perimeter Fences 1/3'.")]
     [SerializeField, LocalizeField] private string _taskFixFencesText = "Fix Perimeter Fences";
+    [Tooltip("If at least this many fences are already broken when the breach clears (e.g. smashed " +
+             "by mutants), no extra fences are broken — the repair task just tracks the existing " +
+             "damage. 0 = always break the usual random batch.")]
+    [SerializeField, Min(0)] private int _skipExtraFenceBreaksIfBrokenAtLeast = 3;
 
     [Header("Day 1 — Take Out Gore (post-breach)")]
     [Tooltip("Base objective text shown in the tutorial list for the post-breach gore clean-up " +
@@ -2316,7 +2320,7 @@ public class Day_01 : DayBase
     /// </summary>
     private void OnClosingDialogueComplete()
     {
-        // Silence Vlad's generic exit bark — his story ends with "Don't fuck it up."
+        // Silence Vlad's generic exit bark — his story ends with "Don't mess it up."
         SuspectController.ForceNextSuspectSkipExitDialogue = true;
 
         // Index 1 is always a random clean civilian — no forced-spawn intercept needed.
@@ -3435,7 +3439,7 @@ public class Day_01 : DayBase
         _goreResolved   = false;
 
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
-            FenceRepairTask.Instance?.TriggerTask();
+            FenceRepairTask.Instance?.TriggerTask(1f, _skipExtraFenceBreaksIfBrokenAtLeast);
 
         StartCoroutine(WaitForFenceCountThenProceed());
 

@@ -11,8 +11,9 @@ public enum ControlHintDevice
 }
 
 /// <summary>
-/// One "{prefix} [icon] {text}" row shown by <see cref="ControlHintsOverlay"/>, e.g. "[LMB] to check / uncheck"
-/// or "Hold [LMB] to rotate". Serializable so systems can author hints in the Inspector.
+/// One prompt row shown by <see cref="ControlHintsOverlay"/>, authored as a single localizable sentence where "{0}"
+/// is the icon (<see cref="IconPrompt"/>): "{0} to check / uncheck", "Hold {0} to rotate".
+/// Serializable so systems can author hints in the Inspector.
 ///
 /// Icon resolution (per active device, first match wins):
 ///  1. The explicit sprite (<see cref="keyboardMouseSprite"/> / <see cref="gamepadSprite"/>).
@@ -24,17 +25,11 @@ public enum ControlHintDevice
 [Serializable]
 public class ControlHint
 {
-    [Tooltip("Label after the icon, e.g. \"to rotate\".")]
+    [Tooltip("Full prompt sentence with {0} where the icon goes, e.g. \"Hold {0} to rotate\".")]
     [LocalizeField] public string text;
 
-    [Tooltip("Optional label used instead of Text while a gamepad is active.")]
+    [Tooltip("Optional sentence used instead of Text while a gamepad is active (also with {0} for the icon).")]
     [LocalizeField] public string gamepadText;
-
-    [Tooltip("Optional word(s) before the icon, e.g. \"Hold\".")]
-    [LocalizeField] public string prefix;
-
-    [Tooltip("Optional prefix used instead of Prefix while a gamepad is active.")]
-    [LocalizeField] public string gamepadPrefix;
 
     [Tooltip("Which input device this row is shown for.")]
     public ControlHintDevice showFor = ControlHintDevice.Both;
@@ -65,9 +60,8 @@ public class ControlHint
         || (showFor == ControlHintDevice.GamepadOnly && gamepad)
         || (showFor == ControlHintDevice.KeyboardMouseOnly && !gamepad);
 
+    /// <summary>English template for the active device ("{0}" = icon).</summary>
     public string TextFor(bool gamepad) => gamepad && !string.IsNullOrEmpty(gamepadText) ? gamepadText : text;
-
-    public string PrefixFor(bool gamepad) => gamepad && !string.IsNullOrEmpty(gamepadPrefix) ? gamepadPrefix : prefix;
 
     public Sprite ResolveIcon(bool gamepad, InputIconDatabase database)
     {
