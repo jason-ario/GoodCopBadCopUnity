@@ -1963,6 +1963,10 @@ public class SuspectCharacter : Interactable
         if (Time.unscaledTime < _dialogueInteractionBlockedUntil)
             return;
 
+        // A megaphone bark is playing — conversations can't start until it finishes.
+        if (ScriptedDialogueRunner.IsMegaphoneBarkActive)
+            return;
+
         // A player who backed out of (or never joined) an active scripted dialogue with this
         // suspect joins by interacting with them — resumes wherever the dialogue presently is,
         // rather than restarting it. Mid-conversation arrivals are never pulled in by proximity.

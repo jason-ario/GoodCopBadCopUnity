@@ -130,15 +130,20 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// shows the cursor, and hides the player arms and body mesh.
     /// Calls <see cref="OnOpened"/> after setup is complete.
     /// </summary>
-    public void Open(PlayerInteractionController player)
+    /// <returns>
+    /// True if the view actually opened. False if it was refused (already active, or the local
+    /// player is in dialogue) — callers that claimed occupancy or opened networked state before
+    /// calling this must roll it back, otherwise the interactable stays "busy" forever.
+    /// </returns>
+    public bool Open(PlayerInteractionController player)
     {
-        if (IsActive) return;
+        if (IsActive) return false;
 
         // Never open while the local player is in any dialogue (locked or unlocked megaphone,
         // scripted runner sequence, world conversation). The dialogue's exit path restores
         // gameplay state (hides the back button/cursor, unlocks movement) without knowing about
         // the view, which would leave the view's camera latched on with no way out.
-        if (IsLocalPlayerInDialogue()) return;
+        if (IsLocalPlayerInDialogue()) return false;
 
         Player = player;
         IsActive = true;
@@ -219,6 +224,8 @@ public abstract class DiegeticViewController : MonoBehaviour
             _actionPromptHint.gamepadSprite = GamepadActionPromptSprite;
             ControlHintsOverlay.Show(this, _actionPromptHint);
         }
+
+        return true;
     }
 
     /// <summary>Reused hint for the view's LMB / RT prompt (Use Item, rebind-aware on both devices).</summary>

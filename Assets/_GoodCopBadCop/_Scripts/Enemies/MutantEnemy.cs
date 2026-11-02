@@ -48,6 +48,14 @@ public class MutantEnemy : NetworkBehaviour
     /// </summary>
     public event Action OnFleeStarted;
 
+    /// <summary>
+    /// Fired on the server every time this mutant accepts damage in <see cref="TakeDamage"/>,
+    /// before a lethal hit is resolved (so it also fires for a one-shot kill). Used by
+    /// <see cref="FollowTrailThreat"/> so shooting a held pack mutant from out of range starts
+    /// the encounter.
+    /// </summary>
+    public event Action<MutantEnemy> OnDamaged;
+
     // ── Static events ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -2929,6 +2937,8 @@ public class MutantEnemy : NetworkBehaviour
         _provokedUntil = Time.time + ProvokedDuration;
 
         SpawnHitParticleClientRpc(hitPoint);
+
+        OnDamaged?.Invoke(this);
 
         if (_health <= 0f)
         {

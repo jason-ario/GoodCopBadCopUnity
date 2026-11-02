@@ -73,7 +73,7 @@ public class Day_02 : DayBase, IDailyTask
     [SerializeField] private ExamNotebook _mutationNotebook;
 
     [Header("Day 2 — UV Light / Mutation Tutorial Dialogue")]
-    [Tooltip("Scripted cutscene: 'Some mutations are obvious... veins... switch to UV mode' (3 lines).")]
+    [Tooltip("Megaphone bark (auto-advancing, no input): 'Some mutations are obvious... veins... switch to UV mode' (3 lines).")]
     [SerializeField] private ScriptedDialogue _mutationUVIntroDialogue;
 
     [Tooltip("Scripted cutscene: Disposition Chart explanation — closing lines (3 lines).")]
@@ -1034,7 +1034,7 @@ public class Day_02 : DayBase, IDailyTask
     {
         yield return new WaitForSeconds(4f);
 
-        yield return PlayMutationDialogue(_mutationUVIntroDialogue);
+        yield return PlayMutationBark(_mutationUVIntroDialogue);
 
         yield return UVLightRevealTutorialBeat();
 
@@ -1241,6 +1241,26 @@ public class Day_02 : DayBase, IDailyTask
 
         bool done = false;
         runner.PlayMegaphoneDialogue(dialogue, () => done = true, unlocked: true);
+        yield return new WaitUntil(() => done);
+    }
+
+    /// <summary>
+    /// Plays a megaphone dialogue as an input-free bark (<see cref="ScriptedDialogueRunner.PlayMegaphoneBark"/>):
+    /// lines auto-advance after revealing, with no continue prompt and no effect on the player
+    /// beyond blocking new character conversations while it plays. Safe with a null asset.
+    /// </summary>
+    private IEnumerator PlayMutationBark(ScriptedDialogue dialogue)
+    {
+        ScriptedDialogueRunner runner = ScriptedDialogueRunner.Instance;
+
+        if (runner == null || dialogue == null)
+        {
+            Debug.LogWarning("[Day_02] Mutation tutorial bark asset or ScriptedDialogueRunner missing — skipping bark.", this);
+            yield break;
+        }
+
+        bool done = false;
+        runner.PlayMegaphoneBark(dialogue, () => done = true);
         yield return new WaitUntil(() => done);
     }
 

@@ -68,6 +68,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // scripted mode for every client (broadcast), unlike participant-targeted suspect dialogue.
     private bool _megaphoneSequenceActive;
 
+    /// <summary>
+    /// True on every client while a megaphone bark (<see cref="PlayMegaphoneBark"/>) is playing.
+    /// A bark never touches the player (no lock, no cutscene flag, no advance input); its only
+    /// gameplay effect is that character conversations can't be started until it ends
+    /// (see <see cref="SuspectCharacter.Interact"/>).
+    /// </summary>
+    public static bool IsMegaphoneBarkActive { get; private set; }
+
     [Header("Cutscene Cameras")]
     [Tooltip("Maps camera trigger keys (set on ScriptedDialogueNode) to Cinemachine camera GameObjects. " +
              "An empty trigger deactivates overrides and returns to the default suspect cam.")]
@@ -79,6 +87,13 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     [Tooltip("Name colour for megaphone subtitles.")]
     [SerializeField] private Color _megaphoneSpeakerColor = new Color(1f, 0.65f, 0f);
+
+    [Header("Megaphone Bark")]
+    [Tooltip("Seconds a bark line stays on screen after its text has fully revealed before the next line plays.")]
+    [SerializeField, Min(0f)] private float _barkLineHoldSeconds = 2f;
+
+    [Tooltip("Safety cap (seconds) on waiting for a bark line's typewriter reveal to finish.")]
+    [SerializeField, Min(1f)] private float _barkRevealTimeoutSeconds = 15f;
 
     [Header("Wobble")]
     [Tooltip("Default wobble profile applied to every scripted dialogue subtitle. " +
@@ -308,6 +323,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // DialogueChoiceSystem.Awake() for IsInDialogueMode. Without this, UIController.ShowPlayerUI()
         // permanently refuses to reveal the HUD because its guard checks this flag.
         IsScriptedModeActive = false;
+        IsMegaphoneBarkActive = false;
     }
 
     private void OnDestroy()
@@ -317,6 +333,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // and never reaches the normal exit cleanup that clears this flag. Clear it here so a
         // future ShowPlayerUI() call is never blocked forever by a leaked lock.
         IsScriptedModeActive = false;
+        IsMegaphoneBarkActive = false;
     }
 
     // -------------------------------------------------------------------------
@@ -535,6 +552,37 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         Color speakerColor = speakerColorOverride ?? _megaphoneSpeakerColor;
 
         StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete, unlocked, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource));
+    }
+
+    /// <summary>
+    /// Plays a scripted dialogue as a megaphone <b>bark</b>: every line plays on its own, with no
+    /// input and no continue chevron. Each line fully reveals, holds for
+    /// <see cref="_barkLineHoldSeconds"/>, then the next one plays. The player is left completely
+    /// alone: no dialogue lock, no camera change, no cutscene flag (so the hotbar, held items and
+    /// zoom views keep working). The only restriction is that character conversations can't be
+    /// started while it plays (<see cref="IsMegaphoneBarkActive"/>). Must be called on the server.
+    /// Choice nodes and camera triggers on the asset are ignored.
+    /// </summary>
+    public void PlayMegaphoneBark(
+        ScriptedDialogue dialogue,
+        Action onComplete = null,
+        string speakerNameOverride = null,
+        Color? speakerColorOverride = null,
+        bool useAlternateVoice = false)
+    {
+        if (!IsServer) return;
+
+        if (dialogue == null || dialogue.nodes == null || dialogue.nodes.Length == 0)
+        {
+            Debug.LogError("[ScriptedDialogueRunner] PlayMegaphoneBark called with null or empty data.");
+            onComplete?.Invoke();
+            return;
+        }
+
+        string speakerName = string.IsNullOrEmpty(speakerNameOverride) ? _megaphoneSpeakerName : speakerNameOverride;
+        Color speakerColor = speakerColorOverride ?? _megaphoneSpeakerColor;
+
+        StartCoroutine(RunMegaphoneBark(dialogue, onComplete, speakerName, speakerColor, useAlternateVoice));
     }
 
     // -------------------------------------------------------------------------
@@ -1374,14 +1422,83 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     /// <summary>
+    /// Server: plays every line of <paramref name="dialogue"/> as an input-free bark (see
+    /// <see cref="PlayMegaphoneBark"/>). Deliberately leaves the advance gate, participants,
+    /// scripted mode and cutscene state untouched, so it can't interfere with the player or with
+    /// any other sequence.
+    /// </summary>
+    private IEnumerator RunMegaphoneBark(
+        ScriptedDialogue dialogue,
+        Action onComplete,
+        string speakerName,
+        Color speakerColor,
+        bool useAlternateVoice)
+    {
+        SetMegaphoneBarkActiveClientRpc(true);
+        yield return null; // flush RPCs before the first line
+
+        foreach (var node in dialogue.nodes)
+        {
+            if (node == null || string.IsNullOrWhiteSpace(node.npcLine)) continue;
+
+            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
+            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride));
+            SayMegaphoneLineClientRpc(node.npcLine, speakerName, speakerColor, useAlternateVoice,
+                useTelephoneAudioSource: false, waitForInput: false);
+
+            yield return StartCoroutine(WaitForBarkLineReveal(node.npcLine.Length));
+            yield return new WaitForSeconds(_barkLineHoldSeconds);
+
+            SetSpeakerSpeakingClientRpc(false);
+        }
+
+        // The last line's subtitle fades out on its own display timer (waitForInput: false).
+        SetMegaphoneBarkActiveClientRpc(false);
+        yield return null;
+
+        onComplete?.Invoke();
+        Debug.Log("[ScriptedDialogueRunner] Megaphone bark complete.");
+    }
+
+    /// <summary>
+    /// Server: waits until the bark line just sent has finished its typewriter reveal on this
+    /// (host) machine. A short start grace covers the ClientRpc reaching the local client; a
+    /// length-based floor and <see cref="_barkRevealTimeoutSeconds"/> keep it bounded if no
+    /// subtitle is visible here.
+    /// </summary>
+    private IEnumerator WaitForBarkLineReveal(int textLength)
+    {
+        const float startGrace = 0.25f;
+        float minWait = Mathf.Max(startGrace, textLength * 0.015f);
+        float elapsed = 0f;
+
+        while (elapsed < _barkRevealTimeoutSeconds)
+        {
+            bool revealing = DialogueManager.Instance != null && DialogueManager.Instance.IsAnySubtitleRevealing();
+            if (!revealing && elapsed >= minWait) yield break;
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+    }
+
+    [ClientRpc]
+    private void SetMegaphoneBarkActiveClientRpc(bool active)
+    {
+        IsMegaphoneBarkActive = active;
+    }
+
+    /// <summary>
     /// Displays a subtitle line using the given megaphone speaker identity and plays its audio
     /// through <see cref="MegaphoneDialogueManager"/> (or, when <paramref name="useTelephoneAudioSource"/>
     /// is set, through <see cref="Telephone.VoiceAudioSource"/> instead — e.g. for HQ calls
     /// answered over the phone). Uses the standard dialogue audio slot so the player clicking to
-    /// advance stops the audio, matching character dialogue behaviour.
+    /// advance stops the audio, matching character dialogue behaviour. With
+    /// <paramref name="waitForInput"/> false (barks) the line shows no continue chevron and
+    /// fades out on its own display timer.
     /// </summary>
     [ClientRpc]
-    private void SayMegaphoneLineClientRpc(string text, string speakerName, Color speakerColor, bool useAlternateVoice, bool useTelephoneAudioSource = false)
+    private void SayMegaphoneLineClientRpc(string text, string speakerName, Color speakerColor, bool useAlternateVoice, bool useTelephoneAudioSource = false, bool waitForInput = true)
     {
         var mgr = MegaphoneDialogueManager.Instance;
         AudioClip[] clips = mgr != null
@@ -1408,7 +1525,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             mgr?.SetSpeakerSpeaking(true);
 
         DialogueManager.Instance.SpawnSubtitles(text, speakerName, speakerColor,
-            isPlayer: false, clearHistory: false, waitForInput: true);
+            isPlayer: false, clearHistory: false, waitForInput: waitForInput);
 
         if (clips.Length > 0 && source != null)
             DialogueManager.Instance.PlayDialogueAudio(text, clips, source);

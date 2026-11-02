@@ -172,15 +172,30 @@ public class ToolsLocker : Interactable, ILockable
             return;
         }
 
+        // The diegetic view refuses to open while the local player is in any dialogue — e.g. the
+        // Day 3 power-outage HQ call, whose unlocked megaphone dialogue flags EVERY client as
+        // in-cutscene (kicking the shopper out). Bail before claiming occupancy / bumping the
+        // viewer count, otherwise both leak and the shop reads "busy" for the rest of the session.
+        if (_diegeticController != null && DiegeticViewController.IsLocalPlayerInDialogue())
+            return;
+
         if (_occupancy != null && !_occupancy.TryClaim(player))
             return;
 
         Debug.Log("Toggle Tool Locker");
 
         if (_diegeticController != null)
-            _diegeticController.Open(player, this);
+        {
+            if (!_diegeticController.Open(player, this))
+            {
+                _occupancy?.Release();
+                return;
+            }
+        }
         else
+        {
             UIController.Instance.OpenToolShop(lookTarget, this);
+        }
 
         OpenLockerServerRpc();
     }

@@ -225,6 +225,12 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     /// </summary>
     private bool _packKillCompletionPending;
 
+    /// <summary>
+    /// Server only. True once a pack mutant has been damaged and the whole pack was released and
+    /// set to charge — see <see cref="OnPackMutantDamaged"/>. Reset by <see cref="ClearPackKillTracking"/>.
+    /// </summary>
+    private bool _packProvoked;
+
     /// <summary>The location that was last passed to SpawnEvent — used at destination discovery time.</summary>
     private FollowTrailLocation _currentLocation;
 
@@ -934,6 +940,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
 
             _packKillHandlers[capturedMutant] = handler;
             capturedMutant.OnRemovedFromPlay += handler;
+            capturedMutant.OnDamaged += OnPackMutantDamaged;
 
             if (IsSpawned && capturedMutant.NetworkObject != null && capturedMutant.NetworkObject.IsSpawned)
                 _packMutantIds.Add(capturedMutant.NetworkObjectId);
@@ -963,6 +970,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     {
         if (mutant != null && handler != null)
             mutant.OnRemovedFromPlay -= handler;
+        if (mutant != null)
+            mutant.OnDamaged -= OnPackMutantDamaged;
 
         // Only a mutant this pack was actually tracking may decrement the count — guards against a
         // duplicate invocation double-counting one kill.
@@ -1020,9 +1029,13 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         foreach (var pair in _packKillHandlers)
         {
             if (pair.Key != null)
+            {
                 pair.Key.OnRemovedFromPlay -= pair.Value;
+                pair.Key.OnDamaged         -= OnPackMutantDamaged;
+            }
         }
         _packKillHandlers.Clear();
+        _packProvoked              = false;
         _packMutantsRemaining      = 0;
         _packSpawnComplete         = false;
         _packKillCompletionPending = false;
@@ -1115,6 +1128,51 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         if (!IsServer || _isDiscovered.Value || !_followTrailActive.Value) return;
         if (spotter == null || !_packKillHandlers.ContainsKey(spotter)) return;
 
+        SkipToKillTask("Pack mutant encountered before destination");
+    }
+
+    /// <summary>
+    /// Server-only. Fired whenever one of THIS pack's mutants takes damage. Shooting a pack mutant
+    /// from outside <see cref="_packHoldReleaseRadius"/> used to leave the pack frozen and the trail
+    /// task running. Now the first hit while the trail or kill task is live releases the whole pack,
+    /// puts every survivor in charge mode (no detection-radius cap, so they come for the shooter
+    /// from any distance), and — if the trail task is still running — ends it and starts the
+    /// kill-mutants task exactly like <see cref="OnPackMutantEncountered"/>.
+    /// </summary>
+    private void OnPackMutantDamaged(MutantEnemy mutant)
+    {
+        if (!IsServer || _packProvoked) return;
+        if (mutant == null || !_packKillHandlers.ContainsKey(mutant)) return;
+        if (!_followTrailActive.Value && !_killTaskActivated) return;
+
+        _packProvoked = true;
+
+        if (_packHoldReleaseCoroutine != null)
+        {
+            StopCoroutine(_packHoldReleaseCoroutine);
+            _packHoldReleaseCoroutine = null;
+        }
+        ReleaseHeldPack();
+
+        foreach (MutantEnemy packMutant in _packKillHandlers.Keys)
+        {
+            if (packMutant != null && !packMutant.IsDead)
+                packMutant.SetBreachChargeMode(true);
+        }
+
+        if (!_isDiscovered.Value && _followTrailActive.Value)
+            SkipToKillTask("Pack mutant attacked before destination");
+    }
+
+    /// <summary>
+    /// Ends the trail task and activates the kill-mutants task without the destination being
+    /// reached. Shared by the early-encounter (<see cref="OnPackMutantEncountered"/>) and
+    /// early-attack (<see cref="OnPackMutantDamaged"/>) paths. Server only.
+    /// </summary>
+    private void SkipToKillTask(string reason)
+    {
+        if (!IsServer || _isDiscovered.Value) return;
+
         // Unsubscribe immediately — only the first encounter matters.
         MutantEnemy.OnAnyMutantSpottedPlayer -= OnPackMutantEncountered;
 
@@ -1150,7 +1208,7 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         // See OnDestinationDiscovered — raise any completion that landed before listeners existed.
         FlushPendingPackKillCompletion();
 
-        Debug.Log("[FollowTrailThreat] Pack mutant encountered before destination — skipping to kill-mutants task.", this);
+        Debug.Log($"[FollowTrailThreat] {reason} — skipping to kill-mutants task.", this);
     }
 
     private void Cleanup()

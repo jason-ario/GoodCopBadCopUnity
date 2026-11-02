@@ -835,22 +835,6 @@ public class SuspectController : NetworkBehaviour
         // the exit-leg waypoints used in PassSequence) auto-opens for an approaching suspect on
         // its own via its proximity check, so no explicit Open/CloseGate call is needed here.
         suspectCharacter.WalkTo(_activeStandPos.position + suspectCharacter.standPosOffset, ArrivedAtPosition);
-
-        // Notify all clients so they can show the booth-waiting notification if needed.
-        NotifySuspectArrivingClientRpc();
-    }
-
-    /// <summary>
-    /// Fires on every client when a new suspect begins walking to the window.
-    /// Shows the booth-waiting notification only if the local player is away from the booth.
-    /// Uses <see cref="PlayerInstance.IsOutsideLocal"/> to avoid a false negative caused
-    /// by the NetworkVariable server round-trip not yet completing.
-    /// </summary>
-    [ClientRpc]
-    private void NotifySuspectArrivingClientRpc()
-    {
-        if (PlayerInstance.Instance != null && PlayerInstance.Instance.IsOutsideLocal)
-            UIController.Instance.ShowBoothWaitingNotification();
     }
 
     /// <summary>
@@ -2182,9 +2166,6 @@ public class SuspectController : NetworkBehaviour
         behaviour.BeginLineup(data, mutantStandPos, despawnPos, climbThroughTargetPos, shutterController, this);
         _currentMutant = behaviour;
         dailySuspectManager?.RecordMutantSpawn(prefab);
-
-        // Reuse the existing booth-waiting notification so players are alerted.
-        NotifySuspectArrivingClientRpc();
         return true;
     }
 

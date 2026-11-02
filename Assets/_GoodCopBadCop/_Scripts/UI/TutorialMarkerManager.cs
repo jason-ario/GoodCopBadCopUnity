@@ -51,7 +51,8 @@ public class TutorialMarkerManager : MonoBehaviour
     /// </summary>
     /// <param name="target">The Transform to point at.</param>
     /// <param name="hoverHeight">Optional world-space height above the target's pivot; defaults to the prefab's authored value.</param>
-    public void Mark(Transform target, float? hoverHeight = null)
+    /// <param name="autoHighlight">False for an arrow-only marker that must not highlight the target's Interactable.</param>
+    public void Mark(Transform target, float? hoverHeight = null, bool autoHighlight = true)
     {
         if (target == null)
         {
@@ -63,7 +64,7 @@ public class TutorialMarkerManager : MonoBehaviour
 
         TutorialMarker marker = GetFromPool();
         _active[target] = marker;
-        marker.Show(target, hoverHeight);
+        marker.Show(target, hoverHeight, autoHighlight);
     }
 
     /// <summary>Hides the marker on <paramref name="target"/> and returns it to the pool.</summary>

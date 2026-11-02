@@ -31,7 +31,8 @@ public class TutorialCallout : MonoBehaviour
     [SerializeField, Min(0f)] private float _arrowHoverHeight = 0.5f;
 
     [Header("Highlight")]
-    [Tooltip("Outline this object while the call-out is active.")]
+    [Tooltip("Outline this object while the call-out is active. Off = arrow-only (the arrow will not " +
+             "highlight an Interactable either).")]
     [SerializeField] private bool _highlight = true;
     [Tooltip("Outline used for plain (non-Interactable) objects. Falls back to GetComponent<HighlightEffect>().")]
     [SerializeField] private HighlightEffect _highlightEffect;
@@ -136,7 +137,8 @@ public class TutorialCallout : MonoBehaviour
         }
 
         _arrowAnchor.position = ComputeTopCenter();
-        manager.Mark(_arrowAnchor, _arrowHoverHeight);
+        // With highlight off this is an arrow-only call-out: stop the marker lighting an Interactable.
+        manager.Mark(_arrowAnchor, _arrowHoverHeight, _highlight);
     }
 
     private void HideArrow()

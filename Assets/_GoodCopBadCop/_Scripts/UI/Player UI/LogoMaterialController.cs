@@ -6,9 +6,10 @@ using UnityEngine.UI;
 /// Drives the main menu logo's burn-in and random glitch bursts.
 ///
 /// The burn restarts from fully burned (invisible) every time the logo is enabled, i.e. every
-/// time the Home Screen opens. The Home Screen is deactivated whenever the player switches menus
-/// (and briefly during menu setup on load), which kills any running coroutine; because each
-/// OnEnable starts a fresh run, an interrupted burn can never leave the logo stuck invisible.
+/// time the Home Screen opens. It is driven from Update with a capped step (so a scene-reload
+/// hitch can't skip it) and the target value is re-asserted every frame afterwards, so the logo
+/// always ends at _targetBurnProgress while active. If another system swaps the Graphic's
+/// material or overwrites _BurnProgress, it is corrected and a one-time warning is logged.
 ///
 /// Writes go to a runtime copy of <see cref="_logoMaterial"/> so the shared asset is never
 /// modified (previously an interrupted burn left the asset saved at _BurnProgress = 1).
@@ -35,7 +36,16 @@ public class LogoMaterialController : MonoBehaviour
     [SerializeField] private float _glitchDurationMax = 1.5f;
     [SerializeField, Range(0f, 1f)] private float _glitchIntensity = 0.5f;
 
+    // Largest per-frame step for the burn, so a scene-load hitch (a reload can produce a multi-second
+    // first frame) can't swallow the animation. Same 1/30s cap as the splash-screen fades.
+    private const float MaxBurnStep = 1f / 30f;
+
     private Material _runtimeMaterial;
+    private Graphic _graphic;
+    private float _burnElapsed;
+    private bool _burnFinished;
+    private bool _warnedMaterialSwap;
+    private bool _warnedExternalWrite;
 
     private void Awake()
     {
@@ -46,8 +56,8 @@ public class LogoMaterialController : MonoBehaviour
         _runtimeMaterial.SetFloat(BurnProgressId, 1f);
         _runtimeMaterial.SetFloat(GlitchStrengthId, 0f);
 
-        if (TryGetComponent(out Graphic graphic))
-            graphic.material = _runtimeMaterial;
+        if (TryGetComponent(out _graphic))
+            _graphic.material = _runtimeMaterial;
     }
 
     private void OnEnable()
@@ -56,11 +66,67 @@ public class LogoMaterialController : MonoBehaviour
             return;
 
         // Every time the home screen opens, restart the burn from fully burned (invisible).
-        // Each activation owns a fresh run, so a menu switch that kills the coroutine mid-burn
-        // can't leave the logo stuck invisible.
-        StartCoroutine(AnimateBurnProgress());
+        // The burn is driven from Update (not a coroutine) and re-asserted every frame, so it
+        // always converges to _targetBurnProgress while the logo is active.
+        _burnElapsed = -Mathf.Max(0f, _delay);
+        _burnFinished = false;
+        _runtimeMaterial.SetFloat(BurnProgressId, 1f);
+
         if (_enableGlitch)
             StartCoroutine(GlitchLoop());
+    }
+
+    private void Update()
+    {
+        if (_runtimeMaterial == null)
+            return;
+
+        EnsureRuntimeMaterialAssigned();
+
+        if (!_burnFinished)
+        {
+            _burnElapsed += Mathf.Min(Time.unscaledDeltaTime, MaxBurnStep);
+            float t = _duration > 0f ? Mathf.Clamp01(_burnElapsed / _duration) : 1f;
+            _runtimeMaterial.SetFloat(BurnProgressId, _burnElapsed <= 0f ? 1f : Mathf.Lerp(1f, _targetBurnProgress, t));
+
+            if (t >= 1f)
+            {
+                _burnFinished = true;
+                if (_burnSound != null && SFXController.Instance != null)
+                    SFXController.Instance.Play(_burnSound);
+            }
+            return;
+        }
+
+        // Burn done: hold the target. If anything else overwrote it, put it back and say so once.
+        if (!Mathf.Approximately(_runtimeMaterial.GetFloat(BurnProgressId), _targetBurnProgress))
+        {
+            if (!_warnedExternalWrite)
+            {
+                _warnedExternalWrite = true;
+                Debug.LogWarning($"[LogoMaterialController] _BurnProgress on '{name}' was changed externally " +
+                                 $"({_runtimeMaterial.GetFloat(BurnProgressId):F3}); restoring {_targetBurnProgress:F3}.", this);
+            }
+            _runtimeMaterial.SetFloat(BurnProgressId, _targetBurnProgress);
+        }
+    }
+
+    /// <summary>
+    /// Re-applies the runtime copy if something replaced the Graphic's material; otherwise burn
+    /// writes would go to a material that isn't being drawn. Warns once with the culprit.
+    /// </summary>
+    private void EnsureRuntimeMaterialAssigned()
+    {
+        if (_graphic == null || _graphic.material == _runtimeMaterial)
+            return;
+
+        if (!_warnedMaterialSwap)
+        {
+            _warnedMaterialSwap = true;
+            Debug.LogWarning($"[LogoMaterialController] Graphic material on '{name}' was replaced with " +
+                             $"'{(_graphic.material != null ? _graphic.material.name : "null")}'; re-assigning the runtime burn material.", this);
+        }
+        _graphic.material = _runtimeMaterial;
     }
 
     private void OnDisable()
@@ -75,36 +141,6 @@ public class LogoMaterialController : MonoBehaviour
     {
         if (_runtimeMaterial != null)
             Destroy(_runtimeMaterial);
-    }
-
-    /// <summary>
-    /// Sets _BurnProgress to 1 (invisible), waits for the configured delay, then animates it to
-    /// the target value. Unscaled time, so a leftover Time.timeScale of 0 can't stall it.
-    /// </summary>
-    private IEnumerator AnimateBurnProgress()
-    {
-        _runtimeMaterial.SetFloat(BurnProgressId, 1f);
-
-        float delayElapsed = 0f;
-        while (delayElapsed < _delay)
-        {
-            delayElapsed += Time.unscaledDeltaTime;
-            yield return null;
-        }
-
-        float elapsed = 0f;
-        while (elapsed < _duration)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / _duration);
-            _runtimeMaterial.SetFloat(BurnProgressId, Mathf.Lerp(1f, _targetBurnProgress, t));
-            yield return null;
-        }
-
-        _runtimeMaterial.SetFloat(BurnProgressId, _targetBurnProgress);
-
-        if (_burnSound != null && SFXController.Instance != null)
-            SFXController.Instance.Play(_burnSound);
     }
 
     /// <summary>

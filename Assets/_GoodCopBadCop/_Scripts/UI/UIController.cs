@@ -1452,11 +1452,9 @@ public class UIController : MonoBehaviour
         shopNotificationManager.ShowErrorNotification(message);
     }
 
-    private const string BoothWaitingNotificationKey = "BoothWaiting";
     private const string MailDeliveryNotificationKey = "MailDelivery";
     private const string RadiationAlertNotificationKey = "RadiationAlert";
     private const string LowHealthAlertNotificationKey = "LowHealthAlert";
-    private const string BoothWaitingMessage = "Someone is waiting at the booth";
 
     /// <summary>
     /// Queues a message on the shared bottom-centre notification slot (see
@@ -1477,21 +1475,6 @@ public class UIController : MonoBehaviour
     {
         if (notificationQueue != null)
             notificationQueue.Hide(key);
-    }
-
-    /// <summary>
-    /// Queues the "someone is waiting at the booth" notification. Call this only on the local
-    /// client and only when the player is away from the booth.
-    /// </summary>
-    public void ShowBoothWaitingNotification()
-    {
-        ShowQueuedNotification(BoothWaitingMessage, BoothWaitingNotificationKey);
-    }
-
-    /// <summary>Hides the booth waiting notification.</summary>
-    public void HideBoothWaitingNotification()
-    {
-        HideQueuedNotification(BoothWaitingNotificationKey);
     }
 
     /// <summary>

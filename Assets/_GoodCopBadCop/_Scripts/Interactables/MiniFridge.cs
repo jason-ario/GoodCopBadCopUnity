@@ -48,12 +48,22 @@ public class MiniFridge : Interactable
 
         if (_diegeticController != null && !_isOpen.Value)
         {
+            // Same leak guard as ToolsLocker: the view won't open during dialogue, so don't
+            // claim occupancy or open the door for a view that never appears.
+            if (DiegeticViewController.IsLocalPlayerInDialogue())
+                return;
+
             if (_occupancy != null && !_occupancy.TryClaim(player))
                 return;
 
+            if (!_diegeticController.Open(player, this))
+            {
+                _occupancy?.Release();
+                return;
+            }
+
             // Open the door and enter the diegetic view together.
             RequestOpenServerRpc();
-            _diegeticController.Open(player, this);
         }
         else
         {

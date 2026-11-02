@@ -65,6 +65,7 @@ public class TutorialMarker : MonoBehaviour
     private float _bobOffset;   // per-instance phase offset to desync multiple markers
     private Vector3 _baseLocalScale; // authored scale at referenceDistance, before distance scaling
     private float _defaultHoverHeight; // authored hoverHeight, restored on every pooled Show()
+    private bool _autoHighlight = true; // false = arrow-only showing; skip resolving the target's Interactable
 
     private static readonly HashSet<TutorialMarker> _activeInstances = new();
 
@@ -177,11 +178,14 @@ public class TutorialMarker : MonoBehaviour
     /// Attaches the marker to <paramref name="target"/> and fades it in. Pass
     /// <paramref name="hoverHeightOverride"/> for tall targets whose pivot is far below their top;
     /// otherwise the authored hover height is used (pooled markers never keep a previous override).
+    /// Pass <paramref name="autoHighlight"/> = false for an arrow-only call-out that must not light
+    /// the <see cref="Interactable"/> resolved from <paramref name="target"/>.
     /// </summary>
-    public void Show(Transform target, float? hoverHeightOverride = null)
+    public void Show(Transform target, float? hoverHeightOverride = null, bool autoHighlight = true)
     {
         hoverHeight = hoverHeightOverride ?? _defaultHoverHeight;
         _target = target;
+        _autoHighlight = autoHighlight;
         _bobOffset = Random.Range(0f, 1f);
         gameObject.SetActive(true);
     }
@@ -191,6 +195,7 @@ public class TutorialMarker : MonoBehaviour
     {
         gameObject.SetActive(false);
         _target = null;
+        _autoHighlight = true;
     }
 
     /// <summary>
@@ -212,7 +217,7 @@ public class TutorialMarker : MonoBehaviour
         _highlightSet.Clear();
         AddRange(highlightTargets);
 
-        if (_target == null) return;
+        if (_target == null || !_autoHighlight) return;
 
         // Day 1 marks pre-placed arrow anchors; their authored targets define what gets lit.
         if (_target.TryGetComponent(out TutorialMarker anchor))

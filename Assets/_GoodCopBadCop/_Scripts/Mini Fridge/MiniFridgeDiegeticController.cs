@@ -31,11 +31,15 @@ public class MiniFridgeDiegeticController : DiegeticViewController
     /// <summary>
     /// Opens the mini fridge diegetic view for <paramref name="player"/>.
     /// Stores the <paramref name="fridge"/> reference so the door can be closed on exit.
+    /// Returns false if the base view refused to open (see <see cref="DiegeticViewController.Open"/>).
     /// </summary>
-    public void Open(PlayerInteractionController player, MiniFridge fridge)
+    public bool Open(PlayerInteractionController player, MiniFridge fridge)
     {
         _fridge = fridge;
-        base.Open(player);
+        if (base.Open(player)) return true;
+
+        _fridge = null;
+        return false;
     }
 
     // ─── DiegeticViewController hooks ────────────────────────────────────────

@@ -66,11 +66,15 @@ public class ToolLockerDiegeticController : DiegeticViewController
     /// <summary>
     /// Opens the locker diegetic view for <paramref name="player"/>.
     /// Stores the <paramref name="locker"/> reference so it can be notified on close.
+    /// Returns false if the base view refused to open (see <see cref="DiegeticViewController.Open"/>).
     /// </summary>
-    public void Open(PlayerInteractionController player, ToolsLocker locker)
+    public bool Open(PlayerInteractionController player, ToolsLocker locker)
     {
         _locker = locker;
-        base.Open(player);
+        if (base.Open(player)) return true;
+
+        _locker = null;
+        return false;
     }
 
     // ─── DiegeticViewController hooks ────────────────────────────────────────

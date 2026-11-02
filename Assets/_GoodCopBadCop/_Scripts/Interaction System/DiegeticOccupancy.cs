@@ -22,6 +22,14 @@ public class DiegeticOccupancy : NetworkBehaviour
     public bool IsOccupied => _occupantClientId.Value != NoOccupant;
 
     /// <summary>
+    /// True from the moment this peer sends a claim until it releases. On a remote client the
+    /// replicated <see cref="IsOccupied"/> lags the claim by a round trip, so an immediate
+    /// rollback (e.g. the view refused to open) would otherwise skip the release RPC and leave
+    /// the interactable stuck "busy" once the claim lands on the server.
+    /// </summary>
+    private bool _claimedLocally;
+
+    /// <summary>
     /// Attempts to claim occupancy for <paramref name="player"/>. If the interactable is
     /// already occupied by someone else, shows a "busy" notification and returns false.
     /// Otherwise claims it (server-authoritative) and returns true.
@@ -35,7 +43,10 @@ public class DiegeticOccupancy : NetworkBehaviour
         }
 
         if (player != null)
+        {
             ClaimServerRpc(player.OwnerClientId);
+            _claimedLocally = true;
+        }
 
         return true;
     }
@@ -43,7 +54,8 @@ public class DiegeticOccupancy : NetworkBehaviour
     /// <summary>Releases occupancy. Safe to call even when not currently occupied.</summary>
     public void Release()
     {
-        if (!IsOccupied) return;
+        if (!IsOccupied && !_claimedLocally) return;
+        _claimedLocally = false;
         ReleaseServerRpc();
     }
 
