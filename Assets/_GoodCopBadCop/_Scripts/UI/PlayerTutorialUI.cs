@@ -14,6 +14,9 @@ public class PlayerTutorialUI : MonoBehaviour
     [Tooltip("Seconds after the intro cinematic ends and the screen fades in before 'Go to the booth' appears.")]
     [SerializeField] private float boothMessageDelay = 4f;
 
+    [Tooltip("Max seconds (unscaled) to wait for the typewriter reveal before snapping the text and continuing, so a stalled reveal can never strand the black bars on screen.")]
+    [SerializeField] private float revealTimeout = 10f;
+
     private Animator _animator;
     private Coroutine _sequenceCoroutine;
     private Action _onCloseCallback;
@@ -196,7 +199,10 @@ public class PlayerTutorialUI : MonoBehaviour
         textReveal.gameObject.SetActive(true);
         _animator.SetBool(BlackBarsOn, true);
 
-        yield return textReveal.RevealText(message);
+        // Bounded + polled instead of `yield return textReveal.RevealText(...)`: yielding on another
+        // object's Coroutine handle never resumes if that routine dies (exception, StopCoroutine, or
+        // deactivation), which left the black bars on screen forever and blocked the day-end UI.
+        yield return textReveal.RevealTextBounded(message, revealTimeout);
         yield return new WaitForSeconds(holdDuration);
 
         Dismiss();
@@ -206,7 +212,7 @@ public class PlayerTutorialUI : MonoBehaviour
     {
         textReveal.gameObject.SetActive(true);
 
-        yield return textReveal.RevealText(message);
+        yield return textReveal.RevealTextBounded(message, revealTimeout);
         yield return new WaitForSeconds(holdDuration);
 
         textReveal.Clear();

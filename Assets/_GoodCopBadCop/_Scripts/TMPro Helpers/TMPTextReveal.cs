@@ -120,7 +120,20 @@ public class TMPTextReveal : MonoBehaviour
         tmp.text = fullText;
         tmp.ForceMeshUpdate();
 
-        // Cache the source-string index of every visible character before we start
+        // TMP's characterInfo[].index points into the text AFTER the ITextPreprocessor ran. The
+        // render-time localization (LocalizationTextRuntime -> Loc.LocalizeRendered) swaps English
+        // source for the translation, so those indices index the translated string, not fullText —
+        // e.g. "MUTANT BREACH DETECTED" (22) renders as "ОБНАРУЖЕН ПРОРЫВ МУТАНТОВ" (25). Growing
+        // fullText.Substring by those indices threw ArgumentOutOfRangeException, which silently
+        // killed this coroutine and stranded every caller yielding on it (the breach black bars
+        // never dismissed). Substrings of a translated line also can't be reverse-translated, so
+        // whenever the preprocessor changes the text, reveal the full laid-out text by visible count.
+        string renderedText = GetRenderedText(fullText);
+        bool isPreprocessed = !string.Equals(renderedText, fullText, StringComparison.Ordinal);
+        bool revealByVisibleCount = reserveFullTextLayout || isPreprocessed;
+        string indexedText = isPreprocessed ? renderedText : fullText;
+
+        // Cache the indexed-string index of every visible character before we start
         // overwriting tmp.text, since textInfo is rebuilt on each text assignment.
         int totalChars = tmp.textInfo.characterCount;
         int[] charStringIndices = new int[totalChars];
@@ -130,9 +143,9 @@ public class TMPTextReveal : MonoBehaviour
         // Reveal by progressively growing tmp.text to a longer substring each step.
         // This makes TMP measure only the currently visible portion, so TMPWidthFitter
         // and any ContentSizeFitter in the hierarchy reflect the actual visible width.
-        // With reserveFullTextLayout the full text stays laid out and only the visible count grows,
-        // so the block keeps its final size/position from the first character.
-        if (!reserveFullTextLayout)
+        // With reserveFullTextLayout (or preprocessed/localized text) the full text stays laid out and
+        // only the visible count grows, so the block keeps its final size/position from the first character.
+        if (!revealByVisibleCount)
             tmp.maxVisibleCharacters = 99999;
 
         _skipLineRequested = false;
@@ -144,27 +157,29 @@ public class TMPTextReveal : MonoBehaviour
                 // Jump to the end of the line being typed; the next line then types on normally.
                 _skipLineRequested = false;
                 int current = charStringIndices[i];
-                int searchFrom = current < fullText.Length && fullText[current] == '\n' ? current + 1 : current;
-                int lineEnd = searchFrom < fullText.Length ? fullText.IndexOf('\n', searchFrom) : -1;
+                int searchFrom = current < indexedText.Length && indexedText[current] == '\n' ? current + 1 : current;
+                int lineEnd = searchFrom < indexedText.Length ? indexedText.IndexOf('\n', searchFrom) : -1;
                 if (lineEnd < 0) break; // last line: finish the whole text
                 while (i + 1 < totalChars && charStringIndices[i + 1] < lineEnd) i++;
             }
 
             int stringIndex = charStringIndices[i];
-            if (reserveFullTextLayout)
+            if (revealByVisibleCount)
                 tmp.maxVisibleCharacters = i + 1;
-            else
+            else if (stringIndex < fullText.Length)
                 tmp.text = fullText.Substring(0, stringIndex + 1);
+            else
+                break; // index past the source (should not happen unpreprocessed) — finish instead of throwing
 
             // Detect a crossed line break whether or not TMP lists '\n' as its own character.
             bool crossedLineBreak = false;
-            for (int s = previousStringIndex + 1; s <= stringIndex && s < fullText.Length; s++)
+            for (int s = previousStringIndex + 1; s <= stringIndex && s < indexedText.Length; s++)
             {
-                if (fullText[s] == '\n') { crossedLineBreak = true; break; }
+                if (indexedText[s] == '\n') { crossedLineBreak = true; break; }
             }
             previousStringIndex = stringIndex;
 
-            char revealed = stringIndex < fullText.Length ? fullText[stringIndex] : ' ';
+            char revealed = stringIndex < indexedText.Length ? indexedText[stringIndex] : ' ';
 
             if (crossedLineBreak && lineBreakDelay > 0f && i > 0)
             {
@@ -191,6 +206,17 @@ public class TMPTextReveal : MonoBehaviour
         tmp.text = fullText;
         tmp.maxVisibleCharacters = 99999;
         revealRoutine = null;
+    }
+
+    /// <summary>
+    /// The string TMP actually lays out for <paramref name="text"/> — i.e. after the label's
+    /// <see cref="ITextPreprocessor"/> (render-time localization / pseudolocalization) has run.
+    /// </summary>
+    private string GetRenderedText(string text)
+    {
+        ITextPreprocessor preprocessor = tmp.textPreprocessor;
+        if (preprocessor == null || string.IsNullOrEmpty(text)) return text;
+        return preprocessor.PreprocessText(text) ?? text;
     }
 
     /// <summary>Returns true while a reveal coroutine is actively running.</summary>

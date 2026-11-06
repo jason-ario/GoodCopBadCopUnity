@@ -1635,6 +1635,11 @@ public class FolderController : PickableObject
             // Shift the page's SocketFollow target to the new slot so it tracks correctly.
             if (_examPageQueue[i] != null)
             {
+                // Keep the replicated slot record in step, or a client that joins later
+                // rebuilds this page in its OLD slot (stacked on top of its neighbour).
+                if (IsServer && i < examPageSlots.Length && examPageSlots[i] != null)
+                    _examPageQueue[i].RecordFolderSlotServer(NetworkObject, GetRelativePath(transform, examPageSlots[i]));
+
                 ShiftDocumentSlotClientRpc(
                     new NetworkObjectReference(_examPageQueue[i].NetworkObject),
                     i);
