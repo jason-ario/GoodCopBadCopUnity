@@ -361,7 +361,13 @@ public class ShiftManager : NetworkBehaviour
     /// </summary>
     private void TryEnableClockOut()
     {
-        if (!IsServer || !_suspectsComplete || _pendingDailyTasks.Count > 0) return;
+        if (!IsServer) return;
+
+        // A blocker whose MonoBehaviour was destroyed (scene reload, despawn) can never fire
+        // OnDailyTaskCompleted, so it would hold the timecard machine closed forever.
+        PruneDestroyedPendingDailyTasks();
+
+        if (!_suspectsComplete || _pendingDailyTasks.Count > 0) return;
         if (_clockOutEnabledThisCycle) return;
 
         // End of the day's schedule — suspects processed AND every post-shift task complete.
@@ -402,6 +408,54 @@ public class ShiftManager : NetworkBehaviour
     /// condition is already satisfied.
     /// </summary>
     public void RecheckClockOutGate() => TryEnableClockOut();
+
+    /// <summary>
+    /// Drops pending daily-task blockers whose backing Unity object has been destroyed. Server only.
+    /// </summary>
+    private void PruneDestroyedPendingDailyTasks()
+    {
+        if (_pendingDailyTasks.Count == 0) return;
+
+        List<IDailyTask> dead = null;
+        foreach (IDailyTask task in _pendingDailyTasks)
+        {
+            if (task == null || (task is UnityEngine.Object o && o == null))
+                (dead ??= new List<IDailyTask>()).Add(task);
+        }
+        if (dead == null) return;
+
+        foreach (IDailyTask task in dead)
+        {
+            _pendingDailyTasks.Remove(task);
+            _pendingDailyTaskHandlers.Remove(task);
+        }
+
+        Debug.LogWarning($"[ShiftManager] Pruned {dead.Count} destroyed pending daily task(s). " +
+                         $"Remaining pending: {_pendingDailyTasks.Count}.");
+    }
+
+    /// <summary>
+    /// Server-side snapshot of everything that gates clock-out (and therefore the bed), for logs.
+    /// </summary>
+    public string DescribeClockOutGate()
+    {
+        if (!IsServer) return "(clock-out gate is server-only state)";
+
+        PruneDestroyedPendingDailyTasks();
+
+        var ids = new List<string>(_pendingDailyTasks.Count);
+        foreach (IDailyTask task in _pendingDailyTasks)
+            ids.Add(task?.DailyTaskId ?? "<null>");
+
+        bool breach = MutantBreachManager.Instance != null &&
+                      MutantBreachManager.Instance.IsBreachPendingOrActiveForToday;
+
+        return $"day={_currentDay}, phase={CurrentPhase}, suspectsComplete={_suspectsComplete}, " +
+               $"pendingTasks=[{string.Join(", ", ids)}], breachPendingOrActive={breach}, " +
+               $"clockOutEnabledThisCycle={_clockOutEnabledThisCycle}, " +
+               $"timecardArmed={TimecardMachine.IsClockOutArmedNow}, " +
+               $"clockedOut={TimecardMachine.HasClockedOutThisCycle}";
+    }
 
     /// <summary>
     /// Fired on the server once every suspect has been processed AND every post-shift daily

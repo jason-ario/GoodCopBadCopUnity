@@ -44,6 +44,7 @@ public class BunkBedInteractable : Interactable
 
     private static readonly string InteractTextReady    = Loc.N("Sleep");
     private static readonly string InteractTextNotReady = Loc.N("Finish remaining tasks to end the day");
+    private static string ClockOutFirstMessage => "<color=red>" + Loc.T("Clock out to end the day") + "</color>";
 
     /// <summary>
     /// Fired locally when the player confirms ending the day at the bunk bed.
@@ -331,6 +332,16 @@ public class BunkBedInteractable : Interactable
         // "End the day?" popup here would let this player fire a duplicate end-of-shift report.
         if (_endDayConfirmed.Value) return;
 
+        // Everything is done and the machine is waiting for the punch — tell the player exactly
+        // that instead of the generic "Finish all tasks" bed view.
+        if (!CanSleep && TimecardMachine.IsClockOutArmedNow)
+        {
+            UIController.Instance?.ShowErrorNotification(ClockOutFirstMessage);
+            TimecardMachine.EnsureClockOutObjectiveShown();
+            Debug.Log("[BunkBedInteractable] Sleep refused — clock-out is armed but nobody has punched out yet.");
+            return;
+        }
+
         _interactingPlayer = player;
         OpenBedView(player);
     }
@@ -360,7 +371,33 @@ public class BunkBedInteractable : Interactable
         if (canSleep)
             UIController.Instance.OpenEndDayPopup(OnConfirmEndDay, OnCancelEndDay);
         else
+        {
             UIController.Instance.OpenEndDayBlockedPopup(OnCancelEndDay);
+            LogBlockedSleep();
+        }
+    }
+
+    /// <summary>
+    /// Records why the bed refused to end the day. The clock-out gate is server-only state, so a
+    /// client asks the host to log it too — the host's Player.log then names the exact blocker.
+    /// </summary>
+    private void LogBlockedSleep()
+    {
+        Debug.LogWarning($"[BunkBedInteractable] Sleep blocked — timecardArmed={TimecardMachine.IsClockOutArmedNow} " +
+                         $"(armed means the team just hasn't punched out yet), clockedOut={TimecardMachine.HasClockedOutThisCycle}.");
+
+        if (!IsSpawned) return;
+        if (IsServer)
+            Debug.LogWarning($"[BunkBedInteractable] Clock-out gate: {ShiftManager.Instance?.DescribeClockOutGate()}");
+        else
+            LogBlockedSleepServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void LogBlockedSleepServerRpc(ServerRpcParams rpcParams = default)
+    {
+        Debug.LogWarning($"[BunkBedInteractable] Client {rpcParams.Receive.SenderClientId} blocked at bed. " +
+                         $"Clock-out gate: {ShiftManager.Instance?.DescribeClockOutGate()}");
     }
 
     private void CloseBedView()

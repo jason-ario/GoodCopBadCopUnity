@@ -100,6 +100,10 @@ public class TimecardMachine : Interactable
     public static bool HasClockedOutThisCycle =>
         _instance != null && _instance.IsSpawned && _instance._clockedOutThisCycle.Value;
 
+    /// <summary>Replicated: true while the machine is primed and waiting for a clock-out punch.</summary>
+    public static bool IsClockOutArmedNow =>
+        _instance != null && _instance.IsSpawned && _instance._clockOutArmed.Value;
+
     [SerializeField] private AudioSource _audioSource;
     [SerializeField] private AudioClip _clockOutSound;
     [SerializeField] private Animator _animator;
@@ -400,6 +404,19 @@ public class TimecardMachine : Interactable
 
     /// <summary>True when the machine is currently ready to accept a clock-out punch.</summary>
     public bool IsClockOutArmed => _clockOutArmed.Value;
+
+    /// <summary>
+    /// Self-heal for this peer: if clock-out is armed but the "Clock out for the day" row is
+    /// missing (never added, or destroyed by a list teardown), add it now. No-op otherwise.
+    /// </summary>
+    public static void EnsureClockOutObjectiveShown()
+    {
+        if (_instance == null || !_instance.IsSpawned || !_instance._clockOutArmed.Value) return;
+        if (_instance._clockOutObjective != null) return; // Unity null also covers destroyed rows.
+
+        Debug.LogWarning("[TimecardMachine] Clock-out is armed but its objective row was missing — re-adding it.");
+        AddObjectiveIfNotDay1(ref _instance._clockOutObjective, _instance._clockOutObjectiveText);
+    }
 
     /// <summary>True when the machine is currently ready to accept a clock-in punch.</summary>
     public bool IsClockInArmed => _clockInArmed.Value;
