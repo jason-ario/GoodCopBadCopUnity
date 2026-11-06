@@ -443,6 +443,8 @@ public class MainMenuController : MonoBehaviour
     public async void StartNewGame()
     {
         Debug.Log("[StartNewGame] Called.");
+        if (!TryBeginSessionStart("StartNewGame")) return;
+
         try
         {
             GameManager.Instance.BeginLobbyTransition();
@@ -466,6 +468,32 @@ public class MainMenuController : MonoBehaviour
             Debug.LogError($"[StartNewGame] Unhandled exception: {e}");
             GameManager.Instance.CancelLobbyTransition();
         }
+        finally
+        {
+            _isStartingSession = false;
+        }
+    }
+
+    /// <summary>
+    /// True while <see cref="StartNewGame"/> or <see cref="ContinueGame"/> is awaiting lobby
+    /// creation. Both are async void, so a double-click on a campaign slot used to run two
+    /// <see cref="LobbyManager.CreateLobby"/> calls in parallel: two Steam lobbies were created,
+    /// the second overwrote <see cref="LobbyManager.CurrentLobby"/> (host alone in it), and the
+    /// joining friend landed in the orphaned first one — so the host's lobby UI showed 1 member
+    /// even though the friend's NGO connection succeeded.
+    /// </summary>
+    private bool _isStartingSession;
+
+    private bool TryBeginSessionStart(string caller)
+    {
+        if (_isStartingSession)
+        {
+            Debug.LogWarning($"[{caller}] Ignored — a session start is already in progress (double-click?).");
+            return false;
+        }
+
+        _isStartingSession = true;
+        return true;
     }
 
     /// <summary>
@@ -481,6 +509,8 @@ public class MainMenuController : MonoBehaviour
             Debug.LogWarning("[ContinueGame] No occupied save slot found.");
             return;
         }
+
+        if (!TryBeginSessionStart("ContinueGame")) return;
 
         try
         {
@@ -538,6 +568,10 @@ public class MainMenuController : MonoBehaviour
             Debug.LogError($"[ContinueGame] Unhandled exception: {e}");
             UIController.Instance.FadeOut();
             GameManager.Instance.CancelLobbyTransition();
+        }
+        finally
+        {
+            _isStartingSession = false;
         }
     }
 

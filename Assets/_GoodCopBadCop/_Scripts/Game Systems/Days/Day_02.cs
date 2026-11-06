@@ -372,15 +372,22 @@ public class Day_02 : DayBase, IDailyTask
 
         // Hide the mutation notebook until the tutorial beat spawns it in.
         _mutationNotebook?.SetVisible(false);
-        _mutationNotebook?.SetInteractableNetworked(false);
 
         // Hide the biological notebook — not introduced until Day 3.
         _biologicalNotebook?.SetVisible(false);
-        _biologicalNotebook?.SetInteractableNetworked(false);
 
-        // The hammer was already unlocked during Day 1's post-breach fence-repair tutorial —
-        // keep it interactable through Day 2 onward.
-        _hammer?.SetInteractableNetworked(true);
+        // Networked interactable gates are server-only: DayActivated also runs on a client that
+        // (re)connects mid-day, and its forwarded writes would re-lock items for every player
+        // (e.g. the mutation notebook after its tutorial unlocked it). See Day_01.DayActivated.
+        if (NetworkManager.Singleton.IsServer)
+        {
+            _mutationNotebook?.SetInteractableNetworked(false);
+            _biologicalNotebook?.SetInteractableNetworked(false);
+
+            // The hammer was already unlocked during Day 1's post-breach fence-repair tutorial —
+            // keep it interactable through Day 2 onward.
+            _hammer?.SetInteractableNetworked(true);
+        }
 
         _mutationTutorialFired = false;
 
@@ -392,7 +399,8 @@ public class Day_02 : DayBase, IDailyTask
         // same as green/yellow (green/yellow are already unlocked by Day 1's own tutorial
         // completion steps). Suspects are generated normally; the player kills whenever they
         // judge a suspect warrants it.
-        _redStampSlot?.SetSlotInteractable(true);
+        if (NetworkManager.Singleton.IsServer)
+            _redStampSlot?.SetSlotInteractable(true);
 
         // Ensure the first booth suspect has Blue Veins specifically, so the UV flashlight
         // tutorial always has a subject to demonstrate on.

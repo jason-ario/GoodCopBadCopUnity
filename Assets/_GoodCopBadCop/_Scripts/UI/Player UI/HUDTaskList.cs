@@ -141,6 +141,13 @@ public class HUDTaskList : MonoBehaviour
 
         foreach (ISystemicThreat threat in stale)
         {
+            // A row from a torn-down scene (or cleared by HideAndClear) is already gone.
+            if (_rows[threat] == null)
+            {
+                _rows.Remove(threat);
+                continue;
+            }
+
             // Briefly show the strikethrough completion visual before the row disappears, same
             // as the hand-scripted tutorial rows elsewhere (e.g. Day_01's task transitions).
             list.CompleteAndRemoveObjective(_rows[threat], preHideDelay: CompletedRowLingerDuration);

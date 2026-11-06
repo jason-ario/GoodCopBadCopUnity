@@ -286,6 +286,18 @@ public class PlayerInteractionController : NetworkBehaviour
             return;
         }
 
+        // The guidebook freezes the player and hides the held item, but world interaction and
+        // placement used to stay live under the frozen crosshair — E / RMB would drop or place the
+        // hidden item (e.g. leaving a folder floating at the hand pose). Block all of it while open.
+        if (GuidebookController.IsLocalGuidebookOpen)
+        {
+            CancelHoldInteract();
+            ClearHoverState();
+            if (ObjectPlacer.Instance != null && ObjectPlacer.Instance.IsActive)
+                ObjectPlacer.Instance.DeactivatePlacer();
+            return;
+        }
+
         HandleReticle();
         
         if (CanInteract == false)

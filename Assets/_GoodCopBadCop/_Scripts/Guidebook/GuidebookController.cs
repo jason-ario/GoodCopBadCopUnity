@@ -436,6 +436,12 @@ public class GuidebookController : MonoBehaviour
         if (pickable != null && _pickupController.HeldObject == pickable) return;
 
         RestoreHiddenHeldItem();
+
+        // Every unequip path (DropObject, forced release, despawn reconcile) ends with
+        // DisableRightArmMask(), zeroing the arm layers the HoldingGuidebook pose plays on — the
+        // book then sinks off-screen while staying open and interactive. Re-assert the book pose.
+        _animationController.EnableHoldObjectTwoArmsMask();
+        _animationController.SetAnimBool(AnimParam, true);
     }
 
     /// <summary>

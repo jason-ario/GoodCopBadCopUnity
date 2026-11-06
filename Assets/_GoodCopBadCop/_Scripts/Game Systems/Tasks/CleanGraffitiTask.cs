@@ -344,6 +344,10 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
         TaskRegistry.OnTaskListChanged -= OnTaskListChanged;
 
+        // Don't leave a dead entry in the DontDestroyOnLoad registry when the session/scene ends.
+        if (TaskRegistry.IsRegistered(this))
+            TaskRegistry.Instance.RemoveThreat(this);
+
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStart;
     }

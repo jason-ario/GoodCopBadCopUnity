@@ -250,6 +250,59 @@ public class PickableObject : Interactable
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// The folder NetworkObject this document is filed in (via <see cref="SocketFollow"/>), or
+    /// default when not filed. Folder filing is otherwise broadcast only through one-shot
+    /// ClientRpcs (<see cref="PlaceInSlotClientRpc"/>, ExamNotebook's NotifyPagePlacedInFolderClientRpc,
+    /// FolderController.SyncDocumentAddedClientRpc), so a client that (re)connects after the
+    /// document was filed would otherwise see it frozen at its spawn-time pose, unassociated
+    /// with the folder. Server-written; cleared whenever the document leaves the slot.
+    /// </summary>
+    private NetworkVariable<NetworkObjectReference> _folderSlotOwner = new NetworkVariable<NetworkObjectReference>(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>Relative path from <see cref="_folderSlotOwner"/> to the slot transform. Empty when not filed.</summary>
+    private NetworkVariable<FixedString128Bytes> _folderSlotPath = new NetworkVariable<FixedString128Bytes>(
+        default,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private Coroutine _lateJoinFolderSlotRoutine;
+
+    /// <summary>
+    /// Resolves the folder this object is filed in from the replicated slot state. Works on
+    /// every peer, including clients that joined after the document was filed.
+    /// </summary>
+    public bool TryGetFiledFolder(out FolderController folder)
+    {
+        folder = null;
+        if (_folderSlotPath.Value.IsEmpty) return false;
+        if (!_folderSlotOwner.Value.TryGet(out NetworkObject owner) || owner == null) return false;
+        folder = owner.GetComponent<FolderController>();
+        return folder != null;
+    }
+
+    /// <summary>
+    /// Server-only. Records that this object is filed into a folder slot so late-joining clients
+    /// can rebuild the SocketFollow/folder association on spawn.
+    /// </summary>
+    public void RecordFolderSlotServer(NetworkObject folderNetObj, string slotRelativePath)
+    {
+        if (!IsServer || folderNetObj == null) return;
+        _folderSlotOwner.Value = new NetworkObjectReference(folderNetObj);
+        _folderSlotPath.Value = new FixedString128Bytes(slotRelativePath ?? string.Empty);
+    }
+
+    /// <summary>Server-only. Clears the replicated folder-slot record (no-op if not filed).</summary>
+    private void ClearFolderSlotServer()
+    {
+        if (!IsServer || _folderSlotPath.Value.IsEmpty) return;
+        _folderSlotOwner.Value = default;
+        _folderSlotPath.Value = default;
+    }
+
     /// <summary>Max seconds a late joiner waits for the supply box NetworkObject to resolve.</summary>
     private const float LateJoinSlotResolveTimeout = 5f;
 
@@ -300,6 +353,10 @@ public class PickableObject : Interactable
         if (!IsServer && _isContainedInSupplyBox.Value && isActiveAndEnabled)
             _lateJoinSlotRoutine = StartCoroutine(RestoreSupplyBoxSlotForLateJoin());
 
+        // Same for documents filed into a folder before this client (re)connected.
+        if (!IsServer && !_folderSlotPath.Value.IsEmpty && isActiveAndEnabled)
+            _lateJoinFolderSlotRoutine = StartCoroutine(RestoreFolderSlotForLateJoin());
+
         PickableObjectRegistry.Instance.Register(this);
     }
 
@@ -323,6 +380,12 @@ public class PickableObject : Interactable
         {
             StopCoroutine(_lateJoinSlotRoutine);
             _lateJoinSlotRoutine = null;
+        }
+
+        if (_lateJoinFolderSlotRoutine != null)
+        {
+            StopCoroutine(_lateJoinFolderSlotRoutine);
+            _lateJoinFolderSlotRoutine = null;
         }
 
         base.OnNetworkDespawn();
@@ -446,6 +509,47 @@ public class PickableObject : Interactable
         AttachToSlotLocal(slotOwner, slot);
         ApplySupplyBoxContainmentPhysics(true);
         ApplyNetworkInteractableState();
+    }
+
+    /// <summary>
+    /// Late-join path for folder filing: waits for the folder NetworkObject to resolve on this
+    /// client, then applies the same SocketFollow attachment <see cref="PlaceInSlotClientRpc"/>
+    /// performs for connected peers and registers the document with the folder locally.
+    /// </summary>
+    private IEnumerator RestoreFolderSlotForLateJoin()
+    {
+        float deadline = Time.time + LateJoinSlotResolveTimeout;
+        NetworkObject slotOwner = null;
+
+        while (!_folderSlotPath.Value.IsEmpty && !_folderSlotOwner.Value.TryGet(out slotOwner))
+        {
+            if (Time.time > deadline)
+            {
+                Debug.LogWarning($"[PickableObject] Late-join: could not resolve folder for filed {name} within {LateJoinSlotResolveTimeout}s.", this);
+                _lateJoinFolderSlotRoutine = null;
+                yield break;
+            }
+            yield return null;
+        }
+
+        _lateJoinFolderSlotRoutine = null;
+
+        // Taken out of the folder while we were waiting — normal holder flow owns it now.
+        if (_folderSlotPath.Value.IsEmpty || slotOwner == null || IsHeld) yield break;
+
+        FolderController folder = slotOwner.GetComponent<FolderController>();
+        string path = _folderSlotPath.Value.ToString();
+        Transform slot = slotOwner.transform.Find(path);
+        if (folder == null || slot == null)
+        {
+            Debug.LogWarning($"[PickableObject] Late-join: could not find folder slot '{path}' on {slotOwner.name} for {name}.", this);
+            yield break;
+        }
+
+        PrepareForSlotLocal(slot.position, slot.rotation);
+        AttachToSlotLocal(slotOwner, slot);
+        folder.RegisterFiledDocumentLocal(this);
+        Debug.Log($"[PickableObject] Late-join: restored filed {name} into {slotOwner.name}/{path} (folder id={slotOwner.NetworkObjectId}).", this);
     }
 
     private void OnSupplyBoxContainmentChanged(bool previousValue, bool newValue)
@@ -705,6 +809,7 @@ public class PickableObject : Interactable
         // Leaving the flag set would keep the box reporting non-empty forever.
         if (_isContainedInSupplyBox.Value)
             SetSupplyBoxContainedNetworked(false);
+        ClearFolderSlotServer();
 
         _holdingClientId.Value = ulong.MaxValue;
         NetworkObject.RemoveOwnership();
@@ -762,6 +867,10 @@ public class PickableObject : Interactable
         // resume identically on the host and all clients.
         if (current != ulong.MaxValue && _isContainedInSupplyBox.Value && IsServer)
             _isContainedInSupplyBox.Value = false;
+
+        // Likewise, a claimed document is no longer filed in a folder.
+        if (current != ulong.MaxValue && IsServer)
+            ClearFolderSlotServer();
 
         // Persistent highlight holds (mail delivery, tutorial, junk affordance, arrows) are hidden
         // on every machine while any player carries this item, and re-shown on release if any hold
@@ -1065,6 +1174,7 @@ public class PickableObject : Interactable
 
         RemoveParent();
         ClearSocketFollow();
+        ClearFolderSlotServer();
         transform.position = position;
         transform.rotation = rotation;
 
@@ -1113,6 +1223,7 @@ public class PickableObject : Interactable
 
         RemoveParent();
         ClearSocketFollow();
+        ClearFolderSlotServer();
 
         if (NetworkObject.OwnerClientId != NetworkManager.ServerClientId)
             NetworkObject.RemoveOwnership();
@@ -1330,6 +1441,13 @@ public class PickableObject : Interactable
         NetworkTransform nt = GetComponent<NetworkTransform>();
         if (nt != null) nt.enabled = false;
 
+        // Persist folder filing for clients that (re)connect later; any other slot clears it.
+        if (slotOwnerRef.TryGet(out NetworkObject slotOwnerNetObj) &&
+            slotOwnerNetObj.GetComponent<FolderController>() != null)
+            RecordFolderSlotServer(slotOwnerNetObj, slotRelativePath);
+        else
+            ClearFolderSlotServer();
+
         Debug.Log($"[PickableObject] PlaceInSlotFromServer: broadcasting PlaceInSlotClientRpc for {name} slotPath='{slotRelativePath}'");
         PlaceInSlotClientRpc(slotOwnerRef, slotRelativePath, position, rotation);
     }
@@ -1349,6 +1467,11 @@ public class PickableObject : Interactable
         {
             StopCoroutine(_lateJoinSlotRoutine);
             _lateJoinSlotRoutine = null;
+        }
+        if (_lateJoinFolderSlotRoutine != null)
+        {
+            StopCoroutine(_lateJoinFolderSlotRoutine);
+            _lateJoinFolderSlotRoutine = null;
         }
 
         PrepareForSlotLocal(position, rotation);
@@ -1459,6 +1582,7 @@ public class PickableObject : Interactable
     public void DropServerRpc(Vector3 position, Quaternion rotation)
     {
         RemoveParent();
+        ClearFolderSlotServer();
 
         transform.position = position;
         transform.rotation = rotation;
@@ -1505,6 +1629,7 @@ public class PickableObject : Interactable
     public void ThrowServerRpc(Vector3 position, Vector3 velocity)
     {
         RemoveParent();
+        ClearFolderSlotServer();
         transform.position = position;
 
         // Ensure server is the owner so NT authority (and NetworkRigidbody authority) is here.

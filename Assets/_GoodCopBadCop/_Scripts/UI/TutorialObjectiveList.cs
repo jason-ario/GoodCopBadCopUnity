@@ -115,6 +115,8 @@ public class TutorialObjectiveList : MonoBehaviour
     {
         if (_instance == this)
             _instance = null;
+        if (_shadowRoot != null)
+            Destroy(_shadowRoot.gameObject);
     }
 
     private void Start() => EnsureInitialized();
@@ -147,6 +149,11 @@ public class TutorialObjectiveList : MonoBehaviour
     /// <returns>The created <see cref="TutorialObjectiveItem"/> handle, used to mark it complete later.</returns>
     public TutorialObjectiveItem AddObjective(string text)
     {
+        // Connected non-host client: the visible list mirrors the host (ObjectiveListSync). Give
+        // the caller a hidden stand-in so its handle, completion and callbacks keep working.
+        if (ObjectiveListSync.IsMirroringLocally)
+            return CreateShadow(text);
+
         Debug.Log($"[TutorialObjectiveList] AddObjective(\"{text}\") called. " +
                   $"instance={(this != null)}, gameObject.activeInHierarchy={gameObject.activeInHierarchy}, " +
                   $"objectiveListRoot={(objectiveListRoot != null ? objectiveListRoot.name : "NULL")}, " +
@@ -187,6 +194,7 @@ public class TutorialObjectiveList : MonoBehaviour
 
         item.SetText(text);
         _items.Add(item);
+        TrackForSync(item);
         Debug.Log($"[TutorialObjectiveList] Objective row created under '{taskListContainer.name}'. " +
                   $"_isShowing={_isShowing}, objectiveListRoot.activeInHierarchy={objectiveListRoot.activeInHierarchy}, " +
                   $"item.gameObject.activeInHierarchy={item.gameObject.activeInHierarchy}");
@@ -230,6 +238,15 @@ public class TutorialObjectiveList : MonoBehaviour
     /// <param name="onComplete">Optional callback fired after items are destroyed.</param>
     public void HideAndClear(float preHideDelay = 0f, Action onComplete = null)
     {
+        // Mirroring client: only this client's hidden shadow rows belong to the caller. The
+        // visible rows are removed when the host's own HideAndClear replicates.
+        if (ObjectiveListSync.IsMirroringLocally)
+        {
+            DestroyAllShadows();
+            InvokeAfter(preHideDelay, onComplete);
+            return;
+        }
+
         if (!_isShowing) return;
 
         _isShowing = false;
@@ -270,6 +287,17 @@ public class TutorialObjectiveList : MonoBehaviour
     {
         if (item == null) return;
 
+        if (item.IsShadow)
+        {
+            if (markComplete) item.MarkComplete();
+            InvokeAfter(preHideDelay, () =>
+            {
+                DestroyShadow(item);
+                onComplete?.Invoke();
+            });
+            return;
+        }
+
         if (markComplete)
             item.MarkComplete();
 
@@ -283,6 +311,211 @@ public class TutorialObjectiveList : MonoBehaviour
 
         StartCoroutine(RemoveObjectiveRoutine(item, preHideDelay, onComplete));
         _pendingCompletedRemovals.Add(item);
+    }
+
+    // ── Host → client mirroring (ObjectiveListSync) ─────────────────────
+
+    /// <summary>One host row as replicated by <see cref="ObjectiveListSync"/>.</summary>
+    public readonly struct MirrorRow
+    {
+        public readonly int Id;
+        public readonly string Text;
+        public readonly bool Completed;
+
+        public MirrorRow(int id, string text, bool completed)
+        {
+            Id = id;
+            Text = text;
+            Completed = completed;
+        }
+    }
+
+    private int _nextSyncId;
+    private readonly Dictionary<int, TutorialObjectiveItem> _mirrorItems = new();
+    private readonly List<TutorialObjectiveItem> _shadowItems = new();
+    private Transform _shadowRoot;
+
+    /// <summary>Gives a real (host/offline) row a sync id and publishes every later change/removal.</summary>
+    private void TrackForSync(TutorialObjectiveItem item)
+    {
+        if (item.SyncId == 0) item.SyncId = ++_nextSyncId;
+        item.StateChanged = PublishItem;
+        item.Destroyed    = it => ObjectiveListSync.PublishRemove(it.SyncId);
+        PublishItem(item);
+    }
+
+    private static void PublishItem(TutorialObjectiveItem item) =>
+        ObjectiveListSync.PublishUpsert(item.SyncId, item.RawText, item.IsComplete);
+
+    /// <summary>Host: (re)publishes every current row, e.g. when the sync object spawns.</summary>
+    internal void PublishAllToSync()
+    {
+        foreach (TutorialObjectiveItem item in _items)
+        {
+            if (item != null && !item.IsShadow)
+                TrackForSync(item);
+        }
+    }
+
+    /// <summary>
+    /// Client: switch to showing only the host's rows. Rows this client built locally before
+    /// connecting are dropped; the replicated rows are built silently (late-join catch-up).
+    /// </summary>
+    internal void EnterMirrorMode(IReadOnlyList<MirrorRow> rows)
+    {
+        EnsureInitialized();
+        if (_clearCoroutine != null)
+        {
+            StopCoroutine(_clearCoroutine);
+            _clearCoroutine = null;
+        }
+
+        ClearAllItems();
+        _mirrorItems.Clear();
+        HideRoot();
+        ApplyMirror(rows, playCues: false);
+    }
+
+    /// <summary>Client: the session ended — drop mirrored and shadow rows.</summary>
+    internal void ExitMirrorMode()
+    {
+        ClearAllItems();
+        _mirrorItems.Clear();
+        DestroyAllShadows();
+        HideRoot();
+    }
+
+    /// <summary>Client: reconciles the visible rows with the host's replicated list.</summary>
+    internal void ApplyMirror(IReadOnlyList<MirrorRow> rows, bool playCues)
+    {
+        if (taskItemPrefab == null || taskListContainer == null) return;
+        EnsureInitialized();
+
+        var live = new HashSet<int>();
+        int sibling = 0;
+
+        foreach (MirrorRow row in rows)
+        {
+            live.Add(row.Id);
+
+            if (!_mirrorItems.TryGetValue(row.Id, out TutorialObjectiveItem item) || item == null)
+            {
+                item = CreateMirrorRow(row.Text, playCues);
+                if (item == null) continue;
+                _mirrorItems[row.Id] = item;
+            }
+            else if (item.RawText != row.Text)
+            {
+                item.MuteSounds = !playCues;
+                item.UpdateText(row.Text);
+                item.MuteSounds = false;
+            }
+
+            if (row.Completed && !item.IsComplete)
+            {
+                item.MuteSounds = !playCues;
+                item.MarkComplete();
+                item.MuteSounds = false;
+            }
+
+            item.transform.SetSiblingIndex(sibling++);
+        }
+
+        List<int> stale = null;
+        foreach (KeyValuePair<int, TutorialObjectiveItem> kvp in _mirrorItems)
+            if (!live.Contains(kvp.Key)) (stale ??= new List<int>()).Add(kvp.Key);
+
+        if (stale != null)
+        {
+            foreach (int id in stale)
+            {
+                TutorialObjectiveItem item = _mirrorItems[id];
+                _mirrorItems.Remove(id);
+                _items.Remove(item);
+                if (item != null) Destroy(item.gameObject);
+            }
+        }
+
+        _items.RemoveAll(i => i == null);
+        if (_items.Count == 0) HideRoot();
+    }
+
+    private TutorialObjectiveItem CreateMirrorRow(string text, bool playCue)
+    {
+        if (!_isShowing || (objectiveListRoot != null && !objectiveListRoot.activeSelf))
+            Show();
+
+        GameObject go = Instantiate(taskItemPrefab, taskListContainer);
+        if (!go.TryGetComponent(out TutorialObjectiveItem item))
+        {
+            Destroy(go);
+            return null;
+        }
+
+        item.MuteSounds = !playCue;
+        item.SetText(text);
+        item.MuteSounds = false;
+        _items.Add(item);
+
+        if (playCue)
+            SFXController.Instance?.Play(newTaskSound, newTaskSoundVolume);
+        return item;
+    }
+
+    private void HideRoot()
+    {
+        _isShowing = false;
+        if (objectiveListRoot != null) objectiveListRoot.SetActive(false);
+    }
+
+    private TutorialObjectiveItem CreateShadow(string text)
+    {
+        // Scene-root, inactive holder (NOT under taskListContainer — ClearAllItems wipes its children).
+        if (_shadowRoot == null)
+        {
+            var holder = new GameObject("[Objective Shadows]");
+            holder.SetActive(false);
+            _shadowRoot = holder.transform;
+        }
+
+        var go = new GameObject("Shadow Objective");
+        go.transform.SetParent(_shadowRoot, false);
+        TutorialObjectiveItem item = go.AddComponent<TutorialObjectiveItem>();
+        item.IsShadow   = true;
+        item.MuteSounds = true;
+        item.SetText(text);
+        _shadowItems.Add(item);
+        return item;
+    }
+
+    private void DestroyShadow(TutorialObjectiveItem item)
+    {
+        _shadowItems.Remove(item);
+        if (item != null) Destroy(item.gameObject);
+    }
+
+    private void DestroyAllShadows()
+    {
+        foreach (TutorialObjectiveItem item in _shadowItems)
+            if (item != null) Destroy(item.gameObject);
+        _shadowItems.Clear();
+    }
+
+    private void InvokeAfter(float delay, Action action)
+    {
+        if (action == null) return;
+        if (delay <= 0f || !isActiveAndEnabled)
+        {
+            action();
+            return;
+        }
+        StartCoroutine(InvokeAfterRoutine(delay, action));
+    }
+
+    private static IEnumerator InvokeAfterRoutine(float delay, Action action)
+    {
+        yield return new WaitForSeconds(delay);
+        action();
     }
 
     // ── Private ─────────────────────────────────────────────────────────

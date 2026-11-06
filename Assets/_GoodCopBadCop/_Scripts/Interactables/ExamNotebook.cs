@@ -1338,6 +1338,10 @@ public class ExamNotebook : PickableObject
         }
 
         string slotPath = FolderController.GetRelativePath(slotOwner.transform, slot);
+
+        // Persist the filing so a client that (re)connects later can rebuild it on spawn.
+        serverPage.RecordFolderSlotServer(slotOwner, slotPath);
+
         NotifyPagePlacedInFolderClientRpc(
             new NetworkObjectReference(serverPage.NetworkObject),
             new NetworkObjectReference(slotOwner),

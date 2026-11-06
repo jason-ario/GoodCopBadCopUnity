@@ -303,6 +303,10 @@ public class PlayerPickupController : NetworkBehaviour
         if(CanPickUpAndPlace == false) return;
         if (DialogueChoiceSystem.IsPostDialogueInputBlocked) return;
 
+        // The open guidebook hides the held item. Placing it now would drop an inactive object at
+        // its hidden hand pose — a kinematic folder left floating mid-air for every player.
+        if (GuidebookController.IsLocalGuidebookOpen) return;
+
         if (HeldObject != null)
         {
             // Release right-click / LT: place the held object only if the placer is active and in range

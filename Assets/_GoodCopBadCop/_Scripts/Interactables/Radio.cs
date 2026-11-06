@@ -24,6 +24,9 @@ public class Radio : Interactable
     /// <summary>Distance within which this radio is considered close enough to duck ambient music while it is on.</summary>
     public float AmbientDuckRange => ambientDuckRange;
 
+    /// <summary>The AudioSource that plays the station's songs. GameAudioMixer routes it to the Music group.</summary>
+    public AudioSource MusicSource => audioSource;
+
     // Whether the radio is currently muted (off) or audible (on).
     private readonly NetworkVariable<bool> _isOn = new NetworkVariable<bool>(
         false,
@@ -63,6 +66,9 @@ public class Radio : Interactable
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        // Route the song source into the Music mixer group so the Music volume setting applies.
+        GoodCopBadCop.Audio.GameAudioMixer.Route(audioSource);
 
         _isOn.OnValueChanged             += OnIsOnChanged;
         _currentSongIndex.OnValueChanged += OnSongIndexChanged;

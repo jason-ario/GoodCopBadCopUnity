@@ -646,36 +646,53 @@ public class Day_01 : DayBase
         _taskClockIn = null;
         _docsFilingComplete = false;
 
-        // Drawer is unlocked so the player can grab a folder during the tutorial.
-        _drawer?.SetLocked(false);
+        // Day-start interactable gates below are all networked (server-written NetworkVariables;
+        // client calls forward via ServerRpc). Only the server may apply them: DayActivated also
+        // runs on a client that (re)connects mid-day (GameManager.InitializeLateJoinClientRpc ->
+        // StartCampaign), and its forwarded writes used to re-lock the folder stack, stamps,
+        // hammer and shovels for EVERY player, undoing the host's tutorial progress. Late
+        // joiners inherit the current values through the NetworkVariables themselves.
+        bool isServer = NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
+        if (isServer)
+        {
+            // Drawer is unlocked so the player can grab a folder during the tutorial.
+            _drawer?.SetLocked(false);
 
-        // Stack of folders is locked until the folder tutorial step begins (after both
-        // Vlad documents are picked up). Prevents premature folder grabs.
-        _stackOfFolders?.SetInteractable(false);
+            // Stack of folders is locked until the folder tutorial step begins (after both
+            // Vlad documents are picked up). Prevents premature folder grabs.
+            _stackOfFolders?.SetInteractable(false);
 
-        // Documentation exam pile is locked until the documentation tutorial begins.
-        _documentationExamShopItem?.SetAvailable(false);
+            // Documentation exam pile is locked until the documentation tutorial begins.
+            _documentationExamShopItem?.SetAvailable(false);
 
-        // Stamps are locked until Vlad grants permission after the document filing tutorial.
-        _greenStampSlot?.SetSlotInteractable(false);
-        _yellowStampSlot?.SetSlotInteractable(false);
-        _redStampSlot?.SetSlotInteractable(false);
-        _examNotebook?.SetInteractableNetworked(true);
+            // Stamps are locked until Vlad grants permission after the document filing tutorial.
+            _greenStampSlot?.SetSlotInteractable(false);
+            _yellowStampSlot?.SetSlotInteractable(false);
+            _redStampSlot?.SetSlotInteractable(false);
+            _examNotebook?.SetInteractableNetworked(true);
 
-        // Hide notebooks that aren't introduced until later days.
+            _mutationNotebook?.SetInteractableNetworked(false);
+            _biologicalNotebook?.SetInteractableNetworked(false);
+
+            // The hammer isn't introduced until the post-breach "Fix Perimeter Fences" tutorial
+            // later this shift (see ShowHammerTutorial) — stays non-interactable until then.
+            _hammer?.SetInteractableNetworked(false);
+
+            // The checkpoint shovels stay non-interactable until the first mutant breach begins —
+            // see OnMutantBreachStarted, which unlocks them the moment the alarm sounds.
+            _breachShovel1?.LockInteractableNetworked();
+            _breachShovel2?.LockInteractableNetworked();
+        }
+        else
+        {
+            Debug.Log("[Day_01] DayActivated on client — skipping networked tutorial locks (server-owned).");
+        }
+
+        // Hide notebooks that aren't introduced until later days. Deliberately NOT server-gated:
+        // SetVisible is a one-shot ClientRpc broadcast (no NetworkVariable), so a late joiner
+        // needs its own request to hide them; they stay hidden all of Day 1, so it's harmless.
         _mutationNotebook?.SetVisible(false);
-        _mutationNotebook?.SetInteractableNetworked(false);
         _biologicalNotebook?.SetVisible(false);
-        _biologicalNotebook?.SetInteractableNetworked(false);
-
-        // The hammer isn't introduced until the post-breach "Fix Perimeter Fences" tutorial
-        // later this shift (see ShowHammerTutorial) — stays non-interactable until then.
-        _hammer?.SetInteractableNetworked(false);
-
-        // The checkpoint shovels stay non-interactable until the first mutant breach begins —
-        // see OnMutantBreachStarted, which unlocks them the moment the alarm sounds.
-        _breachShovel1?.LockInteractableNetworked();
-        _breachShovel2?.LockInteractableNetworked();
 
         MutantBreachManager.OnBreachStartedAllClients      += OnMutantBreachStarted;
         MutantBreachManager.OnBreachCountChangedAllClients += OnMutantBreachCountChanged;

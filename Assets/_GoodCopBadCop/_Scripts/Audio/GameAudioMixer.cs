@@ -18,7 +18,8 @@ namespace GoodCopBadCop.Audio
     ///
     /// Routing: most project AudioSources have no output group, so they bypass any mixer and sum
     /// unprotected at the listener (voice + music clipped). This component assigns every
-    /// unrouted AudioSource to SFX (voice playback to VoiceChat, music sources to Music) and
+    /// unrouted AudioSource to SFX (voice playback to VoiceChat, music sources — MusicManager,
+    /// SFXController music, Radio songs — to Music) and
     /// re-parents the legacy effect mixers (Voices, Loud Speaker, SFX, NewAudioMixer) into SFX,
     /// so everything passes through the Master limiter.
     ///
@@ -193,6 +194,12 @@ namespace GoodCopBadCop.Audio
         private static bool IsMusicSource(AudioSource source)
         {
             if (source.GetComponent<global::MusicManager>() != null)
+            {
+                return true;
+            }
+
+            global::Radio radio = source.GetComponentInParent<global::Radio>();
+            if (radio != null && radio.MusicSource == source)
             {
                 return true;
             }

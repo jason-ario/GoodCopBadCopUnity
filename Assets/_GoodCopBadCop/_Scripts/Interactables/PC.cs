@@ -1201,7 +1201,8 @@ public class PC : Interactable
     private List<SuspectData> GetAllNamedSuspects()
     {
         if (_suspectSet == null || _suspectSet.suspects == null) return new List<SuspectData>();
-        return SortSuspects(_suspectSet.suspects.Where(s => s != null));
+        // Distinct: a SuspectData listed twice in the set must still appear once in the terminal.
+        return SortSuspects(_suspectSet.suspects.Where(s => s != null).Distinct());
     }
 
     private List<SuspectData> GetActiveSuspects()

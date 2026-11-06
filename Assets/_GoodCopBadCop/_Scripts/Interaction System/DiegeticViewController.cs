@@ -145,6 +145,12 @@ public abstract class DiegeticViewController : MonoBehaviour
         // the view, which would leave the view's camera latched on with no way out.
         if (IsLocalPlayerInDialogue()) return false;
 
+        // Put the guidebook away (with full control restore) before taking the lock below.
+        // Otherwise hiding Player_Arms trips the guidebook's hidden-rig safety net, which closes
+        // it WITHOUT restoring movement/look — and Close() here only restores CanControl, leaving
+        // the player frozen after exiting the view until the book is toggled again.
+        GuidebookController.CloseLocalGuidebook();
+
         Player = player;
         IsActive = true;
         IsAnyViewActive = true;

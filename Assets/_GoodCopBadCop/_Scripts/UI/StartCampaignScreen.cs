@@ -21,6 +21,10 @@ public class StartCampaignScreen : MonoBehaviour
 
     private readonly List<PlayerInfoPanel> _spawnedPanels = new List<PlayerInfoPanel>();
 
+    // Player rows only (no invite slots), in lobby member order, so ready toggles can update them in place.
+    private readonly List<PlayerInfoPanel> _memberPanels = new List<PlayerInfoPanel>();
+    private string _rosterKey;
+
     [Header("Lobby Info")]
     [SerializeField] private TextMeshProUGUI inviteCodeText;
     [SerializeField] private GameObject inviteCodeSection;
@@ -210,10 +214,23 @@ public class StartCampaignScreen : MonoBehaviour
             inviteCodeText.text = lobbyId != 0 ? LobbyManager.Instance.CurrentJoinCode : string.Empty;
         }
 
-        // Destroy previously spawned panels and rebuild from scratch.
-        ClearPanels();
-
         bool hasSecondPlayer = members != null && members.Length >= 2;
+
+        // Ready toggles don't change the roster: update the existing rows in place. Rebuilding
+        // them made the labels flicker for a few frames (the language preprocessor attaches a
+        // frame late, TMPWidthFitter resizes a frame late, and the host crown is deferred a frame).
+        string rosterKey = BuildRosterKey(members, hasLobby);
+        if (rosterKey == _rosterKey && TryUpdateReadyInPlace(members, hasLobby, hasSecondPlayer))
+        {
+            EvaluateStartButton(members);
+            if (waitForHostText != null)
+                waitForHostText.SetActive(!isHost);
+            return;
+        }
+
+        // Roster changed: destroy previously spawned panels and rebuild from scratch.
+        ClearPanels();
+        _rosterKey = rosterKey;
 
         if (hasLobby)
         {
@@ -250,6 +267,47 @@ public class StartCampaignScreen : MonoBehaviour
         panel.gameObject.SetActive(true);
         panel.PopulateInfo(playerName, isReady, isHost);
         _spawnedPanels.Add(panel);
+        _memberPanels.Add(panel);
+    }
+
+    /// <summary>Identifies the set of rows on screen; ready state is deliberately excluded.</summary>
+    private string BuildRosterKey(Friend[] members, bool hasLobby)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append(_isMultiplayer ? 'M' : 'S').Append('|').Append(Loc.CurrentLanguage).Append('|');
+        if (!hasLobby)
+        {
+            sb.Append("local:").Append(SteamClient.IsValid ? SteamClient.Name : "Player");
+            return sb.ToString();
+        }
+
+        sb.Append(LobbyManager.Instance.CurrentLobby.Owner.Id.Value).Append('|');
+        foreach (var member in members)
+            sb.Append(member.Id.Value).Append(':').Append(member.Name).Append(';');
+        return sb.ToString();
+    }
+
+    /// <summary>Refreshes only the READY / NOT READY labels on the existing player rows.</summary>
+    private bool TryUpdateReadyInPlace(Friend[] members, bool hasLobby, bool hasSecondPlayer)
+    {
+        int expected = hasLobby ? members.Length : 1;
+        if (_memberPanels.Count != expected) return false;
+        foreach (var panel in _memberPanels)
+            if (panel == null) return false;
+
+        if (!hasLobby)
+        {
+            _memberPanels[0].SetReady(true);
+            return true;
+        }
+
+        for (int i = 0; i < members.Length; i++)
+        {
+            ulong steamId = members[i].Id.Value;
+            bool ready = !hasSecondPlayer || (_readyStates.TryGetValue(steamId, out bool r) && r);
+            _memberPanels[i].SetReady(ready);
+        }
+        return true;
     }
 
     /// <summary>
@@ -281,6 +339,8 @@ public class StartCampaignScreen : MonoBehaviour
                 Destroy(panel.gameObject);
         }
         _spawnedPanels.Clear();
+        _memberPanels.Clear();
+        _rosterKey = null;
     }
 
     private void EvaluateStartButton(Friend[] members)

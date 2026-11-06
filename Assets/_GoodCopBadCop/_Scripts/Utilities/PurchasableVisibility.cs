@@ -37,10 +37,23 @@ public class PurchasableVisibility : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// Set when <see cref="Unlock"/> is called on the authority before this object has spawned
+    /// (e.g. a saved purchase replayed while scene objects are still spawning). Flushed into
+    /// <see cref="_isUnlocked"/> in <see cref="OnNetworkSpawn"/>; previously such a call was
+    /// silently dropped because <c>IsServer</c> is false until spawn.
+    /// </summary>
+    private bool _pendingUnlock;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
         _isUnlocked.OnValueChanged += OnUnlockedChanged;
+
+        if (IsServer && _pendingUnlock)
+            _isUnlocked.Value = true;
+        _pendingUnlock = false;
+
         Apply(_isUnlocked.Value);
     }
 
@@ -71,7 +84,20 @@ public class PurchasableVisibility : NetworkBehaviour
     /// </summary>
     public void Unlock()
     {
-        if (IsServer)
-            _isUnlocked.Value = true;
+        if (IsSpawned)
+        {
+            if (IsServer)
+                _isUnlocked.Value = true;
+            return;
+        }
+
+        // Not spawned yet: only the authority (host, or no live session) may queue the unlock.
+        // A connected client receives the state through the NetworkVariable instead.
+        var nm = NetworkManager.Singleton;
+        bool isAuthority = nm == null || !nm.IsListening || nm.IsServer;
+        if (!isAuthority) return;
+
+        _pendingUnlock = true;
+        Apply(true);
     }
 }

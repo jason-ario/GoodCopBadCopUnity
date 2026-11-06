@@ -117,12 +117,17 @@ public class FolderItem : PickableObject
         // insideThisFolder is only set on the client that originally called AddToFolder.
         // On any other client that picks up this document, resolve the folder from the
         // active SocketFollow target so we can still broadcast ClearSocketFollow to everyone.
+        // Fall back to the replicated folder-slot state: without it, a client that joined after
+        // filing never told the server the document left, so the host kept it glued to the slot
+        // (an un-grabbable phantom that blocked raycasts at the folder).
+        FolderController folder = null;
         SocketFollow socketFollow = GetComponent<SocketFollow>();
         if (socketFollow != null && socketFollow.Target != null)
-        {
-            FolderController folder = socketFollow.Target.GetComponentInParent<FolderController>();
-            if (folder != null)
-                folder.UnregisterDocumentServerRpc(new NetworkObjectReference(NetworkObject));
-        }
+            folder = socketFollow.Target.GetComponentInParent<FolderController>();
+        if (folder == null)
+            TryGetFiledFolder(out folder);
+
+        if (folder != null)
+            folder.UnregisterDocumentServerRpc(new NetworkObjectReference(NetworkObject));
     }
 }

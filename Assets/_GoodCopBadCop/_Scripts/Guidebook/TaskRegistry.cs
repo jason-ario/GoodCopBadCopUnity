@@ -28,8 +28,41 @@ public class TaskRegistry : MonoBehaviour
 
     private readonly List<ISystemicThreat> _threats = new();
 
-    /// <summary>Read-only snapshot of the current threat list.</summary>
-    public IReadOnlyList<ISystemicThreat> Threats => _threats;
+    /// <summary>Read-only snapshot of the current threat list (destroyed scene threats pruned).</summary>
+    public IReadOnlyList<ISystemicThreat> Threats
+    {
+        get
+        {
+            PruneDestroyedThreats();
+            return _threats;
+        }
+    }
+
+    /// <summary>
+    /// This registry is DontDestroyOnLoad, but nearly every threat is a scene MonoBehaviour that
+    /// never unregisters when the scene is torn down (Pause → Return to Main Menu reloads Main).
+    /// The dead C# reference survived the reload, so the fresh scene's HUDTaskList built a row
+    /// for it (new CampaignManager reports Day 1 → cleanup tasks count as mandatory) that stayed
+    /// at e.g. "Clean Graffiti 0/7" forever, while the live task completed separately — the
+    /// "graffiti never completes for the host" bug after recreating a lobby. Unity-null checks
+    /// catch destroyed objects; plain C# threats are left alone.
+    /// </summary>
+    private bool PruneDestroyedThreats()
+    {
+        int removed = _threats.RemoveAll(t => t == null || (t is UnityEngine.Object o && o == null));
+        if (removed > 0)
+            Debug.Log($"[TaskRegistry] Pruned {removed} destroyed threat(s). Total: {_threats.Count}");
+        return removed > 0;
+    }
+
+    private void OnEnable()  => UnityEngine.SceneManagement.SceneManager.sceneUnloaded += OnSceneUnloaded;
+    private void OnDisable() => UnityEngine.SceneManagement.SceneManager.sceneUnloaded -= OnSceneUnloaded;
+
+    private void OnSceneUnloaded(UnityEngine.SceneManagement.Scene _)
+    {
+        if (PruneDestroyedThreats())
+            OnTaskListChanged?.Invoke();
+    }
 
     private static TaskRegistry _instance;
 
@@ -75,7 +108,9 @@ public class TaskRegistry : MonoBehaviour
     /// <summary>Adds a threat to the registry and fires OnTaskListChanged and OnTasksAdded.</summary>
     public void AddThreat(ISystemicThreat threat)
     {
-        if (threat == null || _threats.Contains(threat)) return;
+        if (threat == null || (threat is UnityEngine.Object o && o == null)) return;
+        PruneDestroyedThreats();
+        if (_threats.Contains(threat)) return;
         _threats.Add(threat);
         OnTaskListChanged?.Invoke();
         OnTasksAdded?.Invoke();
@@ -103,7 +138,7 @@ public class TaskRegistry : MonoBehaviour
         if (threats != null)
         {
             foreach (ISystemicThreat t in threats)
-                if (t != null && !_threats.Contains(t)) _threats.Add(t);
+                if (t != null && !(t is UnityEngine.Object o && o == null) && !_threats.Contains(t)) _threats.Add(t);
         }
 
         OnTaskListChanged?.Invoke();

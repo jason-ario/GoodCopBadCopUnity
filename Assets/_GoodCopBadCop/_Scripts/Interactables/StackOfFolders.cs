@@ -50,6 +50,11 @@ public class StackOfFolders : Interactable
             value = true;
         }
 
+        // Every server-side lock is logged with its caller so a "stack is locked" report can be
+        // traced to whoever re-locked it (Day 1 start vs. a stray client/late-join request).
+        if (!value && _isInteractable.Value)
+            Debug.Log($"[StackOfFolders] Server locking '{name}' on Day {TutorialGateRules.CurrentDay}. Caller:\n{System.Environment.StackTrace}", this);
+
         _isInteractable.Value = value;
     }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -58,6 +59,31 @@ public class TutorialObjectiveItem : MonoBehaviour
     /// <summary>True once <see cref="MarkComplete"/> has been called on this row.</summary>
     public bool IsComplete => _isComplete;
 
+    /// <summary>Last source (untranslated) text passed to <see cref="SetText"/>/<see cref="UpdateText"/>.</summary>
+    public string RawText { get; private set; } = string.Empty;
+
+    // ── Host → client mirroring (see ObjectiveListSync) ───────────────────────
+
+    /// <summary>Host-assigned id used by <see cref="ObjectiveListSync"/>; 0 = not published.</summary>
+    internal int SyncId;
+
+    /// <summary>
+    /// Hidden stand-in returned to day scripts on a mirroring client: tracks text/completion so
+    /// existing call sites and callbacks keep working, but is never shown and never plays audio.
+    /// </summary>
+    internal bool IsShadow;
+
+    /// <summary>Suppresses new/progress/complete audio (shadow rows, late-join catch-up build).</summary>
+    internal bool MuteSounds;
+
+    /// <summary>Raised after text or completion changes (host publishes to ObjectiveListSync).</summary>
+    internal Action<TutorialObjectiveItem> StateChanged;
+
+    /// <summary>Raised when the row is destroyed (host removes it from ObjectiveListSync).</summary>
+    internal Action<TutorialObjectiveItem> Destroyed;
+
+    private void OnDestroy() => Destroyed?.Invoke(this);
+
     /// <summary>Prefix shown before every objective's text, e.g. "- Talk to Vlad".</summary>
     private const string BulletPrefix = "- ";
 
@@ -92,8 +118,10 @@ public class TutorialObjectiveItem : MonoBehaviour
     /// <summary>Sets the display text for this objective.</summary>
     public void SetText(string text)
     {
+        RawText = text ?? string.Empty;
         if (label != null)
             label.text = BuildDisplay(text);
+        StateChanged?.Invoke(this);
     }
 
     /// <summary>
@@ -117,6 +145,9 @@ public class TutorialObjectiveItem : MonoBehaviour
 
         if (checkboxUnchecked != null) checkboxUnchecked.SetActive(false);
         if (checkboxChecked != null) checkboxChecked.SetActive(true);
+
+        StateChanged?.Invoke(this);
+        if (MuteSounds) return;
 
         // Saved-day resume: rows torn down by state sync aren't player completions (see ShiftManager).
         if (TaskSuccessCue.IsCompletionSuppressed) return;
@@ -209,14 +240,19 @@ public class TutorialObjectiveItem : MonoBehaviour
     /// </summary>
     public void UpdateText(string text)
     {
-        if (label == null) return;
+        RawText = text ?? string.Empty;
 
-        string prefixed = BuildDisplay(text);
-        bool changed = label.text != prefixed;
-        label.text = prefixed;
+        if (label != null)
+        {
+            string prefixed = BuildDisplay(text);
+            bool changed = label.text != prefixed;
+            label.text = prefixed;
 
-        // Deduplicated against per-item cleanup cues (TaskSuccessCue) so one finished item never dings twice.
-        if (changed && !_isComplete)
-            TaskSuccessCue.TryPlay(progressSound, progressSoundVolume);
+            // Deduplicated against per-item cleanup cues (TaskSuccessCue) so one finished item never dings twice.
+            if (changed && !_isComplete && !MuteSounds)
+                TaskSuccessCue.TryPlay(progressSound, progressSoundVolume);
+        }
+
+        StateChanged?.Invoke(this);
     }
 }

@@ -209,6 +209,33 @@ public class FolderController : PickableObject
         if (doc != null) doc.ClearSocketFollow();
     }
 
+    /// <summary>
+    /// Late-join half of filing: a client that (re)connected after a document was filed missed
+    /// every one-shot filing RPC, so rebuild the local folder association that
+    /// <see cref="SyncDocumentAddedClientRpc"/> / AddToFolder set up for connected peers.
+    /// Called by <see cref="PickableObject"/> once it has re-attached to its slot from the
+    /// replicated folder-slot state. Local only; idempotent.
+    /// </summary>
+    public void RegisterFiledDocumentLocal(PickableObject doc)
+    {
+        if (doc == null) return;
+
+        if (doc is IDCard card && idCard == null) idCard = card;
+        else if (doc is ApplicationLetter letter && application == null) application = letter;
+
+        if (!documents.Contains(doc)) documents.Add(doc);
+
+        if (doc is FolderItem folderItem)
+        {
+            folderItem.insideThisFolder = this;
+            folderItem.RefreshFolderState();
+        }
+
+        // Filed documents aren't children, so mirror a hidden (stowed / guidebook) folder.
+        if (!gameObject.activeInHierarchy && doc.gameObject.activeSelf)
+            doc.gameObject.SetActive(false);
+    }
+
     /// <summary>Despawns all server-tracked documents. Called by SuspectController before despawning the folder.</summary>
     public void DespawnTrackedDocuments()
     {

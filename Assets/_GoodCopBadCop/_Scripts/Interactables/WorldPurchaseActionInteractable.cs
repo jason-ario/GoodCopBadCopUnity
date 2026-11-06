@@ -113,7 +113,13 @@ public class WorldPurchaseActionInteractable : Interactable
         // state is applied in OnNetworkSpawn; until then the ShopItem just refuses interaction.
         _availableLocal = _startAvailable;
         _shopItem?.SetAvailable(_startAvailable);
+    }
 
+    private void Start()
+    {
+        // Deferred from Awake: replaying hides this stand, and an in-scene NetworkObject that is
+        // deactivated before it spawns is never registered on remote clients. Networked sessions
+        // replay from OnNetworkSpawn instead; this only covers play with no NetworkManager at all.
         ApplySavedUnlockState();
     }
 
@@ -124,8 +130,13 @@ public class WorldPurchaseActionInteractable : Interactable
 
         if (IsServer)
         {
-            // The host publishes its own state as the authority for everyone.
-            _netPurchased.Value = HasPersistentUnlockInSave();
+            // The host publishes its own state as the authority for everyone, and replays a saved
+            // purchase explicitly rather than relying on OnValueChanged firing for the initial write.
+            bool purchased = HasPersistentUnlockInSave();
+            _netPurchased.Value = purchased;
+            if (purchased)
+                ReplayPersistentUnlock();
+
             _netAvailable.Value = _availableLocal;
             ApplyAvailableLocal(_availableLocal);
         }
@@ -158,17 +169,14 @@ public class WorldPurchaseActionInteractable : Interactable
     /// If <see cref="_persistentUnlockId"/> was already purchased in a previous session, replays the
     /// purchase effect immediately (without charging) and hides this interactable.
     ///
-    /// Only the authority (host, or offline play) reads the save here. Connected clients deliberately
-    /// skip it and instead adopt <see cref="_netPurchased"/> in <see cref="OnNetworkSpawn"/>, so a
+    /// Only used when there is no NetworkManager at all. With networking, the host replays from
+    /// <see cref="OnNetworkSpawn"/> and connected clients adopt <see cref="_netPurchased"/>, so a
     /// client whose local save disagrees with the host's can no longer show a different world state.
     /// </summary>
     private void ApplySavedUnlockState()
     {
         if (string.IsNullOrEmpty(_persistentUnlockId)) return;
-
-        var nm = NetworkManager.Singleton;
-        bool isAuthority = nm == null || !nm.IsListening || nm.IsServer;
-        if (!isAuthority) return;
+        if (NetworkManager.Singleton != null) return;
 
         if (!HasPersistentUnlockInSave()) return;
 
