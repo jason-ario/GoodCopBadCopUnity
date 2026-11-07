@@ -1,5 +1,7 @@
 using System.Collections;
+using System.Collections.Generic;
 using GoodCopBadCop.Effects;
+using HighlightPlus;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -496,8 +498,40 @@ public class CorpseResurrectionController : NetworkBehaviour
         if (IsWalkingMutant)
             collectible = false;
 
+        if (collectible && corpseJunkItem != null && !corpseJunkItem.enabled)
+            ScopeCorpseHighlightToBody();
+
         if (corpseJunkItem != null && corpseJunkItem.enabled != collectible)
             corpseJunkItem.enabled = collectible;
+    }
+
+    private HighlightEffect _corpseHighlight;
+    private readonly List<Renderer> _corpseHighlightRenderers = new();
+
+    /// <summary>
+    /// Restricts the corpse JunkItem's root <see cref="HighlightEffect"/> to the visible body meshes.
+    /// Its profile (Highlighted.asset, profileSync) sets effectGroup = Children, which on the player
+    /// root collected every renderer in the hierarchy, inactive ones included: all stashed hand/hold
+    /// items, notebooks, exam pages and the first-person arms (~900). Hovering the body then outlined
+    /// all of them every frame and FPS dropped while aiming at it. Keeps only active mesh renderers
+    /// whose nearest HighlightEffect is this one (items with their own Interactable are excluded).
+    /// Re-run each time the body becomes collectible so the set matches the current pose/visuals.
+    /// </summary>
+    private void ScopeCorpseHighlightToBody()
+    {
+        if (corpseJunkItem == null) return;
+        if (_corpseHighlight == null && !corpseJunkItem.TryGetComponent(out _corpseHighlight)) return;
+
+        _corpseHighlightRenderers.Clear();
+        foreach (Renderer r in corpseJunkItem.GetComponentsInChildren<Renderer>(false))
+        {
+            if (r is not SkinnedMeshRenderer && r is not MeshRenderer) continue;
+            if (r.TryGetComponent<TMPro.TMP_Text>(out _)) continue;
+            if (r.GetComponentInParent<HighlightEffect>(true) != _corpseHighlight) continue;
+            _corpseHighlightRenderers.Add(r);
+        }
+
+        _corpseHighlight.SetTargets(corpseJunkItem.transform, _corpseHighlightRenderers.ToArray());
     }
 
     /// <summary>

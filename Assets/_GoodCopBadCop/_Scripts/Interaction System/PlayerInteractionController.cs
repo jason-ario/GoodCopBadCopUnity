@@ -552,16 +552,31 @@ public class PlayerInteractionController : NetworkBehaviour
 
         reticle.SetEnemyState(false);
 
+        // Increase distance significantly to detect "Too Far" objects
+        bool hasInteractHit = TryGetBestInteractHit(ray, out RaycastHit hit);
+        Interactable hitInteractable = hasInteractHit ? ResolveTargetInteractable(hit.collider) : null;
+
+        // Don't switch the hover highlight off and back on for the same target every frame: each
+        // off->on restarts HighlightEffect's fade and forces UpdateMaterialProperties over every
+        // renderer it covers (a dead player's corpse covered hundreds), tanking FPS while aimed at.
+        // Mirrors the conditions under which the branch below re-highlights the target.
+        bool keepHover = lastInteractable != null
+                         && hitInteractable == lastInteractable
+                         && hitInteractable != _playerPickupController.HeldObject
+                         && !IsControlledByOtherPlayer(hitInteractable)
+                         && (onlyAllowedInteractable == null || hitInteractable == onlyAllowedInteractable)
+                         && hitInteractable.IsInteractable
+                         && hit.distance <= CurrentInteractReach;
+
         if (lastInteractable != null)
         {
-            lastInteractable.Highlight(false);
-            if(lastInteractable.GetComponent<PlaceObjectSlot>() != null) lastInteractable.GetComponent<PlaceObjectSlot>().HidePlacedVisual();
+            if (!keepHover) lastInteractable.Highlight(false);
+            if (lastInteractable.TryGetComponent(out PlaceObjectSlot lastSlot)) lastSlot.HidePlacedVisual();
         }
 
-        // Increase distance significantly to detect "Too Far" objects
-        if (TryGetBestInteractHit(ray, out RaycastHit hit))
+        if (hasInteractHit)
         {
-            Interactable interactable = ResolveTargetInteractable(hit.collider);
+            Interactable interactable = hitInteractable;
 
             // The local player's held object keeps its colliders active during the server
             // round-trip after pickup. Treat it as non-interactable immediately so the
@@ -636,7 +651,6 @@ public class PlayerInteractionController : NetworkBehaviour
                 }
                 else
                 {
-                    Debug.Log("Out of range");
                     reticle.SetTooFarState(true);
                     lastInteractable = null;
                 }
