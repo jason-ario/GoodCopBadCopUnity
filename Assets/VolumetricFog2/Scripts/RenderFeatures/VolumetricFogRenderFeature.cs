@@ -96,10 +96,72 @@ namespace VolumetricFogAndMist2 {
 
 #if UNITY_2023_3_OR_NEWER
 
+            // GoodCopBadCop: one fog volume draw into the light buffer, sorted back-to-front.
+            struct FogVolumeDraw {
+                public Renderer renderer;
+                public Material material;
+                public int renderQueue;
+                public float sqrDistance;
+            }
+
+            static readonly Comparison<FogVolumeDraw> FogVolumeDrawComparison = (a, b) => {
+                int byQueue = a.renderQueue.CompareTo(b.renderQueue);
+                return byQueue != 0 ? byQueue : b.sqrDistance.CompareTo(a.sqrDistance);
+            };
+
+            static readonly Plane[] fogFrustumPlanes = new Plane[6];
+
             class PassData {
-                public RendererListHandle rendererListHandle;
                 public UniversalCameraData cameraData;
                 public RenderPassEvent renderPassEvent;
+                public readonly List<FogVolumeDraw> fogVolumeDraws = new List<FogVolumeDraw>();
+            }
+
+            /// <summary>
+            /// GoodCopBadCop: collects the VolumetricFog volume renderers to draw into the light buffer.
+            /// The stock pass used a renderer list filtered by renderingLayerMask = FOG_VOLUMES_RENDERING_LAYER
+            /// (declared as 1 &lt;&lt; 49 on a uint, which wraps to bit 17). Every transparent renderer whose
+            /// Rendering Layer Mask is "Everything" (the default on most third-party particle prefabs) matched
+            /// too, so particles were drawn into this depthless buffer and composited over the screen through
+            /// walls (mop scrub VFX, run dust, etc.). Drawing only the registered fog volumes keeps the
+            /// original layer / culling-mask / frustum / back-to-front semantics without that leak.
+            /// </summary>
+            void CollectFogVolumeDraws(UniversalCameraData cameraData, List<FogVolumeDraw> draws) {
+                draws.Clear();
+                Camera cam = cameraData.camera;
+                if (cam == null) return;
+
+                GeometryUtility.CalculateFrustumPlanes(cam, fogFrustumPlanes);
+                Vector3 camPos = cam.transform.position;
+                int fogLayerMask = settings.fogLayerMask;
+                int cullingMask = cam.cullingMask;
+                bool restrictToCameraScene = cam.scene.IsValid();
+
+                List<VolumetricFog> fogs = VolumetricFog.volumetricFogs;
+                for (int i = 0; i < fogs.Count; i++) {
+                    VolumetricFog vg = fogs[i];
+                    if (vg == null || !vg.isActiveAndEnabled) continue;
+                    MeshRenderer mr = vg.meshRenderer;
+                    if (mr == null || !mr.enabled) continue;
+                    Material mat = mr.sharedMaterial;
+                    if (mat == null || mat.passCount == 0) continue;
+
+                    int layerBit = 1 << vg.gameObject.layer;
+                    if ((fogLayerMask & layerBit) == 0 || (cullingMask & layerBit) == 0) continue;
+                    if (restrictToCameraScene && vg.gameObject.scene != cam.scene) continue;
+
+                    Bounds bounds = mr.bounds;
+                    if (!GeometryUtility.TestPlanesAABB(fogFrustumPlanes, bounds)) continue;
+
+                    draws.Add(new FogVolumeDraw {
+                        renderer = mr,
+                        material = mat,
+                        renderQueue = mat.renderQueue,
+                        sqrDistance = (bounds.center - camPos).sqrMagnitude
+                    });
+                }
+
+                if (draws.Count > 1) draws.Sort(FogVolumeDrawComparison);
             }
 
             public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData) {
@@ -108,8 +170,6 @@ namespace VolumetricFogAndMist2 {
                     builder.AllowPassCulling(false);
 
                     UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
-                    UniversalRenderingData renderingData = frameData.Get<UniversalRenderingData>();
-                    UniversalLightData lightData = frameData.Get<UniversalLightData>();
                     UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
                     passData.cameraData = cameraData;
                     passData.renderPassEvent = renderPassEvent;
@@ -117,14 +177,8 @@ namespace VolumetricFogAndMist2 {
                     builder.UseTexture(resourceData.activeDepthTexture, AccessFlags.Read);
                     ConfigureInput(ScriptableRenderPassInput.Depth);
 
-                    SortingCriteria sortingCriteria = SortingCriteria.CommonTransparent;
-                    var drawingSettings = CreateDrawingSettings(shaderTagIdList, renderingData, cameraData, lightData, sortingCriteria);
-                    var filterSettings = filteringSettings;
-                    filterSettings.layerMask = settings.fogLayerMask;
-                    filterSettings.renderingLayerMask = VolumetricFogManager.FOG_VOLUMES_RENDERING_LAYER;
-                    RendererListParams listParams = new RendererListParams(renderingData.cullResults, drawingSettings, filterSettings);
-                    passData.rendererListHandle = renderGraph.CreateRendererList(listParams);
-                    builder.UseRendererList(passData.rendererListHandle);
+                    // GoodCopBadCop: explicit fog-volume list replaces the renderingLayerMask renderer list (see CollectFogVolumeDraws).
+                    CollectFogVolumeDraws(cameraData, passData.fogVolumeDraws);
 
                     builder.SetRenderFunc(static (PassData passData, UnsafeGraphContext context) => {
 
@@ -189,7 +243,13 @@ namespace VolumetricFogAndMist2 {
                             }
                         }
 
-                        context.cmd.DrawRendererList(passData.rendererListHandle);
+                        // GoodCopBadCop: draw only the fog volumes (pass 0 is their single forward pass).
+                        List<FogVolumeDraw> draws = passData.fogVolumeDraws;
+                        for (int d = 0; d < draws.Count; d++) {
+                            FogVolumeDraw draw = draws[d];
+                            if (draw.renderer == null || draw.material == null) continue;
+                            cmd.DrawRenderer(draw.renderer, draw.material, 0, 0);
+                        }
                     });
                 }
             }

@@ -330,6 +330,12 @@ public class PickableObject : Interactable
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        // Picking up transfers ownership to the holder. Without this, NGO destroys every object a
+        // disconnecting client owns before OnClientDisconnectCallback runs, so any item missed by
+        // PlayerInventory's despawn drop would vanish instead of reaching the registry's sweep.
+        if (IsServer) NetworkObject.DontDestroyWithOwner = true;
+
         _holdingClientId.OnValueChanged             += OnHoldingClientChanged;
         _networkInteractableOverride.OnValueChanged += OnNetworkInteractableOverrideChanged;
         _isStowed.OnValueChanged                    += OnIsStowedChanged;

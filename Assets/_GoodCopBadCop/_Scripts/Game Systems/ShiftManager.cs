@@ -832,6 +832,7 @@ public class ShiftManager : NetworkBehaviour
         InitializeDateSystem();
         OnDayStart += HandleDayStartCheckpoint;
         OnShiftReady += ClearIntroCutsceneInProgress;
+        OnShiftReady += ClearLocalIntroCutsceneActive;
     }
 
     private void OnEnable()
@@ -862,6 +863,7 @@ public class ShiftManager : NetworkBehaviour
     {
         _networkCurrentDay.OnValueChanged -= OnCurrentDayChanged;
         ClearIntroCutsceneInProgress();
+        ClearLocalIntroCutsceneActive();
     }
 
     private void OnCurrentDayChanged(int oldValue, int newValue)
@@ -1895,6 +1897,7 @@ public class ShiftManager : NetworkBehaviour
         if (UIController.Instance != null && UIController.Instance.IsStartShiftScreenOpen)
             UIController.Instance.CloseStartShiftScreenForShiftStart();
 
+        IsLocalIntroCutsceneActive = true;
         StartCoroutine(RunInitiateIntroCutsceneSequence());
     }
 
@@ -1902,6 +1905,40 @@ public class ShiftManager : NetworkBehaviour
     /// True on the server from the first accepted Start Shift until the intro completes.
     /// </summary>
     public bool IsIntroCutsceneInProgress => _introCutsceneInProgress;
+
+    /// <summary>
+    /// LOCAL: true on this client from the moment the Day 1 intro cutscene RPC lands until
+    /// <see cref="OnShiftReady"/> fires. While set, the intro cutscene owns the local player's
+    /// position, camera and controls — e.g. <see cref="IntroCinematicController"/> must not hand
+    /// control back when a player finishes the intro story text mid-cutscene.
+    /// </summary>
+    public bool IsLocalIntroCutsceneActive { get; private set; }
+
+    private void ClearLocalIntroCutsceneActive() => IsLocalIntroCutsceneActive = false;
+
+    /// <summary>
+    /// LOCAL: called when this player finishes the intro story text. If a teammate already pressed
+    /// Start Shift and the intro cutscene has finished on this client, this player must join them
+    /// inside the booth rather than revealing at the lobby (bus stop) spawn. Day 1 only (the intro
+    /// is complete, so the gate no longer offers a start-shift screen and the player would otherwise
+    /// be stranded outside). While the cutscene is still running locally, its own
+    /// <see cref="EndIntroCutsceneSequence"/> handles the booth placement instead.
+    /// </summary>
+    public void PlaceLocalPlayerInBoothIfShiftAlreadyStarted()
+    {
+        if (IsLocalIntroCutsceneActive) return;
+        if (GameManager.Instance == null || !GameManager.Instance.HasIntroCutsceneStarted) return;
+        if (CampaignManager.Instance != null && CampaignManager.Instance.CurrentDay != 1) return;
+
+        PlayerInstance local = PlayerInstance.Instance;
+        if (local == null || PlayerSpawner.Instance == null) return;
+
+        local.SetPosition(PlayerSpawner.Instance.GetBoothSpawnPoint(local.OwnerClientId));
+        local.RequestSetIsOutside(false);
+        local.ResetCameraOrientation();
+        local.SetOwnCameraActive(true);
+        local.EnableReticle();
+    }
 
     /// <summary>
     /// Waits for <see cref="PlayerInstance.Instance"/> to be available before touching it.

@@ -393,6 +393,11 @@ public class PlayerInstance : NetworkBehaviour
         while (IntroCinematicController.Instance != null && IntroCinematicController.Instance.IsPlaying)
             yield return null;
 
+        // If a teammate started the Day 1 intro cutscene while this player was still reading, the
+        // cutscene now owns control/HUD and restores them itself when it ends.
+        while (ShiftManager.Instance != null && ShiftManager.Instance.IsLocalIntroCutsceneActive)
+            yield return null;
+
         // Only wait on cheap static flags. The reticle is not a readiness signal: Die() leaves it
         // inactive, so an active-only lookup never succeeded and stalled the HUD for every attempt.
         // EnableReticle() below finds it even while inactive.
@@ -973,8 +978,7 @@ public class PlayerInstance : NetworkBehaviour
     {
         if (IsOwner)
         {
-            transform.position = position.position;
-            transform.rotation = position.rotation;
+            ApplyTeleport(position.position, position.rotation);
         }
         else
         {
@@ -989,8 +993,24 @@ public class PlayerInstance : NetworkBehaviour
     [ClientRpc]
     private void SetPositionClientRpc(Vector3 position, Quaternion rotation, ClientRpcParams rpcParams = default)
     {
-        transform.position = position;
-        transform.rotation = rotation;
+        ApplyTeleport(position, rotation);
+    }
+
+    /// <summary>
+    /// Physics.autoSyncTransforms is disabled project-wide, so writing transform.position while the
+    /// CharacterController is enabled can be reverted by its next Move() (it still holds the old
+    /// PhysX pose) whenever no physics step runs in between. Toggling the controller re-syncs it.
+    /// </summary>
+    private void ApplyTeleport(Vector3 position, Quaternion rotation)
+    {
+        bool controllerWasEnabled = _characterController != null && _characterController.enabled;
+        if (controllerWasEnabled)
+            _characterController.enabled = false;
+
+        transform.SetPositionAndRotation(position, rotation);
+
+        if (controllerWasEnabled)
+            _characterController.enabled = true;
     }
 
     public void DisableReticle()

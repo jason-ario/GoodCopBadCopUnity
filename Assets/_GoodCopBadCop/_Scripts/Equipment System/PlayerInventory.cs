@@ -223,6 +223,19 @@ public class PlayerInventory : NetworkBehaviour
         if (_health != null)
             _health.OnDeath -= DropAllItemsOnDeathServer;
 
+        // Server-side disconnect drop. When a client leaves, NGO despawns its player object and
+        // then DESTROYS every NetworkObject still owned by that client — which includes held and
+        // stowed items (pickup transfers ownership) — before OnClientDisconnectCallback fires, so
+        // PickableObjectRegistry's sweep is too late. This runs during the player despawn, while
+        // the items are still spawned: dropping them here (same path as death) returns ownership
+        // to the server so they survive, landing where the player stood.
+        if (IsServer && NetworkManager != null && !NetworkManager.ShutdownInProgress &&
+            OwnerClientId != NetworkManager.ServerClientId)
+        {
+            DropAllItemsOnDeathServer();
+            return;
+        }
+
         // Drop any stowed items back to the world so they are not lost on disconnect.
         for (int i = 0; i < _slots.Length; i++)
         {
@@ -584,6 +597,7 @@ public class PlayerInventory : NetworkBehaviour
     /// hovering where the player died. Uses the replicated held/slot references, so it is
     /// server-authoritative and works whether or not the dead client's own teardown lands.
     /// The owner separately clears its local hold/hotbar state (<see cref="ClearAllSlotsLocalOnDeath"/>).
+    /// Also used when a remote player's object despawns (disconnect) — see <see cref="OnNetworkDespawn"/>.
     /// </summary>
     private void DropAllItemsOnDeathServer()
     {

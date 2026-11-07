@@ -193,12 +193,21 @@ public class IntroCinematicController : MonoBehaviour
         foreach (string line in storyLines)
             yield return StartCoroutine(ShowLineAndWait(line));
 
+        // A teammate may have pressed Start Shift while this player was still reading. The intro
+        // cutscene's own booth teleport ran behind this panel; re-place the player inside the booth
+        // now (still behind the black panel) so they never reveal stranded at the bus stop.
+        ShiftManager shiftManager = ShiftManager.Instance;
+        shiftManager?.PlaceLocalPlayerInBoothIfShiftAlreadyStarted();
+
         panelRoot.SetActive(false);
         IsPlaying = false;
 
         if (_lockedPlayer != null)
         {
-            _lockedPlayer.ClosedUIPanel();
+            // If the Day 1 intro cutscene is still playing on this client, it owns the controls
+            // and restores them itself (ShiftManager.EnablePlayerControl) when it ends.
+            if (shiftManager == null || !shiftManager.IsLocalIntroCutsceneActive)
+                _lockedPlayer.ClosedUIPanel();
             _lockedPlayer = null;
         }
     }
