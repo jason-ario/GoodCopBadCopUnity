@@ -152,10 +152,11 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
         ShiftManager.OnSuspectProcessed -= OnSuspectProcessed;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
         ShiftManager.OnSuspectProcessed -= OnSuspectProcessed;
+        base.OnDestroy();
     }
 
     private void OnNetworkValueChanged<T>(T previous, T current)

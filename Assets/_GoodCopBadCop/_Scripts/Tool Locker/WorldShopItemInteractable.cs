@@ -61,6 +61,20 @@ public class WorldShopItemInteractable : Interactable
         // Mirror the shop item's name as the interaction tooltip.
         if (_shopItem != null && string.IsNullOrEmpty(interactText))
             interactText = _shopItem.Name;
+
+        // The unlock gate is purely local presentation derived from the (day-driven) anomaly
+        // unlock state, so it must not depend on the network spawn lifecycle. Subscribing here
+        // (paired with OnDestroy) keeps the pile and its tape label correct on late joiners even
+        // if OnNetworkSpawn is skipped or runs before the client's day has been applied.
+        AnomalyUnlockManager.OnAnomalyUnlocked += OnAnomalyUnlocked;
+        CampaignManager.OnDayChanged += OnCampaignDayChanged;
+    }
+
+    private void Start()
+    {
+        // Authored scene state has every tape label visible; hide gated labels immediately on
+        // every peer instead of waiting for a network spawn (the pile itself waits for spawn).
+        ApplyUnlockGate();
     }
 
     public override void OnNetworkSpawn()
@@ -68,7 +82,6 @@ public class WorldShopItemInteractable : Interactable
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart += OnDayStart;
 
-        AnomalyUnlockManager.OnAnomalyUnlocked += OnAnomalyUnlocked;
         ApplyUnlockGate();
     }
 
@@ -76,8 +89,13 @@ public class WorldShopItemInteractable : Interactable
     {
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStart;
+    }
 
+    public override void OnDestroy()
+    {
         AnomalyUnlockManager.OnAnomalyUnlocked -= OnAnomalyUnlocked;
+        CampaignManager.OnDayChanged -= OnCampaignDayChanged;
+        base.OnDestroy();
     }
 
     // ─── Interactable override ────────────────────────────────────────────────
@@ -240,6 +258,8 @@ public class WorldShopItemInteractable : Interactable
 
     private void OnAnomalyUnlocked(string typeName) => ApplyUnlockGate();
 
+    private void OnCampaignDayChanged(int day) => ApplyUnlockGate();
+
     /// <summary>
     /// Shows or hides this pile (and its optional <see cref="_unlockLabel"/>) to match
     /// <see cref="ShopItem.IsUnlockRequirementMet"/>. Items with no required anomaly type always
@@ -251,7 +271,13 @@ public class WorldShopItemInteractable : Interactable
 
         bool unlocked = _shopItem.IsUnlockRequirementMet();
         _shopItem.SetAvailable(unlocked);
-        gameObject.SetActive(unlocked);
+
+        // Only toggle this NetworkObject's own GameObject once it is spawned: NGO's server start
+        // sweep (ServerSpawnSceneObjectsOnStartSweep) skips inactive in-scene objects, and Start()
+        // runs in the menu before the host starts, so deactivating early would leave the pile
+        // permanently unspawned. The tape label is a plain sibling and is always safe to toggle.
+        if (IsSpawned)
+            gameObject.SetActive(unlocked);
 
         if (_unlockLabel != null)
             _unlockLabel.SetActive(unlocked);

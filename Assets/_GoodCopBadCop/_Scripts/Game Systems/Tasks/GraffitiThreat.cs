@@ -119,9 +119,10 @@ public class GraffitiThreat : NetworkBehaviour, ISystemicThreat
             ShiftManager.Instance.OnDayStart -= OnDayStart;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        base.OnDestroy();
     }
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────

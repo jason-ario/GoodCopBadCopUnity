@@ -103,7 +103,7 @@ public class ElectricityController : NetworkBehaviour
         UIController.Instance.OnReportHidden += ResumeCountdown;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
 
@@ -115,6 +115,7 @@ public class ElectricityController : NetworkBehaviour
             UIController.Instance.OnReportShown -= PauseCountdown;
             UIController.Instance.OnReportHidden -= ResumeCountdown;
         }
+        base.OnDestroy();
     }
 
     public override void OnNetworkDespawn()

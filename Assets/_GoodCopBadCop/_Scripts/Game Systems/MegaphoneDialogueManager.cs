@@ -95,12 +95,13 @@ public class MegaphoneDialogueManager : NetworkBehaviour
         CampaignManager.OnTutorialStepRequested += HandleTutorialStep;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnShiftStart -= OnShiftStart;
 
         CampaignManager.OnTutorialStepRequested -= HandleTutorialStep;
+        base.OnDestroy();
     }
 
     // ---------------------------------------------------------------------------

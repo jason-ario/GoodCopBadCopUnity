@@ -78,10 +78,11 @@ public class BoothLightSwitch : Interactable
             ShiftManager.Instance.OnDayStart += HandleDayStart;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= HandleDayStart;
+        base.OnDestroy();
     }
 
     // -----------------------------------------------------------------------

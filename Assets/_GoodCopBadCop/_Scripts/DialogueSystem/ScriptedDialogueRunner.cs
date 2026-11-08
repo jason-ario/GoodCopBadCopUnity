@@ -326,7 +326,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         IsMegaphoneBarkActive = false;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         // Safety net: if this object is destroyed while a scripted dialogue coroutine is
         // still running (e.g. mid-sequence day transition), the coroutine is silently killed
@@ -334,6 +334,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // future ShowPlayerUI() call is never blocked forever by a leaked lock.
         IsScriptedModeActive = false;
         IsMegaphoneBarkActive = false;
+        base.OnDestroy();
     }
 
     // -------------------------------------------------------------------------

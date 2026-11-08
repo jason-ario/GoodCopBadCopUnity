@@ -47,9 +47,10 @@ public class FaxMachine : NetworkBehaviour
 
     private void Awake() => Instance = this;
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        base.OnDestroy();
     }
 
     /// <summary>

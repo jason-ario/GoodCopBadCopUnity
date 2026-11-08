@@ -352,12 +352,13 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             ShiftManager.Instance.OnDayStart -= OnDayStart;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
         TaskRegistry.OnTaskListChanged -= OnTaskListChanged;
         OnDailyTaskCompleted = null;
         OnProgressChanged    = null;
+        base.OnDestroy();
     }
 
     // ── Scrub callback (called by GraffitiInteractable on the server) ─────────

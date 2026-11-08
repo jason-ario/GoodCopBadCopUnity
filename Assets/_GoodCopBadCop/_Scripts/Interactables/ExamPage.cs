@@ -696,7 +696,7 @@ public class ExamPage : FolderItem
         RefreshLockStates();
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (_renderTexture != null)
         {
@@ -706,6 +706,7 @@ public class ExamPage : FolderItem
 
         if (_paperMaterialInstance != null)
             Destroy(_paperMaterialInstance);
+        base.OnDestroy();
     }
 
     // ── Lock-state management ─────────────────────────────────────────────────

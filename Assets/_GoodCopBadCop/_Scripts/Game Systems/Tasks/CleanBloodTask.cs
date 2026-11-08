@@ -291,10 +291,11 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             ShiftManager.Instance.OnDayStart -= DespawnTransientSplattersOnDayStart;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
         OnDailyTaskCompleted = null;
+        base.OnDestroy();
     }
 
     // ── Public API ────────────────────────────────────────────────────────────

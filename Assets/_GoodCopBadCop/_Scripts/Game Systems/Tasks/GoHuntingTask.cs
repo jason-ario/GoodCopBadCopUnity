@@ -93,13 +93,14 @@ public class GoHuntingTask : NetworkBehaviour, IBetweenShiftTask
             ShiftManager.Instance.OnDayStart -= OnDayStart;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this)
         {
             Instance = null;
             IsTaskActive = false;
         }
+        base.OnDestroy();
     }
 
     // ── IBetweenShiftTask ────────────────────────────────────────────────────
