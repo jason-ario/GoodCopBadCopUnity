@@ -139,6 +139,16 @@ public class PlayerPickupController : NetworkBehaviour
     private Transform _followTarget;
     private NetworkTransform _followNT;
 
+    // Non-owner: true while _heldObjectRef points at a NetworkObject that hasn't spawned on this
+    // client yet. Late-join initial sync spawns objects in no guaranteed order, so this player can
+    // spawn before the item it's holding; TryGet then fails, and since initial NetworkVariable
+    // values never raise OnValueChanged nothing would ever re-apply the follow — the item stays
+    // frozen at its join-time pose. LateUpdate retries ApplyBodyConstraint until it resolves.
+    private bool _pendingHeldRefResolve;
+    private float _pendingHeldRefSince;
+    private bool _pendingHeldRefWarned;
+    private const float PendingHeldRefWarnAfter = 5f;
+
     // When true (set by SpectateManager), SyncWorldObjectToBody follows the camera arm socket
     // instead of the body arm socket, eliminating the NetworkAnimator interpolation lag that
     // makes held items drift behind the spectated player's camera position.
@@ -366,7 +376,39 @@ public class PlayerPickupController : NetworkBehaviour
 
     private void LateUpdate()
     {
+        RetryPendingHeldRefResolve();
         SyncWorldObjectToBody();
+    }
+
+    /// <summary>
+    /// Non-owner late-join recovery: keeps retrying <see cref="ApplyBodyConstraint"/> until the
+    /// held item's NetworkObject has spawned locally (see <see cref="_pendingHeldRefResolve"/>).
+    /// </summary>
+    private void RetryPendingHeldRefResolve()
+    {
+        if (!_pendingHeldRefResolve) return;
+
+        if (IsOwner || !IsSpawned || _heldObjectRef.Value.NetworkObjectId == 0 || itemEquippedIndex.Value < 0)
+        {
+            ClearPendingHeldRefResolve();
+            return;
+        }
+
+        ApplyBodyConstraint();
+        if (!_pendingHeldRefResolve) return;
+
+        if (!_pendingHeldRefWarned && Time.time - _pendingHeldRefSince > PendingHeldRefWarnAfter)
+        {
+            _pendingHeldRefWarned = true;
+            Debug.LogWarning($"[PlayerPickupController] Held object {_heldObjectRef.Value.NetworkObjectId} for '{name}' " +
+                             $"still not spawned locally after {PendingHeldRefWarnAfter}s; continuing to wait.", this);
+        }
+    }
+
+    private void ClearPendingHeldRefResolve()
+    {
+        _pendingHeldRefResolve = false;
+        _pendingHeldRefWarned  = false;
     }
 
     /// <summary>
@@ -1281,7 +1323,20 @@ public class PlayerPickupController : NetworkBehaviour
     private void ApplyBodyConstraint()
     {
         if (_bodyCurrentlyEquippedItem == null) return;
-        if (!_heldObjectRef.Value.TryGet(out NetworkObject netObj)) return;
+        if (!_heldObjectRef.Value.TryGet(out NetworkObject netObj))
+        {
+            // Ref is set but the item hasn't spawned here yet (late-join spawn order) — retry
+            // from LateUpdate instead of silently leaving the item frozen in place.
+            if (!IsOwner && _heldObjectRef.Value.NetworkObjectId != 0 && !_pendingHeldRefResolve)
+            {
+                _pendingHeldRefResolve = true;
+                _pendingHeldRefSince   = Time.time;
+                _pendingHeldRefWarned  = false;
+            }
+            return;
+        }
+
+        ClearPendingHeldRefResolve();
 
         PickableObject worldObj = netObj.GetComponent<PickableObject>();
         if (worldObj == null) return;
@@ -1311,6 +1366,7 @@ public class PlayerPickupController : NetworkBehaviour
     /// </summary>
     private void RemoveBodyConstraint(NetworkObjectReference objectRef)
     {
+        ClearPendingHeldRefResolve();
         ClearCamContainerSpectate();
         _followWorldObj = null;
         _followTarget   = null;

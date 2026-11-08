@@ -357,10 +357,11 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
         ClearEnemyCompassMarkers();
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
         ClearEnemyCompassMarkers();
+        base.OnDestroy();
     }
 
     private void Update()

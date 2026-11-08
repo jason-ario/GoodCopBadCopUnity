@@ -103,10 +103,11 @@ public class HeartRateScanner : PickableObject
     }
 
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (waveformTexture != null)
             Destroy(waveformTexture);
+        base.OnDestroy();
     }
 
     /// <summary>LMB (held) scans a heart rate. Inherited by Scanner.</summary>

@@ -140,6 +140,7 @@ public class LobbyManager : MonoBehaviour
 
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+        NetworkManager.Singleton.OnServerStopped += OnServerStopped;
 
         if (networkTransport is FacepunchTransport)
             _ = TryJoinLobbyFromLaunchArgs();
@@ -324,6 +325,7 @@ public class LobbyManager : MonoBehaviour
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+            NetworkManager.Singleton.OnServerStopped -= OnServerStopped;
             if (NetworkManager.Singleton.ConnectionApprovalCallback == ApproveConnection)
                 NetworkManager.Singleton.ConnectionApprovalCallback = null;
         }
@@ -970,6 +972,8 @@ public class LobbyManager : MonoBehaviour
             return;
         }
 
+        CacheSpectatorMembers(lobby);
+
         Debug.Log($"[OnLobbyEntered] IsHost={NetworkManager.Singleton.IsHost} IsClient={NetworkManager.Singleton.IsClient} Members={CurrentLobby.Members.Count()} OwnerSteamId={lobby.Owner.Id}");
 
         OnLobbyUpdated?.Invoke();
@@ -985,6 +989,13 @@ public class LobbyManager : MonoBehaviour
         Debug.Log($"[OnLobbyMemberJoined] {friend.Name}");
         Debug.Log($"Members now: {CurrentLobby.Members.Count()}");
 
+        CacheSpectatorMembers(lobby);
+
+        // A fresh member hasn't published a role yet; IsSpectatorMember treats whitelisted dev
+        // Steam IDs as spectators in that window, so a spectating developer never gets announced.
+        if (ShouldShowMembershipNotification(lobby, friend))
+            ShowMembershipNotification(friend.Name, joined: true);
+
         PublishVisiblePlayerCount();
         OnLobbyUpdated?.Invoke();
     }
@@ -994,18 +1005,90 @@ public class LobbyManager : MonoBehaviour
         if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
             return;
 
+        // Decide before the delay: the leaver's member data (spectator role) may be gone afterwards.
+        bool showLeftNotification = ShouldShowMembershipNotification(lobby, friend);
+        _spectatorMemberIds.Remove(friend.Id.Value);
+
         await Task.Delay(50);
 
         Debug.Log($"[OnLobbyMemberLeave] {friend.Name}");
 
+        if (showLeftNotification)
+            ShowMembershipNotification(friend.Name, joined: false);
+
         PublishVisiblePlayerCount();
         OnLobbyUpdated?.Invoke();
+    }
+
+    // Steam IDs of lobby members known to be hidden dev spectators. Cached while they're present
+    // because their role member data can't be read reliably once they've left.
+    private readonly System.Collections.Generic.HashSet<ulong> _spectatorMemberIds =
+        new System.Collections.Generic.HashSet<ulong>();
+
+    private void CacheSpectatorMembers(Lobby lobby)
+    {
+        _spectatorMemberIds.Clear();
+        foreach (var member in lobby.Members)
+        {
+            if (DevSpectatorConfig.IsSpectatorMember(lobby, member))
+                _spectatorMemberIds.Add(member.Id.Value);
+        }
+    }
+
+    /// <summary>
+    /// True when a joining/leaving lobby member should produce a "X has joined/left the game"
+    /// toast here: we're in a live session, it isn't us, it isn't a hidden dev spectator, and it
+    /// isn't the host (losing the host is handled by <see cref="ConnectionLossHandler"/>).
+    /// </summary>
+    private bool ShouldShowMembershipNotification(Lobby lobby, Friend friend)
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsListening || IsIntentionalDisconnect)
+            return false;
+
+        if (SteamClient.IsValid && friend.Id == SteamClient.SteamId)
+            return false;
+
+        if (_spectatorMemberIds.Contains(friend.Id.Value) || DevSpectatorConfig.IsSpectatorMember(lobby, friend))
+            return false;
+
+        if (!nm.IsServer && facepunchTransport != null && friend.Id == facepunchTransport.targetSteamId)
+            return false;
+
+        return true;
+    }
+
+    private static void ShowMembershipNotification(string steamName, bool joined)
+    {
+        if (UIController.Instance == null)
+            return;
+
+        bool hasName = !string.IsNullOrWhiteSpace(steamName);
+        string message = joined
+            ? (hasName ? Loc.T("{0} has joined the game.", steamName) : Loc.T("A player has joined the game."))
+            : (hasName ? Loc.T("{0} has left the game.", steamName) : Loc.T("A player has left the game."));
+
+        // Unique key per player and event so several joins/leaves queue up instead of replacing
+        // each other. A rejoin drops that player's pending "left" toast so the two don't contradict.
+        string leftKey = "PlayerLeft:" + steamName;
+        if (joined)
+        {
+            UIController.Instance.HideQueuedNotification(leftKey);
+            UIController.Instance.ShowQueuedNotification(message, "PlayerJoined:" + steamName);
+        }
+        else
+        {
+            UIController.Instance.HideQueuedNotification("PlayerJoined:" + steamName);
+            UIController.Instance.ShowQueuedNotification(message, leftKey);
+        }
     }
 
     private void OnLobbyMemberDataChanged(Lobby lobby, Friend friend)
     {
         if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
             return;
+
+        CacheSpectatorMembers(lobby);
 
         // Role changes (player/spectator) affect which members the UI shows.
         PublishVisiblePlayerCount();
@@ -1073,13 +1156,20 @@ public class LobbyManager : MonoBehaviour
             return;
         }
 
-        if (DevSpectatorRegistry.PlayerClientCount(NetworkManager.Singleton) >= MaxLobbyMembers)
+        int playerCount = HandshakeCompletePlayerCount(NetworkManager.Singleton);
+        if (playerCount >= MaxLobbyMembers)
         {
             response.Approved = false;
             response.Reason = "LobbyFull";
-            Debug.LogWarning($"[LobbyManager] Rejected clientId={request.ClientNetworkId} — player cap ({MaxLobbyMembers}) reached.");
+            Debug.LogWarning($"[LobbyManager] Rejected clientId={request.ClientNetworkId} — player cap ({MaxLobbyMembers}) reached. " +
+                             $"NGO connected ids=[{string.Join(",", NetworkManager.Singleton.ConnectedClientsIds)}], " +
+                             $"handshake-complete=[{string.Join(",", _handshakeCompleteClientIds)}].");
             return;
         }
+
+        // Late-join sync throws (and drops the joiner) if any spawned NetworkObject still lists a
+        // destroyed NetworkBehaviour — see NetworkSyncGuard. Clean that up before NGO serializes.
+        NetworkSyncGuard.PurgeDestroyedBehaviours(NetworkManager.Singleton);
 
         // Remember who this is so a player who left while dead can be recognised on rejoin
         // (see ReviveManager.ShouldSpawnAsDeadServer).
@@ -1087,10 +1177,33 @@ public class LobbyManager : MonoBehaviour
         response.Approved = true;
     }
 
+    /// <summary>
+    /// SERVER: NGO client ids whose connection fully completed (OnClientConnectedCallback fired).
+    /// A join that throws mid-handshake never reaches that callback but can linger in
+    /// ConnectedClientsIds as a ghost; counting only completed handshakes keeps ghosts from
+    /// filling the player cap and locking everyone out.
+    /// </summary>
+    private readonly System.Collections.Generic.HashSet<ulong> _handshakeCompleteClientIds = new();
+
+    /// <summary>SERVER: real (non-spectator) players that are connected AND finished the handshake.</summary>
+    private int HandshakeCompletePlayerCount(NetworkManager networkManager)
+    {
+        int count = 0;
+        foreach (ulong id in DevSpectatorRegistry.PlayerClientIds(networkManager))
+        {
+            if (_handshakeCompleteClientIds.Contains(id))
+                count++;
+        }
+        return count;
+    }
+
+    private void OnServerStopped(bool wasHost) => _handshakeCompleteClientIds.Clear();
+
     private void OnClientDisconnected(ulong clientId)
     {
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
         {
+            _handshakeCompleteClientIds.Remove(clientId);
             DevSpectatorRegistry.UnregisterSpectator(clientId);
             PlayerSessionIdentity.UnregisterClient(clientId);
         }
@@ -1100,6 +1213,8 @@ public class LobbyManager : MonoBehaviour
     {
         if (!NetworkManager.Singleton.IsHost)
             return;
+
+        _handshakeCompleteClientIds.Add(clientId);
 
         // NGO fires OnClientConnectedCallback for the host's own LocalClientId too, synchronously
         // inside StartHost() — not just for remote clients joining. The normal main-menu "Play"

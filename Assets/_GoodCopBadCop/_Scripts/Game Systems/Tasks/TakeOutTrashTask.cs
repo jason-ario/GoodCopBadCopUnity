@@ -419,13 +419,14 @@ public class TakeOutTrashTask : NetworkBehaviour, ISystemicThreat, IDailyTask
             TaskRegistry.Instance?.RemoveThreat(this);
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
         JunkItem.OnAnyJunkItemCollected          -= OnJunkItemCollected;
         DumpsterInteractable.OnTrashBagDeposited -= OnTrashBagDeposited;
         OnAllItemsDeposited                       = null;
         OnProgressChanged                         = null;
+        base.OnDestroy();
     }
 
     // ── ISystemicThreat stubs ────────────────────────────────────────────────

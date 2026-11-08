@@ -94,13 +94,14 @@ public class MutantThreat : NetworkBehaviour, ISystemicThreat
             ShiftManager.Instance.OnDayStart -= OnDayStart;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this)
         {
             Instance   = null;
             DropActive = false;
         }
+        base.OnDestroy();
     }
 
     // ── ISystemicThreat ──────────────────────────────────────────────────────

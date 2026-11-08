@@ -88,9 +88,10 @@ public class CampaignManager : NetworkBehaviour
         SuspectController.OnFirstKillEver += OnFirstKillEver_ArmOcho;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         SuspectController.OnFirstKillEver -= OnFirstKillEver_ArmOcho;
+        base.OnDestroy();
     }
 
     /// <summary>

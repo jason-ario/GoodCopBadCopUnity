@@ -183,7 +183,7 @@ public class ExamNotebook : PickableObject
             ShiftManager.Instance.OnDayStart += OnDayStarted;
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         UnsubscribeFromCutsceneState();
 
@@ -192,6 +192,7 @@ public class ExamNotebook : PickableObject
 
         if (ShiftManager.Instance != null)
             ShiftManager.Instance.OnDayStart -= OnDayStarted;
+        base.OnDestroy();
     }
 
     /// <summary>

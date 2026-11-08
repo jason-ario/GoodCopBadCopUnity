@@ -310,11 +310,12 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
         if (IsServer) StopObservingFences();
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
         OnProgressChanged     = null;
         OnAllFencesRepaired   = null;
+        base.OnDestroy();
     }
 
     // ── Public API ────────────────────────────────────────────────────────────

@@ -124,7 +124,7 @@ public class Polaroid : PickableObject
     }
 
     /// <summary>Cleans up the per-instance material copy and owned texture to avoid leaks.</summary>
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (_instanceMaterial != null)
         {
@@ -137,5 +137,6 @@ public class Polaroid : PickableObject
             Destroy(_ownedTexture);
             _ownedTexture = null;
         }
+        base.OnDestroy();
     }
 }

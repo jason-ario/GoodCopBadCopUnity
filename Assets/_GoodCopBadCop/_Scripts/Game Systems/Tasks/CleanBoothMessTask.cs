@@ -156,9 +156,10 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
         TaskRegistry.Instance?.RemoveThreat(this);
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        base.OnDestroy();
     }
 
     // ── Day 3 activation ─────────────────────────────────────────────────────

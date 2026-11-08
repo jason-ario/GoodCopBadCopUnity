@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -119,7 +120,23 @@ public class AnomalyUnlockManager : MonoBehaviour
         if (_runtimeUnlocked.Contains(typeName))
             return true;
 
+        // A connected non-host client must never read its own local save: SaveDataManager is
+        // DontDestroyOnLoad and may still hold a slot from an earlier session (with unlocks from a
+        // later day). Clients derive unlocks from the host's authoritative day via progression.
+        if (IsRemoteClient)
+            return false;
+
         return SaveDataManager.Instance != null && SaveDataManager.Instance.IsAnomalyUnlocked(typeName);
+    }
+
+    /// <summary>True when this peer is connected to a session as a client but is not the server/host.</summary>
+    private static bool IsRemoteClient
+    {
+        get
+        {
+            NetworkManager nm = NetworkManager.Singleton;
+            return nm != null && nm.IsListening && !nm.IsServer;
+        }
     }
 
     /// <summary>
@@ -137,7 +154,8 @@ public class AnomalyUnlockManager : MonoBehaviour
         // This also ensures correctness when SaveDataManager has no active slot
         // (e.g. debug skip cheats), where the save write is silently skipped.
         _runtimeUnlocked.Add(typeName);
-        SaveDataManager.Instance?.UnlockAnomaly(typeName);
+        if (!IsRemoteClient)
+            SaveDataManager.Instance?.UnlockAnomaly(typeName);
         OnAnomalyUnlocked?.Invoke(typeName);
         Debug.Log($"[AnomalyUnlockManager] Anomaly unlocked: '{typeName}'.");
     }

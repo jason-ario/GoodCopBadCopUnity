@@ -327,10 +327,11 @@ public class OchoEatingVladCutscene : NetworkBehaviour
             ApplyLateJoinOchoVisualState(_networkPhase.Value);
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
         StopMouthGore(immediate: true);
+        base.OnDestroy();
     }
 
     private void LateUpdate()
