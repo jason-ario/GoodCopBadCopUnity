@@ -34,8 +34,9 @@ public class ObjectPlacer : MonoBehaviour
     /// noise, unlike free-surface placement where it helps show where the item will land.
     /// </summary>
     private bool _suppressArc;
+    private Vector3 _pendingTargetPosition;
     private Quaternion _pendingTargetRotation;
-    private bool _hasPendingTargetRotation;
+    private bool _hasPendingTargetPose;
     private readonly List<Material> _ghostMaterials = new List<Material>();
     public bool IsActive;
     public bool IsInRange { get; private set; } = true;
@@ -103,7 +104,7 @@ public class ObjectPlacer : MonoBehaviour
         yield return new WaitForEndOfFrame();
         deactivatedThisFrame = false;
         _currentPlacementBoard = null;
-        _hasPendingTargetRotation = false;
+        _hasPendingTargetPose = false;
     }
 
     public void SetItem(PickableItemData itemData)
@@ -273,25 +274,30 @@ public class ObjectPlacer : MonoBehaviour
     }
 
     /// <summary>
-    /// Records the rotation the placement preview is currently interpolating toward.
-    /// The pending value remains available through the release frame, even if the
-    /// preview is deactivated before the drop input is processed.
+    /// Records the pose (surface hit point + orientation) the placement preview is currently
+    /// interpolating toward. The pending value remains available through the release frame,
+    /// even if the preview is deactivated before the drop input is processed.
     /// </summary>
-    public void SetPendingTargetRotation(Quaternion rotation)
+    public void SetPendingTargetPose(Vector3 position, Quaternion rotation)
     {
+        _pendingTargetPosition = position;
         _pendingTargetRotation = rotation;
-        _hasPendingTargetRotation = true;
+        _hasPendingTargetPose = true;
     }
 
     /// <summary>
-    /// Immediately completes the active placement rotation interpolation.
-    /// Called just before a drop reads this transform to ensure the placed object
-    /// uses the exact target orientation rather than an in-between preview angle.
+    /// Immediately completes the active placement interpolation (position AND rotation).
+    /// Called just before a drop reads this transform so the placed object lands exactly on
+    /// the aimed surface point. Snapping only the rotation used to leave the position
+    /// mid-lerp: when the aim moved between surfaces at different heights (desk → raised
+    /// board/tray), the straight-line path between the two hit points cuts through the
+    /// collider volume, so a release during the lerp dropped the item inside the collider
+    /// instead of on its outer surface.
     /// </summary>
-    public void SnapToPendingTargetRotation()
+    public void SnapToPendingTargetPose()
     {
-        if (_hasPendingTargetRotation)
-            transform.rotation = _pendingTargetRotation;
+        if (_hasPendingTargetPose)
+            transform.SetPositionAndRotation(_pendingTargetPosition, _pendingTargetRotation);
     }
 
     /// <summary>

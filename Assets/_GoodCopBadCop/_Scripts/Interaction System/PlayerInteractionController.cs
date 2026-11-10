@@ -48,6 +48,16 @@ public class PlayerInteractionController : NetworkBehaviour
     [SerializeField] float objectPlacerLerpSpeed = 10f;
 
     /// <summary>
+    /// Surface collider / normal the placement ghost was last aimed at. When the aim moves to a
+    /// different collider or a differently-angled face, the ghost snaps instead of lerping — a
+    /// straight-line lerp between two such surfaces cuts through the collider volume, so the
+    /// ghost (and any drop released mid-lerp) would sit inside the collider.
+    /// </summary>
+    private Collider _lastPlacementSurface;
+    private Vector3 _lastPlacementNormal;
+    private const float PlacementSnapNormalAngle = 1f;
+
+    /// <summary>
     /// Maximum surface slope angle (in degrees from vertical-up) that allows free placement.
     /// Surfaces steeper than this will show the ghost red and block the drop.
     /// Hanging placement boards are exempt from this check.
@@ -1189,7 +1199,15 @@ public class PlayerInteractionController : NetworkBehaviour
                 : Quaternion.FromToRotation(Vector3.up, hit.normal);
 
         Vector3 targetPosition = placementSlot != null ? placementSlot.SnapPoint.position : hit.point;
-        ObjectPlacer.Instance.SetPendingTargetRotation(targetRotation);
+        ObjectPlacer.Instance.SetPendingTargetPose(targetPosition, targetRotation);
+
+        // Lerping is only safe while sliding along the same flat face. Jumping to another
+        // collider or face (desk → raised tray/board, top → side) snaps so the interpolated
+        // path never passes through the collider's interior.
+        bool surfaceChanged = hit.collider != _lastPlacementSurface
+            || Vector3.Angle(hit.normal, _lastPlacementNormal) > PlacementSnapNormalAngle;
+        _lastPlacementSurface = hit.collider;
+        _lastPlacementNormal = hit.normal;
 
         reticle.SetInteractState(false);
 
@@ -1210,8 +1228,15 @@ public class PlayerInteractionController : NetworkBehaviour
             ObjectPlacer.Instance.ActivatePlacer(placementBoard);
         }
 
-        ObjectPlacer.Instance.transform.rotation = Quaternion.Lerp(ObjectPlacer.Instance.transform.rotation, targetRotation, Time.deltaTime * objectPlacerLerpSpeed);
-        ObjectPlacer.Instance.transform.position = Vector3.Lerp(ObjectPlacer.Instance.transform.position, targetPosition, Time.deltaTime * objectPlacerLerpSpeed);
+        if (surfaceChanged)
+        {
+            ObjectPlacer.Instance.transform.SetPositionAndRotation(targetPosition, targetRotation);
+        }
+        else
+        {
+            ObjectPlacer.Instance.transform.rotation = Quaternion.Lerp(ObjectPlacer.Instance.transform.rotation, targetRotation, Time.deltaTime * objectPlacerLerpSpeed);
+            ObjectPlacer.Instance.transform.position = Vector3.Lerp(ObjectPlacer.Instance.transform.position, targetPosition, Time.deltaTime * objectPlacerLerpSpeed);
+        }
         ObjectPlacer.Instance.SetInRange(inRange);
     }
     

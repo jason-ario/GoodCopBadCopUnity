@@ -232,7 +232,7 @@ namespace GoodCopBadCop.Autopilot
                 Vector3 position = slot != null ? slot.SnapPoint.position : point;
 
                 if (placer.IsActive) placer.DeactivatePlacer();
-                placer.SetPendingTargetRotation(rotation);
+                placer.SetPendingTargetPose(position, rotation);
                 placer.SetItem(held.ItemData);
                 placer.transform.SetPositionAndRotation(position, rotation);
                 placer.ActivatePlacer(board);

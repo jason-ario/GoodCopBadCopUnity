@@ -1147,10 +1147,10 @@ public class PlayerPickupController : NetworkBehaviour
             return;
         }
 
-        // Finish the preview's rotation before resolving the placement pose. The ghost is
-        // smoothed while aiming, but releasing placement must commit the intended target
-        // rotation rather than whichever intermediate angle it had reached this frame.
-        ObjectPlacer.Instance.SnapToPendingTargetRotation();
+        // Finish the preview's interpolation before resolving the placement pose. The ghost is
+        // smoothed while aiming, but releasing placement must commit the exact aimed surface
+        // point and rotation — an in-between lerp position can sit inside the surface collider.
+        ObjectPlacer.Instance.SnapToPendingTargetPose();
 
         bool hasPlacementPose = ObjectPlacer.Instance.TryGetPlacementPose(
             _heldObject,
