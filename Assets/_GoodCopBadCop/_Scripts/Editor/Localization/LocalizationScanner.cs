@@ -291,6 +291,8 @@ public static partial class LocalizationScanner
         string n = fieldName.ToLowerInvariant();
         if (n.Contains("trigger") || n.Contains("animation") || n.Contains("animator") || n.EndsWith("id") && n.Length <= 4) return true;
         if (n.TrimStart('_') == "tag") return true;
+        // Expression keys (ScriptedDialogue.expression, DialogueExpressionMaterial._expressions[].key) are lookups, not text.
+        if (n.TrimStart('_') == "expression" || n.TrimStart('_') == "key") return true;
         foreach (var suffix in IdentifierSuffixes)
         {
             // Only a real camelCase word boundary counts: "playerTag" yes, "hashtag" / "paid" no.
