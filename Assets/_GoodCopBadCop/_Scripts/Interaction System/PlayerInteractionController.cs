@@ -926,6 +926,13 @@ public class PlayerInteractionController : NetworkBehaviour
         bool crossedGlass = false;
         RaycastHit glassHit = default;
 
+        // Set once the ray has entered a container's trigger volume (see
+        // Interactable.LetsInteractionRayReachContents, e.g. dumpsters). Anything interactable
+        // found inside wins; solid geometry (the bin walls) or nothing at all falls back to the
+        // container itself, so it stays targetable exactly as before.
+        Interactable crossedContainer = null;
+        RaycastHit containerHit = default;
+
         // First hit that isn't the local player's own held item (see the skip in the loop).
         int firstEligibleHit = -1;
 
@@ -956,6 +963,22 @@ public class PlayerInteractionController : NetworkBehaviour
             // trigger or solid â€” this is a legitimate interaction target either way.
             if (candidate != null && candidate.IsInteractable)
             {
+                // Container trigger volume (e.g. dumpster): look inside it first.
+                if (!crossedFence && crossedContainer == null && collider.isTrigger
+                    && candidate.LetsInteractionRayReachContents(heldObject))
+                {
+                    crossedContainer = candidate;
+                    containerHit = hits[i];
+                    continue;
+                }
+
+                // Another collider of the same container resolves to the container itself.
+                if (crossedContainer != null && candidate == crossedContainer)
+                {
+                    bestHit = containerHit;
+                    return true;
+                }
+
                 if (crossedFence && !IsPassthroughEligibleJunk(candidate))
                 {
                     bestHit = fenceHit;
@@ -987,14 +1010,16 @@ public class PlayerInteractionController : NetworkBehaviour
                     continue;
                 }
 
-                if (!crossedGlass && IsGlassBarrier(collider) && IsBoothWindowOpen())
+                if (!crossedGlass && crossedContainer == null && IsGlassBarrier(collider) && IsBoothWindowOpen())
                 {
                     crossedGlass = true;
                     glassHit = hits[i];
                     continue;
                 }
 
-                bestHit = crossedFence ? fenceHit : (crossedGlass ? glassHit : hits[i]);
+                bestHit = crossedFence ? fenceHit
+                        : crossedContainer != null ? containerHit
+                        : (crossedGlass ? glassHit : hits[i]);
                 return true;
             }
 
@@ -1003,6 +1028,7 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         if (crossedFence) { bestHit = fenceHit; return true; }
+        if (crossedContainer != null) { bestHit = containerHit; return true; }
         if (crossedGlass) { bestHit = glassHit; return true; }
         if (firstEligibleHit < 0)
         {

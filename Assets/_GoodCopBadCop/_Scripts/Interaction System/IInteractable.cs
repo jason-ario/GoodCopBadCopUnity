@@ -305,6 +305,16 @@ public abstract class Interactable : NetworkBehaviour, IInteractable
     /// </summary>
     public virtual bool PassesInteractionRayThrough => false;
 
+    /// <summary>
+    /// When true, a <b>trigger</b> collider belonging to this object lets
+    /// <see cref="PlayerInteractionController"/>'s interaction ray continue to any interactable
+    /// resting inside/behind it (e.g. items lying in a <see cref="DumpsterInteractable"/>, whose
+    /// trigger volume encloses the whole bin). If the ray instead reaches solid geometry or
+    /// nothing interactable, this object is still the target, so it stays usable as before.
+    /// <paramref name="heldItem"/> is the local player's held item (null when empty-handed).
+    /// </summary>
+    public virtual bool LetsInteractionRayReachContents(PickableObject heldItem) => false;
+
     public virtual void Interact(PlayerInteractionController player)
     {
         OnInteract?.Invoke();

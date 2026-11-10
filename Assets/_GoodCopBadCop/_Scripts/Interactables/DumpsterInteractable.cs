@@ -194,6 +194,15 @@ public class DumpsterInteractable : CollectableContainer
     public override bool AcceptsHeldItems => true;
 
     /// <summary>
+    /// The dumpster's interact trigger encloses the whole bin, so without this, items lying inside
+    /// were unreachable. Let the ray through to them, except while holding something the dumpster
+    /// accepts. In that case the dumpster stays the target, so throwing a bag in or discarding an
+    /// item works no matter what's already inside.
+    /// </summary>
+    public override bool LetsInteractionRayReachContents(PickableObject heldItem)
+        => heldItem == null || !CanInteractWithItem(heldItem);
+
+    /// <summary>
     /// Non-bag items go through the trash can's discard flow (rules + confirmation popup).
     /// They don't count toward the dumpster's fill/trash task — only bags do.
     /// </summary>
