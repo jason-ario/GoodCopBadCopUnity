@@ -96,6 +96,15 @@ public static class CheatConsoleActions
 
         cheats.Add(("Trigger Mutant Breach", () =>
             DebugConsole.Instance.DebugForceMutantBreach()));
+        // Fake multiplayer: a host-owned teammate body for testing co-op death/corpse flows solo.
+        cheats.Add(("Fake Teammate — Spawn (P)", () =>
+            DebugConsole.Instance.EnsureGameStartedThen(FakeTeammateTester.Spawn)));
+
+        cheats.Add(("Fake Teammate — Kill Nearest (L)", () => FakeTeammateTester.KillNearest()));
+
+        cheats.Add(("Fake Teammate — Remove All (Shift+P)", () => FakeTeammateTester.DespawnAll()));
+
+
 
         // Localization: LQA testers switch language without a menu. Equivalent of a "language <code>" command.
         cheats.Add(("Language — Cycle Next (current shown in log)", () =>

@@ -25,7 +25,9 @@ public class HurtVFXController : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        if (!IsOwner)
+        // IsLocalPlayer, not IsOwner: the host owns server-owned player bodies (retained corpses,
+        // FakeTeammateTester dummies), and their damage must not play this machine's hurt feedback.
+        if (!IsLocalPlayer)
             return;
 
         _playerHealth = GetComponent<PlayerHealth>();

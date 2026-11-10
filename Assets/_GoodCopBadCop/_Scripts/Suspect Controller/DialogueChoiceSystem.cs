@@ -80,6 +80,9 @@ public class DialogueChoiceSystem : NetworkBehaviour
     // Other players' held world items, hidden locally alongside their bodies. Restored in ShowOtherPlayers.
     private readonly List<Renderer> _hiddenOtherPlayerRenderers = new();
 
+    // Other players' floating name tags, hidden locally alongside their bodies. Restored in ShowOtherPlayers.
+    private readonly List<NameTag> _hiddenOtherPlayerNameTags = new();
+
     // ── Controller choice navigation ─────────────────────────────────────────
 
     /// <summary>Index of the choice currently highlighted by the controller (-1 = none).</summary>
@@ -849,6 +852,14 @@ public class DialogueChoiceSystem : NetworkBehaviour
             if (otherHeld != null)
                 HideRenderers(otherHeld.gameObject, _hiddenOtherPlayerRenderers);
 
+            // Their floating name tag is a separate object (not under Art) — hide it too.
+            NameTag otherTag = playerObject.GetComponent<NameTag>();
+            if (otherTag != null && !_hiddenOtherPlayerNameTags.Contains(otherTag))
+            {
+                otherTag.SetLocallyHidden(true);
+                _hiddenOtherPlayerNameTags.Add(otherTag);
+            }
+
             GameObject otherBody = playerObject.transform.Find("Art")?.gameObject;
             if (otherBody == null || !otherBody.activeSelf) continue;
 
@@ -865,6 +876,12 @@ public class DialogueChoiceSystem : NetworkBehaviour
                 body.SetActive(true);
 
         _hiddenOtherPlayerBodies.Clear();
+
+        foreach (NameTag tag in _hiddenOtherPlayerNameTags)
+            if (tag != null)
+                tag.SetLocallyHidden(false);
+
+        _hiddenOtherPlayerNameTags.Clear();
         RestoreRenderers(_hiddenOtherPlayerRenderers);
     }
 

@@ -337,6 +337,51 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         base.OnDestroy();
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+        base.OnNetworkDespawn();
+    }
+
+    /// <summary>
+    /// Server-only. A disconnected client is dropped from the participant set and any vote it
+    /// cast is discarded, so the host left alone advances like single-player instead of starting
+    /// (or waiting out) the multi-player countdown for a player who is gone.
+    /// </summary>
+    private void OnClientDisconnected(ulong clientId)
+    {
+        if (!IsServer || NetworkManager.Singleton == null || NetworkManager.Singleton.ShutdownInProgress) return;
+        if (clientId == NetworkManager.ServerClientId) return;
+
+        _leftParticipants.Remove(clientId);
+        _advanceSet.Remove(clientId);
+        _choiceSubmissions.Remove(clientId);
+        _choicePlayerNames.Remove(clientId);
+
+        if (!_participants.Remove(clientId)) return;
+
+        Debug.Log($"[ScriptedDialogueRunner] Client {clientId} disconnected " +
+                  $"({_participants.Count} participant(s) remaining).");
+
+        if (!_serverSequenceActive && !_megaphoneSequenceActive) return;
+
+        if (_abandonWhenEmpty && _participants.Count == 0)
+        {
+            AbandonSequence();
+            return;
+        }
+
+        RecheckGatesAfterParticipantChange();
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -1244,10 +1289,40 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         {
             ResolveChoices();
         }
+        else if (_participants.Count == 1)
+        {
+            CancelGateTimersForSolo();
+        }
         else
         {
             TryAutoAdvanceIfUnattended();
         }
+    }
+
+    /// <summary>
+    /// Server-only. Exactly one participant remains and they haven't submitted yet: stop any
+    /// countdown the departed player started, so the gate waits for the remaining player's own
+    /// input — the same as single-player, where no timer is ever shown.
+    /// </summary>
+    private void CancelGateTimersForSolo()
+    {
+        bool hadTimer = false;
+
+        if (_advanceTimerCoroutine != null && !_scriptedAdvanceReady)
+        {
+            StopCoroutine(_advanceTimerCoroutine);
+            _advanceTimerCoroutine = null;
+            hadTimer = true;
+        }
+        if (_choiceTimerCoroutine != null && !_choiceResolved)
+        {
+            StopCoroutine(_choiceTimerCoroutine);
+            _choiceTimerCoroutine = null;
+            hadTimer = true;
+        }
+
+        if (hadTimer)
+            HideAdvanceTimerClientRpc();
     }
 
     /// <summary>
@@ -2252,7 +2327,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         int required = Mathf.Max(1, _participants.Count);
 
-        if (_choiceSubmissions.Count == 1)
+        if (_choiceSubmissions.Count == 1 && _choiceTimerCoroutine == null && required > 1)
             _choiceTimerCoroutine = StartCoroutine(ChoiceTimeoutCoroutine());
 
         if (_choiceSubmissions.Count >= required)

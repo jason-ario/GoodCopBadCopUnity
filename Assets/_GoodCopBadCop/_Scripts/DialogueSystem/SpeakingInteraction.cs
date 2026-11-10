@@ -205,12 +205,26 @@ public class SpeakingInteraction : NetworkBehaviour
     // vanished player doesn't leave the choice/advance gates waiting on them forever.
     private void OnClientDisconnected(ulong clientId)
     {
-        if (_worldParticipants.Remove(clientId))
-        {
-            LogWorldGate($"client {clientId} left (disconnect)");
-            _isEngaged.Value = _worldParticipants.Count > 0;
-            RecheckWorldGatesAfterParticipantChange();
-        }
+        if (!IsServer || NetworkManager.Singleton == null || NetworkManager.Singleton.ShutdownInProgress) return;
+        RemoveWorldParticipant(clientId, "disconnect");
+    }
+
+    /// <summary>
+    /// Server-only. Drops <paramref name="clientId"/> from the conversation together with any vote
+    /// they cast on the open gate, then re-evaluates the gates. A departed player's vote must not
+    /// count, and once only one player remains the conversation behaves like single-player.
+    /// </summary>
+    private void RemoveWorldParticipant(ulong clientId, string reason)
+    {
+        if (!_worldParticipants.Remove(clientId)) return;
+
+        _worldAdvanceSet.Remove(clientId);
+        _worldChoiceSubmissions.Remove(clientId);
+        _worldChoicePlayerNames.Remove(clientId);
+
+        LogWorldGate($"client {clientId} left ({reason})");
+        _isEngaged.Value = _worldParticipants.Count > 0;
+        RecheckWorldGatesAfterParticipantChange();
     }
 
     /// <summary>
@@ -275,13 +289,7 @@ public class SpeakingInteraction : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void EndEngagementServerRpc(ServerRpcParams rpcParams = default)
     {
-        ulong senderId = rpcParams.Receive.SenderClientId;
-        if (_worldParticipants.Remove(senderId))
-        {
-            LogWorldGate($"client {senderId} left (EndEngagement)");
-            _isEngaged.Value = _worldParticipants.Count > 0;
-            RecheckWorldGatesAfterParticipantChange();
-        }
+        RemoveWorldParticipant(rpcParams.Receive.SenderClientId, "EndEngagement");
     }
 
     /// <summary>
@@ -994,6 +1002,37 @@ public class SpeakingInteraction : NetworkBehaviour
             OpenWorldAdvanceGate("participant left, remaining all voted");
         else if (_awaitingWorldChoice && !_worldChoiceResolved && _worldChoiceSubmissions.Count >= required)
             ResolveWorldChoiceVote();
+        else if (required == 1)
+            CancelWorldGateTimersForSolo();
+    }
+
+    /// <summary>
+    /// Server-only. One participant left and they haven't voted yet: drop any countdown the
+    /// departed player started, so the gate waits for the remaining player's own press/pick
+    /// exactly like single-player (where no timer is ever shown).
+    /// </summary>
+    private void CancelWorldGateTimersForSolo()
+    {
+        bool hadTimer = false;
+
+        if (_worldAdvanceTimerCoroutine != null)
+        {
+            StopCoroutine(_worldAdvanceTimerCoroutine);
+            _worldAdvanceTimerCoroutine = null;
+            hadTimer = true;
+        }
+        if (_worldChoiceTimerCoroutine != null)
+        {
+            StopCoroutine(_worldChoiceTimerCoroutine);
+            _worldChoiceTimerCoroutine = null;
+            hadTimer = true;
+        }
+
+        if (hadTimer)
+        {
+            LogWorldGate("countdown cancelled: single participant remaining");
+            HideWorldAdvanceTimerClientRpc(WorldParticipantRpcParams());
+        }
     }
 
     /// <summary>Mirrors <c>ScriptedDialogueRunner.GetLocalPlayerName</c>.</summary>

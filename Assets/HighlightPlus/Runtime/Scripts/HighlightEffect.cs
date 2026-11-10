@@ -2855,8 +2855,17 @@ namespace HighlightPlus {
                     rr = FindRenderersInChildren(target);
                     break;
                 case TargetOptions.Scripting:
-                    UpdateMaterialProperties();
-                    return;
+                    // GCBC patch: rebuild from the renderers given to SetTargets instead of only
+                    // updating properties. Vanilla never re-forked materials here, so if an effect
+                    // was enabled after SetTargets (e.g. outline 0 -> >0 when a JunkItem swaps from
+                    // its overlay hold pulse to the hover outline) fxMatOutline stayed null, the
+                    // render path threw every frame and the visibility check re-requested setup forever.
+                    scriptingRR.Clear();
+                    for (int k = 0; k < rmsCount; k++) {
+                        if (rms[k].renderer != null) scriptingRR.Add(rms[k].renderer);
+                    }
+                    rr = scriptingRR;
+                    break;
             }
 
             SetupMaterial(rr);
@@ -3086,6 +3095,7 @@ namespace HighlightPlus {
         }
 
         readonly List<Renderer> tempRR = new List<Renderer>();
+        readonly List<Renderer> scriptingRR = new List<Renderer>(); // GCBC patch, see SetupMaterial Scripting case
 
         bool ValidRenderer (Renderer r) {
             return r is MeshRenderer || r is SpriteRenderer || r is SkinnedMeshRenderer || r is ParticleSystemRenderer;

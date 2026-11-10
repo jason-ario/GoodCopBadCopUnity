@@ -32,6 +32,9 @@ public class PlayerSpawner : NetworkBehaviour
     [Tooltip("Per-client spawns used when waking up at the start of each new day (interior of the bunker, behind the closed door).")]
     [SerializeField] private Transform[] multiplayerInsideBunkerSpawnPoints;
 
+    /// <summary>The networked player prefab (read by debug tooling such as <see cref="FakeTeammateTester"/>).</summary>
+    public GameObject PlayerPrefab => playerPrefab;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)

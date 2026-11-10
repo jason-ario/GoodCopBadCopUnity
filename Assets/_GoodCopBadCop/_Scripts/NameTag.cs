@@ -31,6 +31,18 @@ public class NameTag : NetworkBehaviour
             NetworkVariableWritePermission.Owner);
 
     private bool _nameResolved;
+    private bool _locallyHidden;
+
+    /// <summary>
+    /// Client-side visibility toggle (never touches network state), e.g. hidden while the local
+    /// player is in a dialogue cutscene. The owner's own tag always stays hidden regardless.
+    /// </summary>
+    public void SetLocallyHidden(bool hidden)
+    {
+        _locallyHidden = hidden;
+        if (IsOwner || nameTagObject == null) return;
+        nameTagObject.SetActive(!hidden);
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -56,9 +68,10 @@ public class NameTag : NetworkBehaviour
             return;
         }
 
-        // Non-owner: show the name tag and apply immediately if the name snapshot already arrived (e.g. late joiner).
+        // Non-owner: show the name tag (unless locally hidden, e.g. during dialogue) and apply
+        // immediately if the name snapshot already arrived (e.g. late joiner).
         if (nameTagObject != null)
-            nameTagObject.SetActive(true);
+            nameTagObject.SetActive(!_locallyHidden);
 
         string existingName = _ownerName.Value.ToString();
         if (!string.IsNullOrEmpty(existingName))

@@ -233,6 +233,20 @@ public class DebugConsole : MonoBehaviour
             HitLocalPlayer();
         }
 
+        // P — spawn a fake teammate in front of you (Shift+P removes all). L — kill the nearest one.
+        // Host only; see FakeTeammateTester.
+        if (Input.GetKeyDown(KeyCode.P))
+        {
+            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            if (shift) FakeTeammateTester.DespawnAll();
+            else FakeTeammateTester.Spawn();
+        }
+
+        if (Input.GetKeyDown(KeyCode.L))
+        {
+            FakeTeammateTester.KillNearest();
+        }
+
         // J — drop the local player's held item straight down (no mouse needed).
         if (Input.GetKeyDown(KeyCode.J))
         {
