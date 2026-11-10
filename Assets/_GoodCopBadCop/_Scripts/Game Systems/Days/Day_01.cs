@@ -479,6 +479,18 @@ public class Day_01 : DayBase
     // OnGreenStampGrabbedForFolderArrow / OnYellowStampGrabbedForFolderArrow).
     private FolderController _currentFolder;
 
+    // Local: the exact folder Transform the green-stamp step pointed an arrow at, so it can be
+    // unmarked even if _currentFolder has since changed (e.g. a client equipped another folder).
+    private Transform _markedStampFolder;
+
+    // Local, order-independence guards for the Vlad stamp -> hand-off steps. Each peer runs
+    // its own scaled-time delays (VladStampPermissionRoutine) and local events, while the
+    // stamp/hand-off transitions arrive via replication. When the host runs at a different
+    // timescale (debug fast-forward) or under latency, those can land in any order — these
+    // flags stop a late local step from re-showing an arrow/task for a step that's already done.
+    private bool _tutorialFolderStamped;
+    private bool _tutorialFolderHandedToVlad;
+
     // Active tutorial task entries — created when each step begins, completed when done.
     private TutorialObjectiveItem _taskPickUpDocs;
     private TutorialObjectiveItem _taskFolder;
@@ -645,6 +657,9 @@ public class Day_01 : DayBase
         ShowClockInArrow(false);
         _taskClockIn = null;
         _docsFilingComplete = false;
+        _tutorialFolderStamped = false;
+        _tutorialFolderHandedToVlad = false;
+        _markedStampFolder = null;
 
         // Day-start interactable gates below are all networked (server-written NetworkVariables;
         // client calls forward via ServerRpc). Only the server may apply them: DayActivated also
@@ -1937,6 +1952,16 @@ public class Day_01 : DayBase
             _taskFile = null;
         }
 
+        // Race guard: the replicated stamp (or hand-off) can reach this peer before its local
+        // filing count completes. The stamp step is already over — don't re-show its arrow/task.
+        if (_tutorialFolderStamped || _tutorialFolderHandedToVlad)
+        {
+            if (TutorialMarkerManager.Instance != null && _markerDeskBoard != null)
+                TutorialMarkerManager.Instance.Unmark(_markerDeskBoard);
+            Debug.Log("[Day_01] Document filing reported after the folder was already stamped — skipping stamp step UI.");
+            return;
+        }
+
         if (TutorialMarkerManager.Instance != null)
         {
             if (_markerDeskBoard != null)  TutorialMarkerManager.Instance.Unmark(_markerDeskBoard);
@@ -1972,9 +1997,15 @@ public class Day_01 : DayBase
 
         _greenStampSlot?.SetSlotInteractable(true);
 
+        // Each peer runs this delay on its own (scaled) clock, so on a client the replicated
+        // stamp can already have landed — e.g. the host fast-forwarding. Subscribing now would
+        // re-arm a stale "arrow on folder" step that nothing would ever clear.
+        if (_tutorialFolderStamped || _tutorialFolderHandedToVlad) yield break;
+
         // Once the player actually grabs the green stamp, swap the arrow onto the folder
         // itself so it's clear where the stamp should be applied — see
         // OnGreenStampGrabbedForFolderArrow.
+        InkStamp.OnAnyStampPickedUp -= OnGreenStampGrabbedForFolderArrow;
         InkStamp.OnAnyStampPickedUp += OnGreenStampGrabbedForFolderArrow;
     }
 
@@ -1988,11 +2019,38 @@ public class Day_01 : DayBase
         if (stamp != _greenStampSlot) return;
         InkStamp.OnAnyStampPickedUp -= OnGreenStampGrabbedForFolderArrow;
 
+        if (_tutorialFolderStamped || _tutorialFolderHandedToVlad) return;
+
         if (TutorialMarkerManager.Instance != null)
         {
             if (_markerGreenStamp != null) TutorialMarkerManager.Instance.Unmark(_markerGreenStamp);
-            if (_currentFolder != null)    TutorialMarkerManager.Instance.Mark(_currentFolder.transform);
+            if (_currentFolder != null)
+            {
+                _markedStampFolder = _currentFolder.transform;
+                TutorialMarkerManager.Instance.Mark(_markedStampFolder);
+            }
         }
+    }
+
+    /// <summary>
+    /// Local, idempotent: removes every arrow belonging to the filing/stamp steps (desk board,
+    /// green stamp station, and the folder the stamp arrow was moved onto) and drops the
+    /// handlers that could re-show them. Safe to call from any later step on any peer.
+    /// </summary>
+    private void ClearStampStepArrows()
+    {
+        InkStamp.OnAnyStampPickedUp -= OnGreenStampGrabbedForFolderArrow;
+        FolderController.OnFolderEquipped -= OnFolderGrabbedForDeskArrow;
+
+        if (TutorialMarkerManager.Instance != null)
+        {
+            if (_markerDrawer != null)      TutorialMarkerManager.Instance.Unmark(_markerDrawer);
+            if (_markerDeskBoard != null)   TutorialMarkerManager.Instance.Unmark(_markerDeskBoard);
+            if (_markerGreenStamp != null)  TutorialMarkerManager.Instance.Unmark(_markerGreenStamp);
+            if (_markedStampFolder != null) TutorialMarkerManager.Instance.Unmark(_markedStampFolder);
+            if (_currentFolder != null)     TutorialMarkerManager.Instance.Unmark(_currentFolder.transform);
+        }
+        _markedStampFolder = null;
     }
 
     // -------------------------------------------------------------------------
@@ -2006,7 +2064,18 @@ public class Day_01 : DayBase
     private void OnTutorialFolderStamped()
     {
         FolderController.OnAnyFolderStamped -= OnTutorialFolderStamped;
-        InkStamp.OnAnyStampPickedUp -= OnGreenStampGrabbedForFolderArrow;
+        _tutorialFolderStamped = true;
+
+        // Stamping implies filing is done (the stamp is locked until then). If this peer's own
+        // filing count hasn't caught up yet, close that step out now so a late filing event
+        // can't re-show the desk-board / green-stamp arrows (see OnDocumentFiledInFolder).
+        _docsFilingComplete = true;
+
+        if (_taskFile != null)
+        {
+            TutorialObjectiveList.Instance?.CompleteAndRemoveObjective(_taskFile, preHideDelay: 1.5f);
+            _taskFile = null;
+        }
 
         if (_taskStamp != null)
         {
@@ -2014,12 +2083,14 @@ public class Day_01 : DayBase
             _taskStamp = null;
         }
 
-        if (TutorialMarkerManager.Instance != null)
-        {
-            if (_markerGreenStamp != null)  TutorialMarkerManager.Instance.Unmark(_markerGreenStamp);
-            if (_currentFolder != null)     TutorialMarkerManager.Instance.Unmark(_currentFolder.transform);
-            if (_markerWindowBoard != null) TutorialMarkerManager.Instance.Mark(_markerWindowBoard);
-        }
+        ClearStampStepArrows();
+
+        // Race guard: if the hand-off already completed on this peer, the window arrow and
+        // hand-off task were already dismissed — don't bring them back.
+        if (_tutorialFolderHandedToVlad) return;
+
+        if (TutorialMarkerManager.Instance != null && _markerWindowBoard != null)
+            TutorialMarkerManager.Instance.Mark(_markerWindowBoard);
 
         _taskHandOff = TutorialObjectiveList.Instance?.AddObjective(_taskHandOffText);
 
@@ -2071,6 +2142,7 @@ public class Day_01 : DayBase
     private void OnFolderHandedToVladSync(NetworkObjectReference folderRef)
     {
         TutorialTaskSync.OnFolderHandedToVladAllClients -= OnFolderHandedToVladSync;
+        _tutorialFolderHandedToVlad = true;
 
         if (_taskHandOff != null)
         {
@@ -2078,8 +2150,16 @@ public class Day_01 : DayBase
             _taskHandOff = null;
         }
 
+        // The hand-off ends the whole filing -> stamp -> hand-off chain, so clear every arrow it
+        // could have left behind on this peer — not just the window one. A peer whose local
+        // steps ran out of order (e.g. host fast-forwarding) may still be showing an earlier one.
+        ClearStampStepArrows();
         if (TutorialMarkerManager.Instance != null && _markerWindowBoard != null)
             TutorialMarkerManager.Instance.Unmark(_markerWindowBoard);
+
+        // HideAndClear below drops every row; forget stale handles so nothing re-completes them.
+        _taskFile = null;
+        _taskStamp = null;
 
         TutorialObjectiveList.Instance?.HideAndClear(preHideDelay: 1.5f);
 
