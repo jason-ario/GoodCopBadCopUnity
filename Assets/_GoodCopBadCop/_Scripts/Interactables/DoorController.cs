@@ -319,6 +319,10 @@ public class DoorController : Interactable, IMutantPassable
         Reset();
         Lock();
     }
+    /// <summary>Replicated lock state (valid on every client).</summary>
+    public bool IsLocked => _isLocked.Value;
+
+
 
     /// <summary>
     /// Locks the door on all clients. Only callable from the server.

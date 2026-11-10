@@ -125,8 +125,20 @@ public class PlayerInteractionController : NetworkBehaviour
     private bool LmbHeld => Input.GetMouseButton(0)     || RebindableInput.GetGamepadHeld(GameAction.UseItem);
     private bool RmbHeld => RebindableInput.GetMouseButtonHeld(GameAction.PlaceObject) || RebindableInput.GetGamepadHeld(GameAction.PlaceObject);
     private bool RmbUp   => RebindableInput.GetMouseButtonUp(GameAction.PlaceObject)   || RebindableInput.GetGamepadUp(GameAction.PlaceObject);
-    private bool MmbDown => RebindableInput.GetMouseButtonDown(GameAction.ThrowObject) || RebindableInput.GetGamepadDown(GameAction.ThrowObject);
-    private bool MmbUp   => RebindableInput.GetMouseButtonUp(GameAction.ThrowObject)   || RebindableInput.GetGamepadUp(GameAction.ThrowObject);
+    private bool MmbDown => RebindableInput.GetMouseButtonDown(GameAction.ThrowObject) || RebindableInput.GetGamepadDown(GameAction.ThrowObject) || DebugThrowKeyDown;
+    private bool MmbUp   => RebindableInput.GetMouseButtonUp(GameAction.ThrowObject)   || RebindableInput.GetGamepadUp(GameAction.ThrowObject)   || DebugThrowKeyUp;
+
+    [Header("Debug")]
+    [Tooltip("Editor/development-build only: keyboard key that mirrors the Throw input (hold to aim, release to throw). Useful when no mouse is available. Set to None to disable.")]
+    [SerializeField] private KeyCode debugThrowKey = KeyCode.Y;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    private bool DebugThrowKeyDown => debugThrowKey != KeyCode.None && Input.GetKeyDown(debugThrowKey);
+    private bool DebugThrowKeyUp   => debugThrowKey != KeyCode.None && Input.GetKeyUp(debugThrowKey);
+#else
+    private bool DebugThrowKeyDown => false;
+    private bool DebugThrowKeyUp   => false;
+#endif
     private bool InteractDown => RebindableInput.GetKeyDown(GameAction.Interact) || RebindableInput.GetGamepadDown(GameAction.Interact);
     private bool InteractHeld => RebindableInput.GetKeyHeld(GameAction.Interact) || RebindableInput.GetGamepadHeld(GameAction.Interact);
 
@@ -501,7 +513,7 @@ public class PlayerInteractionController : NetworkBehaviour
             }
 
             if (hit.collider.isTrigger) continue;
-            if (hit.collider.GetComponentInParent<PerimiterFence>() != null) continue;
+            if (CombatHitUtility.IsBulletPassthrough(hit.collider)) continue;
 
             return false;
         }
@@ -553,7 +565,7 @@ public class PlayerInteractionController : NetworkBehaviour
         bool holdingGun = gunRange > 0f;
 
         if (holdingMelee
-            && Physics.Raycast(ray, out RaycastHit enemyHit, enemyDetectionDistance, ~0, QueryTriggerInteraction.Ignore))
+            && RaycastTransparentBlocker.Raycast(ray, out RaycastHit enemyHit, enemyDetectionDistance, ~0, QueryTriggerInteraction.Ignore))
         {
             MutantEnemy enemy = enemyHit.collider.GetComponentInParent<MutantEnemy>();
             if (enemy != null && !enemy.IsDead)
@@ -749,7 +761,7 @@ public class PlayerInteractionController : NetworkBehaviour
             
             lastInteractable = null;
         }
-        else if (Physics.Raycast(ray, out RaycastHit surfaceHit, placementDistance, placementLayer, QueryTriggerInteraction.Ignore))
+        else if (RaycastTransparentBlocker.Raycast(ray, out RaycastHit surfaceHit, placementDistance, placementLayer, QueryTriggerInteraction.Ignore))
         {
             // No interactable hit but we did hit a placement surface â€” handle free placement.
             // The surface itself usually isn't a PlacementBoard, but a tutorial hand-off

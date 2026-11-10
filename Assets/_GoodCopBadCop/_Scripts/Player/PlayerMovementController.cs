@@ -1189,13 +1189,13 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         float standoff = overrideDistance > 0f ? overrideDistance : dialogueZoomDistance;
         float distance = Mathf.Max(0f, horizontalDist - standoff);
 
-        if (distance > 0f && Physics.Raycast(camPos, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
+        if (distance > 0f && RaycastTransparentBlocker.Raycast(camPos, direction, out RaycastHit hit, distance, ~0, QueryTriggerInteraction.Ignore))
             distance = Mathf.Max(0f, hit.distance - dialogueZoomClearance);
 
         if (allowBackOff && horizontalDist < standoff)
         {
             float backOff = standoff - horizontalDist;
-            if (Physics.Raycast(camPos, -direction, out RaycastHit backHit, backOff + dialogueZoomClearance, ~0, QueryTriggerInteraction.Ignore))
+            if (RaycastTransparentBlocker.Raycast(camPos, -direction, out RaycastHit backHit, backOff + dialogueZoomClearance, ~0, QueryTriggerInteraction.Ignore))
                 backOff = Mathf.Max(0f, backHit.distance - dialogueZoomClearance);
             distance = -backOff;
         }

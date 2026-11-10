@@ -233,6 +233,12 @@ public class DebugConsole : MonoBehaviour
             HitLocalPlayer();
         }
 
+        // J — drop the local player's held item straight down (no mouse needed).
+        if (Input.GetKeyDown(KeyCode.J))
+        {
+            DropLocalPlayerHeldItem();
+        }
+
         // O — force-spawn a guaranteed aggroed mutant from the debug spawner.
         if (Input.GetKeyDown(KeyCode.O))
         {
@@ -646,6 +652,34 @@ public class DebugConsole : MonoBehaviour
         const float DebugHitDamage = 10f;
         PlayerInstance.Instance.PlayerHealth.TakeDamage(DebugHitDamage, EffectKeys.DefaultPlayerDamage);
         Debug.Log($"[DebugConsole] Local player hit for {DebugHitDamage} damage (H).");
+    }
+
+    /// <summary>
+    /// Drops the local player's held item where it is and lets it fall with real physics.
+    /// Reuses the throw release path (<see cref="PlayerPickupController.ReleaseHeldObjectForThrow"/>
+    /// + <see cref="PickableObject.ThrowServerRpc"/>) with zero velocity. A normal drop leaves the
+    /// item kinematic at the given pose, so dropping from the hand would leave it floating.
+    /// Ignores <c>canBeThrown</c> on purpose, since this is a debug tool.
+    /// </summary>
+    private void DropLocalPlayerHeldItem()
+    {
+        PlayerPickupController pickup = PlayerInstance.Instance != null
+            ? PlayerInstance.Instance.PlayerPickupController
+            : null;
+
+        if (pickup == null || !pickup.IsHoldingObject)
+        {
+            Debug.Log("[DebugConsole] Nothing held to drop (J).");
+            return;
+        }
+
+        pickup.GetComponent<ThrowController>()?.CancelCharge();
+
+        PickableObject released = pickup.ReleaseHeldObjectForThrow();
+        if (released == null) return;
+
+        released.ThrowServerRpc(released.transform.position, Vector3.zero);
+        Debug.Log($"[DebugConsole] Dropped held item '{released.name}' (J).");
     }
 
     /// <summary>Kills the local player for testing death and spectating.</summary>
