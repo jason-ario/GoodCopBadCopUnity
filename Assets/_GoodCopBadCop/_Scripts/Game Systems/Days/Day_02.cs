@@ -527,6 +527,10 @@ public class Day_02 : DayBase, IDailyTask
         // Despawn Ocho if still present (e.g. player never approached him).
         DespawnOcho();
 
+        // Release the booth door in case the day ended while Vlad was mid-walk into the booth.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            _boothDoor?.SetInteractionBlocked(false);
+
         StopAllCoroutines();
     }
 
@@ -721,10 +725,12 @@ public class Day_02 : DayBase, IDailyTask
         {
             yield return StartCoroutine(WalkVladTo(_boothDoorWaypoint));
 
-            // Open the booth door.
+            // Open the booth door and stop players from closing it until Vlad reaches the tool
+            // locker — closing it re-enables its NavMeshObstacle and strands him mid-path.
             if (_boothDoor != null)
             {
                 _boothDoor.ForceOpen(openedIn: true);
+                _boothDoor.SetInteractionBlocked(true);
                 yield return new WaitForSeconds(0.5f);
             }
         }
@@ -733,6 +739,7 @@ public class Day_02 : DayBase, IDailyTask
         if (_toolLockerWaypoint != null)
         {
             yield return StartCoroutine(WalkVladTo(_toolLockerWaypoint));
+            _boothDoor?.SetInteractionBlocked(false);
 
             // Perform an unlock gesture (use the existing "Give" trigger as a stand-in;
             // replace with a dedicated "Unlock" trigger once that animation is authored).
@@ -745,6 +752,9 @@ public class Day_02 : DayBase, IDailyTask
         }
 
         // ── Rotate toward final waypoint and wait ───────────────────────────────
+        // Safety net: release the door if the tool locker walk was skipped (no waypoint).
+        _boothDoor?.SetInteractionBlocked(false);
+
         if (_vladFinalWaypoint != null)
         {
             Vector3 dir = _vladFinalWaypoint.position - _spawnedVlad.transform.position;

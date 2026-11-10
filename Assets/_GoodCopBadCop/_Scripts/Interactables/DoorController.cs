@@ -24,6 +24,14 @@ public class DoorController : Interactable, IMutantPassable
         NetworkVariableWritePermission.Server
     );
 
+    // When true, players cannot target or toggle the door (e.g. while a scripted NPC is walking
+    // through it and a player closing it would re-enable the NavMeshObstacle mid-path).
+    private NetworkVariable<bool> _interactionBlocked = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     /// <summary>
     /// Fired on all clients when this door opens (transitions from closed to open).
     /// Unsubscribe after the first use if you only want a one-shot trigger.
@@ -113,6 +121,23 @@ public class DoorController : Interactable, IMutantPassable
         }
     }
 
+    /// <summary>
+    /// False while <see cref="SetInteractionBlocked"/> has blocked player interaction, so the
+    /// reticle can't target or highlight the door.
+    /// </summary>
+    public override bool IsInteractable => base.IsInteractable && !_interactionBlocked.Value;
+
+    /// <summary>
+    /// Blocks or re-allows player interaction with this door on all clients. Scripted
+    /// <see cref="ForceOpen"/>/<see cref="Reset"/> calls still work while blocked.
+    /// Only callable from the server.
+    /// </summary>
+    public void SetInteractionBlocked(bool blocked)
+    {
+        if (!IsServer) return;
+        _interactionBlocked.Value = blocked;
+    }
+
     public override string GetInteractVerb(PlayerInteractionController player)
     {
         if (!string.IsNullOrEmpty(interactVerb)) return interactVerb;
@@ -121,6 +146,8 @@ public class DoorController : Interactable, IMutantPassable
 
     public override void Interact(PlayerInteractionController player)
     {
+        if (_interactionBlocked.Value) return;
+
         base.Interact(player);
 
         // A locked door can still be shut if something forced it open (e.g. a fleeing mutant
@@ -191,6 +218,14 @@ public class DoorController : Interactable, IMutantPassable
     [ServerRpc(RequireOwnership = false)]
     private void ToggleDoorServerRpc(bool openedIn, ulong senderClientId)
     {
+        // Reject toggles that raced the block (sent just before it replicated) and resync the
+        // sender's predicted visuals back to the authoritative state.
+        if (_interactionBlocked.Value)
+        {
+            BroadcastDoorStateClientRpc(_doorOpen.Value, _openedIn.Value, ulong.MaxValue);
+            return;
+        }
+
         if (_doorOpen.Value)
         {
             _doorOpen.Value = false;
