@@ -299,6 +299,15 @@ public class PlayerInteractionController : NetworkBehaviour
         }
 
         HandleReticle();
+
+        // TEMP [StampDiag]: "stamp after hotbar swap does nothing" repro.
+        if (LmbDown && _playerPickupController.HeldObject is InkStampPickup diagStamp)
+        {
+            Debug.Log($"[StampDiag] LMB with '{diagStamp.name}': canInteract={_canInteract} suspectCam={_suspectCamActive} " +
+                      $"postDialogueBlock={DialogueChoiceSystem.IsPostDialogueInputBlocked} cursorVisible={Cursor.visible} " +
+                      $"active={diagStamp.gameObject.activeInHierarchy} isOwner={diagStamp.IsOwner} holder={diagStamp.HolderClientId} " +
+                      $"onlyAllowed={(onlyAllowedInteractable != null ? onlyAllowedInteractable.name : "none")}", diagStamp);
+        }
         
         if (CanInteract == false)
         {
@@ -1228,11 +1237,23 @@ public class PlayerInteractionController : NetworkBehaviour
         // Same tie-break/sticky resolution as the reticle highlight â€” see TryWorldInteract.
         if (!TryGetBestInteractHit(ray, out RaycastHit hit) || hit.distance > CurrentInteractReach)
         {
+            if (_playerPickupController.HeldObject is InkStampPickup)
+                Debug.Log("[StampDiag] TryItemUse: no interact hit in reach — using stamp in place.");
             _playerPickupController.TryUseObject();
             return;
         }
 
         Interactable interactable = ResolveTargetInteractable(hit.collider);
+
+        // TEMP [StampDiag]
+        if (_playerPickupController.HeldObject is InkStampPickup)
+        {
+            PickableObject h = _playerPickupController.HeldObject;
+            Debug.Log($"[StampDiag] TryItemUse hit='{hit.collider.name}' target='{(interactable != null ? interactable.name : "null")}' " +
+                      $"interactable={(interactable != null && interactable.IsInteractable)} otherPlayer={IsControlledByOtherPlayer(interactable)} " +
+                      $"canUseItem={(interactable != null && interactable.CanInteractWithItem(h))} " +
+                      $"key={(interactable != null ? interactable.GetItemTargetKey(this, h).ToString() : "-")}");
+        }
 
         if (IsControlledByOtherPlayer(interactable)) return;
         if (onlyAllowedInteractable != null && interactable != onlyAllowedInteractable) return;

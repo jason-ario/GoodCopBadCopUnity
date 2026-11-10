@@ -59,6 +59,7 @@ public partial class LocalizationWindow : EditorWindow
         LoadChecklist();
         if (string.IsNullOrEmpty(_sheetFilter) || (_sheetFilter != AllSheets && !_table.SheetNames().Contains(_sheetFilter)))
             _sheetFilter = AllSheets;
+        _sheetsFingerprint = SheetsFingerprint();
     }
 
     private void SaveDirty()
@@ -67,7 +68,43 @@ public partial class LocalizationWindow : EditorWindow
         foreach (var sheet in _dirtySheets) LocalizationSheetIO.SaveSheet(_table, sheet);
         if (_dirtySheets.Count > 0) AssetDatabase.Refresh();
         _dirtySheets.Clear();
+        _sheetsFingerprint = SheetsFingerprint();
     }
+
+    // ---- Stale table guard: the sheets can change on disk (scan / pipeline actions, git, copied-in CSVs) while this
+    // window holds its own copy. Saving that copy (Freeze, Import, Save) would silently revert those changes.
+
+    private string _sheetsFingerprint;
+
+    private static string SheetsFingerprint()
+    {
+        string dir = LocalizationPaths.Abs(LocalizationPaths.Sheets);
+        if (!System.IO.Directory.Exists(dir)) return "";
+        var sb = new System.Text.StringBuilder();
+        foreach (var f in System.IO.Directory.GetFiles(dir, "*.csv").OrderBy(f => f, System.StringComparer.OrdinalIgnoreCase))
+            sb.Append(System.IO.Path.GetFileName(f)).Append(':').Append(System.IO.File.GetLastWriteTimeUtc(f).Ticks).Append(';');
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Reloads when the sheets changed on disk since this window last loaded or saved them. Returns false (and sets the
+    /// status) when they changed but the window has unsaved edits, so the caller must not write its stale copy.
+    /// </summary>
+    private bool EnsureFreshTable()
+    {
+        if (_table == null) { Reload(); return true; }
+        if (SheetsFingerprint() == _sheetsFingerprint) return true;
+        if (_dirtySheets.Count > 0 || _pendingSourceKey != null)
+        {
+            _status = "Error: the sheets changed on disk while this window has unsaved edits. Press Reload (discards the window's edits) before continuing.";
+            return false;
+        }
+        Reload();
+        _status = "Sheets changed on disk; reloaded.";
+        return true;
+    }
+
+    private void OnFocus() { EnsureFreshTable(); }
 
     private void MarkDirty(LocEntry e) { _dirtySheets.Add(e.sheet); }
 
@@ -139,7 +176,10 @@ public partial class LocalizationWindow : EditorWindow
         _lastFocus = focus;
         if (_pendingSourceKey != null && focus != "src:" + _pendingSourceKey) CommitPendingSource();
         if (_dirtySheets.Count > 0)
+        {
             foreach (var s in _dirtySheets) LocalizationSheetIO.SaveSheet(_table, s);
+            _sheetsFingerprint = SheetsFingerprint();
+        }
     }
 
     private void CommitPendingSource()

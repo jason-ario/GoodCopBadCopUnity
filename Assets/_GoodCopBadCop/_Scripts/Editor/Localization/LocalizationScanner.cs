@@ -151,7 +151,20 @@ public static partial class LocalizationScanner
 
         foreach (var tmp in root.GetComponentsInChildren<TMP_Text>(true))
         {
-            if (PrefabUtility.IsPartOfPrefabInstance(tmp)) continue; // the source prefab is scanned on its own
+            // Unmodified prefab instances are covered by their source prefab. An instance that overrides the text
+            // ("Settings" on a shared Text Button), or was given its own LocalizedText key, is scanned here.
+            TMP_Text instanceSource = null;
+            if (PrefabUtility.IsPartOfPrefabInstance(tmp))
+            {
+                instanceSource = PrefabUtility.GetCorrespondingObjectFromSource(tmp);
+                if (instanceSource == null) continue;
+                if (instanceSource.text == tmp.text)
+                {
+                    var ownKey = tmp.GetComponent<LocalizedText>();
+                    var srcKey = instanceSource.GetComponent<LocalizedText>();
+                    if (ownKey == null || string.IsNullOrEmpty(ownKey.key) || (srcKey != null && srcKey.key == ownKey.key)) continue;
+                }
+            }
             if (driven.Contains(tmp)) continue;
             string text = tmp.text;
             if (!LooksLikeCopy(text)) continue;
@@ -160,6 +173,12 @@ public static partial class LocalizationScanner
             string category = CategoryOf(tmp);
             string sheet = SheetFor(assetPath, objPath);
             var existing = tmp.GetComponent<LocalizedText>();
+            if (existing != null && instanceSource != null && !string.IsNullOrEmpty(existing.key))
+            {
+                // A key inherited unchanged from the source prefab belongs to the source text, not this override.
+                var srcLt = instanceSource.GetComponent<LocalizedText>();
+                if (srcLt != null && srcLt.key == existing.key) existing = null;
+            }
 
             var item = new ScanItem
             {

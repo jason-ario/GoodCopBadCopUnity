@@ -27,6 +27,8 @@ public static partial class LocalizationScanner
     private static readonly Dictionary<Type, string> ChainSourceCache = new Dictionary<Type, string>();
     private static readonly Dictionary<string, bool> FieldWriteCache = new Dictionary<string, bool>();
     private static readonly Dictionary<TMP_Text, string> RuntimeDriven = new Dictionary<TMP_Text, string>();
+    /// <summary>Labels a writer points at directly (not the original-source copies MarkDriven adds for instances).</summary>
+    private static readonly Dictionary<TMP_Text, string> RuntimeDrivenDirect = new Dictionary<TMP_Text, string>();
 
     /// <summary>Identifier used by the override lists in LocalizationSettings.</summary>
     public static string RuntimeTextId(LocBinding b) => b.assetPath + "|" + b.objectPath;
@@ -40,6 +42,7 @@ public static partial class LocalizationScanner
         ChainSourceCache.Clear();
         FieldWriteCache.Clear();
         RuntimeDriven.Clear();
+        RuntimeDrivenDirect.Clear();
     }
 
     /// <summary>For a text relay type: a regex suffix matching a call to any of its public string-taking methods; otherwise null.</summary>
@@ -263,6 +266,7 @@ public static partial class LocalizationScanner
     {
         if (tmp == null) return;
         if (!RuntimeDriven.ContainsKey(tmp)) RuntimeDriven[tmp] = reason;
+        if (!RuntimeDrivenDirect.ContainsKey(tmp)) RuntimeDrivenDirect[tmp] = reason;
         // A scene/prefab writer pointing into a prefab instance: the label is scanned in its source prefab.
         if (PrefabUtility.IsPartOfPrefabInstance(tmp))
         {
@@ -280,6 +284,17 @@ public static partial class LocalizationScanner
             if (item.source == null) continue;
             string id = RuntimeTextId(item.binding);
             bool detected = RuntimeDriven.TryGetValue(item.source, out var reason);
+            if (detected && PrefabUtility.IsPartOfPrefabInstance(item.source) && !RuntimeDrivenDirect.ContainsKey(item.source))
+                detected = false; // only an original-source copy; re-checked against the source chain below
+            if (!detected && PrefabUtility.IsPartOfPrefabInstance(item.source))
+            {
+                // Overridden prefab-instance label: a writer inside one of its source prefabs (e.g. Save Slot filling
+                // "Slot 1") still fills it. Original-source copies don't count, so one dialog's confirm button pointing
+                // into a shared Text Button doesn't flag every Text Button in the game.
+                for (var src = PrefabUtility.GetCorrespondingObjectFromSource(item.source); src != null && !detected;
+                     src = PrefabUtility.GetCorrespondingObjectFromSource(src))
+                    detected = RuntimeDrivenDirect.TryGetValue(src, out reason);
+            }
             if (forced.Contains(id)) reason = "marked runtime";
             else if (allowed.Contains(id)) { item.runtimeOverridden = detected; continue; }
             else if (!detected) continue;
