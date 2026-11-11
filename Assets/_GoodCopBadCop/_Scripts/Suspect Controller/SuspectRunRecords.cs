@@ -416,6 +416,48 @@ public class SuspectRunRecords : MonoBehaviour
         SaveRecords();
     }
 
+    /// <summary>
+    /// Debug-only. Turns up to <paramref name="count"/> random living suspects into fully mutated
+    /// legacy mutants (infection score at <see cref="AnomalyController.FULLY_MUTATED_THRESHOLD"/>,
+    /// <see cref="SuspectRecord.isLegacyMutant"/> set), so <see cref="MutantSpawner"/>s with
+    /// legacy mutants enabled can spawn them. Suspects that are already legacy mutants are picked
+    /// first. Killed, replacement, prefab-less, or already-roaming suspects are skipped.
+    /// Records are deliberately NOT saved, so the cheat doesn't change the save slot unless a
+    /// later gameplay event saves records. Server-only. Returns the seeded suspects.
+    /// </summary>
+    public List<SuspectData> DebugSeedLegacyMutants(int count)
+    {
+        var existing = new List<SuspectRecord>();
+        var fresh = new List<SuspectRecord>();
+        foreach (SuspectRecord record in records)
+        {
+            if (record == null || record.isKilled || record.isReplacement) continue;
+            if (record.SuspectData == null || record.SuspectData.CharacterPrefab == null) continue;
+            if (IsFullMutantInstanceActive(record.SuspectData)) continue;
+            (record.isLegacyMutant ? existing : fresh).Add(record);
+        }
+
+        // Fisher-Yates shuffle so repeated runs seed different residents.
+        for (int i = fresh.Count - 1; i > 0; i--)
+        {
+            int j = UnityEngine.Random.Range(0, i + 1);
+            (fresh[i], fresh[j]) = (fresh[j], fresh[i]);
+        }
+        existing.AddRange(fresh);
+
+        var seeded = new List<SuspectData>();
+        for (int i = 0; i < existing.Count && seeded.Count < count; i++)
+        {
+            SuspectRecord record = existing[i];
+            record.infectionScore = Mathf.Max(record.infectionScore, AnomalyController.FULLY_MUTATED_THRESHOLD);
+            record.isLegacyMutant = true;
+            seeded.Add(record.SuspectData);
+        }
+
+        Debug.Log($"[SuspectRunRecords] DEBUG seeded {seeded.Count}/{count} fully mutated legacy mutants (not saved).");
+        return seeded;
+    }
+
     /// <summary>True when at least one suspect is currently eligible for a legacy-mutant world spawn.</summary>
     public bool HasLegacyMutantCandidates
     {

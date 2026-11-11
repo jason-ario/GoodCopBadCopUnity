@@ -424,8 +424,9 @@ public class MutantSpawner : NetworkBehaviour
     /// <paramref name="forceAggro"/> override (used solely by the debug console's
     /// "Aggroed Mutant" cheat via <see cref="ForceSpawnAggroed"/>), can start hostile.
     /// </summary>
+    /// <param name="forcedLegacyRecord">Debug override: spawn this legacy mutant and skip the legacy roll.</param>
     /// <returns>True when an enemy was actually spawned.</returns>
-    private bool SpawnSingleEnemy(bool forceAggro = false)
+    private bool SpawnSingleEnemy(bool forceAggro = false, SuspectRecord forcedLegacyRecord = null)
     {
         Quaternion spawnRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
 
@@ -433,10 +434,10 @@ public class MutantSpawner : NetworkBehaviour
         // recurring NPC who turned during the story (NpcMutantPool, e.g. the postman) — before
         // falling back to the normal random mutantPrefabs pool. Each eligible character has an
         // equal share of the roll.
-        SuspectRecord legacyRecord = null;
+        SuspectRecord legacyRecord = forcedLegacyRecord;
         string npcMutantId = null;
         GameObject npcMutantPrefab = null;
-        if (spawnLegacyMutants && Random.value < legacyMutantChance)
+        if (legacyRecord == null && spawnLegacyMutants && Random.value < legacyMutantChance)
         {
             int suspectCandidates = SuspectRunRecords.Instance != null ? SuspectRunRecords.Instance.LegacyMutantCandidateCount : 0;
             int npcCandidates = NpcMutantPool.EligibleCount;
@@ -753,6 +754,42 @@ public class MutantSpawner : NetworkBehaviour
 
         SpawnSingleEnemy(forceAggro: true);
         Debug.Log("[MutantSpawner] Forced aggroed mutant spawn.");
+    }
+
+    /// <summary>
+    /// Debug-only (cheat console). Spawns each given suspect in this spawner's box as a legacy
+    /// full mutant, one every <see cref="burstSpawnDelay"/>. Skips the legacy-chance roll, the
+    /// map-wide daily budget, and the active-enemy cap. Suspects must already be legacy mutants
+    /// (see <see cref="SuspectRunRecords.DebugSeedLegacyMutants"/>). Mutants spawn non-aggroed,
+    /// like ambient legacy reintroductions. SERVER ONLY.
+    /// </summary>
+    public void DebugSpawnLegacyMutants(IReadOnlyList<SuspectData> suspects)
+    {
+        if (!IsServer || suspects == null) return;
+        StartCoroutine(DebugSpawnLegacyMutantsRoutine(suspects));
+    }
+
+    private IEnumerator DebugSpawnLegacyMutantsRoutine(IReadOnlyList<SuspectData> suspects)
+    {
+        int spawned = 0;
+        for (int i = 0; i < suspects.Count; i++)
+        {
+            SuspectRecord record = SuspectRunRecords.Instance != null ? SuspectRunRecords.Instance.GetRecord(suspects[i]) : null;
+            if (record == null || record.SuspectData == null || record.SuspectData.CharacterPrefab == null
+                || SuspectRunRecords.Instance.IsFullMutantInstanceActive(record.SuspectData))
+            {
+                Debug.LogWarning($"[MutantSpawner] {name}: DEBUG skipped '{suspects[i]?.name}' — no record/prefab or already roaming.", this);
+                continue;
+            }
+
+            if (SpawnSingleEnemy(forcedLegacyRecord: record))
+                spawned++;
+
+            if (i < suspects.Count - 1)
+                yield return new WaitForSeconds(burstSpawnDelay);
+        }
+
+        Debug.Log($"[MutantSpawner] {name}: DEBUG spawned {spawned}/{suspects.Count} legacy full mutants.", this);
     }
 
     /// <summary>

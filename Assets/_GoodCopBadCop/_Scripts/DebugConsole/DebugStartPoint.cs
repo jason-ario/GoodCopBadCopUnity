@@ -23,6 +23,7 @@ public enum DebugStartPoint
     Day2OchoBoothEncounter,
     Day3StartInsideBunker,
     Day3InBoothAllSuspectsProcessed,
+    Day3PowerStationFullMutants,
     EndOfDay4BeforeMutantBreach,
     FreePlayDay4Booth,
     FreePlayDay5Booth,

@@ -63,6 +63,9 @@ public static class CheatConsoleActions
         cheats.Add(("Teleport to Power Station", () =>
             DebugConsole.Instance.TeleportToPowerStation()));
 
+        cheats.Add(("Skip to Day 3 — Power Station + Full Mutants", () =>
+            DebugConsole.Instance.SkipToPowerStationWithFullMutants()));
+
         cheats.Add(("Unlock All Anomalies + Guidebook Pages", () =>
             DebugConsole.Instance.EnsureGameStartedThen(() =>
             {

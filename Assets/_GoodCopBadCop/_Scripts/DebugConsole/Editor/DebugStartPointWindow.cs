@@ -24,6 +24,7 @@ public class DebugStartPointWindow : EditorWindow
         (DebugStartPoint.Day2OchoBoothEncounter, "Skip to Day 2 — Ocho Booth Encounter"),
         (DebugStartPoint.Day3StartInsideBunker, "Skip to Day 3 — Start (Inside Bunker)"),
         (DebugStartPoint.Day3InBoothAllSuspectsProcessed, "Skip to Day 3 — In Booth, All Suspects Processed"),
+        (DebugStartPoint.Day3PowerStationFullMutants, "Skip to Day 3 — Power Station + Full Mutants"),
         (DebugStartPoint.EndOfDay4BeforeMutantBreach, "Skip to End of Day 4 — Before Mutant Breach"),
         (DebugStartPoint.FreePlayDay4Booth, "Free Play — Day 4 Booth"),
         (DebugStartPoint.FreePlayDay5Booth, "Free Play — Day 5 Booth"),

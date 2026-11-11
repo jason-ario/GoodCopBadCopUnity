@@ -56,6 +56,12 @@ public class DebugConsole : MonoBehaviour
     [Tooltip("Spawn point at the power station. Assign 'Player Spawn Pos - At Power Station' from the scene. Used by the P key and the cheat console button.")]
     [SerializeField] private Transform _powerStationSpawnPoint;
 
+    [Tooltip("The power plant's MutantSpawner ('--- ENV_Power_station/Power Plant Mutant Spawner'). Seeded with full-mutant suspects by the 'Day 3 Power Station + Full Mutants' skip. If empty, it's found by name at runtime.")]
+    [SerializeField] private MutantSpawner _powerPlantMutantSpawner;
+
+    [Tooltip("How many suspects the 'Day 3 Power Station + Full Mutants' skip turns into full mutants and spawns at the power plant.")]
+    [SerializeField, Min(1)] private int _powerPlantFullMutantCount = 6;
+
     [Header("Gate Debug")]
     [Tooltip("Start Shift Gate — forced into post-intro state by the F12 skip so interactions toggle it instead of opening the start-shift screen.")]
     [SerializeField] private GateStartShiftController _startShiftGate;
@@ -399,6 +405,9 @@ public class DebugConsole : MonoBehaviour
                 break;
             case DebugStartPoint.Day3InBoothAllSuspectsProcessed:
                 EnsureGameStartedThen(SkipToDay3PostShiftBooth);
+                break;
+            case DebugStartPoint.Day3PowerStationFullMutants:
+                EnsureGameStartedThen(SkipToPowerStationWithFullMutants);
                 break;
             case DebugStartPoint.EndOfDay4BeforeMutantBreach:
                 EnsureGameStartedThen(SkipToEndOfDay4);
@@ -1444,7 +1453,72 @@ public class DebugConsole : MonoBehaviour
         });
     }
 
-    private IEnumerator TeleportToPowerStationAfterDelay()
+    /// <summary>
+    /// Same as <see cref="TeleportToPowerStation"/> (Day 3, shift running, player at the power
+    /// station), then turns <see cref="_powerPlantFullMutantCount"/> suspects into fully mutated
+    /// legacy mutants and spawns them all from the power plant's <see cref="MutantSpawner"/>.
+    /// The seeded suspects also stay in the legacy pool, so later zone bursts can roll them too.
+    /// Host-only. The records aren't saved (see <see cref="SuspectRunRecords.DebugSeedLegacyMutants"/>).
+    /// </summary>
+    public void SkipToPowerStationWithFullMutants()
+    {
+        if (_powerStationSpawnPoint == null)
+        {
+            Debug.LogWarning("[DebugConsole] SkipToPowerStationWithFullMutants: _powerStationSpawnPoint not assigned — assign it in the Inspector.");
+            return;
+        }
+
+        EnsureGameStartedThen(() =>
+        {
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
+            {
+                Debug.LogWarning("[DebugConsole] SkipToPowerStationWithFullMutants: run this cheat on the host.");
+                return;
+            }
+
+            SkipToDay(3);
+            StartCoroutine(TeleportToPowerStationAfterDelay(SeedPowerPlantFullMutants));
+        });
+    }
+
+    private void SeedPowerPlantFullMutants()
+    {
+        MutantSpawner spawner = _powerPlantMutantSpawner != null ? _powerPlantMutantSpawner : FindPowerPlantMutantSpawner();
+        if (spawner == null)
+        {
+            Debug.LogWarning("[DebugConsole] SeedPowerPlantFullMutants: power plant MutantSpawner not found — assign _powerPlantMutantSpawner in the Inspector.");
+            return;
+        }
+
+        if (SuspectRunRecords.Instance == null)
+        {
+            Debug.LogWarning("[DebugConsole] SeedPowerPlantFullMutants: SuspectRunRecords.Instance not found.");
+            return;
+        }
+
+        List<SuspectData> seeded = SuspectRunRecords.Instance.DebugSeedLegacyMutants(_powerPlantFullMutantCount);
+        if (seeded.Count == 0)
+        {
+            Debug.LogWarning("[DebugConsole] SeedPowerPlantFullMutants: no eligible suspects to mutate (all killed, replaced, or missing a CharacterPrefab).");
+            return;
+        }
+
+        spawner.DebugSpawnLegacyMutants(seeded);
+
+        var names = new List<string>(seeded.Count);
+        foreach (var s in seeded) names.Add(GetSuspectLabel(s));
+        Debug.Log($"[DebugConsole] Seeding power plant spawner '{spawner.name}' with {seeded.Count} full mutants: {string.Join(", ", names)}.");
+    }
+
+    private static MutantSpawner FindPowerPlantMutantSpawner()
+    {
+        foreach (var spawner in FindObjectsByType<MutantSpawner>(FindObjectsSortMode.None))
+            if (spawner.name.IndexOf("Power Plant", StringComparison.OrdinalIgnoreCase) >= 0)
+                return spawner;
+        return null;
+    }
+
+    private IEnumerator TeleportToPowerStationAfterDelay(Action onArrived = null)
     {
         // Wait one frame for Day_03 to activate and subscribe its events.
         yield return null;
@@ -1467,6 +1541,8 @@ public class DebugConsole : MonoBehaviour
 
         PlayerInstance.Instance.SetPosition(_powerStationSpawnPoint);
         Debug.Log($"[DebugConsole] Teleported local player to power station at {_powerStationSpawnPoint.position} (P).");
+
+        onArrived?.Invoke();
     }
 
     /// <summary>

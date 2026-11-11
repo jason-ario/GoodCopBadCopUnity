@@ -243,6 +243,55 @@ public static class LocalizationPipelineActions
                stale + " row(s) whose English changed were left untranslated.";
     }
 
+    [BeziAction("Fill translation cells in the localization sheets from a UTF-8 tab-separated file (absolute path). First line: 'key<TAB><lang codes...>'; " +
+                "then one line per key. A literal \\n in a cell becomes a line break (CRLF when the row's source uses CRLF). Leading/trailing whitespace is copied " +
+                "from source_en. overwrite=false only fills empty cells. Reports placeholder/markup mismatches and max_chars overruns. Run BuildLocalizationRuntime afterwards.")]
+    public static string ImportLocalizationTranslationsTsv(string tsvAbsolutePath, bool overwrite = false, bool dryRun = false)
+    {
+        if (!System.IO.File.Exists(tsvAbsolutePath)) return "Error: file not found: " + tsvAbsolutePath;
+        var lines = System.IO.File.ReadAllLines(tsvAbsolutePath, Encoding.UTF8).Where(l => l.Trim().Length > 0).ToList();
+        if (lines.Count < 2) return "Error: no data lines.";
+        var header = lines[0].Split('\t');
+        if (header[0] != "key") return "Error: first header column must be 'key'.";
+
+        var table = LocalizationSheetIO.LoadAll();
+        var stored = new HashSet<string>(LocalizationSheetIO.StoredLanguages(table));
+        var tokenRx = new System.Text.RegularExpressions.Regex(@"\{\d+\}|\[\[|\]\]|\{\{|\}\}|</?[a-zA-Z]+>");
+        string Tokens(string s) => string.Join(",", tokenRx.Matches(s ?? "").Cast<System.Text.RegularExpressions.Match>().Select(m => m.Value.ToLowerInvariant()).OrderBy(t => t, System.StringComparer.Ordinal));
+
+        var sheets = new HashSet<string>();
+        var sb = new StringBuilder();
+        int cells = 0, rowsTouched = 0;
+        var missing = new List<string>();
+        for (int i = 1; i < lines.Count; i++)
+        {
+            var cols = lines[i].Split('\t');
+            if (!table.TryGet(cols[0], out var e)) { missing.Add(cols[0]); continue; }
+            string src = e.source ?? "";
+            string nl = src.Contains("\r\n") ? "\r\n" : "\n";
+            string lead = src.Substring(0, src.Length - src.TrimStart().Length);
+            string trail = src.Substring(src.TrimEnd().Length);
+            bool any = false;
+            for (int c = 1; c < header.Length && c < cols.Length; c++)
+            {
+                string lang = header[c];
+                if (!stored.Contains(lang)) { sb.AppendLine("WARN unknown language column " + lang); continue; }
+                string v = cols[c].Replace("\\n", nl).Trim();
+                if (v.Length == 0) continue;
+                v = lead + v + trail;
+                if (!overwrite && !string.IsNullOrEmpty(e.GetValue(lang))) continue;
+                if (Tokens(v) != Tokens(src)) sb.AppendLine("MARKUP " + e.key + " [" + lang + "] src={" + Tokens(src) + "} tr={" + Tokens(v) + "}");
+                if (e.maxChars > 0 && v.Trim().Length > e.maxChars) sb.AppendLine("MAXCHARS " + e.key + " [" + lang + "] " + v.Trim().Length + "/" + e.maxChars);
+                e.values[lang] = v;
+                cells++; any = true;
+            }
+            if (any) { rowsTouched++; sheets.Add(e.sheet); }
+        }
+        if (!dryRun && sheets.Count > 0) LocalizationSheetIO.SaveSheets(table, sheets);
+        return (dryRun ? "DRY RUN. " : "") + "Filled " + cells + " cell(s) in " + rowsTouched + " row(s) across " + sheets.Count + " sheet(s): " + string.Join(", ", sheets) +
+               (missing.Count > 0 ? "\nMissing keys: " + string.Join(", ", missing) : "") + "\n" + sb;
+    }
+
     private static string Flat(string s)
     {
         return (s ?? "").Replace("\r", "\\r").Replace("\n", "\\n");
