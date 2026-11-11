@@ -1772,7 +1772,7 @@ public class SuspectController : NetworkBehaviour
             }
         }
 
-        if (IsServer) DialogueManager.Instance.SayDialogue(suspectCharacter, "Wait... No... I'm healthy.. No!");
+        if (IsServer) DialogueManager.Instance.SayDialogue(suspectCharacter, Loc.N("Wait... No... I'm healthy.. No!"));
 
         yield return new WaitForSeconds(2f);
 
@@ -1874,7 +1874,7 @@ public class SuspectController : NetworkBehaviour
 
         yield return new WaitForSeconds(1f);
 
-        if (IsServer) DialogueManager.Instance.SayDialogue(thisCharacter, "Wait... NO!!!");
+        if (IsServer) DialogueManager.Instance.SayDialogue(thisCharacter, Loc.N("Wait... NO!!!"));
         thisCharacter.animator.SetTrigger("ShotUp");
         yield return new WaitForSeconds(1f);
 

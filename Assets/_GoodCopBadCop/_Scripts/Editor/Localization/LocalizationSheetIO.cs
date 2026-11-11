@@ -133,7 +133,12 @@ public static class LocalizationSheetIO
     public static string Status(LocEntry e)
     {
         if (string.IsNullOrEmpty(e.frozenHash)) return "new";
-        return e.frozenHash == LocalizationTable.Hash(e.source) ? "frozen" : "changed";
+        if (e.frozenHash == LocalizationTable.Hash(e.source)) return "frozen";
+        // git core.autocrlf checks the sheets out with "\r\n" inside multi-line cells; a row frozen from the LF
+        // text is still the same English, so don't report it as changed (and re-send it in the delta).
+        string src = e.source ?? "";
+        if (src.IndexOf('\r') >= 0 && e.frozenHash == LocalizationTable.Hash(src.Replace("\r\n", "\n"))) return "frozen";
+        return "changed";
     }
 
     public static List<IList<string>> BuildRows(IEnumerable<LocEntry> entries, IEnumerable<string> languages, bool includeStatus)

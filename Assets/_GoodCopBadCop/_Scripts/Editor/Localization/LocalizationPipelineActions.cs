@@ -16,9 +16,10 @@ public static class LocalizationPipelineActions
         "Run the full Localization scan (loaded scenes, prefabs, dialogue data assets, suspect objects, code strings). Reports SourceChanged items, " +
         "new items by binding kind, and deleted sheet rows (keys no scanned source produces any more, only where every recorded source was covered by the scan). " +
         "apply=true writes SourceChanged sources to the sheets and adds new items whose binding kind is in addNewKinds (comma list of TMP, SO, MB, CODE). " +
-        "Deleted rows are only reported; delete them with DeleteLocalizationKeys.",
+        "Deleted rows are only reported; delete them with DeleteLocalizationKeys. " +
+        "applySourceChanged=false adds only the new items and leaves SourceChanged rows untouched (keeps frozen rows out of the next delta).",
         IsReadOnly = false)]
-    public static string ScanLocalization(bool apply = false, string addNewKinds = "CODE", int listMax = 150)
+    public static string ScanLocalization(bool apply = false, string addNewKinds = "CODE", int listMax = 150, bool applySourceChanged = true)
     {
         var settings = LocalizationSheetIO.LoadOrCreateSettings();
         var table = LocalizationSheetIO.LoadAll();
@@ -55,7 +56,7 @@ public static class LocalizationPipelineActions
         if (apply)
         {
             foreach (var i in items)
-                i.selected = !i.runtime && i.state != ScanState.Deleted && (i.state == ScanState.SourceChanged || (i.state == ScanState.Unlocalized && kinds.Contains(i.binding.kind)));
+                i.selected = !i.runtime && i.state != ScanState.Deleted && ((applySourceChanged && i.state == ScanState.SourceChanged) || (i.state == ScanState.Unlocalized && kinds.Contains(i.binding.kind)));
             int n = LocalizationScanner.Apply(items, table);
             sb.AppendLine("\nApplied " + n + " item(s).");
         }

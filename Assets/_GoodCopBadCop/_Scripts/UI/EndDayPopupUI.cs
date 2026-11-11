@@ -16,8 +16,8 @@ public class EndDayPopupUI : MonoBehaviour
     [SerializeField] private Button _cancelButton;
     [SerializeField] private GameObject _buttonsContainer;
 
-    private const string TitleReady   = "End the day?";
-    private const string TitleBlocked = "Can't sleep yet";
+    private static string TitleReady   => Loc.T("End the day?");
+    private static string TitleBlocked => Loc.T("Can't sleep yet");
 
     private Action _onConfirm;
     private Action _onCancel;

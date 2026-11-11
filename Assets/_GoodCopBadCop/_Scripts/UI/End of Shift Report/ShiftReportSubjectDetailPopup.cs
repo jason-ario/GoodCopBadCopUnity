@@ -215,7 +215,7 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
     {
         if (nameText != null)
         {
-            string name = string.IsNullOrWhiteSpace(subject.SubjectName) ? "Unknown Subject" : subject.SubjectName;
+            string name = string.IsNullOrWhiteSpace(subject.SubjectName) ? Loc.T("Unknown Subject") : subject.SubjectName;
             nameText.text = $"{index + 1:00}. {name}";
         }
 
@@ -224,7 +224,7 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
 
         if (verdictText != null)
         {
-            verdictText.text = $"VERDICT: {VerdictLabel(subject.Verdict)}";
+            verdictText.text = Loc.T("VERDICT: {0}", VerdictLabel(subject.Verdict));
             verdictText.color = VerdictColor(subject.Verdict);
         }
 
@@ -249,14 +249,14 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
         var parts = new List<string>();
 
         if (subject.AnomaliesCaught == ShiftSubjectResult.NotAssessed)
-            parts.Add("Anomalies: Not Assessed");
+            parts.Add(Loc.T("Anomalies: Not Assessed"));
         else
-            parts.Add($"Anomalies: {subject.AnomaliesCaught} / {subject.AnomaliesTotal}");
+            parts.Add(Loc.T("Anomalies: {0} / {1}", subject.AnomaliesCaught, subject.AnomaliesTotal));
 
-        parts.Add($"Coupons: {subject.CouponsEarned}");
+        parts.Add(Loc.T("Coupons: {0}", subject.CouponsEarned));
 
         if (subject.HasIntegrity)
-            parts.Add($"Integrity: {Mathf.RoundToInt(subject.IntegrityAtProcessing * 100f)}%");
+            parts.Add(Loc.T("Integrity: {0}%", Mathf.RoundToInt(subject.IntegrityAtProcessing * 100f)));
 
         return string.Join("     ", parts);
     }
@@ -265,10 +265,10 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
     {
         switch (verdict)
         {
-            case ShiftSubjectVerdict.Quarantined: return "QUARANTINED";
-            case ShiftSubjectVerdict.Killed: return "KILLED";
-            case ShiftSubjectVerdict.Fled: return "FLED";
-            default: return "PASSED";
+            case ShiftSubjectVerdict.Quarantined: return Loc.T("QUARANTINED");
+            case ShiftSubjectVerdict.Killed: return Loc.T("KILLED");
+            case ShiftSubjectVerdict.Fled: return Loc.T("FLED");
+            default: return Loc.T("PASSED");
         }
     }
 
@@ -293,8 +293,8 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
 
         if (!subject.HasBreakdown)
         {
-            AddHeader("DETAILS");
-            AddLine(null, neutralColor, "No detailed record was kept for this subject.", null, clear);
+            AddHeader(Loc.T("DETAILS"));
+            AddLine(null, neutralColor, Loc.T("No detailed record was kept for this subject."), null, clear);
             EndList();
             return;
         }
@@ -305,16 +305,16 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
         if (notAssessed)
         {
             string reason = subject.Verdict == ShiftSubjectVerdict.Fled
-                ? "Subject fled before their paperwork was assessed."
-                : "Subject was killed before their paperwork was assessed.";
-            AddHeader("NOT ASSESSED");
+                ? Loc.T("Subject fled before their paperwork was assessed.")
+                : Loc.T("Subject was killed before their paperwork was assessed.");
+            AddHeader(Loc.T("NOT ASSESSED"));
             AddLine(null, neutralColor, reason, null, clear);
 
-            AddHeader($"ANOMALIES ON RECORD ({anomalies.Length})");
+            AddHeader(Loc.T("ANOMALIES ON RECORD ({0})", anomalies.Length));
             if (anomalies.Length == 0)
-                AddLine(null, neutralColor, "No anomalies on record.", null, clear);
+                AddLine(null, neutralColor, Loc.T("No anomalies on record."), null, clear);
             foreach (ShiftAnomalyResult anomaly in anomalies)
-                AddLine("UNCHECKED", neutralColor, anomaly.Name, ShiftAnomalyCategories.Label(anomaly.Category), clear);
+                AddLine(Loc.T("UNCHECKED"), neutralColor, anomaly.Name, ShiftAnomalyCategories.Label(anomaly.Category), clear);
 
             EndList();
             return;
@@ -338,29 +338,29 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
 
         if (anomalies.Length == 0)
         {
-            AddHeader("ANOMALIES");
-            AddLine("CLEAN", caughtColor, "No anomalies were present.", null, clear);
+            AddHeader(Loc.T("ANOMALIES"));
+            AddLine(Loc.T("CLEAN"), caughtColor, Loc.T("No anomalies were present."), null, clear);
         }
 
         if (caught.Count > 0)
         {
-            AddHeader($"CAUGHT ({caught.Count})");
+            AddHeader(Loc.T("CAUGHT ({0})", caught.Count));
             foreach (ShiftAnomalyResult anomaly in caught)
-                AddLine("CAUGHT", caughtColor, anomaly.Name, ShiftAnomalyCategories.Label(anomaly.Category), caughtTint);
+                AddLine(Loc.T("CAUGHT"), caughtColor, anomaly.Name, ShiftAnomalyCategories.Label(anomaly.Category), caughtTint);
         }
 
         if (missed.Count > 0)
         {
-            AddHeader($"MISSED ({missed.Count})");
+            AddHeader(Loc.T("MISSED ({0})", missed.Count));
             foreach (ShiftAnomalyResult anomaly in missed)
-                AddLine("MISSED", missedColor, anomaly.Name, ShiftAnomalyCategories.Label(anomaly.Category), missedTint);
+                AddLine(Loc.T("MISSED"), missedColor, anomaly.Name, ShiftAnomalyCategories.Label(anomaly.Category), missedTint);
         }
 
         if (falseFlags.Count > 0)
         {
-            AddHeader($"FALSE FLAGS ({falseFlags.Count})");
+            AddHeader(Loc.T("FALSE FLAGS ({0})", falseFlags.Count));
             foreach (ShiftAnomalyCategory category in falseFlags)
-                AddLine("FLAGGED", falseFlagColor, $"{ShiftAnomalyCategories.Label(category)} box ticked", "Nothing present", falseFlagTint);
+                AddLine(Loc.T("FLAGGED"), falseFlagColor, Loc.T("{0} box ticked", ShiftAnomalyCategories.Label(category)), Loc.T("Nothing present"), falseFlagTint);
         }
 
         EndList();

@@ -139,7 +139,7 @@ public class MegaphoneDialogueManager : NetworkBehaviour
     /// <summary>Shown when the shift clock-out is ready.</summary>
     public void SayClockOutReady()
     {
-        ShowDialogue("Your shift is over. Clock out to end the day.");
+        ShowDialogue(Loc.N("Your shift is over. Clock out to end the day."));
     }
 
     /// <summary>Shown when not all players are inside the booth at shift start.</summary>

@@ -116,7 +116,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
              "again. It keeps repeating until a player opens the gate.")]
     [SerializeField, Min(0f)] private float _gateAlertRepeatInterval = 5f;
 
-    private const string GateWaitingMessage = "A shipment is waiting at the gate.";
+    private static string GateWaitingMessage => Loc.T("A shipment is waiting at the gate.");
 
     [Header("Sorting Destination Tutorial")]
     [Tooltip("Arrows/outlines on the sorting destinations (Mail Cubbies stands, Confiscate bin). Shown " +
@@ -129,7 +129,7 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     [Tooltip("The full pool of goods categories that can appear on packages. Every delivery, " +
              "_prohibitedCountPerDay of these are drawn at random to be today's contraband; the " +
              "rest are allowed that day. Changeable at any time in the Inspector.")]
-    [SerializeField] private string[] _goodsTypePool =
+    [SerializeField, LocalizeField] private string[] _goodsTypePool =
     {
         "Clothing", "Books", "Toiletries", "Food", "Toys", "Letters",
         "Medicine", "Weapons", "Radio Equipment"

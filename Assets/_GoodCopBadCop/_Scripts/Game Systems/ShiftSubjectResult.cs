@@ -104,12 +104,12 @@ public static class ShiftAnomalyCategories
     {
         switch (category)
         {
-            case ShiftAnomalyCategory.Documentation: return "Documentation";
-            case ShiftAnomalyCategory.Vitals: return "Vitals";
-            case ShiftAnomalyCategory.Behavior: return "Behavior";
-            case ShiftAnomalyCategory.Physical: return "Physical";
-            case ShiftAnomalyCategory.Supernatural: return "Supernatural";
-            default: return "Other";
+            case ShiftAnomalyCategory.Documentation: return Loc.T("Documentation");
+            case ShiftAnomalyCategory.Vitals: return Loc.T("Vitals");
+            case ShiftAnomalyCategory.Behavior: return Loc.T("Behavior");
+            case ShiftAnomalyCategory.Physical: return Loc.T("Physical");
+            case ShiftAnomalyCategory.Supernatural: return Loc.T("Supernatural");
+            default: return Loc.T("Other");
         }
     }
 

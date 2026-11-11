@@ -18,6 +18,10 @@ public class PlayerAnimationController : NetworkBehaviour
     [SerializeField] private float animLerpSpeed = 5f;
     [Tooltip("How quickly MoveX/MoveZ blend towards the raw input value. Lower = smoother but laggier feel.")]
     [SerializeField] private float moveAnimSmoothSpeed = 8f;
+    [Tooltip("Playback speed of the first-person arms' Running state (drives the RunAnimSpeed animator parameter on " +
+             "the arms animator only; the body keeps 1 so its legs stay in sync with movement).")]
+    [SerializeField, Min(0.1f)] private float armsRunAnimSpeed = 1.5f;
+    private static readonly int RunAnimSpeedHash = Animator.StringToHash("RunAnimSpeed");
     [Tooltip("How long the Jump animator bool stays true after a jump is performed.")]
     [SerializeField] private float jumpAnimDuration = 0.15f;
 
@@ -712,6 +716,8 @@ public class PlayerAnimationController : NetworkBehaviour
             armsAnimator.SetFloat("MoveX", netMoveX.Value);
             armsAnimator.SetFloat("MoveZ", netMoveZ.Value);
             bodyAnimator.SetBool("IsRunning", netIsRunning.Value);
+            armsAnimator.SetBool("IsRunning", netIsRunning.Value);
+            armsAnimator.SetFloat(RunAnimSpeedHash, armsRunAnimSpeed);
             bodyAnimator.SetBool("Grounded", netGrounded.Value);
             armsAnimator.SetBool("Grounded", netGrounded.Value);
 
@@ -746,6 +752,8 @@ public class PlayerAnimationController : NetworkBehaviour
         netIsRunning.Value = isRunning;
 
         bodyAnimator.SetBool("IsRunning", isRunning);
+        armsAnimator.SetBool("IsRunning", isRunning);
+        armsAnimator.SetFloat(RunAnimSpeedHash, armsRunAnimSpeed);
 
         bool grounded = _playerMovementController.RawGrounded;
         netGrounded.Value = grounded;

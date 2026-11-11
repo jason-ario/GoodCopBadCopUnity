@@ -89,7 +89,7 @@ public class ProhibitedGoodsSignDisplay : MonoBehaviour
         for (int i = 0; i < _goodsTypeTexts.Length; i++)
         {
             if (_goodsTypeTexts[i] == null) continue;
-            _goodsTypeTexts[i].text = i < prohibited.Count ? prohibited[i].ToString() : _emptySlotText;
+            _goodsTypeTexts[i].text = i < prohibited.Count ? Loc.TranslateSource(prohibited[i].ToString()) : _emptySlotText;
         }
     }
     

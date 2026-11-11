@@ -509,7 +509,21 @@ public static class Loc
             if (string.IsNullOrEmpty(e.source) || IsLookupOnlySheet(e.sheet)) continue;
             if (!_sourceIndex.TryGetValue(e.source, out var list)) _sourceIndex[e.source] = list = new List<LocEntry>();
             list.Add(e);
+
+            // Sheets saved on Windows keep "\r\n" inside multi-line cells, while serialized assets use "\n".
+            // Index the LF form too so source-text lookup doesn't miss on line endings alone.
+            string lf = NormalizeNewlines(e.source);
+            if (!ReferenceEquals(lf, e.source))
+            {
+                if (!_sourceIndex.TryGetValue(lf, out var lfList)) _sourceIndex[lf] = lfList = new List<LocEntry>();
+                lfList.Add(e);
+            }
         }
+    }
+
+    private static string NormalizeNewlines(string s)
+    {
+        return s != null && s.IndexOf('\r') >= 0 ? s.Replace("\r\n", "\n").Replace('\r', '\n') : s;
     }
 
     /// <summary>
@@ -526,6 +540,11 @@ public static class Loc
 
         if (_sourceIndex.TryGetValue(english, out var matches) && matches.Count > 0)
             return Resolve(matches[0], false);
+
+        string lfEnglish = NormalizeNewlines(english);
+        if (!ReferenceEquals(lfEnglish, english) && _sourceIndex.TryGetValue(lfEnglish, out matches) && matches.Count > 0)
+            return Resolve(matches[0], false);
+        english = lfEnglish;
 
         // Authored labels often carry stray leading/trailing whitespace ("Ready Up ", "Case #02\n\n"): match the
         // trimmed text and keep the original padding around the translation.

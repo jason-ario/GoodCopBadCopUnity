@@ -85,7 +85,7 @@ public class CosmeticsMenuUI : MonoBehaviour
         if (_buttonTemplate == null || _buttonContainer == null) return;
 
         // Index -1 = no hat.
-        CreateButton(-1, "No Hat", null);
+        CreateButton(-1, Loc.T("No Hat"), null);
 
         if (_hatController != null)
         {

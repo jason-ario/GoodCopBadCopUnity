@@ -22,7 +22,7 @@ public class ShiftReportSubjectRow : MonoBehaviour
         public Texture icon;
         public Color iconColor;
         [Tooltip("Optional stamp word next to the icon (e.g. QUARANTINE). Empty hides the label.")]
-        public string stampLabel;
+        [LocalizeField] public string stampLabel;
         [Tooltip("Row background tint. Alpha 0 leaves the paper showing through.")]
         public Color rowTint;
         [Tooltip("Ink color used for the anomaly count and earnings on this row.")]
@@ -157,7 +157,7 @@ public class ShiftReportSubjectRow : MonoBehaviour
             indexText.text = (index + 1).ToString("00");
 
         if (nameText != null)
-            nameText.text = string.IsNullOrWhiteSpace(subject.SubjectName) ? "Unknown Subject" : subject.SubjectName;
+            nameText.text = string.IsNullOrWhiteSpace(subject.SubjectName) ? Loc.T("Unknown Subject") : subject.SubjectName;
 
         if (idText != null)
             idText.text = FormatId(subject.IDNumber);
@@ -169,7 +169,7 @@ public class ShiftReportSubjectRow : MonoBehaviour
             anomaliesText.color = style.valueColor;
         }
         if (anomaliesCaptionText != null)
-            anomaliesCaptionText.text = notAssessed ? "Not Assessed" : "Anomalies";
+            anomaliesCaptionText.text = notAssessed ? Loc.T("Not Assessed") : Loc.T("Anomalies");
 
         if (earningsText != null)
         {
@@ -196,7 +196,7 @@ public class ShiftReportSubjectRow : MonoBehaviour
         _hasStampLabel = verdictStampText != null && !string.IsNullOrEmpty(style.stampLabel);
         if (verdictStampText != null)
         {
-            verdictStampText.text = style.stampLabel ?? string.Empty;
+            verdictStampText.text = Loc.TranslateSource(style.stampLabel) ?? string.Empty;
             verdictStampText.color = style.iconColor;
             verdictStampText.gameObject.SetActive(_hasStampLabel);
         }
@@ -244,9 +244,9 @@ public class ShiftReportSubjectRow : MonoBehaviour
     public static string FormatId(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
-            return "ID ----";
+            return Loc.T("ID ----");
 
-        return $"ID {id}";
+        return Loc.T("ID {0}", id);
     }
 
     private VerdictStyle StyleFor(ShiftSubjectVerdict verdict)
