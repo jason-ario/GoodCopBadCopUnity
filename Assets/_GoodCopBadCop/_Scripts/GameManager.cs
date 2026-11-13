@@ -184,6 +184,7 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     private void TransitionToLobbyClientRpc()
     {
+        GoodCopBadCop.Networking.JoinLoaderOverlay.Complete();
         StartCoroutine(LobbyTransitionSequence());
     }
 
@@ -198,6 +199,7 @@ public class GameManager : NetworkBehaviour
         // Players are about to be spawned at the lobby and moved into the bunker; go black
         // before the menu disappears so the outside camera is never shown.
         UIController.Instance?.SetBlackImmediate();
+        GoodCopBadCop.Networking.JoinLoaderOverlay.Complete();
         MainMenuController.Instance?.TransitionToGameplay();
         MainMenuController.Instance?.StopMainMenuMusic();
     }
@@ -407,6 +409,7 @@ public class GameManager : NetworkBehaviour
             // PlayerReadyManager, so simply switching screens here is enough.
             Debug.Log("[GameManager] LobbyJoinClientSequence: host still in pre-game lobby — opening ready-up screen");
             MainMenuController.Instance.OpenPreGameLobbyScreen(multiplayerMode: true);
+            GoodCopBadCop.Networking.JoinLoaderOverlay.Complete();
             yield break;
         }
 
@@ -442,6 +445,7 @@ public class GameManager : NetworkBehaviour
         // subscriptions are set up.
         CampaignManager.Instance.StartCampaign();
 
+        GoodCopBadCop.Networking.JoinLoaderOverlay.Complete();
         OnGameStart?.Invoke();
     }
 
@@ -470,6 +474,9 @@ public class GameManager : NetworkBehaviour
             BetweenShiftTaskManager.Instance.ActivateTasks();
 
         FindObjectOfType<HUDTaskList>(true)?.ForceRebuild();
+
+        // Day 2+ joiners land here once the (chunked) synchronization and day bootstrap are done.
+        GoodCopBadCop.Networking.JoinLoaderOverlay.Complete();
     }
 
     [ClientRpc]

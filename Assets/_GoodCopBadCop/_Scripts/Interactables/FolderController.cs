@@ -39,6 +39,25 @@ public class FolderController : PickableObject
     
     private bool isStamping;
 
+    // Per-client state for the running UseStampSequence, kept in fields (not coroutine locals) so
+    // FinishStampSequence can restore the player if the coroutine is cut short (folder despawned,
+    // deactivated or StopAllCoroutines'd mid-stamp). Without this, an interrupted sequence left the
+    // stamping player with CanControl = false for good.
+    private bool _stampSequenceActive;
+    private PlayerPickupController _stampSeqPpc;
+    private bool _stampSeqIsLocalPlayer;
+    private Transform _stampSeqSavedRightArmIKTarget;
+    private Transform _stampSeqSavedCamRightArmRigIKTarget;
+
+    /// <summary>
+    /// True while a stamp sequence is in progress for this folder — server-authoritative on the
+    /// server (<see cref="isStamping"/>), and set on every client for the duration of its local
+    /// <see cref="UseStampSequence"/>. isStamped becomes true at the START of the sequence, so
+    /// hand-off code must check this too: handing the folder off mid-stamp despawns it ~1s later
+    /// (SuspectController.PassSequence), killing the sequence before it returns player control.
+    /// </summary>
+    public bool IsStampSequenceActive => isStamping || _stampSequenceActive;
+
     [Header("Camera")] 
     [SerializeField] private GameObject cinemachineVirtualCamera;
     [SerializeField] private CinemachineImpulseSource _impulseSource;
@@ -439,6 +458,13 @@ public class FolderController : PickableObject
     private void OnDisable()
     {
         FolderDebug("OnDisable", withStack: true);
+
+        // Deactivation/destruction kills UseStampSequence — restore the player it locked.
+        if (_stampSequenceActive)
+        {
+            Debug.LogWarning($"[FolderController] Stamp sequence interrupted (folder disabled) — restoring player state. NetworkObjectId={NetworkObjectId}");
+            FinishStampSequence(interrupted: true);
+        }
     }
 
     private void LateUpdate()
@@ -833,12 +859,19 @@ public class FolderController : PickableObject
     {
         // Find the player instance that initiated the stamp
         NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(interactingPlayerId, out var playerObj);
-        if (playerObj == null) return;
+        if (playerObj == null)
+        {
+            // No sequence will run to clear the server's latch — don't leave the folder
+            // permanently "mid-stamp" (that would block pickup and hand-off forever).
+            if (IsServer) isStamping = false;
+            return;
+        }
 
         // Lock the folder against pickup on every client for the duration of the sequence.
         SetInteractable(false);
 
         playerPickupController = playerObj.GetComponent<PlayerPickupController>();
+        _stampSequenceActive = true;
         StartCoroutine(UseStampSequence(stampType));
     }
 
@@ -1007,6 +1040,8 @@ public class FolderController : PickableObject
 
         // Only the stamping player's local client locks controls and activates the cinematic camera.
         bool isStampingLocalPlayer = ppc.IsLocalPlayer;
+        _stampSeqPpc = ppc;
+        _stampSeqIsLocalPlayer = isStampingLocalPlayer;
         if (isStampingLocalPlayer) PlayerInstance.Instance.CanControl = false;
 
         if (isStampingLocalPlayer)
@@ -1020,6 +1055,7 @@ public class FolderController : PickableObject
         // for the duration of the sequence, then restore it when the sequence completes.
         // We then drive rightArmRigIKTarget (the fixed rig constraint target) directly via DOTween.
         Transform savedRightArmIKTarget = ppc.PlayerAnimationController.RightArmIKTarget;
+        _stampSeqSavedRightArmIKTarget = savedRightArmIKTarget;
         ppc.PlayerAnimationController.RightArmIKTarget = null;
         // Tell the proxy passthrough in Update not to overwrite the rig target while the
         // stamp sequence owns it directly via DOTween.
@@ -1031,6 +1067,7 @@ public class FolderController : PickableObject
             savedCamRightArmRigIKTarget = ppc.PlayerAnimationController.CamRightArmRigIKTarget;
             ppc.PlayerAnimationController.CamRightArmRigIKTarget = null;
         }
+        _stampSeqSavedCamRightArmRigIKTarget = savedCamRightArmRigIKTarget;
 
         yield return new WaitForSeconds(.25f);
 
@@ -1130,32 +1167,7 @@ public class FolderController : PickableObject
 
         yield return new WaitForSeconds(.5f);
 
-        isStamping = false;
-
-        // Restore the external IK target so the pickup system resumes driving the rig target,
-        // and release the direct-drive lock so the proxy passthrough resumes.
-        ppc.PlayerAnimationController.RightArmIKTarget = savedRightArmIKTarget;
-        ppc.PlayerAnimationController.DriveRightArmRigTargetDirectly = false;
-
-        if (isStampingLocalPlayer)
-        {
-            ppc.PlayerAnimationController.CamRightArmRigIKTarget = savedCamRightArmRigIKTarget;
-        }
-
-        ppc.PlayerAnimationController.SetAnimBoolLocal("HoldingStamp", false);
-
-        if (isStampingLocalPlayer)
-        {
-            // Release the lean lock so the camera-offset-driven lean takes over, then snap the
-            // player's camera to its normal first-person look pose while the folder vcam still
-            // owns the view (hidden). The Cinemachine blend then goes straight from the folder
-            // shot to the head, instead of tweening the player camera back from the rig pos
-            // through the leaning body (which clipped and fought mouse look for ~0.5s).
-            ppc.PlayerAnimationController.LockBodyLeanFactor = false;
-            ppc.PlayerMovementController.SnapCameraToLookPose();
-            cinemachineVirtualCamera.SetActive(false);
-            PlayerInstance.Instance.CanControl = true;
-        }
+        FinishStampSequence(interrupted: false);
 
         // Do NOT force the outline back on here. This sequence runs on every client (ClientRpc),
         // and on observers nothing is hovering the folder, so a forced `highlighted = true` stuck
@@ -1186,6 +1198,68 @@ public class FolderController : PickableObject
 
             HandOffPoint.TryHandOffRestingFolder(this);
         }
+    }
+
+    /// <summary>
+    /// Undoes everything <see cref="UseStampSequence"/> changed on the stamping player: IK
+    /// targets, the HoldingStamp pose, the lean lock, the cinematic camera and — most
+    /// importantly — <see cref="PlayerInstance.CanControl"/>. Runs at the normal end of the
+    /// sequence, and from <see cref="OnDisable"/> if the folder is despawned/deactivated
+    /// mid-stamp (which kills the coroutine). Idempotent via <see cref="_stampSequenceActive"/>.
+    /// </summary>
+    private void FinishStampSequence(bool interrupted)
+    {
+        if (!_stampSequenceActive) return;
+        _stampSequenceActive = false;
+        isStamping = false;
+
+        PlayerPickupController ppc = _stampSeqPpc;
+        bool isLocal = _stampSeqIsLocalPlayer;
+        _stampSeqPpc = null;
+
+        if (ppc != null && ppc.PlayerAnimationController != null)
+        {
+            // Restore the external IK target so the pickup system resumes driving the rig target,
+            // and release the direct-drive lock so the proxy passthrough resumes.
+            ppc.PlayerAnimationController.RightArmIKTarget = _stampSeqSavedRightArmIKTarget;
+            ppc.PlayerAnimationController.DriveRightArmRigTargetDirectly = false;
+
+            if (isLocal)
+                ppc.PlayerAnimationController.CamRightArmRigIKTarget = _stampSeqSavedCamRightArmRigIKTarget;
+
+            ppc.PlayerAnimationController.SetAnimBoolLocal("HoldingStamp", false);
+
+            if (isLocal)
+            {
+                // Release the lean lock so the camera-offset-driven lean takes over.
+                ppc.PlayerAnimationController.LockBodyLeanFactor = false;
+            }
+        }
+
+        _stampSeqSavedRightArmIKTarget = null;
+        _stampSeqSavedCamRightArmRigIKTarget = null;
+
+        if (!isLocal) return;
+
+        if (ppc != null && ppc.PlayerMovementController != null)
+        {
+            // An interrupted sequence may still have the camera tweening toward cameraRigPos.
+            if (interrupted) ppc.PlayerMovementController.CameraTransform.DOKill();
+
+            // Snap the player's camera to its normal first-person look pose while the folder vcam
+            // still owns the view (hidden). The Cinemachine blend then goes straight from the
+            // folder shot to the head, instead of tweening the player camera back from the rig
+            // pos through the leaning body (which clipped and fought mouse look for ~0.5s).
+            ppc.PlayerMovementController.SnapCameraToLookPose();
+        }
+
+        // The vcam is a child of this folder: when interrupted by deactivation/destruction it is
+        // going away with us, and toggling it during that would error.
+        if (!interrupted && cinemachineVirtualCamera != null)
+            cinemachineVirtualCamera.SetActive(false);
+
+        if (PlayerInstance.Instance != null)
+            PlayerInstance.Instance.CanControl = true;
     }
 
     /// <summary>LMB toggles the folder open or closed.</summary>

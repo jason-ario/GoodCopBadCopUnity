@@ -129,6 +129,7 @@ public class InkStamp : Interactable, IPickupSlot
         if (stamp == null) return false;
 
         spawnedInkStamp = stamp;
+        if (stamp is InkStampPickup stampPickup) stampPickup.HomeStation = this;
         // CanPickUpManually must be false so the player cannot grab the pickup directly —
         // only InkStamp.Interact (slot interaction) sets it to true before a pickup.
         // Collider state is authoritative via _networkInteractableOverride (set by
@@ -173,6 +174,7 @@ public class InkStamp : Interactable, IPickupSlot
         inkStamp.Spawn();
 
         spawnedInkStamp = inkStamp.GetComponent<PickableObject>();
+        if (spawnedInkStamp is InkStampPickup stampPickup) stampPickup.HomeStation = this;
         spawnedInkStamp.CanPickUpManually = false;
         // LockInteractableNetworked writes _networkInteractableOverride = 0 as a NetworkVariable
         // so every client receives the locked state reliably via OnValueChanged, regardless of
@@ -327,4 +329,38 @@ public class InkStamp : Interactable, IPickupSlot
 
     [ServerRpc(RequireOwnership = false)]
     private void SetIsPlacedServerRpc(bool value) => SetIsPlaced(value);
+
+    /// <summary>
+    /// Server-only. Puts this holder's stamp back in its slot and marks the slot filled, the same
+    /// end state as a player returning it (<see cref="InteractWithItem"/>). Used when the player
+    /// holding the stamp disconnects or dies: the normal drop would leave the stamp on the floor
+    /// while <see cref="_isPlaced"/> stays false, and since the stamp can only be taken through
+    /// this holder, nobody could pick it up again. Returns false if the return could not be done.
+    /// </summary>
+    public bool ReturnStampToSlotServer(PickableObject stamp)
+    {
+        if (!IsServer || !IsSpawned || stamp == null || stamp != spawnedInkStamp) return false;
+        if (stampPlaceObjectSlot == null || stampPlaceObjectSlot.PlaceObjectPos == null) return false;
+
+        Transform slot = stampPlaceObjectSlot.PlaceObjectPos;
+        NetworkObject slotOwner = slot.GetComponentInParent<NetworkObject>();
+        if (slotOwner == null) return false;
+
+        stamp.CanPickUpManually = false;
+        stamp.PlaceInSlotFromServer(new NetworkObjectReference(slotOwner), GetRelativePath(slotOwner.transform, slot),
+            slot.position, slot.rotation);
+        SetIsPlaced(true);
+
+        Debug.Log($"[InkStamp] Returned '{stamp.name}' to '{name}' after its holder left or dropped it.", this);
+        return true;
+    }
+
+    private static string GetRelativePath(Transform root, Transform target)
+    {
+        if (target == root) return string.Empty;
+        string path = target.name;
+        for (Transform t = target.parent; t != null && t != root; t = t.parent)
+            path = t.name + "/" + path;
+        return path;
+    }
 }

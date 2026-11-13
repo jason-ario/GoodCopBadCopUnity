@@ -778,8 +778,16 @@ public class LobbyManager : MonoBehaviour
 
             if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsHost)
             {
+                // Hidden dev spectators drive their own setup and never get the late-join
+                // bootstrap RPC that dismisses the loader, so only players see it.
+                if (!asSpectator)
+                    GoodCopBadCop.Networking.JoinLoaderOverlay.Show();
+
                 bool started = NetworkManager.Singleton.StartClient();
                 Debug.Log($"[JoinLobby] StartClient={started}");
+
+                if (!started)
+                    GoodCopBadCop.Networking.JoinLoaderOverlay.Cancel();
             }
             else
             {
@@ -794,7 +802,9 @@ public class LobbyManager : MonoBehaviour
 
             if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsHost)
             {
-                NetworkManager.Singleton.StartClient();
+                GoodCopBadCop.Networking.JoinLoaderOverlay.Show();
+                if (!NetworkManager.Singleton.StartClient())
+                    GoodCopBadCop.Networking.JoinLoaderOverlay.Cancel();
             }
         }
     }

@@ -16,6 +16,8 @@ public class DailySuspectManager : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float mutantSpawnChance = 0.2f;
 
     [Header("Doppelganger")]
+    [Tooltip("Master switch for lineup doppelgangers. Off while the feature isn't in the game yet — no doppelganger is ever injected, regardless of the lineup set's spawnChance.")]
+    [SerializeField] private bool doppelgangersEnabled = false;
     [SerializeField] private DoppelgangerLineupSet lineupDoppelgangers;
 
     public static DailySuspectManager Instance;
@@ -388,6 +390,12 @@ public class DailySuspectManager : MonoBehaviour
             return;
         }
 
+        if (!doppelgangersEnabled)
+        {
+            Debug.Log("[DailySuspectManager] Doppelgangers are disabled — injection skipped.");
+            return;
+        }
+
         if (lineupDoppelgangers == null)
             return;
 
@@ -403,25 +411,10 @@ public class DailySuspectManager : MonoBehaviour
             return;
         }
 
-        DoppelgangerData doppelgangerData = lineupDoppelgangers.GetRandom();
+        DoppelgangerData doppelgangerData = PickEligibleDoppelganger();
         if (doppelgangerData == null)
-            return;
-
-        if (doppelgangerData.targetSuspect == null)
         {
-            Debug.LogWarning($"[DailySuspectManager] DoppelgangerData '{doppelgangerData.name}' has no targetSuspect assigned — skipping injection.");
-            return;
-        }
-
-        if (doppelgangerData.targetSuspect.CharacterPrefab == null)
-        {
-            Debug.LogWarning($"[DailySuspectManager] DoppelgangerData target '{doppelgangerData.targetSuspect.name}' has no CharacterPrefab — skipping injection.");
-            return;
-        }
-
-        if (IsExcludedToday(CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null, doppelgangerData.targetSuspect))
-        {
-            Debug.Log($"[DailySuspectManager] Doppelganger target '{doppelgangerData.targetSuspect.name}' is excluded today — skipping injection.");
+            Debug.Log("[DailySuspectManager] No eligible doppelganger target today — skipping injection.");
             return;
         }
 
@@ -438,6 +431,56 @@ public class DailySuspectManager : MonoBehaviour
         _doppelgangerSlots[insertIndex] = doppelgangerData;
 
         Debug.Log($"[DailySuspectManager] Doppelganger of '{doppelgangerData.targetSuspect.name}' injected at lineup index {insertIndex}. Total slots: {shiftSuspects.Count}.");
+    }
+
+    /// <summary>
+    /// Picks a random doppelganger whose target can legitimately be "at the checkpoint" today.
+    /// The target must not already be in today's lineup (otherwise the real suspect and their
+    /// double both walk up, and quarantining or killing the real one still lets the double
+    /// arrive), must be alive (or an activated replacement, mirroring the random draw), must not
+    /// be serving a quarantine (including one that started today), must not be excluded today,
+    /// and must not have a live full-mutant instance elsewhere.
+    /// </summary>
+    private DoppelgangerData PickEligibleDoppelganger()
+    {
+        DayBase today = CampaignManager.Instance != null ? CampaignManager.Instance.ActiveDay : null;
+        int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
+        SuspectRunRecords runRecords = SuspectRunRecords.Instance;
+
+        var eligible = new List<DoppelgangerData>();
+        foreach (DoppelgangerData data in lineupDoppelgangers.doppelgangers)
+        {
+            if (data == null) continue;
+
+            SuspectData target = data.targetSuspect;
+            if (target == null)
+            {
+                Debug.LogWarning($"[DailySuspectManager] DoppelgangerData '{data.name}' has no targetSuspect assigned — not eligible.");
+                continue;
+            }
+
+            if (target.CharacterPrefab == null)
+            {
+                Debug.LogWarning($"[DailySuspectManager] DoppelgangerData target '{target.name}' has no CharacterPrefab — not eligible.");
+                continue;
+            }
+
+            if (IsExcludedToday(today, target)) continue;
+            if (shiftSuspects.Contains(target)) continue;
+
+            SuspectRecord record = runRecords?.GetRecord(target);
+            if (record != null)
+            {
+                if (record.isKilled && !record.isReplacement) continue;
+                if (record.IsOnQuarantineCooldown(currentDay)) continue;
+                if (runRecords.GetRemainingQuarantineDays(record, currentDay) > 0) continue;
+                if (runRecords.IsFullMutantInstanceActive(target)) continue;
+            }
+
+            eligible.Add(data);
+        }
+
+        return eligible.Count > 0 ? eligible[UnityEngine.Random.Range(0, eligible.Count)] : null;
     }
 
     /// <summary>

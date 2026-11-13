@@ -9,8 +9,34 @@ public class HandOffPoint : PlacementBoard
     /// <see cref="PendingVerdictFolder"/> so a deferred caller (e.g. a cutscene) can
     /// deliver the verdict at the right moment.
     /// Reset to false by whoever sets it once the deferred call is made.
+    /// <para>
+    /// Server-authoritative: writes on the server are mirrored to clients through
+    /// <see cref="SuspectController.IsVerdictBlockedReplicated"/>, and non-host clients read that
+    /// replicated value instead of their own local copy. A client that (re)joins mid-day runs
+    /// Day_01.DayActivated again (which sets this to true) after the one-shot clear RPC has
+    /// already been sent, so its local copy alone would defer, and never deliver, every folder it hands off.
+    /// </para>
     /// </summary>
-    public static bool BlockVerdict { get; set; }
+    public static bool BlockVerdict
+    {
+        get
+        {
+            SuspectController sc = SuspectController.Instance;
+            if (sc != null && sc.IsSpawned && !sc.IsServer)
+                return sc.IsVerdictBlockedReplicated;
+            return _blockVerdict;
+        }
+        set
+        {
+            _blockVerdict = value;
+            SuspectController.Instance?.PushVerdictBlockedServer(value);
+        }
+    }
+
+    private static bool _blockVerdict;
+
+    /// <summary>This process's own copy of <see cref="BlockVerdict"/>, ignoring replication.</summary>
+    public static bool BlockVerdictLocal => _blockVerdict;
 
     /// <summary>The stamped folder held back by <see cref="BlockVerdict"/>.</summary>
     public static FolderController PendingVerdictFolder { get; private set; }
@@ -90,6 +116,12 @@ public class HandOffPoint : PlacementBoard
     {
         if (folder == null || folder.IsHeld || folder.IsHandedOff || folder.HandOffRequestedLocally || !folder.IsStamped) return;
 
+        // isStamped flips true at the START of the stamp sequence. The post-drop poll
+        // (FolderController.RestingHandOffCheckRoutine) would otherwise hand the folder off
+        // mid-stamp; the suspect then despawns it, killing the sequence before it gives the
+        // stamping player control back. The sequence calls this again itself when it completes.
+        if (folder.IsStampSequenceActive) return;
+
         // Already held back for a deferred verdict — re-running would re-fire OnItemPlaced.
         if (PendingVerdictFolder == folder) return;
 
@@ -127,6 +159,9 @@ public class HandOffPoint : PlacementBoard
         // no verdict is ever delivered. If it is stamped later while still resting here,
         // TryHandOffRestingFolder re-runs this placement.
         if (!folderController.IsStamped) return;
+
+        // Mid-stamp: wait for the sequence to finish (it re-runs this via TryHandOffRestingFolder).
+        if (folderController.IsStampSequenceActive) return;
 
         // Verdict gate (replicated from the server): the suspect must have handed over their
         // paperwork at least SuspectController.verdictDelayAfterPaperwork seconds ago, and every

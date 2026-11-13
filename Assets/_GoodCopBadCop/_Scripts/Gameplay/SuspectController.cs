@@ -270,6 +270,24 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public bool IsReadyForVerdict => _verdictReady.Value;
 
+    // Server-written mirror of HandOffPoint.BlockVerdict. The static is per-process and the
+    // one-shot ClearBlockVerdictClientRpc never reaches a client that (re)joins later; that
+    // client's DayActivated sets its own copy back to true, so every folder it hands off is
+    // deferred and never delivered. Non-host clients read this replicated value instead.
+    private readonly NetworkVariable<bool> _verdictBlocked = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    /// <summary>Replicated server value of <see cref="HandOffPoint.BlockVerdict"/>. Valid once spawned.</summary>
+    public bool IsVerdictBlockedReplicated => _verdictBlocked.Value;
+
+    /// <summary>Server-only. Mirrors the server's <see cref="HandOffPoint.BlockVerdict"/> to every client.</summary>
+    public void PushVerdictBlockedServer(bool blocked)
+    {
+        if (!IsServer || !IsSpawned) return;
+        if (_verdictBlocked.Value != blocked)
+            _verdictBlocked.Value = blocked;
+    }
+
     /// <summary>Server-only. Starts the verdict gate for the current suspect's paperwork hand-over.</summary>
     private void BeginVerdictGateServer(params PickableObject[] documents)
     {
@@ -2060,6 +2078,8 @@ public class SuspectController : NetworkBehaviour
         {
             SuspectCharacter.OnSuspectKilledByPlayer += HandleSuspectKilledByPlayer;
             SuspectCharacter.OnSuspectFledFromWounds += HandleSuspectFledFromWounds;
+            // BlockVerdict may have been set before this object spawned.
+            PushVerdictBlockedServer(HandOffPoint.BlockVerdictLocal);
         }
 
         suspectIndex.OnValueChanged += HandleSuspectIndexChanged;
@@ -2288,6 +2308,15 @@ public class SuspectController : NetworkBehaviour
             return;
         }
 
+        // Never take a folder mid-stamp: the verdict sequence despawns it, which kills the
+        // stamping player's UseStampSequence before it restores their controls. The stamp
+        // sequence re-runs the hand-off itself once it finishes.
+        if (IsServer && folder.IsStampSequenceActive)
+        {
+            Debug.Log("[SuspectController] DeliverVerdict: folder is mid-stamp — hand-off deferred to stamp completion.");
+            return;
+        }
+
         SetCanInteract(false);
         folder.OnHandOff();
 
@@ -2322,6 +2351,15 @@ public class SuspectController : NetworkBehaviour
         if (!EvaluateVerdictReadyServer())
         {
             Debug.Log("[SuspectController] DeliverVerdictServerRpc: verdict gate closed — rejecting hand-off.");
+            folder.RejectHandOffClientRpc();
+            return;
+        }
+
+        // Authoritative mid-stamp guard (server-only isStamping) — closes the race where a
+        // client's poll saw the replicated isStamped before its stamp ClientRpc arrived.
+        if (folder.IsStampSequenceActive)
+        {
+            Debug.Log("[SuspectController] DeliverVerdictServerRpc: folder is mid-stamp — rejecting hand-off.");
             folder.RejectHandOffClientRpc();
             return;
         }

@@ -1146,6 +1146,15 @@ public class PickableObject : Interactable
     public ulong HolderClientId => _holdingClientId.Value;
 
     /// <summary>
+    /// Server-only hook for <see cref="ForceReleaseToWorldServer(Vector3, Quaternion)"/> and
+    /// <see cref="ForceDropWithPhysicsServer"/>, called after the holder, stow and parent state
+    /// are cleared. Return true after placing the item somewhere authored (e.g. a stamp back in
+    /// its holder) to skip the world drop. Items that only a station can hand out would otherwise
+    /// end up unreachable on the floor when their holder disconnects or dies.
+    /// </summary>
+    protected virtual bool TryReturnHomeOnForcedReleaseServer() => false;
+
+    /// <summary>
     /// Server-only rescue path used when a holder vanishes without dropping its items (quit,
     /// crash, timeout) — see <see cref="PickableObjectRegistry"/>'s disconnect sweep. A client
     /// that disappears can no longer deliver <see cref="ReleaseHolderServerRpc"/> /
@@ -1181,6 +1190,9 @@ public class PickableObject : Interactable
         RemoveParent();
         ClearSocketFollow();
         ClearFolderSlotServer();
+
+        if (TryReturnHomeOnForcedReleaseServer()) return;
+
         transform.position = position;
         transform.rotation = rotation;
 
@@ -1230,6 +1242,8 @@ public class PickableObject : Interactable
         RemoveParent();
         ClearSocketFollow();
         ClearFolderSlotServer();
+
+        if (TryReturnHomeOnForcedReleaseServer()) return;
 
         if (NetworkObject.OwnerClientId != NetworkManager.ServerClientId)
             NetworkObject.RemoveOwnership();
