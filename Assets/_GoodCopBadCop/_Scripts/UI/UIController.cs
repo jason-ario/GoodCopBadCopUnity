@@ -1434,6 +1434,16 @@ public class UIController : MonoBehaviour
         cashNotificationPopupManager.SpawnCashNotification(amount, message);
     }
 
+    /// <summary>
+    /// Shows a small plain-text line in the top-left cash notification stack (no panel, no sound).
+    /// Use for low-priority info such as player join/leave.
+    /// </summary>
+    public void ShowTextNotification(string message)
+    {
+        if (cashNotificationPopupManager != null)
+            cashNotificationPopupManager.SpawnTextNotification(message);
+    }
+
     /// <summary>Displays a transient shop alert notification (purchase confirmed, error, etc.).</summary>
     public void ShowShopNotification(string message)
     {

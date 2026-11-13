@@ -1078,19 +1078,9 @@ public class LobbyManager : MonoBehaviour
             ? (hasName ? Loc.T("{0} has joined the game.", steamName) : Loc.T("A player has joined the game."))
             : (hasName ? Loc.T("{0} has left the game.", steamName) : Loc.T("A player has left the game."));
 
-        // Unique key per player and event so several joins/leaves queue up instead of replacing
-        // each other. A rejoin drops that player's pending "left" toast so the two don't contradict.
-        string leftKey = "PlayerLeft:" + steamName;
-        if (joined)
-        {
-            UIController.Instance.HideQueuedNotification(leftKey);
-            UIController.Instance.ShowQueuedNotification(message, "PlayerJoined:" + steamName);
-        }
-        else
-        {
-            UIController.Instance.HideQueuedNotification("PlayerJoined:" + steamName);
-            UIController.Instance.ShowQueuedNotification(message, leftKey);
-        }
+        // Small plain-text line in the top-left cash notification stack, kept out of the large
+        // bottom-centre HUD queue so it doesn't compete with gameplay alerts.
+        UIController.Instance.ShowTextNotification(message);
     }
 
     private void OnLobbyMemberDataChanged(Lobby lobby, Friend friend)
