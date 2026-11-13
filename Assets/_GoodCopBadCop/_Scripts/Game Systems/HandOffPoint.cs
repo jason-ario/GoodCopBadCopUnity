@@ -128,6 +128,13 @@ public class HandOffPoint : PlacementBoard
         // TryHandOffRestingFolder re-runs this placement.
         if (!folderController.IsStamped) return;
 
+        // Verdict gate (replicated from the server): the suspect must have handed over their
+        // paperwork at least SuspectController.verdictDelayAfterPaperwork seconds ago, and every
+        // handed-over document must have been picked up. Until then placing a stamped folder does
+        // nothing — no OnItemPlaced, no hand-off, and the folder stays pickable. Not retried
+        // automatically: the player re-places the folder once the gate is open.
+        if (SuspectController.Instance == null || !SuspectController.Instance.IsReadyForVerdict) return;
+
         base.OnPlaced(pickableObject);
 
         if (BlockVerdict)

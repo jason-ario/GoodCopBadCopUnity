@@ -246,6 +246,71 @@ public class SuspectController : NetworkBehaviour
     public NetworkVariable<int> suspectIndex = new NetworkVariable<int>(-1); 
     public int SuspectIndex => suspectIndex.Value;
 
+    [Header("Verdict Gate")]
+    [Tooltip("Seconds after the current suspect hands over their paperwork before a stamped folder " +
+             "placed at the window is accepted. Every handed-over document must also have been picked up.")]
+    [SerializeField, Min(0f)] private float verdictDelayAfterPaperwork = 10f;
+
+    // Server-written, replicated: true once the current suspect's paperwork was handed over at least
+    // verdictDelayAfterPaperwork seconds ago and every handed-over document has been picked up.
+    // HandOffPoint reads it on every machine so an early placement does nothing at all.
+    private readonly NetworkVariable<bool> _verdictReady = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // Server-only gate state. _paperworkGateSuspect ties the gate to the suspect that handed the
+    // paperwork over, so a new suspect automatically starts closed.
+    private SuspectCharacter _paperworkGateSuspect;
+    private float _paperworkHandedOverTime;
+    private readonly List<PickableObject> _paperworkAwaitingPickup = new List<PickableObject>();
+
+    /// <summary>
+    /// True when a stamped folder placed at the window may deliver a verdict: the current suspect
+    /// handed over their paperwork at least <see cref="verdictDelayAfterPaperwork"/> seconds ago
+    /// and players have picked up every document they put down. Replicated; valid on every machine.
+    /// </summary>
+    public bool IsReadyForVerdict => _verdictReady.Value;
+
+    /// <summary>Server-only. Starts the verdict gate for the current suspect's paperwork hand-over.</summary>
+    private void BeginVerdictGateServer(params PickableObject[] documents)
+    {
+        _paperworkGateSuspect = suspectCharacter;
+        _paperworkHandedOverTime = Time.time;
+        _paperworkAwaitingPickup.Clear();
+        foreach (PickableObject doc in documents)
+        {
+            if (doc != null) _paperworkAwaitingPickup.Add(doc);
+        }
+    }
+
+    /// <summary>Server-only. Evaluates the verdict gate directly (no replication lag).</summary>
+    private bool EvaluateVerdictReadyServer()
+    {
+        if (suspectCharacter == null || _paperworkGateSuspect != suspectCharacter) return false;
+
+        // A document counts as picked up once any player has held it (filing into a folder
+        // requires holding it first). Despawned documents no longer block the verdict.
+        for (int i = _paperworkAwaitingPickup.Count - 1; i >= 0; i--)
+        {
+            PickableObject doc = _paperworkAwaitingPickup[i];
+            if (doc == null || !doc.IsSpawned || doc.IsHeld ||
+                (doc is FolderItem filed && filed.insideThisFolder != null))
+            {
+                _paperworkAwaitingPickup.RemoveAt(i);
+            }
+        }
+
+        return _paperworkAwaitingPickup.Count == 0
+               && Time.time - _paperworkHandedOverTime >= verdictDelayAfterPaperwork;
+    }
+
+    private void Update()
+    {
+        if (!IsServer) return;
+        bool ready = EvaluateVerdictReadyServer();
+        if (_verdictReady.Value != ready)
+            _verdictReady.Value = ready;
+    }
+
     private ulong _currentSuspectNetworkObjectId = ulong.MaxValue;
     private bool _currentSuspectInitialized = false;
 
@@ -1195,6 +1260,9 @@ public class SuspectController : NetworkBehaviour
         if (!paperworkState.DocumentsVisible)
         {
             Debug.LogWarning($"[SuspectController] SpawnPaperwork: aborting — BuildPaperworkState() returned DocumentsVisible=false for '{suspectCharacter.Data.name}' (likely MissingDocumentAnomaly active).");
+            // The hand-over still happened (with nothing in it) — start the verdict timer so the
+            // missing-documents suspect can still be judged.
+            BeginVerdictGateServer();
             return;
         }
 
@@ -1223,6 +1291,8 @@ public class SuspectController : NetworkBehaviour
         applicationLetter.SetPaperworkSuspectServer(suspectCharacter);
         spawnedDocuments.Add(newApplicationForm.GetComponent<PickableObject>());
         OnApplicationFormSpawned?.Invoke(applicationLetter);
+
+        BeginVerdictGateServer(newIDCard.GetComponent<PickableObject>(), newApplicationForm.GetComponent<PickableObject>());
 
         NotifyPaperworkSpawnedClientRpc(
             new NetworkObjectReference(newIDCard),
@@ -2207,6 +2277,17 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     public void DeliverVerdict(FolderController folder)
     {
+        // Reject BEFORE committing the hand-off. OnHandOff flags the folder as handed off, which
+        // permanently blocks FolderController.Interact — a verdict that is then ignored would leave
+        // the folder stuck on the window, unpickable. HandOffPoint already gates on the replicated
+        // IsReadyForVerdict; this is the authoritative re-check (non-host requests are re-checked
+        // in DeliverVerdictServerRpc).
+        if (IsServer && !EvaluateVerdictReadyServer())
+        {
+            Debug.Log("[SuspectController] DeliverVerdict: verdict gate closed (no suspect / paperwork not handed over, delay not elapsed, or documents not picked up) — folder left in place.");
+            return;
+        }
+
         SetCanInteract(false);
         folder.OnHandOff();
 
@@ -2233,6 +2314,15 @@ public class SuspectController : NetworkBehaviour
         if (folder == null)
         {
             Debug.LogError("DeliverVerdictServerRpc: NetworkObject does not have a FolderController.");
+            return;
+        }
+
+        // Gate closed: don't write isHandedOff (which would lock the folder for everyone) and undo
+        // the requesting client's local HandOffRequestedLocally flag.
+        if (!EvaluateVerdictReadyServer())
+        {
+            Debug.Log("[SuspectController] DeliverVerdictServerRpc: verdict gate closed — rejecting hand-off.");
+            folder.RejectHandOffClientRpc();
             return;
         }
 
@@ -2341,6 +2431,8 @@ public class SuspectController : NetworkBehaviour
         // (or clicked in right as the verdict landed) would otherwise stay locked in with the
         // suspect cam latched on and the conversation's subtitles still on screen.
         suspectCharacter.CloseForVerdictServer();
+        // One verdict per suspect: close the gate so a second folder placed while they leave does nothing.
+        _paperworkGateSuspect = null;
         ForceExitDialogueForVerdictClientRpc(suspectCharacter.NetworkObject);
 
         suspectCharacter?.GetComponent<SuspectBarkController>()?.StopBarks();

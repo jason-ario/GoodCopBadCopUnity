@@ -520,6 +520,17 @@ public class FolderController : PickableObject
     }
 
     /// <summary>
+    /// Sent by the server when a client's hand-off request was rejected (no suspect at the
+    /// window yet). Clears the local <see cref="HandOffRequestedLocally"/> guard so the folder can
+    /// be handed off again later; isHandedOff was never written, so the folder stays pickable.
+    /// </summary>
+    [ClientRpc]
+    public void RejectHandOffClientRpc()
+    {
+        HandOffRequestedLocally = false;
+    }
+
+    /// <summary>
     /// Tells the server that this stamped folder is being held back for a deferred verdict
     /// (see <see cref="HandOffPoint.BlockVerdict"/>). <see cref="HandOffPoint.PendingVerdictFolder"/>
     /// is a per-process static, but the deferred delivery is only ever read on the server
