@@ -143,10 +143,14 @@ public partial class LocalizationWindow
 
             int selected = _importRows.Count(r => r.apply);
             int closeCells = _importRows.Count(IsCloseMatch);
-            EditorGUILayout.LabelField($"{selected} of {_importRows.Count} cell(s) selected ({_importRows.Count(r => r.apply && r.sourceMismatch)} flagged).", EditorStyles.boldLabel);
+            int overwrites = _importRows.Count(r => r.apply && !string.IsNullOrEmpty(r.oldValue));
+            EditorGUILayout.LabelField($"{selected} of {_importRows.Count} cell(s) selected ({_importRows.Count(r => r.apply && r.sourceMismatch)} flagged, {overwrites} overwrite existing translations).", EditorStyles.boldLabel);
 
             using (new EditorGUILayout.HorizontalScope())
             {
+                if (GUILayout.Button(new GUIContent("Select all (" + _importRows.Count + ")",
+                        "Every changed cell, including ones that overwrite existing translations and ones with errors or source mismatches. Mismatched cells are applied as drafts marked 'changed'.")))
+                    foreach (var r in _importRows) r.apply = true;
                 if (GUILayout.Button("Select valid")) foreach (var r in _importRows) r.apply = !r.HasError;
                 GUI.enabled = closeCells > 0;
                 if (GUILayout.Button(new GUIContent("Also select close matches (" + closeCells + ")",
