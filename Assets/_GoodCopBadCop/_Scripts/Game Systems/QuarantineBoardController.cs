@@ -49,6 +49,7 @@ public class QuarantineBoardController : MonoBehaviour
         CampaignManager.OnDayChanged              += OnDayChanged;
         SuspectController.OnSuspectQuarantined    += RefreshBoard;
         SuspectRunRecords.OnQuarantineSnapshotApplied += RefreshBoard;
+        Loc.LanguageChanged                       += RefreshBoard;
     }
 
     private void OnDisable()
@@ -56,6 +57,7 @@ public class QuarantineBoardController : MonoBehaviour
         CampaignManager.OnDayChanged              -= OnDayChanged;
         SuspectController.OnSuspectQuarantined    -= RefreshBoard;
         SuspectRunRecords.OnQuarantineSnapshotApplied -= RefreshBoard;
+        Loc.LanguageChanged                       -= RefreshBoard;
     }
 
     private void Start()
@@ -105,7 +107,9 @@ public class QuarantineBoardController : MonoBehaviour
 
         if (_titleText != null)
         {
-            _titleText.text = $"Quarantine {quarantined.Count}/{SuspectRunRecords.QuarantineSlotLimit}";
+            // Translate the word on its own (reuses the existing "Quarantine" sheet row): render-time lookup can't
+            // match "Quarantine 2/5" once the numbers are baked in.
+            _titleText.text = $"{Loc.TranslateSource("Quarantine")} {quarantined.Count}/{SuspectRunRecords.QuarantineSlotLimit}";
         }
     }
 
