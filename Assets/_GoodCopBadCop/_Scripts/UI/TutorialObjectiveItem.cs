@@ -82,7 +82,41 @@ public class TutorialObjectiveItem : MonoBehaviour
     /// <summary>Raised when the row is destroyed (host removes it from ObjectiveListSync).</summary>
     internal Action<TutorialObjectiveItem> Destroyed;
 
-    private void OnDestroy() => Destroyed?.Invoke(this);
+    private void OnDestroy()
+    {
+        Loc.LanguageChanged -= RefreshLanguage;
+        Destroyed?.Invoke(this);
+    }
+
+    // Subscribed for the row's whole lifetime: the objective list hides rows (and itself) while the
+    // pause/settings menu is open, which is exactly when the language is changed.
+    private void Awake() => Loc.LanguageChanged += RefreshLanguage;
+
+    // Rows created inactive only subscribe on first activation, so catch up then.
+    private void OnEnable()
+    {
+        if (!string.IsNullOrEmpty(RawText)) RefreshLanguage();
+    }
+
+    /// <summary>Re-renders the label from <see cref="RawText"/> in the current language (no sound, no sync).</summary>
+    private void RefreshLanguage()
+    {
+        if (label == null || IsShadow) return;
+        label.text = BuildDisplay(RawText);
+        if (_isComplete && _strikethroughRoutine == null && label.isActiveAndEnabled)
+            DrawStrikethroughBars(1f);
+    }
+
+    /// <summary>
+    /// Replaces the text without the progress cue, e.g. a caller re-translating its label after a
+    /// language change. Still publishes the change to <see cref="ObjectiveListSync"/>.
+    /// </summary>
+    public void ReplaceTextSilently(string text)
+    {
+        RawText = text ?? string.Empty;
+        if (label != null) label.text = BuildDisplay(text);
+        StateChanged?.Invoke(this);
+    }
 
     /// <summary>Prefix shown before every objective's text, e.g. "- Talk to Vlad".</summary>
     private const string BulletPrefix = "- ";
@@ -100,7 +134,8 @@ public class TutorialObjectiveItem : MonoBehaviour
     {
         if (string.IsNullOrEmpty(text)) return BulletPrefix;
 
-        string translated = Loc.TranslateSource(text);
+        // TranslateFormatted also resolves English formatted from a "{0}" source ("Process 5 subjects 2/5").
+        string translated = Loc.TranslateFormatted(text);
         if (translated == text)
         {
             var match = ProgressSuffix.Match(text);

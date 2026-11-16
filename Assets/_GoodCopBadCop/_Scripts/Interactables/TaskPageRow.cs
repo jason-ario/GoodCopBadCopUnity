@@ -43,11 +43,14 @@ public class TaskPageRow : MonoBehaviour
     private void OnEnable()
     {
         TaskRegistry.OnTaskStateChanged += Refresh;
+        Loc.LanguageChanged += Refresh;
+        Refresh(); // catches a language change made while the page was hidden
     }
 
     private void OnDisable()
     {
         TaskRegistry.OnTaskStateChanged -= Refresh;
+        Loc.LanguageChanged -= Refresh;
     }
 
     /// <summary>

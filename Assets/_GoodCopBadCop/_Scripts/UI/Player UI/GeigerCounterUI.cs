@@ -173,6 +173,9 @@ public class GeigerCounterUI : MonoBehaviour
             return;
         }
         SubscribeTo(SpectateManager.HudSubject);
+        // The HUD is hidden while the pause/settings menu is open, so a language change made there
+        // arrives while this is disabled; the band-change check in SubscribeTo would skip the rewrite.
+        RefreshValueText(force: true);
     }
 
     private void OnLanguageChanged() => RefreshValueText(force: true);

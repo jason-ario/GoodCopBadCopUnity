@@ -2389,8 +2389,10 @@ public class Day_01 : DayBase
         }
     }
 
+    // English on purpose: the objective row translates it per language (Loc.TranslateFormatted).
     private string GetSubjectCountText() =>
-        Loc.T("Process {0} subjects {1}/{2}", SubjectsToProcess, _subjectProcessedCount, SubjectsToProcess);
+        string.Format(System.Globalization.CultureInfo.InvariantCulture,
+            Loc.N("Process {0} subjects {1}/{2}"), SubjectsToProcess, _subjectProcessedCount, SubjectsToProcess);
 
     private IEnumerator StartClosingDialogue()
     {
@@ -3480,7 +3482,7 @@ public class Day_01 : DayBase
         int defeated = Mathf.Clamp(_lastBreachTotal - _lastBreachRemaining, 0, _lastBreachTotal);
         _taskRepelMutants.SetText(_lastBreachRemaining > 0
             ? $"{_taskRepelMutantsText} ({defeated}/{_lastBreachTotal})"
-            : Loc.T("{0} — all clear!", Loc.TranslateSource(_taskRepelMutantsText)));
+            : string.Format(Loc.N("{0} — all clear!"), _taskRepelMutantsText)); // translated per language by the row
     }
 
     /// <summary>

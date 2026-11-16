@@ -236,36 +236,110 @@ public class Subtitles : MonoBehaviour
             textReveal.SetTextInstant(formattedText);
     }
 
-    private string WrapText(string text, int maxChars)
+    /// <summary>
+    /// Inserts line breaks so no line exceeds <paramref name="maxChars"/> half-width units. The bar's
+    /// ContentSizeFitter sizes to the text's preferred width, so TMP never wraps on its own: these
+    /// manual breaks are the only wrapping. Full-width characters (CJK, kana, Hangul, full-width
+    /// punctuation) count as 2 units. Lines break at spaces, and also between Chinese/Japanese
+    /// characters (which have no spaces), following basic kinsoku rules: no line starts with closing
+    /// punctuation or small kana, and none ends with opening brackets. Korean keeps breaking at spaces.
+    /// Rich-text tags (keyword emphasis) have no width and are never split.
+    /// </summary>
+    private static string WrapText(string text, int maxChars)
     {
-        // Measure rendered length only, so rich-text tags (keyword emphasis) don't cause early wraps.
-        if (string.IsNullOrEmpty(text) || DialogueKeywordMarkup.VisibleLength(text) <= maxChars)
-            return text;
+        if (string.IsNullOrEmpty(text) || maxChars <= 0) return text;
 
-        StringBuilder sb = new StringBuilder();
-        string[] words = text.Split(' ');
-        int currentLineLength = 0;
+        var sb = new StringBuilder(text.Length + 8);
+        int lineWidth = 0;
+        int breakAt = -1;           // index in sb where a break may go
+        bool breakReplaces = false; // true when sb[breakAt] is a space to turn into the newline
+        int widthAfterBreak = 0;    // visible width written after breakAt
+        char prev = '\0';           // previous visible character on this line
 
-        foreach (string word in words)
+        for (int i = 0; i < text.Length; i++)
         {
-            int wordLength = DialogueKeywordMarkup.VisibleLength(word);
-            if (currentLineLength + wordLength + 1 > maxChars)
+            char c = text[i];
+
+            if (c == '<')
             {
-                sb.Append('\n');
-                currentLineLength = 0;
-            }
-            else if (currentLineLength > 0)
-            {
-                sb.Append(' ');
-                currentLineLength++;
+                int close = text.IndexOf('>', i);
+                if (close > i)
+                {
+                    sb.Append(text, i, close - i + 1);
+                    i = close;
+                    continue;
+                }
             }
 
-            sb.Append(word);
-            currentLineLength += wordLength;
+            if (c == '\n')
+            {
+                sb.Append(c);
+                lineWidth = 0;
+                breakAt = -1;
+                prev = '\0';
+                continue;
+            }
+
+            if (c == ' ')
+            {
+                breakAt = sb.Length;
+                breakReplaces = true;
+                widthAfterBreak = 0;
+                sb.Append(c);
+                lineWidth++;
+                prev = c;
+                continue;
+            }
+
+            if (prev != '\0' && prev != ' ' && (BreaksAnywhere(prev) || BreaksAnywhere(c)) &&
+                NoLineStart.IndexOf(c) < 0 && NoLineEnd.IndexOf(prev) < 0)
+            {
+                breakAt = sb.Length;
+                breakReplaces = false;
+                widthAfterBreak = 0;
+            }
+
+            int w = IsFullWidth(c) ? 2 : 1;
+            if (lineWidth + w > maxChars && breakAt >= 0)
+            {
+                if (breakReplaces) sb[breakAt] = '\n';
+                else sb.Insert(breakAt, '\n');
+                lineWidth = widthAfterBreak;
+                breakAt = -1;
+            }
+
+            sb.Append(c);
+            lineWidth += w;
+            widthAfterBreak += w;
+            prev = c;
         }
 
         return sb.ToString();
     }
+
+    /// <summary>Closing punctuation, prolonged sound mark and small kana: never start a line (kinsoku).</summary>
+    private const string NoLineStart =
+        "、。，．・：；？！‼⁇⁈⁉ー〜～゛゜ヽヾゝゞ々〻）」』】〕〉》〙〗］｝｠’”…‥" +
+        "ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ" +
+        ")]}!?,.:;%";
+
+    /// <summary>Opening brackets and quotes: never end a line.</summary>
+    private const string NoLineEnd = "（「『【〔〈《〘〖［｛｟‘“([{";
+
+    /// <summary>Visually double-width characters: CJK, kana, Hangul and full-width forms.</summary>
+    private static bool IsFullWidth(char c) =>
+        (c >= '\u1100' && c <= '\u115F') ||
+        (c >= '\u2E80' && c <= '\uA4CF') ||
+        (c >= '\uAC00' && c <= '\uD7A3') ||
+        (c >= '\uF900' && c <= '\uFAFF') ||
+        (c >= '\uFE30' && c <= '\uFE4F') ||
+        (c >= '\uFF00' && c <= '\uFF60') ||
+        (c >= '\uFFE0' && c <= '\uFFE6');
+
+    /// <summary>Scripts written without spaces (Chinese, Japanese) may break between any two characters. Hangul breaks at spaces.</summary>
+    private static bool BreaksAnywhere(char c) =>
+        IsFullWidth(c) && !(c >= '\u1100' && c <= '\u115F') && !(c >= '\uAC00' && c <= '\uD7A3') &&
+        !(c >= '\u3130' && c <= '\u318F');
 
     void OnValidate()
     {

@@ -17,7 +17,7 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private GameObject menuBackground;
     [SerializeField] private GameObject menuHeader;
 
-    private const string LobbyCodePrefix = "LOBBY CODE: ";
+    private static string LobbyCodeFormat => Loc.N("LOBBY CODE: {0}");
     private const string ReturnToMainMenuTitle = "Return to main menu?";
     private const string ReturnToMainMenuBody = "Current shift progress may be lost.";
     private const string QuitGameTitle = "Quit game?";
@@ -52,6 +52,7 @@ public class PauseMenuController : MonoBehaviour
         LayoutRebuilder.ForceRebuildLayoutImmediate(rootRectTransform);
         BackToMainMenu();
         RefreshLobbyCode();
+        Loc.LanguageChanged += OnLanguageChanged;
     }
 
     /// <summary>
@@ -74,6 +75,7 @@ public class PauseMenuController : MonoBehaviour
 
     private void OnDisable()
     {
+        Loc.LanguageChanged -= OnLanguageChanged;
         HideTransientPanels();
     }
 
@@ -88,9 +90,13 @@ public class PauseMenuController : MonoBehaviour
         if (hasLobby)
         {
             string joinCode = LobbyManager.Instance.CurrentJoinCode;
-            lobbyCodeText.text = LobbyCodePrefix + joinCode;
+            // Verbatim: the join code must never be run through render-time localization.
+            lobbyCodeText.text = Loc.Verbatim(Loc.T(LobbyCodeFormat, joinCode));
         }
     }
+
+    // The language is usually changed from Settings while this menu stays enabled.
+    private void OnLanguageChanged() => RefreshLobbyCode();
 
     private void SetPauseMenuShellVisible(bool visible)
     {

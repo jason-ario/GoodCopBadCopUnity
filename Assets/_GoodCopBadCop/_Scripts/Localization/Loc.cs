@@ -101,6 +101,8 @@ public static class Loc
         _language = null;
         _initialized = false;
         _sourceIndex = null;
+        _templates = null;
+        _templatesTable = null;
         Warned.Clear();
         PseudoCache.Clear();
         RenderCache.Clear();
@@ -558,6 +560,101 @@ public static class Loc
 
         return IsPseudoAvailable(_language) ? PseudoOf(english) : english;
     }
+
+    private sealed class Template
+    {
+        public System.Text.RegularExpressions.Regex Pattern;
+        public LocEntry Entry;
+        public int ArgCount;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex PlaceholderRx =
+        new System.Text.RegularExpressions.Regex(@"\{(\d+)(?:[,:][^}]*)?\}");
+
+    private static List<Template> _templates;
+
+    /// <summary>
+    /// Like <see cref="TranslateSource"/>, but also resolves text formatted in English from a parameterized source
+    /// ("Process 5 subjects 2/5" from "Process {0} subjects {1}/{2}"). Captured arguments are translated on their own
+    /// when they are known sources. Lets callers keep language-neutral English text (synced rows, cached labels) and
+    /// re-translate it whenever the language changes.
+    /// </summary>
+    public static string TranslateFormatted(string english)
+    {
+        Init();
+        if (string.IsNullOrEmpty(english) || _language == SourceLanguage) return english;
+        if (english.IndexOf(Marker, StringComparison.Ordinal) >= 0) return english;
+
+        string direct = TranslateSource(english);
+        if (direct != english) return direct;
+        if (IsPseudoAvailable(_language) || !_table.languages.Contains(_language)) return english;
+
+        EnsureTemplates();
+        string text = NormalizeNewlines(english).Trim();
+        foreach (var t in _templates)
+        {
+            var m = t.Pattern.Match(text);
+            if (!m.Success) continue;
+            var args = new object[t.ArgCount];
+            for (int i = 0; i < t.ArgCount; i++)
+            {
+                var g = m.Groups["a" + i];
+                args[i] = g.Success ? TranslateSource(g.Value) : string.Empty;
+            }
+            try { return string.Format(Culture, Resolve(t.Entry, false), args); }
+            catch (FormatException) { return english; }
+        }
+        return english;
+    }
+
+    private static void EnsureTemplates()
+    {
+        if (_templates != null && ReferenceEquals(_templatesTable, _table)) return;
+        _templatesTable = _table;
+        _templates = new List<Template>();
+        var seen = new HashSet<string>();
+        foreach (var e in _table.entries)
+        {
+            if (string.IsNullOrEmpty(e.source) || IsLookupOnlySheet(e.sheet)) continue;
+            string src = NormalizeNewlines(e.source).Trim();
+            var holders = PlaceholderRx.Matches(src);
+            if (holders.Count == 0 || !seen.Add(src)) continue;
+
+            var sb = new StringBuilder("^");
+            var used = new HashSet<int>();
+            int last = 0, maxIndex = -1, literal = 0;
+            foreach (System.Text.RegularExpressions.Match h in holders)
+            {
+                string piece = src.Substring(last, h.Index - last);
+                literal += piece.Trim().Length;
+                sb.Append(System.Text.RegularExpressions.Regex.Escape(piece));
+                int index = int.Parse(h.Groups[1].Value, CultureInfo.InvariantCulture);
+                // A repeated placeholder must match the same text as its first occurrence.
+                sb.Append(used.Add(index) ? "(?<a" + index + ">.+?)" : "\\k<a" + index + ">");
+                maxIndex = Math.Max(maxIndex, index);
+                last = h.Index + h.Length;
+            }
+            string tail = src.Substring(last);
+            literal += tail.Trim().Length;
+            sb.Append(System.Text.RegularExpressions.Regex.Escape(tail)).Append(EndAnchor);
+
+            // "{0}" or "{0}{1}" alone would match any text.
+            if (literal == 0) continue;
+            _templates.Add(new Template
+            {
+                Pattern = new System.Text.RegularExpressions.Regex(sb.ToString(), System.Text.RegularExpressions.RegexOptions.Singleline),
+                Entry = e,
+                ArgCount = maxIndex + 1,
+            });
+        }
+        // Most specific (longest literal text) first, so "{0} — all clear!" can't shadow a longer template.
+        _templates.Sort((a, b) => b.Pattern.ToString().Length.CompareTo(a.Pattern.ToString().Length));
+    }
+
+    private static LocalizationTable _templatesTable;
+
+    /// <summary>Regex end-of-input anchor.</summary>
+    private const char EndAnchor = '\u0024';
 
     private static string PseudoOf(string english)
     {

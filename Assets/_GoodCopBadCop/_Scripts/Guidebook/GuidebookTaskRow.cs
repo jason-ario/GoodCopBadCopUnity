@@ -25,16 +25,18 @@ public class GuidebookTaskRow : MonoBehaviour
     private void OnEnable()
     {
         TaskRegistry.OnTaskStateChanged += OnTaskStateChanged;
+        Loc.LanguageChanged += OnTaskStateChanged;
         Debug.Log($"[GuidebookTaskRow] Subscribed to OnTaskStateChanged. Threat: {_threat?.ThreatName ?? "none"}", this);
 
-        // Re-sync in case the threat level changed while the panel was closed.
+        // Re-sync in case the threat level or language changed while the panel was closed.
         if (_threat != null)
-            SetHighThreat(_threat.ThreatLevel >= 0.5f);
+            Bind(_threat);
     }
 
     private void OnDisable()
     {
         TaskRegistry.OnTaskStateChanged -= OnTaskStateChanged;
+        Loc.LanguageChanged -= OnTaskStateChanged;
     }
 
     /// <summary>Populates all row fields from the given threat and syncs the high-threat indicator.</summary>

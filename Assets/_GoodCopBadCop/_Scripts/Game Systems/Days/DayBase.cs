@@ -298,8 +298,11 @@ public abstract class DayBase : MonoBehaviour
         _autoSubjectCounterTask = null;
     }
 
+    // English on purpose: the objective row translates it (and re-translates on language change) via
+    // Loc.TranslateFormatted, and the English text is what ObjectiveListSync mirrors to clients.
     private static string GetAutomaticSubjectCounterText(int processed, int total) =>
-        Loc.T("Process {0} subjects {1}/{2}", total, Mathf.Min(processed, total), total);
+        string.Format(System.Globalization.CultureInfo.InvariantCulture,
+            Loc.N("Process {0} subjects {1}/{2}"), total, Mathf.Min(processed, total), total);
 
     // -------------------------------------------------------------------------
     // C# Events — subscribe from external systems or day subclasses

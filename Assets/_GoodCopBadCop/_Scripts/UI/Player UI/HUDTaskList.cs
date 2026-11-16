@@ -44,12 +44,22 @@ public class HUDTaskList : MonoBehaviour
     {
         TaskRegistry.OnTaskListChanged += Rebuild;
         TaskRegistry.OnTaskStateChanged += RefreshLabels;
+        Loc.LanguageChanged += RelabelForLanguage;
     }
 
     private void OnDestroy()
     {
         TaskRegistry.OnTaskListChanged -= Rebuild;
         TaskRegistry.OnTaskStateChanged -= RefreshLabels;
+        Loc.LanguageChanged -= RelabelForLanguage;
+    }
+
+    /// <summary>Rows hold already-translated labels, so rebuild them in the new language (without the progress cue).</summary>
+    private void RelabelForLanguage()
+    {
+        foreach (KeyValuePair<ISystemicThreat, TutorialObjectiveItem> kvp in _rows)
+            if (kvp.Value != null)
+                kvp.Value.ReplaceTextSilently(BuildLabel(kvp.Key));
     }
 
     private void OnEnable() => Rebuild();
