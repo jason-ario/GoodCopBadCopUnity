@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using TMPro;
+using UnityEngine.TextCore.LowLevel;
 
 public enum IssueSeverity { Warning, Error }
 
@@ -85,15 +86,47 @@ public static class LocalizationValidator
         return new LocIssue { severity = IssueSeverity.Error, code = "maxchars", message = len + " characters, limit is " + maxChars + " (over by " + (len - maxChars) + ")." };
     }
 
+    /// <summary>
+    /// Characters of <paramref name="text"/> that neither the font, its fallback chain, nor the global TMP fallbacks can draw.
+    /// Dynamic font assets are checked against their source font file, not just the glyphs already baked into the atlas
+    /// (a cleared dynamic atlas holds no characters until runtime). Read-only: never adds glyphs to an atlas.
+    /// </summary>
     public static string MissingGlyphs(TMP_FontAsset font, string text)
     {
         var missing = new List<char>();
+        if (font == null || string.IsNullOrEmpty(text)) return "";
+        var globalFallbacks = TMP_Settings.instance != null ? TMP_Settings.fallbackFontAssets : null;
         foreach (char c in text.Distinct())
         {
-            if (char.IsControl(c) || char.IsWhiteSpace(c)) continue;
-            if (!font.HasCharacter(c, true)) missing.Add(c);
+            if (char.IsControl(c) || char.IsWhiteSpace(c) || char.IsSurrogate(c)) continue;
+            var visited = new HashSet<TMP_FontAsset>();
+            if (HasGlyph(font, c, visited)) continue;
+            bool found = false;
+            if (globalFallbacks != null)
+                foreach (var fb in globalFallbacks)
+                    if (HasGlyph(fb, c, visited)) { found = true; break; }
+            if (!found) missing.Add(c);
         }
         return new string(missing.ToArray());
+    }
+
+    private static bool HasGlyph(TMP_FontAsset font, uint unicode, HashSet<TMP_FontAsset> visited)
+    {
+        if (font == null || !visited.Add(font)) return false;
+        var table = font.characterLookupTable;
+        if (table != null && table.ContainsKey(unicode)) return true;
+        if (font.atlasPopulationMode != AtlasPopulationMode.Static && SourceHasGlyph(font.sourceFontFile, unicode)) return true;
+        if (font.fallbackFontAssetTable != null)
+            foreach (var fb in font.fallbackFontAssetTable)
+                if (HasGlyph(fb, unicode, visited)) return true;
+        return false;
+    }
+
+    private static bool SourceHasGlyph(UnityEngine.Font sourceFont, uint unicode)
+    {
+        if (sourceFont == null) return false;
+        if (FontEngine.LoadFontFace(sourceFont) != FontEngineError.Success) return false;
+        return FontEngine.TryGetGlyphIndex(unicode, out uint glyphIndex) && glyphIndex != 0;
     }
 
     private static void CompareMultiset(List<PseudoSegment> a, List<PseudoSegment> b, PseudoSegmentKind kind, string code, List<LocIssue> issues)
