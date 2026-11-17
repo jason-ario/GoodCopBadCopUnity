@@ -95,9 +95,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
     [Tooltip("Maximum downward velocity while underwater (must be negative).")]
     [SerializeField] private float underwaterTerminalVelocity = -3f;
     [Tooltip("Target upward velocity reached when holding Jump underwater.")]
-    [SerializeField] private float underwaterSwimUpSpeed = 3f;
+    [SerializeField] private float underwaterSwimUpSpeed = 6f;
     [Tooltip("How quickly vertical velocity ramps toward swim speed when Jump is held.")]
-    [SerializeField] private float underwaterSwimAcceleration = 8f;
+    [SerializeField] private float underwaterSwimAcceleration = 16f;
 
     private bool _isUnderwater;
 

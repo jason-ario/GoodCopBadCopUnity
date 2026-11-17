@@ -139,8 +139,9 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
-    /// Server-written, permanent close-out set the moment this suspect hands off to full-mutant
-    /// behaviour (booth window attack or legacy world spawn). A full mutant is a hostile threat,
+    /// Server-written, permanent close-out set the moment this suspect's full-mutant form is
+    /// activated (<see cref="ActivateFullMutantForm"/> — before walk-in, the settle beat and the
+    /// mutant speech), and again on hand-off to mutant behaviour. A full mutant is a hostile threat,
     /// not a suspect — no player can start or rejoin any dialogue with them (intro, question
     /// choices, scripted rejoin) and the reticle can't target them. Only junk collection after
     /// death remains. Networked because <see cref="_isMutant"/> is server-only.
@@ -335,6 +336,13 @@ public class SuspectCharacter : Interactable
     public void ActivateFullMutantForm()
     {
         _fullMutantFormActive = true;
+
+        // A full mutant only delivers its mutant speech and then attacks — it is never talkable,
+        // not even between arriving at the window and the speech starting (settle beat), or by
+        // rejoining the speech. Close it out now rather than waiting for BeginMutantBehavior.
+        if (IsServer || !IsSpawned)
+            _mutantInteractionClosed.Value = true;
+
         if (_baseVersion != null) _baseVersion.SetActive(false);
         if (_mutatedVersion != null) _mutatedVersion.SetActive(true);
 
@@ -2537,6 +2545,30 @@ public class SuspectCharacter : Interactable
 
         if (animator != null && !string.IsNullOrEmpty(hitAnimTrigger))
             animator.SetTrigger(hitAnimTrigger);
+    }
+
+    /// <summary>
+    /// SERVER ONLY. Cosmetic blood spray when a player weapon strikes this character's corpse —
+    /// the same hit particle a living subject bleeds, without the hit-reaction animation. No-op
+    /// while alive.
+    /// </summary>
+    public void PlayCorpseHitEffect(Vector3 hitPoint)
+    {
+        if (!IsServer || !_isDead || hitParticlePrefab == null)
+            return;
+
+        SpawnCorpseHitParticleClientRpc(hitPoint);
+    }
+
+    [ClientRpc]
+    private void SpawnCorpseHitParticleClientRpc(Vector3 hitPoint)
+    {
+        if (hitParticlePrefab == null)
+            return;
+
+        GameObject fx = Instantiate(hitParticlePrefab, hitPoint, Quaternion.identity);
+        if (fx.GetComponentInChildren<AutoDestroy>() == null)
+            fx.AddComponent<AutoDestroy>();
     }
 
     /// <summary>

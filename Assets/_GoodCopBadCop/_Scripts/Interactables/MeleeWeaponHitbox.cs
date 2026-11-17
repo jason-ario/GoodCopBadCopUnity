@@ -241,11 +241,13 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 return HitKind.Mutant;
             }
 
+            // Dead bodies are reported too (death state is server-only); the server turns a hit on a
+            // corpse into a cosmetic blood spray.
             SuspectCharacter suspect = col.GetComponentInParent<SuspectCharacter>();
-            if (suspect != null && !suspect.IsDead)
+            if (suspect != null)
             {
-                Vector3 suspectPoint = col.ClosestPoint(attackOrigin);
-                if (checkLineOfSight && !HasLineOfSight(eye, suspectPoint, col, suspect))
+                Vector3 suspectPoint = SafeClosestPoint(col, attackOrigin);
+                if (checkLineOfSight && !TryFindVisibleBodyPoint(eye, attackOrigin, col, suspect, ref suspectPoint))
                     continue;
 
                 target   = suspect;
@@ -256,13 +258,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             // Check for a fellow player hit (friendly fire).
             if (root.CompareTag(PlayerTag))
             {
-                // Skip the player who is swinging this weapon.
-                NetworkObject playerNetObj = col.GetComponentInParent<NetworkObject>();
-                if (playerNetObj != null && playerNetObj.OwnerClientId == localClientId)
-                    continue;
-
                 PlayerHealth playerHealth = col.GetComponentInParent<PlayerHealth>();
                 if (playerHealth == null)
+                    continue;
+
+                // Skip the player who is swinging this weapon. A dead body is always hittable
+                // (cosmetic blood only) — after a revive the old corpse is server-owned.
+                NetworkObject playerNetObj = col.GetComponentInParent<NetworkObject>();
+                if (playerNetObj != null && playerNetObj.OwnerClientId == localClientId && !playerHealth.IsDead)
                     continue;
 
                 Vector3 playerPoint = col.ClosestPoint(attackOrigin);
@@ -362,6 +365,33 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     private static readonly RaycastHit[] LineOfSightBuffer = new RaycastHit[32];
 
     /// <summary>
+    /// Line-of-sight test against a body that tolerates furniture. A seated suspect (or one behind
+    /// the booth counter) has a tall capsule whose point closest to the weapon often sits below the
+    /// desk top, so the eye ray to it is blocked even though the torso is plainly visible. Tries
+    /// the closest point first, then points on the body's centre line (swing height, centre, chest).
+    /// All samples lie on the target itself, so walls, glass and shutters still block the swing.
+    /// On success <paramref name="point"/> is the first visible sample.
+    /// </summary>
+    private bool TryFindVisibleBodyPoint(Vector3 eye, Vector3 attackOrigin, Collider col, Component owner, ref Vector3 point)
+    {
+        if (HasLineOfSight(eye, point, col, owner))
+            return true;
+
+        Bounds b = col.bounds;
+        float swingHeight = Mathf.Clamp(attackOrigin.y, b.min.y, b.max.y);
+
+        Vector3 atSwingHeight = new Vector3(b.center.x, swingHeight, b.center.z);
+        if (HasLineOfSight(eye, atSwingHeight, col, owner)) { point = atSwingHeight; return true; }
+
+        if (HasLineOfSight(eye, b.center, col, owner)) { point = b.center; return true; }
+
+        Vector3 chest = new Vector3(b.center.x, Mathf.Lerp(b.min.y, b.max.y, 0.75f), b.center.z);
+        if (HasLineOfSight(eye, chest, col, owner)) { point = chest; return true; }
+
+        return false;
+    }
+
+    /// <summary>
     /// True when nothing solid sits between the swinger's <paramref name="eye"/> and
     /// <paramref name="point"/> on the candidate. Blockers are static/kinematic world geometry,
     /// intact booth glass, and the closed rolling shutter (which has no collider, so it is tested
@@ -369,8 +399,12 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     /// </summary>
     private bool HasLineOfSight(Vector3 eye, Vector3 point, Collider targetCollider, Component targetOwner)
     {
+        // The shutter-line test is for reaching THROUGH the window (things beyond it). When the target
+        // is the pane itself, skip it: the pane's colliders extend past its centre plane toward the
+        // shutter, so a swing from inside would always "cross" the plane and be wrongly blocked.
+        // Which side the closed shutter shields is decided by BreakableGlassController.IsShieldedFrom.
         BreakableGlassController booth = BreakableGlassController.Instance;
-        if (booth != null && booth.IsLineBlockedByShutter(eye, point))
+        if (booth != null && !ReferenceEquals(targetOwner, booth) && booth.IsLineBlockedByShutter(eye, point))
             return false;
 
         Vector3 delta = point - eye;
@@ -478,6 +512,12 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 MutantEnemy enemy = FindOn<MutantEnemy>(targetObj);
                 if (enemy == null) return;
 
+                if (enemy.IsDead)
+                {
+                    enemy.PlayCorpseHitEffect(hitPoint);
+                    break;
+                }
+
                 // Knockback direction comes from the swing the CLIENT reported, so the shove always
                 // matches the angle the player actually struck from.
                 Vector3 knockbackDirection = hitPoint - attackOrigin;
@@ -489,7 +529,13 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             case HitKind.Suspect:
             {
                 SuspectCharacter suspect = FindOn<SuspectCharacter>(targetObj);
-                if (suspect == null || suspect.IsDead) return;
+                if (suspect == null) return;
+
+                if (suspect.IsDead)
+                {
+                    suspect.PlayCorpseHitEffect(hitPoint);
+                    break;
+                }
 
                 suspect.TakeDamage(damage, hitPoint);
                 Debug.Log($"[MeleeWeaponHitbox] Client {senderClientId} hit suspect '{suspect.name}' for {damage} damage.", this);
@@ -498,11 +544,18 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
             case HitKind.Player:
             {
-                // Never let a swing hurt the player who threw it, whatever the client claims.
-                if (targetObj.OwnerClientId == senderClientId) return;
-
                 PlayerHealth playerHealth = FindOn<PlayerHealth>(targetObj);
                 if (playerHealth == null) return;
+
+                // Corpse hits are cosmetic only, so they skip the self-hit guard below.
+                if (playerHealth.IsDead)
+                {
+                    playerHealth.PlayCorpseHitEffect(hitPoint);
+                    break;
+                }
+
+                // Never let a swing hurt the player who threw it, whatever the client claims.
+                if (targetObj.OwnerClientId == senderClientId) return;
 
                 playerHealth.TakeDamage(damage, EffectKeys.FriendlyMeleeDamage, hitPoint);
                 Debug.Log($"[MeleeWeaponHitbox] Friendly fire: client {senderClientId} hit player '{targetObj.name}' for {damage} damage.", this);

@@ -263,10 +263,11 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
                 continue;
             }
 
-            // Living subjects / world NPCs (Soldier, Vlad, guards). Shots are harmless: they only
-            // trigger a flinch on the server (see SuspectCharacter.PlayHarmlessHitReaction).
+            // Subjects / world NPCs (Soldier, Vlad, guards). Shots are harmless: they only trigger a
+            // flinch on the server (see SuspectCharacter.PlayHarmlessHitReaction), or a blood spray
+            // on a corpse. Death state is server-only, so dead bodies are reported too.
             SuspectCharacter suspect = hit.collider.GetComponentInParent<SuspectCharacter>();
-            if (suspect != null && !suspect.IsDead && suspect.NetworkObject != null)
+            if (suspect != null && suspect.NetworkObject != null)
                 return new FireHit(ShotKind.Suspect, new NetworkObjectReference(suspect.NetworkObject), hit.point);
 
             // An irrelevant trigger (interaction zone, click detector, task area, etc.) — bullets
@@ -284,8 +285,11 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
                 NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
                 PlayerHealth playerHealth  = hit.collider.GetComponentInParent<PlayerHealth>();
 
-                // Skip the shooter's own body so hitting yourself never registers damage.
-                if (playerNetObj != null && playerHealth != null && playerNetObj.OwnerClientId != localClientId)
+                // Skip the shooter's own living body so hitting yourself never registers damage.
+                // A dead body is always hittable (cosmetic blood only) — after a revive the old
+                // corpse is server-owned, which would otherwise read as the host's own body.
+                if (playerNetObj != null && playerHealth != null
+                    && (playerNetObj.OwnerClientId != localClientId || playerHealth.IsDead))
                     return new FireHit(ShotKind.Player, new NetworkObjectReference(playerNetObj), hit.point);
 
                 return new FireHit(ShotKind.None, default, hit.point);
@@ -451,24 +455,39 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         if (kind == ShotKind.Mutant)
         {
             MutantEnemy enemy = targetObj.GetComponent<MutantEnemy>() ?? targetObj.GetComponentInChildren<MutantEnemy>();
-            enemy?.TakeDamage(_damage, hitPoint, knockbackDirection: rayDirection);
+            if (enemy == null) return;
+
+            if (enemy.IsDead) enemy.PlayCorpseHitEffect(hitPoint);
+            else              enemy.TakeDamage(_damage, hitPoint, knockbackDirection: rayDirection);
             return;
         }
 
         if (kind == ShotKind.Suspect)
         {
             SuspectCharacter suspect = targetObj.GetComponent<SuspectCharacter>() ?? targetObj.GetComponentInChildren<SuspectCharacter>();
-            suspect?.PlayHarmlessHitReaction(hitPoint);
+            if (suspect == null) return;
+
+            if (suspect.IsDead) suspect.PlayCorpseHitEffect(hitPoint);
+            else                suspect.PlayHarmlessHitReaction(hitPoint);
             return;
         }
 
         if (kind == ShotKind.Player)
         {
+            PlayerHealth playerHealth = targetObj.GetComponent<PlayerHealth>() ?? targetObj.GetComponentInChildren<PlayerHealth>();
+            if (playerHealth == null) return;
+
+            // Corpse hits are cosmetic only, so they skip the self-hit guard below.
+            if (playerHealth.IsDead)
+            {
+                playerHealth.PlayCorpseHitEffect(hitPoint);
+                return;
+            }
+
             // Never let a shot hurt the shooter, whatever the client claims.
             if (targetObj.OwnerClientId == shooterClientId) return;
 
-            PlayerHealth playerHealth = targetObj.GetComponent<PlayerHealth>() ?? targetObj.GetComponentInChildren<PlayerHealth>();
-            playerHealth?.TakeDamage(_damage, EffectKeys.FriendlyGunshotDamage, hitPoint);
+            playerHealth.TakeDamage(_damage, EffectKeys.FriendlyGunshotDamage, hitPoint);
         }
     }
 

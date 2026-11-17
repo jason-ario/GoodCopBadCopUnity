@@ -175,7 +175,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             // locally could deal little or nothing. See FireServerRpc.
             ResolveBlast(cam.transform.position, cam.transform.forward,
                 out NetworkObjectReference[] mutantRefs, out int[] mutantPellets, out Vector3[] mutantPelletPoints,
-                out NetworkObjectReference[] playerRefs, out int[] playerPellets,
+                out NetworkObjectReference[] playerRefs, out int[] playerPellets, out Vector3[] playerPoints,
                 out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
                 out bool hitGlass, out Vector3[] propPoints, out Vector3[] pelletEndPoints);
 
@@ -187,7 +187,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 HittableProp.TryHitAt(point, cam.transform.forward);
 
             FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, mutantPelletPoints, playerRefs, playerPellets,
-                suspectRefs, suspectPoints, hitGlass, propPoints, pelletEndPoints);
+                playerPoints, suspectRefs, suspectPoints, hitGlass, propPoints, pelletEndPoints);
         }
     }
 
@@ -201,12 +201,13 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     /// </summary>
     private void ResolveBlast(Vector3 rayOrigin, Vector3 rayDirection,
         out NetworkObjectReference[] mutantRefs, out int[] mutantPellets, out Vector3[] mutantPelletPoints,
-        out NetworkObjectReference[] playerRefs, out int[] playerPellets,
+        out NetworkObjectReference[] playerRefs, out int[] playerPellets, out Vector3[] playerPoints,
         out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
         out bool hitGlass, out Vector3[] propPoints, out Vector3[] pelletEndPoints)
     {
         Dictionary<NetworkObject, List<Vector3>> mutantHits = new();
         Dictionary<NetworkObject, int> playerHits = new();
+        Dictionary<NetworkObject, Vector3> playerFirstPoints = new();
         Dictionary<NetworkObject, Vector3> suspectHits = new();
         Dictionary<HittableProp, Vector3> propHits = new();
         hitGlass = false;
@@ -265,9 +266,10 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                     break;
                 }
 
-                // Living subjects / world NPCs (Soldier, Vlad, guards) — harmless flinch only.
+                // Subjects / world NPCs (Soldier, Vlad, guards) — harmless flinch, or blood on a
+                // corpse. Death state is server-only, so dead bodies are reported too.
                 SuspectCharacter suspect = hit.collider.GetComponentInParent<SuspectCharacter>();
-                if (suspect != null && !suspect.IsDead && suspect.NetworkObject != null)
+                if (suspect != null && suspect.NetworkObject != null)
                 {
                     pelletEndPoints[i] = hit.point;
                     if (!suspectHits.ContainsKey(suspect.NetworkObject))
@@ -292,14 +294,19 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 if (root.CompareTag("Player"))
                 {
                     NetworkObject playerNetObj = hit.collider.GetComponentInParent<NetworkObject>();
-                    if (playerNetObj == null || playerNetObj.OwnerClientId == localClientId)
+                    PlayerHealth hitPlayerHealth = hit.collider.GetComponentInParent<PlayerHealth>();
+                    if (playerNetObj == null || hitPlayerHealth == null)
                         break;
 
-                    if (hit.collider.GetComponentInParent<PlayerHealth>() != null)
-                    {
-                        playerHits.TryGetValue(playerNetObj, out int pCount);
-                        playerHits[playerNetObj] = pCount + 1;
-                    }
+                    // Skip the shooter's own living body. A dead body is always hittable (cosmetic
+                    // blood only) — after a revive the old corpse is server-owned.
+                    if (playerNetObj.OwnerClientId == localClientId && !hitPlayerHealth.IsDead)
+                        break;
+
+                    playerHits.TryGetValue(playerNetObj, out int pCount);
+                    playerHits[playerNetObj] = pCount + 1;
+                    if (!playerFirstPoints.ContainsKey(playerNetObj))
+                        playerFirstPoints[playerNetObj] = hit.point;
                     break;
                 }
 
@@ -324,6 +331,11 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
         MutantHitsToArrays(mutantHits, out mutantRefs, out mutantPellets, out mutantPelletPoints);
         ToArrays(playerHits, out playerRefs, out playerPellets);
+
+        playerPoints = new Vector3[playerRefs.Length];
+        int pp = 0;
+        foreach (var kvp in playerHits)
+            playerPoints[pp++] = playerFirstPoints.TryGetValue(kvp.Key, out Vector3 firstPoint) ? firstPoint : kvp.Key.transform.position;
 
         propPoints = new Vector3[propHits.Count];
         propHits.Values.CopyTo(propPoints, 0);
@@ -441,7 +453,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     [ServerRpc(RequireOwnership = false)]
     private void FireServerRpc(Vector3 rayDirection,
         NetworkObjectReference[] mutantRefs, int[] mutantPellets, Vector3[] mutantPelletPoints,
-        NetworkObjectReference[] playerRefs, int[] playerPellets,
+        NetworkObjectReference[] playerRefs, int[] playerPellets, Vector3[] playerPoints,
         NetworkObjectReference[] suspectRefs, Vector3[] suspectPoints,
         bool hitGlass, Vector3[] propPoints, Vector3[] pelletEndPoints, ServerRpcParams rpcParams = default)
     {
@@ -506,6 +518,15 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 }
 
                 Vector3 damagePoint = validPoints.Count > 0 ? validPoints[0] : enemy.transform.position;
+
+                // A corpse just bleeds where the pellets struck — no damage or limb reactions.
+                if (enemy.IsDead)
+                {
+                    if (validPoints.Count > 0)
+                        enemy.PlayCorpseHitEffect(damagePoint);
+                    continue;
+                }
+
                 enemy.TakeDamage(_mutantPelletDamage * pellets, damagePoint);
 
                 if (validPoints.Count > 0)
@@ -520,16 +541,29 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             {
                 if (!playerRefs[i].TryGet(out NetworkObject targetObj) || targetObj == null) continue;
 
-                // Never let a blast hurt the shooter, whatever the client claims.
-                if (targetObj.OwnerClientId == shooterClientId) continue;
-
                 PlayerHealth playerHealth = targetObj.GetComponent<PlayerHealth>() ?? targetObj.GetComponentInChildren<PlayerHealth>();
                 if (playerHealth == null) continue;
 
                 int pellets = Mathf.Clamp(playerPellets[i], 0, _pelletCount);
                 if (pellets <= 0) continue;
 
-                playerHealth.TakeDamage(_playerPelletDamage * pellets, EffectKeys.FriendlyGunshotDamage, targetObj.transform.position);
+                // Use the reported pellet point when it is plausibly on this body, else the pivot.
+                Vector3 hitPoint = targetObj.transform.position;
+                if (playerPoints != null && i < playerPoints.Length
+                    && CombatHitUtility.DistanceToTarget(targetObj, playerPoints[i]) <= MaxReportedHitDistance)
+                    hitPoint = playerPoints[i];
+
+                // Corpse hits are cosmetic only, so they skip the self-hit guard below.
+                if (playerHealth.IsDead)
+                {
+                    playerHealth.PlayCorpseHitEffect(hitPoint);
+                    continue;
+                }
+
+                // Never let a blast hurt the shooter, whatever the client claims.
+                if (targetObj.OwnerClientId == shooterClientId) continue;
+
+                playerHealth.TakeDamage(_playerPelletDamage * pellets, EffectKeys.FriendlyGunshotDamage, hitPoint);
             }
         }
 
@@ -544,7 +578,10 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 if (Vector3.Distance(targetObj.transform.position, suspectPoints[i]) > 6f) continue;
 
                 SuspectCharacter suspect = targetObj.GetComponent<SuspectCharacter>() ?? targetObj.GetComponentInChildren<SuspectCharacter>();
-                suspect?.PlayHarmlessHitReaction(suspectPoints[i]);
+                if (suspect == null) continue;
+
+                if (suspect.IsDead) suspect.PlayCorpseHitEffect(suspectPoints[i]);
+                else                suspect.PlayHarmlessHitReaction(suspectPoints[i]);
             }
         }
 

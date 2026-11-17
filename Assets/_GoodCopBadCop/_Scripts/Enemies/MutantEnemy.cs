@@ -3495,6 +3495,23 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
+    /// SERVER ONLY. Cosmetic blood spray when a player weapon strikes this mutant's corpse — the
+    /// same hit particle it bled while alive. No damage, knockback, sound or state change. No-op
+    /// unless permanently dead. A resurrected player corpse whose mutant has no hit particle of its
+    /// own falls back to the player's blood effect.
+    /// </summary>
+    public void PlayCorpseHitEffect(Vector3 hitPoint)
+    {
+        if (!IsServer || !_isDead || !DiedPermanently)
+            return;
+
+        if (hitParticlePrefab != null)
+            SpawnHitParticleClientRpc(hitPoint);
+        else
+            GetComponent<PlayerHealth>()?.PlayCorpseHitEffect(hitPoint);
+    }
+
+    /// <summary>
     /// Resolves the killing blow. Fire damage (<paramref name="killedByFire"/>) always results in a
     /// permanent death, even when <see cref="fleeInsteadOfDie"/> is set — otherwise a
     /// fleeInsteadOfDie unit flees and survives to be re-encountered later.

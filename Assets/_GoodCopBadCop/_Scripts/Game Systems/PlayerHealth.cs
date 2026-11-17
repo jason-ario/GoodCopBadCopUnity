@@ -169,6 +169,23 @@ public class PlayerHealth : NetworkBehaviour
             TakeDamageServerRpc(damage, effectKey, hitPoint);
     }
 
+    /// <summary>
+    /// SERVER ONLY. Cosmetic blood spray on this player's dead body when a weapon strikes it — the
+    /// same hit particle a living player bleeds, minus the hurt sound. No damage, no state change.
+    /// No-op while alive or once the corpse has been burned away.
+    /// </summary>
+    public void PlayCorpseHitEffect(Vector3 hitPoint)
+    {
+        if (!IsServer || !_networkIsDead.Value)
+            return;
+
+        CorpseResurrectionController corpse = GetComponent<CorpseResurrectionController>();
+        if (corpse != null && corpse.IsBurnedAway)
+            return;
+
+        SpawnHitEffectClientRpc(hitPoint, false);
+    }
+
     /// <summary>Restores health by the given amount. Has no effect while the player is dead.</summary>
     public void Heal(float healAmount)
     {
@@ -256,7 +273,7 @@ public class PlayerHealth : NetworkBehaviour
         // mirrors MutantEnemy.TakeDamage / SuspectCharacter.TakeDamage.
         // Radiation is internal poisoning (and ticks every frame), so it never bleeds or plays hurt SFX.
         if (effectKey != EffectKeys.RadiationTickDamage)
-            SpawnHitEffectClientRpc(hitPoint);
+            SpawnHitEffectClientRpc(hitPoint, true);
 
         if (Health <= 0f)
             _networkIsDead.Value = true;
@@ -301,7 +318,7 @@ public class PlayerHealth : NetworkBehaviour
     /// of whether the player survives it — mirrors MutantEnemy/SuspectCharacter's hit feedback.
     /// </summary>
     [ClientRpc]
-    private void SpawnHitEffectClientRpc(Vector3 hitPoint)
+    private void SpawnHitEffectClientRpc(Vector3 hitPoint, bool playHurtSound)
     {
         if (_hitParticlePrefab != null)
         {
@@ -310,7 +327,7 @@ public class PlayerHealth : NetworkBehaviour
                 fx.AddComponent<AutoDestroy>();
         }
 
-        if (_hurtSounds != null && _hurtSounds.Length > 0)
+        if (playHurtSound && _hurtSounds != null && _hurtSounds.Length > 0)
         {
             AudioClip clip = _hurtSounds[UnityEngine.Random.Range(0, _hurtSounds.Length)];
             if (clip != null)

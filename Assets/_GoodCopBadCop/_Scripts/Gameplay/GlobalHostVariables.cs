@@ -139,4 +139,50 @@ public class GlobalHostVariables : NetworkBehaviour
 
         money.Value = Mathf.Max(0, amount);
     }
+
+    // ─── World purchase relay ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Client → server route for a <see cref="WorldPurchaseActionInteractable"/> whose OWN
+    /// NetworkObject is not spawned on that client (e.g. it was inactive when NGO soft-synchronised
+    /// the scene, which skips inactive in-scene objects). This object is always spawned, so the
+    /// request still reaches the host. The stand is identified by its in-scene GlobalObjectIdHash,
+    /// which is identical on every peer.
+    /// </summary>
+    public void RelayWorldPurchase(uint standKey)
+    {
+        if (!IsSpawned) return;
+        RelayWorldPurchaseServerRpc(standKey);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RelayWorldPurchaseServerRpc(uint standKey, ServerRpcParams rpcParams = default)
+    {
+        ulong buyer = rpcParams.Receive.SenderClientId;
+        var stand = WorldPurchaseActionInteractable.FindByRelayKey(standKey);
+        if (stand == null)
+        {
+            Debug.LogWarning($"[GlobalHostVariables] Relayed world purchase for unknown stand key {standKey}.");
+            NotifyWorldPurchaseRejected(buyer, WorldPurchaseActionInteractable.UnavailableMessage);
+            return;
+        }
+
+        stand.ServerExecutePurchase(buyer, relayed: true);
+    }
+
+    /// <summary>Server-only. Shows a refusal message on one client without needing the stand to be spawned there.</summary>
+    public void NotifyWorldPurchaseRejected(ulong clientId, string message)
+    {
+        if (!IsServer) return;
+        WorldPurchaseRejectedClientRpc(message, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+        });
+    }
+
+    [ClientRpc]
+    private void WorldPurchaseRejectedClientRpc(string message, ClientRpcParams clientRpcParams = default)
+    {
+        UIController.Instance?.ShowShopNotification(message);
+    }
 }

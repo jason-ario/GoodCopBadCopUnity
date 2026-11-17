@@ -299,11 +299,22 @@ public class WorldPurchaseActionInteractable : Interactable
             SetAvailable(false);
             PersistUnlock();
         }
+        else if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.IsSpawned && RelayKey != 0)
+        {
+            // This client's copy of the stand never spawned (NGO skips in-scene NetworkObjects that
+            // are inactive when the client synchronises the scene), so its own RPCs can't reach the
+            // host. Relay through the always-spawned GlobalHostVariables instead; the server applies
+            // the purchase on its spawned copy and the effect replicates back (for the glass, via
+            // the replicated glass hit count).
+            Debug.LogWarning($"[WorldPurchaseActionInteractable] '{name}' is not network-spawned on this client " +
+                             $"(activeInHierarchy={gameObject.activeInHierarchy}); relaying purchase via GlobalHostVariables.");
+            GlobalHostVariables.Instance.RelayWorldPurchase(RelayKey);
+        }
         else
         {
-            // A connected client whose copy of this stand isn't spawned yet has no route to the
-            // host. Never apply the effect locally — that would only change THIS player's world.
-            Debug.LogWarning($"[WorldPurchaseActionInteractable] '{name}' is not network-spawned on this client yet; purchase not sent.");
+            // No route to the host at all. Never apply the effect locally — that would only change
+            // THIS player's world.
+            Debug.LogWarning($"[WorldPurchaseActionInteractable] '{name}' is not network-spawned on this client and no relay is available; purchase not sent.");
             UIController.Instance.ShowShopNotification(PurchaseUnavailableMessage);
             ClosePurchaseView();
             return;
@@ -333,15 +344,55 @@ public class WorldPurchaseActionInteractable : Interactable
 
     // ─── Networking ─────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Stable identifier for this stand that is identical on every peer (the in-scene
+    /// NetworkObject's GlobalObjectIdHash). Used to relay a purchase through
+    /// <see cref="GlobalHostVariables"/> when this stand isn't spawned on the buying client.
+    /// </summary>
+    public uint RelayKey
+    {
+        get
+        {
+            var netObj = GetComponent<NetworkObject>();
+            return netObj != null ? netObj.PrefabIdHash : 0u;
+        }
+    }
+
+    /// <summary>Server-side lookup for <see cref="RelayKey"/>, including inactive stands.</summary>
+    public static WorldPurchaseActionInteractable FindByRelayKey(uint key)
+    {
+        if (key == 0) return null;
+        foreach (var stand in FindObjectsByType<WorldPurchaseActionInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (stand.RelayKey == key) return stand;
+        }
+        return null;
+    }
+
+    /// <summary>Shown when a relayed purchase targets a stand the server can't resolve.</summary>
+    public static string UnavailableMessage => PurchaseUnavailableMessage;
+
     [ServerRpc(RequireOwnership = false)]
     private void ExecutePurchaseServerRpc(ServerRpcParams rpcParams = default)
     {
-        ulong buyer = rpcParams.Receive.SenderClientId;
+        ServerExecutePurchase(rpcParams.Receive.SenderClientId, relayed: false);
+    }
+
+    /// <summary>
+    /// Server-only. Validates, charges and applies a purchase requested by <paramref name="buyer"/>.
+    /// <paramref name="relayed"/> is true when the request arrived through
+    /// <see cref="GlobalHostVariables"/> because the buyer's copy of this stand isn't spawned, so
+    /// refusals must be routed back through that always-spawned object too.
+    /// </summary>
+    public void ServerExecutePurchase(ulong buyer, bool relayed)
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer) return;
 
         // Another player may have bought it a moment earlier (e.g. the glass was already repaired).
         if (!_availableLocal || _shopItem == null || !_shopItem.IsAvailable)
         {
-            RejectPurchase(buyer, AlreadyPurchasedMessage);
+            RejectPurchase(buyer, AlreadyPurchasedMessage, relayed);
             return;
         }
 
@@ -349,7 +400,19 @@ public class WorldPurchaseActionInteractable : Interactable
         var host = GlobalHostVariables.Instance;
         if (host != null && !host.SubtractMoney(_shopItem.Price))
         {
-            RejectPurchase(buyer, NotEnoughMoneyMessage);
+            RejectPurchase(buyer, NotEnoughMoneyMessage, relayed);
+            return;
+        }
+
+        if (!IsSpawned)
+        {
+            // The host's own copy isn't spawned either, so no ClientRpc can be sent. Apply the
+            // effect authoritatively here; replicated effects (e.g. the glass hit count and
+            // _netAvailable) still reach every client.
+            Debug.LogWarning($"[WorldPurchaseActionInteractable] '{name}' is not spawned on the server; applying relayed purchase locally.", this);
+            PersistUnlock();
+            _onPurchaseConfirmed?.Invoke();
+            SetAvailable(false);
             return;
         }
 
@@ -385,8 +448,14 @@ public class WorldPurchaseActionInteractable : Interactable
     }
 
     /// <summary>Tells only the requesting client that its purchase was refused by the server.</summary>
-    private void RejectPurchase(ulong clientId, string message)
+    private void RejectPurchase(ulong clientId, string message, bool relayed = false)
     {
+        if (relayed || !IsSpawned)
+        {
+            GlobalHostVariables.Instance?.NotifyWorldPurchaseRejected(clientId, message);
+            return;
+        }
+
         PurchaseRejectedClientRpc(message, new ClientRpcParams
         {
             Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }

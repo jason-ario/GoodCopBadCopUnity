@@ -22,6 +22,16 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     [Tooltip("How long the climbing animation bool stays true after the climb begins. Set to 0 to turn it off exactly when the movement tween finishes.")]
     [SerializeField] private float _climbAnimHoldSeconds = 0.1f;
 
+    [Header("Window Attack Spacing")]
+    [Tooltip("Metres the mutant shuffles backwards (away from the booth window) when it starts its first window slam, " +
+             "so its fist doesn't clip through the shutter/glass. 0 disables.")]
+    [Min(0f)]
+    [SerializeField] private float _windowAttackStepBackDistance = 0.15f;
+
+    [Tooltip("Seconds the backward shuffle takes. Clamped to the attack impact delay so it finishes before the first blow lands.")]
+    [Min(0f)]
+    [SerializeField] private float _windowAttackStepBackSeconds = 0.2f;
+
     [Header("Sounds")]
     [Tooltip("Played on all clients at the moment the mutant begins climbing through the booth window.")]
     [SerializeField] private AudioClip _climbThroughSound;
@@ -63,6 +73,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
     private bool _isAtBoothWindowServer;
     private bool _lineupSlotReleasedAtWindow;
     private bool _defeatRewardArmed;
+    private bool _hasSteppedBackForWindowAttack;
 
     /// <summary>
     /// Replicated mirror of the server's at-booth-window state. Client-side weapon hit resolution
@@ -169,6 +180,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _isDone = false;
         _isAtBoothWindow = false;
         _lineupSlotReleasedAtWindow = false;
+        _hasSteppedBackForWindowAttack = false;
 
         _data = data;
         _standPos = standPos;
@@ -562,7 +574,11 @@ public class MutantSuspectBehaviour : NetworkBehaviour
             float endTime = Time.time + _data.losesInterestAfterSeconds;
             while (!_isDone && Time.time < endTime)
             {
-                if (HasBarrierToBangOn()) SetAttackClientRpc(true);
+                if (HasBarrierToBangOn())
+                {
+                    StepBackForWindowAttack();
+                    SetAttackClientRpc(true);
+                }
                 yield return new WaitForSeconds(ImpactDelay);
                 if (_isDone) yield break;
                 HitShutterClientRpc();
@@ -627,6 +643,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
             bool swingAtGlass = shutterOpen;
 
+            StepBackForWindowAttack();
             SetAttackClientRpc(true);
             yield return new WaitForSeconds(ImpactDelay);
             if (_isDone) yield break;
@@ -685,6 +702,38 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         }
 
         yield return StartCoroutine(RetreatingSequence(notifyController: true));
+    }
+
+    /// <summary>
+    /// Server-side: on the first window slam of this visit, tweens the mutant a short distance
+    /// straight back from the window (opposite its flattened facing) so the slam animation's fist
+    /// stops short of the shutter/glass instead of clipping through. Runs alongside the attack
+    /// animation and is clamped to finish before the impact point. Climb-through tweens from the
+    /// current position, and retreat/hostile handoff re-link to the NavMesh, so the offset is safe.
+    /// </summary>
+    private void StepBackForWindowAttack()
+    {
+        if (_hasSteppedBackForWindowAttack) return;
+        _hasSteppedBackForWindowAttack = true;
+
+        if (_windowAttackStepBackDistance <= 0f) return;
+
+        Vector3 back = -transform.forward;
+        back.y = 0f;
+        if (back.sqrMagnitude < 0.0001f) return;
+
+        Vector3 target = transform.position + back.normalized * _windowAttackStepBackDistance;
+        float duration = Mathf.Min(_windowAttackStepBackSeconds, ImpactDelay);
+
+        _activeTween?.Kill();
+        if (duration <= 0f)
+        {
+            transform.position = target;
+            _activeTween = null;
+            return;
+        }
+
+        _activeTween = transform.DOMove(target, duration).SetEase(Ease.OutQuad);
     }
 
     /// <summary>
@@ -785,6 +834,7 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         _isDone = false;
         _isAtBoothWindow = false;
         _lineupSlotReleasedAtWindow = false;
+        _hasSteppedBackForWindowAttack = false;
 
         _data = data;
         _standPos = standPos;

@@ -44,10 +44,8 @@ public class QuarantinePolaroid : MonoBehaviour
     {
         gameObject.SetActive(true);
         _suspectData = suspectData;
-        ApplyName();
-
-        if (_daysLeftText != null)
-            _daysLeftText.text = remainingDays == 1 ? "1 Day Left" : $"{remainingDays} Days Left";
+        _remainingDays = remainingDays;
+        ApplyLocalizedText();
 
         if (_photoRenderer != null && suspectData.IDPhoto != null)
         {
@@ -58,16 +56,37 @@ public class QuarantinePolaroid : MonoBehaviour
     }
 
     private SuspectData _suspectData;
+    private int _remainingDays = -1;
 
-    private void OnEnable() { Loc.LanguageChanged += ApplyName; }
+    private void OnEnable()
+    {
+        Loc.LanguageChanged += ApplyLocalizedText;
+        ApplyLocalizedText();
+    }
 
-    private void OnDisable() { Loc.LanguageChanged -= ApplyName; }
+    private void OnDisable() { Loc.LanguageChanged -= ApplyLocalizedText; }
+
+    private void ApplyLocalizedText()
+    {
+        ApplyName();
+        ApplyDaysLeft();
+    }
 
     // Name in the local language, matching the ID card / registry spelling (Loc.Name).
     private void ApplyName()
     {
         if (_nameText != null && _suspectData != null)
             _nameText.text = $"{Loc.Name(_suspectData.FirstName)} {Loc.Name(_suspectData.LastName)}".Trim();
+    }
+
+    // Code.csv rows. QuarantineDurationDays is 2, so the plural row only ever shows 2
+    // (translations use the 2-4 plural form, e.g. ru "дня", pl "dni").
+    private void ApplyDaysLeft()
+    {
+        if (_daysLeftText == null || _remainingDays < 0) return;
+        _daysLeftText.text = _remainingDays == 1
+            ? Loc.T("1 Day Left")
+            : Loc.T("{0} Days Left", _remainingDays);
     }
 
     /// <summary>Hides this slot when no suspect is currently assigned to it.</summary>

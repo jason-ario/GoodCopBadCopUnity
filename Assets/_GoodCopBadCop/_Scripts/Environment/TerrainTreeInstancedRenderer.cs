@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 /// <summary>
 /// GPU-instanced replacement for the terrain's own tree rendering, Play Mode only.
@@ -15,6 +16,8 @@ using UnityEngine.Rendering;
 /// against a padded frustum (padding keeps off-screen trees casting shadows into
 /// view), and LOD-selected with the same screen-relative-height rule as LODGroup
 /// (honours QualitySettings.lodBias). LOD cross-fade is not reproduced (LODs pop).
+/// Trees farther than the URP asset's shadow distance (plus their radius) are drawn
+/// with shadow casting off, so they skip the shadow pass.
 /// Call <see cref="Rebuild"/> after modifying terrain trees at runtime.
 /// </summary>
 [DisallowMultipleComponent]
@@ -56,6 +59,10 @@ public class TerrainTreeInstancedRenderer : MonoBehaviour
         public int layer;
         public Matrix4x4[] buffer = new Matrix4x4[64];
         public int count;
+
+        // Shadow-less copy used for trees beyond the main light's shadow distance (their
+        // shadows can't land in the shadow map anyway). Null when the part casts no shadows.
+        public Part noShadowTwin;
 
         public void Add(in Matrix4x4 matrix)
         {
@@ -328,7 +335,7 @@ public class TerrainTreeInstancedRenderer : MonoBehaviour
                 Material material = materials.Length > 0 ? materials[Mathf.Min(sub, materials.Length - 1)] : null;
                 if (material == null) continue;
 
-                parts.Add(new Part
+                var part = new Part
                 {
                     mesh = mesh,
                     submesh = sub,
@@ -338,7 +345,22 @@ public class TerrainTreeInstancedRenderer : MonoBehaviour
                     shadows = renderer.shadowCastingMode,
                     receiveShadows = renderer.receiveShadows,
                     layer = layer,
-                });
+                };
+                if (part.shadows == ShadowCastingMode.On || part.shadows == ShadowCastingMode.TwoSided)
+                {
+                    part.noShadowTwin = new Part
+                    {
+                        mesh = mesh,
+                        submesh = sub,
+                        material = part.material,
+                        local = local,
+                        localIsIdentity = identity,
+                        shadows = ShadowCastingMode.Off,
+                        receiveShadows = part.receiveShadows,
+                        layer = layer,
+                    };
+                }
+                parts.Add(part);
             }
 
             Bounds meshBounds = TransformBounds(local, mesh.bounds);
@@ -463,6 +485,10 @@ public class TerrainTreeInstancedRenderer : MonoBehaviour
         float halfTan = Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
         int cullingMask = cam.cullingMask;
 
+        // URP keeps shadow distance on the pipeline asset (QualitySettings' value is ignored).
+        var urpAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+        float shadowDistance = urpAsset != null ? urpAsset.shadowDistance : QualitySettings.shadowDistance;
+
         for (int c = 0; c < _cellCount; c++)
         {
             int start = _cellStart[c];
@@ -496,12 +522,20 @@ public class TerrainTreeInstancedRenderer : MonoBehaviour
                 }
                 if (lod == null) continue;
 
+                // Distance minus radius: a tree whose bounds reach into shadow range still casts.
+                bool beyondShadows = Mathf.Sqrt(distanceSq) - _treeRadii[i] > shadowDistance;
+
                 Matrix4x4 treeMatrix = _treeMatrices[i];
                 Part[] parts = lod.parts;
                 for (int pi = 0; pi < parts.Length; pi++)
                 {
                     Part part = parts[pi];
                     if ((cullingMask & (1 << part.layer)) == 0) continue;
+                    if (beyondShadows)
+                    {
+                        if (part.shadows == ShadowCastingMode.ShadowsOnly) continue;
+                        if (part.noShadowTwin != null) part = part.noShadowTwin;
+                    }
                     if (part.count == 0) _activeParts.Add(part);
                     if (part.localIsIdentity) part.Add(treeMatrix);
                     else part.Add(treeMatrix * part.local);
