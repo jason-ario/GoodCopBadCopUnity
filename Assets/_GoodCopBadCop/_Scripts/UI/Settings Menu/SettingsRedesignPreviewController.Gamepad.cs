@@ -467,6 +467,9 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 case Control.Slider:
                     StepSlider(focusIndex, direction);
                     break;
+                case Control.Toggle:
+                    FlipToggle(focusIndex);
+                    break;
             }
         }
 
@@ -500,6 +503,9 @@ namespace GoodCopBadCop.UI.SettingsMenu
             {
                 case Control.Dropdown:
                     ToggleDropdown(focusIndex);
+                    break;
+                case Control.Toggle:
+                    FlipToggle(focusIndex);
                     break;
                 case Control.Rebind:
                     if (fromGamepad) BeginGamepadRebind(focusIndex);

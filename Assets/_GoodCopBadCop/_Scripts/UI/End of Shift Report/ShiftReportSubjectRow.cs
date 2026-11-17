@@ -157,7 +157,7 @@ public class ShiftReportSubjectRow : MonoBehaviour
             indexText.text = (index + 1).ToString("00");
 
         if (nameText != null)
-            nameText.text = string.IsNullOrWhiteSpace(subject.SubjectName) ? Loc.T("Unknown Subject") : subject.SubjectName;
+            nameText.text = FormatName(subject.SubjectName);
 
         if (idText != null)
             idText.text = FormatId(subject.IDNumber);
@@ -239,6 +239,20 @@ public class ShiftReportSubjectRow : MonoBehaviour
 
         float h = texAspect / boxAspect;
         return new Rect(0f, (1f - h) * 0.5f, 1f, h);
+    }
+
+    /// <summary>
+    /// Display name for a subject. <see cref="ShiftSubjectResult.SubjectName"/> is replicated as the English
+    /// source name (server builds it), so each client translates it locally via <see cref="Loc.Name"/>
+    /// (same spelling as the ID card / registry / mail cubby tape). "Unknown Subject" is the server's English
+    /// fallback and goes through <c>Loc.T</c> instead.
+    /// </summary>
+    public static string FormatName(string subjectName)
+    {
+        if (string.IsNullOrWhiteSpace(subjectName) || subjectName == "Unknown Subject")
+            return Loc.T("Unknown Subject");
+
+        return Loc.Name(subjectName);
     }
 
     public static string FormatId(string id)

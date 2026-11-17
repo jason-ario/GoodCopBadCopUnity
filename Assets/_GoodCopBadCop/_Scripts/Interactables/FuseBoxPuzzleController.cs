@@ -73,6 +73,13 @@ public class FuseBoxPuzzleController : Interactable
     public int FilledSlotCount => _fuseSlots == null ? 0 : _fuseSlots.Count(s => s != null && s.IsFilled);
 
     /// <summary>
+    /// True on all clients while the door is open (server-authoritative NetworkVariable).
+    /// Lets listeners that subscribe late (e.g. <c>Day_03</c>'s fuse-box tutorial, granted after the
+    /// HQ call) catch up with a door that was already opened before they started listening.
+    /// </summary>
+    public bool IsDoorOpen => _doorOpen.Value;
+
+    /// <summary>
     /// Fired on all clients whenever the box door is toggled (opened or closed) via
     /// <see cref="Interact"/>. Used to drive the "find the fuse box" objective —
     /// listeners should unsubscribe after the first invocation if they only care about

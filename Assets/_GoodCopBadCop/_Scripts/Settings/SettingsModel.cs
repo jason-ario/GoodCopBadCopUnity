@@ -158,7 +158,8 @@ namespace GoodCopBadCop.Settings
             new("settings.voiceChat.enabled", true);
 
         public readonly PersistentReactiveProperty<bool> VoiceChatMutedMutable =
-            new("settings.voiceChat.muted", false);
+            // Key bumped (v2) so any mute saved by the old dropdown is dropped and everyone starts unmuted.
+            new("settings.voiceChat.muted.v2", false);
 
         public readonly PersistentReactiveProperty<bool> VoiceChatDeafenedMutable =
             new("settings.voiceChat.deafened", false);

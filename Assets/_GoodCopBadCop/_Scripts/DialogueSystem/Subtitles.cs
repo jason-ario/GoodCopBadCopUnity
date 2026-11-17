@@ -31,6 +31,12 @@ public class Subtitles : MonoBehaviour
     private string originalText;
     private Color lastDisplayColor;
 
+    // English source of the current line plus the prefab's authored font and any scripted override, kept so the
+    // line can be re-translated and re-fonted in place when the language changes mid-subtitle.
+    private string _sourceText;
+    private TMP_FontAsset _authoredFont;
+    private TMP_FontAsset _fontOverride;
+
     public bool IsPromptActive { get; private set; }
 
     // -------------------------------------------------------------------------
@@ -65,26 +71,54 @@ public class Subtitles : MonoBehaviour
     {
         if (font == null || textReveal == null) return;
 
-        var tmp = textReveal.GetComponent<TextMeshProUGUI>();
-        if (tmp != null)
-            tmp.font = LocalizationSettings.Localize(font);
+        _fontOverride = font;
+        ApplyLanguageFont();
     }
 
     /// <summary>
-    /// Swaps the prefab's authored subtitle font for the current language's font. Uses the font's
-    /// assigned role, falling back to the "Dialogue" role when the font isn't assigned to any.
+    /// Sets the subtitle font for the current language. A scripted override is localized as-is; otherwise the
+    /// prefab's authored font is swapped by its assigned role, falling back to the "Dialogue" role when the font
+    /// isn't assigned to any. Always resolves from the authored/override font (never the already-swapped one),
+    /// so it can be re-run on every language change.
     /// </summary>
     private void ApplyLanguageFont()
     {
         if (textReveal == null) return;
         var tmp = textReveal.GetComponent<TextMeshProUGUI>();
-        if (tmp == null || tmp.font == null) return;
+        if (tmp == null) return;
+        if (_authoredFont == null) _authoredFont = tmp.font;
 
-        var settings = LocalizationSettings.Instance;
-        string role = settings != null ? settings.EffectiveRoleOf(tmp.font) : null;
-        if (role == null && settings != null && settings.HasRole(DialogueFontRole)) role = DialogueFontRole;
-        var localized = LocalizationSettings.Localize(tmp.font, role);
+        TMP_FontAsset localized;
+        if (_fontOverride != null)
+        {
+            localized = LocalizationSettings.Localize(_fontOverride);
+        }
+        else
+        {
+            if (_authoredFont == null) return;
+            var settings = LocalizationSettings.Instance;
+            string role = settings != null ? settings.EffectiveRoleOf(_authoredFont) : null;
+            if (role == null && settings != null && settings.HasRole(DialogueFontRole)) role = DialogueFontRole;
+            localized = LocalizationSettings.Localize(_authoredFont, role);
+        }
+
         if (localized != null && localized != tmp.font) tmp.font = localized;
+    }
+
+    /// <summary>
+    /// Language switched while this line is on screen: swap to the new language's font and re-translate the
+    /// English source together, so text and font never disagree. A line still typing restarts its reveal (the
+    /// old reveal cached character indices from the previous language's layout); a finished line updates instantly.
+    /// </summary>
+    private void OnLanguageChanged()
+    {
+        if (!Application.isPlaying) return;
+
+        ApplyLanguageFont();
+        if (_sourceText == null || textReveal == null) return;
+
+        originalText = Loc.TranslateSource(_sourceText);
+        UpdateVisuals(instant: !textReveal.IsRevealing);
     }
 
     private const string DialogueFontRole = "Dialogue";
@@ -175,11 +209,13 @@ public class Subtitles : MonoBehaviour
     {
         TrailerHiddenChanged += ApplyTrailerHidden;
         ApplyTrailerHidden(TrailerHidden);
+        Loc.LanguageChanged += OnLanguageChanged;
     }
 
     private void OnDisable()
     {
         TrailerHiddenChanged -= ApplyTrailerHidden;
+        Loc.LanguageChanged -= OnLanguageChanged;
     }
 
     private void ApplyTrailerHidden(bool hidden)
@@ -210,13 +246,15 @@ public class Subtitles : MonoBehaviour
     public void SetText(string text, string name = null, Color nameColor = default)
     {
         // Localize the incoming source string before keyword markup, wrapping and color are applied.
+        // The English source is kept so a mid-line language change can re-translate it.
+        _sourceText = text;
         originalText = Loc.TranslateSource(text);
         lastDisplayColor = nameColor;
 
-        UpdateVisuals();
+        UpdateVisuals(instant: !Application.isPlaying);
     }
 
-    private void UpdateVisuals()
+    private void UpdateVisuals(bool instant)
     {
         if (textReveal == null || string.IsNullOrEmpty(originalText)) return;
 
@@ -229,11 +267,12 @@ public class Subtitles : MonoBehaviour
         if (tmp != null)
             tmp.textWrappingMode = TextWrappingModes.Normal;
 
-        // Use typewriter reveal in play mode; instant set in editor to keep OnValidate previews fast.
-        if (Application.isPlaying)
-            textReveal.RevealText(formattedText);
-        else
+        // Typewriter reveal for new lines in play mode; instant for editor OnValidate previews and for
+        // re-rendering an already finished line after a language change.
+        if (instant)
             textReveal.SetTextInstant(formattedText);
+        else
+            textReveal.RevealText(formattedText);
     }
 
     /// <summary>
@@ -362,6 +401,6 @@ public class Subtitles : MonoBehaviour
             }
         }
 
-        UpdateVisuals();
+        UpdateVisuals(instant: !Application.isPlaying);
     }
 }

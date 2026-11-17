@@ -2621,6 +2621,10 @@ public class Day_01 : DayBase
 
         if (!NetworkManager.Singleton.IsServer) return;
 
+        // Tension build-up: fade out any background music and keep it silent through the
+        // Soldier's dialogue until Alexei's own music kicks in (released by AlexeiController).
+        AlexeiController.Instance?.SilenceBackgroundMusicForSoldier();
+
         StartCoroutine(WaitAndStartSoldierDialogue());
         Debug.Log($"[Day_01] Soldier (index {index}) arrived — starting dialogue after settle delay.");
     }

@@ -125,6 +125,15 @@ public class ShiftManager : NetworkBehaviour
     public bool IsDayTransitionRunningLocally => _transitionRunningLocally;
 
     /// <summary>
+    /// SERVER. True from the moment the end-of-shift report is broadcast until the in-between-shift
+    /// transition has teleported everyone into the bunker and revealed the new day. The campaign
+    /// advances (and the next day's <see cref="DayBase.DayActivated"/> runs) when the report opens,
+    /// while players are still wherever they were at bedtime — so proximity-triggered day-start
+    /// events must ignore player positions during this window.
+    /// </summary>
+    public bool IsEndOfDayTransitionPending => _endOfShiftReportBroadcast || _transitionRunningLocally;
+
+    /// <summary>
     /// Fired on EVERY peer during the in-between-shift transition, once the screen is fully black
     /// and before the campaign day advances / <see cref="OnDayStart"/>. Use it to switch world
     /// devices (radio, PC terminal, ...) back to their idle/off state for the new day.

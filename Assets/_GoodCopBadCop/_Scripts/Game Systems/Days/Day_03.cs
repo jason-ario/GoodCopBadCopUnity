@@ -573,7 +573,19 @@ public class Day_03 : DayBase, IDailyTask
 
         _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
         _fuseBoxController.OnBoxInteracted += OnFuseBoxFirstOpened;
+        // Any fuse activity also proves the player has found the box.
+        _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedBeforeOpened;
+        _fuseBoxController.OnFuseCountChanged += OnFuseCountChangedBeforeOpened;
+
+        // The box is interactable for the whole outage, including while HQ's call rings, before this
+        // task exists. A door opened (or fuses inserted) before now raised its events with nobody
+        // listening, which left the task stuck on step 1 — arrow on the box, no "pull the lever"
+        // step and no switch arrow even with every slot filled. Catch up from the current state.
+        if (_fuseBoxController.IsDoorOpen || _fuseBoxController.FilledSlotCount > 0)
+            OnFuseBoxFirstOpened();
     }
+
+    private void OnFuseCountChangedBeforeOpened(int filled, int total) => OnFuseBoxFirstOpened();
 
     /// <summary>
     /// Hover height (above <paramref name="target"/>'s pivot) that places the arrow clearly above
@@ -630,6 +642,7 @@ public class Day_03 : DayBase, IDailyTask
     private void OnFuseBoxFirstOpened()
     {
         _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
+        _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedBeforeOpened;
 
         if (!_fuseTutorialShown)
         {
@@ -641,6 +654,7 @@ public class Day_03 : DayBase, IDailyTask
 
         _powerOutageThreat?.SetStep(RepairPowerThreat.Step.InsertFuses);
 
+        _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedDuringOutage;
         _fuseBoxController.OnFuseCountChanged += OnFuseCountChangedDuringOutage;
 
         // Catch up immediately in case every slot was somehow already filled before the box
@@ -685,6 +699,7 @@ public class Day_03 : DayBase, IDailyTask
         if (_fuseBoxController == null) return;
 
         _fuseBoxController.OnBoxInteracted -= OnFuseBoxFirstOpened;
+        _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedBeforeOpened;
         _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedDuringOutage;
         _fuseBoxController.OnFuseCountChanged -= OnFuseCountChangedForSwitchArrow;
         _fuseBoxController.SetForceHighlight(false);

@@ -28,13 +28,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
         private static readonly Vector2 RowPosition = new Vector2(-371.25f, FirstRowY);
 
         private enum Tab { Gameplay, Graphics, Audio, Controls }
-        private enum Control { Dropdown, Slider, Rebind }
+        private enum Control { Dropdown, Slider, Rebind, Toggle }
 
         private sealed class Setting
         {
             public readonly string Label;
             public readonly string Key;
-            public readonly Control Control;
+            public Control Control { get; private set; }
             public string[] Options;
             public readonly GameAction RebindAction;
             public int Index;
@@ -75,6 +75,13 @@ namespace GoodCopBadCop.UI.SettingsMenu
             {
                 defaultIndex = index;
                 Index = index;
+                return this;
+            }
+
+            /// <summary>Two-option (Off/On) row that flips on click instead of opening a dropdown.</summary>
+            public Setting AsToggle()
+            {
+                Control = Control.Toggle;
                 return this;
             }
 
@@ -186,7 +193,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
             new Setting(Loc.N("Voice Volume"), "voice_volume", 80f),
             new Setting(Loc.N("Voice Chat"), "voice_chat_enabled", Loc.N("Off"), Loc.N("On")),
             new Setting(Loc.N("Voice Input"), "voice_input", Loc.N("Voice Activation"), Loc.N("Push To Talk"), Loc.N("Open Mic")),
-            new Setting(Loc.N("Microphone Muted"), "microphone_muted", Loc.N("Off"), Loc.N("On")),
+            new Setting(Loc.N("Microphone Muted"), "microphone_muted", Loc.N("Off"), Loc.N("On")).AsToggle(),
             new Setting(Loc.N("Voice Deafened"), "voice_deafened", Loc.N("Off"), Loc.N("On")),
             // Voice is lobby-wide, so there is no proximity range row.
             // Device names are verbatim; option 0 ("Default") is still localized (see OptionText).
@@ -974,6 +981,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 {
                     row.Button.onClick.AddListener(() => ToggleDropdown(index));
                 }
+                else if (supported && setting.Control == Control.Toggle)
+                {
+                    row.Button.onClick.AddListener(() => FlipToggle(index));
+                }
                 else if (supported && keyboardRebindable)
                 {
                     row.Button.onClick.AddListener(() => BeginRebind(index));
@@ -1328,6 +1339,18 @@ namespace GoodCopBadCop.UI.SettingsMenu
             rows[settingIndex].Value.text = setting.DisplayValue;
             Apply(setting);
             CloseDropdown();
+        }
+
+        private void FlipToggle(int settingIndex)
+        {
+            if (settingIndex < 0 || settingIndex >= activeSettings.Length) return;
+            Setting setting = activeSettings[settingIndex];
+            if (setting.Control != Control.Toggle) return;
+
+            CloseDropdown();
+            setting.Index = setting.Index == 1 ? 0 : 1;
+            rows[settingIndex].Value.text = setting.DisplayValue;
+            Apply(setting);
         }
 
         private void CloseDropdown()

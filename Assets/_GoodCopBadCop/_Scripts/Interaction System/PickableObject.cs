@@ -1616,6 +1616,15 @@ public class PickableObject : Interactable
     /// <summary>Call on the picking-up client as part of an optimistic local pickup.</summary>
     public void NoteLocalPickup() => _localHoldActionSeq++;
 
+    /// <summary>True when this object is the item currently in the local player's hand.</summary>
+    private bool IsInLocalPlayersHand()
+    {
+        PlayerInstance local = PlayerInstance.Instance;
+        return local != null
+            && local.PlayerPickupController != null
+            && local.PlayerPickupController.HeldObject == this;
+    }
+
     /// <summary>
     /// Hand-drop entry point for <see cref="PlayerPickupController"/>. Same as
     /// <see cref="DropServerRpc"/>, but tags the drop so a stale echo can't detach the object
@@ -1677,6 +1686,23 @@ public class PickableObject : Interactable
             && requestSeq != _localHoldActionSeq)
         {
             Debug.LogWarning($"[PickableObject] Ignored stale drop echo on '{name}' (drop #{requestSeq}, latest local hand action #{_localHoldActionSeq}).", this);
+            return;
+        }
+
+        // Stale drop by ANOTHER player: e.g. the host spams pick-up/put-down, this client grabs
+        // the item during one of the host's "down" windows, and one of the host's drop broadcasts
+        // is still in flight. It lands after PickUpObject already put the item in this client's
+        // hand and would tear it out (client sees it on the floor, everyone else sees it held).
+        // Server-ordering makes any hand drop that reaches us while we hold the item stale:
+        //  - if our grab was accepted, the server processed that drop BEFORE our claim;
+        //  - if our grab is being rejected, the rejection RPC was sent before any later drop
+        //    and arrives first, so OnPendingGrabRejected has already released our hand.
+        // Not applied on the server/host: its RPCs run synchronously in authoritative order (and
+        // its own DropObject still has the item in hand at the moment this executes locally).
+        // Forced/server drops (requestSeq == 0) always apply.
+        if (requestSeq != 0 && !IsServer && IsInLocalPlayersHand())
+        {
+            Debug.LogWarning($"[PickableObject] Ignored stale drop by client {requesterClientId} on '{name}': it is in the local player's hand (drop #{requestSeq}).", this);
             return;
         }
 

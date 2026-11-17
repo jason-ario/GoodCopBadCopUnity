@@ -147,6 +147,12 @@ public class Day_02 : DayBase, IDailyTask
              "Ocho's OchoBoothEncounter — can't be baked into the prefab asset.")]
     [SerializeField] private ElectricPanelController _ochoElectricalPanel;
 
+    /// <summary>
+    /// Scene Electrical Panel used by Ocho's power outage. Exposed so remote clients (which never
+    /// run <see cref="ArmOchoBoothEncounter"/>) can resolve the arrow target / highlight locally.
+    /// </summary>
+    public ElectricPanelController OchoElectricalPanel => _ochoElectricalPanel;
+
     // -------------------------------------------------------------------------
     // Day 2 Opening Sequence
     // -------------------------------------------------------------------------
@@ -883,25 +889,26 @@ public class Day_02 : DayBase, IDailyTask
                 new SuspectWorldDialogue.DaySet
                 {
                     day = 2,
-                    greetingLine = "Catch your breath, officer. Long day.",
+                    // Loc.N: English stays on the wire; subtitles/choice labels translate on each client.
+                    greetingLine = Loc.N("Catch your breath, officer. Long day."),
                     options = new[]
                     {
                         new SuspectWorldDialogue.DialogueOption
                         {
-                            playerLine = "How's it going?",
-                            npcResponse = "Better than yours, I'd wager. Sit down if your legs need it. I won't tell anyone.",
+                            playerLine = Loc.N("How's it going?"),
+                            npcResponse = Loc.N("Better than yours, I'd wager. Sit down if your legs need it. I won't tell anyone."),
                             animationTrigger = "TalkShrug"
                         },
                         new SuspectWorldDialogue.DialogueOption
                         {
-                            playerLine = "Anything else I should know?",
-                            npcResponse = "Keep your eyes open tonight. This place doesn't stay quiet for long.",
+                            playerLine = Loc.N("Anything else I should know?"),
+                            npcResponse = Loc.N("Keep your eyes open tonight. This place doesn't stay quiet for long."),
                             animationTrigger = "TalkSarcasticNod"
                         },
                         new SuspectWorldDialogue.DialogueOption
                         {
-                            playerLine = "I'll get back to it.",
-                            npcResponse = "Go on then. I'll be right here when you need me.",
+                            playerLine = Loc.N("I'll get back to it."),
+                            npcResponse = Loc.N("Go on then. I'll be right here when you need me."),
                             animationTrigger = "TalkDismissing"
                         }
                     }

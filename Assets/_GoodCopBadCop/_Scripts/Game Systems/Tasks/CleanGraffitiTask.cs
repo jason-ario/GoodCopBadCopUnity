@@ -657,12 +657,17 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     }
 
     /// <summary>
-    /// Builds the tutorial-overlay objective label, e.g. "Clean graffiti 1/10".
+    /// Builds the tutorial-overlay objective label's ENGLISH source, e.g. "Clean graffiti 1/10".
     /// Public so day scripts (which now own their own <see cref="TutorialObjectiveItem"/>
     /// for this task — see <see cref="OnDailyTaskCompleted"/>) can reuse the same format.
+    /// Must stay untranslated: it becomes the row's <see cref="TutorialObjectiveItem.RawText"/>,
+    /// which the row re-translates (via the "{0}/{1}" template) on every language change and which
+    /// <see cref="ObjectiveListSync"/> mirrors host → clients. Pre-translating with Loc.T froze the
+    /// host's language into the row.
     /// </summary>
     public string GetTutorialObjectiveText() =>
-        Loc.T("Clean graffiti {0}/{1}", Mathf.Min(_scrubbed.Value, _totalCount.Value), _totalCount.Value);
+        string.Format(System.Globalization.CultureInfo.InvariantCulture, Loc.N("Clean graffiti {0}/{1}"),
+            Mathf.Min(_scrubbed.Value, _totalCount.Value), _totalCount.Value);
 
     // ── Editor gizmos ─────────────────────────────────────────────────────────
 

@@ -52,9 +52,17 @@ public class MusicManager : MonoBehaviour
 
     private AudioSource _source;
     private MusicPriority _currentPriority = MusicPriority.Ambient;
+    private bool _ambientSuppressed;
 
     /// <summary>Priority of the track currently active on the source (or last active one).</summary>
     public MusicPriority CurrentPriority => _currentPriority;
+
+    /// <summary>
+    /// True while a scripted moment (e.g. the Day 1 Soldier/Alexei tension build-up) has
+    /// silenced background music. Ambient-priority <see cref="Play"/> calls are ignored and
+    /// <see cref="SetDuck"/> is a no-op until it is released. Encounter music is unaffected.
+    /// </summary>
+    public bool AmbientSuppressed => _ambientSuppressed;
 
     /// <summary>True while the underlying AudioSource is actually playing.</summary>
     public bool IsPlaying => _source != null && _source.isPlaying;
@@ -113,6 +121,12 @@ public class MusicManager : MonoBehaviour
         if (clip == null)
         {
             Debug.LogWarning("[MusicManager] Play called with a null clip.");
+            return;
+        }
+
+        if (_ambientSuppressed && priority == MusicPriority.Ambient)
+        {
+            Debug.Log($"[MusicManager] Play ignored — '{clip.name}' is Ambient and background music is suppressed.");
             return;
         }
 
@@ -186,11 +200,30 @@ public class MusicManager : MonoBehaviour
     /// </summary>
     public void SetDuck(bool ducked, float duration)
     {
+        if (_ambientSuppressed) return; // Don't let radio un-ducking undo a suppression fade-out.
         if (_source == null || !_source.isPlaying || _currentPriority != MusicPriority.Ambient) return;
 
         float target = ducked ? 0f : TargetVolume(_currentPriority);
         _source.DOKill();
         _source.DOFade(target, Mathf.Max(0f, duration));
+    }
+
+    /// <summary>
+    /// Enables or releases background-music suppression for a scripted tension moment.
+    /// Enabling fades out whatever is currently playing over <paramref name="fadeOutDuration"/>
+    /// seconds (-1 = <see cref="_defaultFadeOutDuration"/>) and blocks Ambient-priority tracks
+    /// until released. Encounter-priority <see cref="Play"/> calls (e.g. Alexei's music) still
+    /// play normally. Releasing does not start any music by itself. Client-local.
+    /// </summary>
+    public void SetAmbientSuppressed(bool suppressed, float fadeOutDuration = -1f)
+    {
+        if (_ambientSuppressed == suppressed) return;
+        _ambientSuppressed = suppressed;
+
+        Debug.Log($"[MusicManager] Background music suppression {(suppressed ? "ON" : "OFF")}.");
+
+        if (suppressed)
+            FadeOut(fadeOutDuration);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

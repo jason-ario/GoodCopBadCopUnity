@@ -280,6 +280,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         NetworkVariableWritePermission.Server);
 
     private bool _triggered;
+    private Coroutine _armRoutine;
     private Coroutine _monitorRoutine;
 
     // Index-paired with _vladPieceRoots / _networkedVladPiecePrefabs.
@@ -360,6 +361,40 @@ public class OchoEatingVladCutscene : NetworkBehaviour
         if (!IsServer) return;
         if (_triggered) return;
         _triggered = true;
+
+        // Day 3 is activated the moment Day 2's end-of-shift report opens, while players are still
+        // wherever they were at bedtime. Keep Ocho hidden (no pieces, audio or gore) until the
+        // transition has moved everyone into the bunker and revealed the new day — otherwise a
+        // player left near the checkpoint plays the whole scene behind the report.
+        if (IsDayTransitionPending())
+        {
+            _armRoutine = StartCoroutine(ArmWhenDayStarts());
+            Debug.Log("[OchoEatingVladCutscene] Day transition in progress — arming deferred until the day starts.", this);
+            return;
+        }
+
+        Arm();
+    }
+
+    private static bool IsDayTransitionPending() =>
+        ShiftManager.Instance != null && ShiftManager.Instance.IsEndOfDayTransitionPending;
+
+    private IEnumerator ArmWhenDayStarts()
+    {
+        yield return new WaitWhile(IsDayTransitionPending);
+        _armRoutine = null;
+        Arm();
+    }
+
+    private void StopArmRoutine()
+    {
+        if (_armRoutine == null) return;
+        StopCoroutine(_armRoutine);
+        _armRoutine = null;
+    }
+
+    private void Arm()
+    {
         _networkPhase.Value = NetworkCutscenePhase.Eating;
 
         ActivateOchoClientRpc();
@@ -382,6 +417,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        StopArmRoutine();
         if (_monitorRoutine != null)
         {
             StopCoroutine(_monitorRoutine);
@@ -415,6 +451,7 @@ public class OchoEatingVladCutscene : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        StopArmRoutine();
         if (_monitorRoutine != null)
         {
             StopCoroutine(_monitorRoutine);

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -611,16 +611,45 @@ public class OchoBoothEncounter : NetworkBehaviour
     /// </summary>
     private void BeginLocalPowerOutageTask(bool runServerSide)
     {
+        ResolveLocalPanelReferences();
+
         if (TutorialMarkerManager.Instance != null && _electricalPanelMarker != null)
             TutorialMarkerManager.Instance.Mark(_electricalPanelMarker);
 
-        _electricalPanelInteractable?.SetForceHighlight(true);
+        if (_electricalPanelInteractable != null)
+            _electricalPanelInteractable.SetForceHighlight(true);
 
         TutorialOverlay.Instance?.ShowElectricalPanelTutorial();
 
         FixElectricalPanelThreat threat = new FixElectricalPanelThreat();
         TaskRegistry.Instance?.AddThreat(threat);
         new PowerOutageAftermath(this, threat, runServerSide).Arm();
+    }
+
+    /// <summary>
+    /// <see cref="ConfigureSceneReferences"/> is only called on the server (Day_02 arms Ocho
+    /// server-side), so remote clients' instances never receive the panel marker/interactable.
+    /// Resolve them locally from the scene's Day_02 when missing.
+    /// </summary>
+    private void ResolveLocalPanelReferences()
+    {
+        if (_electricalPanelMarker != null && _electricalPanelInteractable != null) return;
+
+        Day_02 day2 = Day_02.Instance != null
+            ? Day_02.Instance
+            : FindFirstObjectByType<Day_02>(FindObjectsInactive.Include);
+        ElectricPanelController panel = day2 != null ? day2.OchoElectricalPanel : null;
+        if (panel == null)
+            panel = FindFirstObjectByType<ElectricPanelController>(FindObjectsInactive.Include);
+
+        if (panel == null)
+        {
+            Debug.LogWarning("[OchoBoothEncounter] Couldn't resolve the Electrical Panel locally — no arrow/highlight on this peer.");
+            return;
+        }
+
+        if (_electricalPanelMarker == null) _electricalPanelMarker = panel.ArrowTarget;
+        if (_electricalPanelInteractable == null) _electricalPanelInteractable = panel;
     }
 
     private void SetVisible(bool visible)

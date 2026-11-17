@@ -75,6 +75,10 @@ public class AlexeiController : NetworkBehaviour
     [Tooltip("Seconds over which the music fades out after Alexei despawns.")]
     [SerializeField] private float _musicFadeOutDuration = 3f;
 
+    [Tooltip("Seconds over which any background music fades out when the Soldier arrives at the booth. " +
+             "Background music stays silenced until Alexei's music starts.")]
+    [SerializeField] private float _soldierMusicFadeOutDuration = 2.5f;
+
     [Header("Dead Soldier")]
     [Tooltip("SuspectCharacter on Suspect_Soldier (Day 1). Must have a JunkItem component attached " +
              "and kept disabled in the Inspector — TriggerEndOfShiftSetup calls EnableJunkPickup() " +
@@ -115,6 +119,16 @@ public class AlexeiController : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// True from the moment the Soldier arrives at the booth until Alexei's encounter music
+    /// starts. While set, every client fades out and suppresses background (ambient) music so
+    /// the Soldier's dialogue plays in tense silence. Replicated so late joiners match.
+    /// </summary>
+    private readonly NetworkVariable<bool> _backgroundMusicSilenced = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake() => Instance = this;
@@ -123,17 +137,49 @@ public class AlexeiController : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         _cutsceneActive.OnValueChanged += OnCutsceneActiveChanged;
+        _backgroundMusicSilenced.OnValueChanged += OnBackgroundMusicSilencedChanged;
 
         // Late-joiner / reconnect catch-up: if the cutscene was already triggered
         // before this client spawned the NetworkObject, activate immediately.
         if (_cutsceneActive.Value)
             ActivateCutsceneLocally(_cutsceneStartServerTime.Value);
+
+        if (_backgroundMusicSilenced.Value)
+            MusicManager.Instance?.SetAmbientSuppressed(true, 0f);
     }
 
     public override void OnNetworkDespawn()
     {
         base.OnNetworkDespawn();
         _cutsceneActive.OnValueChanged -= OnCutsceneActiveChanged;
+        _backgroundMusicSilenced.OnValueChanged -= OnBackgroundMusicSilencedChanged;
+
+        // Never leave the persistent MusicManager suppressed past this scene/session.
+        MusicManager.Instance?.SetAmbientSuppressed(false);
+    }
+
+    // ── Background music silence (Soldier build-up) ────────────────────────────
+
+    /// <summary>
+    /// Fades out any background music on all clients and blocks ambient music until
+    /// Alexei's encounter music starts. Call when the Soldier arrives at the booth. Server-only.
+    /// </summary>
+    public void SilenceBackgroundMusicForSoldier()
+    {
+        if (!IsServer) return;
+        _backgroundMusicSilenced.Value = true;
+    }
+
+    /// <summary>Releases the Soldier build-up music silence on all clients. Server-only.</summary>
+    private void ReleaseBackgroundMusicSilence()
+    {
+        if (!IsServer) return;
+        _backgroundMusicSilenced.Value = false;
+    }
+
+    private void OnBackgroundMusicSilencedChanged(bool previous, bool current)
+    {
+        MusicManager.Instance?.SetAmbientSuppressed(current, _soldierMusicFadeOutDuration);
     }
 
     // ── Attack behaviour gate ──────────────────────────────────────────────────
@@ -287,6 +333,8 @@ public class AlexeiController : NetworkBehaviour
         MusicManager.Instance?.Play(_alexeiMusicClip);
         if (IsSpawned)
             StartAlexeiMusicClientRpc();
+        // Alexei's encounter music now owns the source; ambient stays blocked by priority.
+        ReleaseBackgroundMusicSilence();
     }
 
     [ClientRpc]
@@ -448,6 +496,7 @@ public class AlexeiController : NetworkBehaviour
         if (_mutantPrefab == null || _mutantSpawnPos == null || _mutantBoothPos == null)
         {
             Debug.LogWarning("[AlexeiController] MutantEntranceSequence: missing prefab or position references — invoking callback immediately.");
+            ReleaseBackgroundMusicSilence();
             onMutantIdle?.Invoke();
             yield break;
         }
@@ -460,6 +509,7 @@ public class AlexeiController : NetworkBehaviour
         {
             Debug.LogError("[AlexeiController] Mutant prefab is missing a NetworkObject component.");
             Destroy(instance);
+            ReleaseBackgroundMusicSilence();
             onMutantIdle?.Invoke();
             yield break;
         }
@@ -486,6 +536,8 @@ public class AlexeiController : NetworkBehaviour
         // Play locally first (works offline / host), then broadcast to remote clients.
         if (_alexeiMusicClip != null)
             StartCoroutine(DelayedStartAlexeiMusic(1.5f));
+        else
+            ReleaseBackgroundMusicSilence();
 
         // Suspend AI immediately after spawn — ChaseLoop's first frame yield means this
         // call wins the race and prevents the mutant from targeting players during the entrance.
@@ -553,6 +605,7 @@ public class AlexeiController : NetworkBehaviour
         msb.DespawnInsteadOfRetreat = true;
         msb.OnSequenceComplete = _ =>
         {
+            ReleaseBackgroundMusicSilence(); // Safety — normally already released when the music started.
             OnAlexeiSequenceDone?.Invoke();
             // Fade locally first, then broadcast to remote clients.
             MusicManager.Instance?.FadeOut(_musicFadeOutDuration);

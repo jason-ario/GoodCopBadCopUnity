@@ -598,11 +598,20 @@ public static class Loc
             var m = t.Pattern.Match(text);
             if (!m.Success) continue;
             var args = new object[t.ArgCount];
+            bool argsResolved = true;
             for (int i = 0; i < t.ArgCount; i++)
             {
                 var g = m.Groups["a" + i];
-                args[i] = g.Success ? TranslateSource(g.Value) : string.Empty;
+                string arg = g.Success ? g.Value : string.Empty;
+                string translatedArg = TranslateSource(arg);
+                // Short generic templates ("{0} to {1}", a control-hint format) otherwise swallow whole
+                // sentences that merely contain " to ", dropping the literal and leaving untranslated English
+                // ("Restore Power: Find and add the fuses to the fuse box."). Accept a match only when every
+                // captured argument is language-neutral (numbers/punctuation) or is itself a known source.
+                if (translatedArg == arg && ContainsLetter(arg)) { argsResolved = false; break; }
+                args[i] = translatedArg;
             }
+            if (!argsResolved) continue;
             try { return string.Format(Culture, Resolve(t.Entry, false), args); }
             catch (FormatException) { return english; }
         }
@@ -654,6 +663,14 @@ public static class Loc
     }
 
     private static LocalizationTable _templatesTable;
+
+    private static bool ContainsLetter(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return false;
+        foreach (char c in s)
+            if (char.IsLetter(c)) return true;
+        return false;
+    }
 
     /// <summary>Regex end-of-input anchor.</summary>
     private const char EndAnchor = '\u0024';

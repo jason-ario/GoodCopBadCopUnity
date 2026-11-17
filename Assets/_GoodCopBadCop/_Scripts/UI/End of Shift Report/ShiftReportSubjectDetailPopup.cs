@@ -215,8 +215,7 @@ public class ShiftReportSubjectDetailPopup : MonoBehaviour
     {
         if (nameText != null)
         {
-            string name = string.IsNullOrWhiteSpace(subject.SubjectName) ? Loc.T("Unknown Subject") : subject.SubjectName;
-            nameText.text = $"{index + 1:00}. {name}";
+            nameText.text = $"{index + 1:00}. {ShiftReportSubjectRow.FormatName(subject.SubjectName)}";
         }
 
         if (idText != null)

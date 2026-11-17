@@ -117,6 +117,10 @@ public class AmbientMusicDirector : NetworkBehaviour
     {
         if (!IsClient) return false; // Dedicated server has no local music to check.
         MusicManager music = MusicManager.Instance;
-        return music != null && music.IsPlaying && music.CurrentPriority != MusicPriority.Ambient;
+        if (music == null) return false;
+        // A scripted silence (e.g. Day 1 Soldier/Alexei build-up) counts as "encounter" so no
+        // ambient track is scheduled, and any in-progress one is ended.
+        if (music.AmbientSuppressed) return true;
+        return music.IsPlaying && music.CurrentPriority != MusicPriority.Ambient;
     }
 }
