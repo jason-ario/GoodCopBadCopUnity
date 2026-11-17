@@ -171,7 +171,7 @@ public class CleanBloodTask : NetworkBehaviour, ISystemicThreat, IDailyTask
 
     public string ThreatDescription =>
         _isComplete
-            ? $"All {_totalCount.Value} splatter(s) scrubbed!"
+            ? string.Format(Loc.N("All {0} splatter(s) scrubbed!"), _totalCount.Value)
             : _totalCount.Value > 0
                 ? $"{Mathf.Min(_scrubbed.Value, RequiredCount)}/{RequiredCount}"
                 : string.Empty;

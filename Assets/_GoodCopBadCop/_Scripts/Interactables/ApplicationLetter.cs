@@ -201,6 +201,11 @@ public class ApplicationLetter : FolderItem
             documentRenderer.enabled = visible;
         }
 
+        // ApplySyncedState re-runs on every Loc.LanguageChanged. While held, re-enabling would turn
+        // the root collider back on as a solid body and shove the carrying player through walls;
+        // the holder flow (OnHoldingClientChanged) restores interactability on release.
+        if (visible && IsHeld) return;
+
         SetInteractable(visible);
     }
 

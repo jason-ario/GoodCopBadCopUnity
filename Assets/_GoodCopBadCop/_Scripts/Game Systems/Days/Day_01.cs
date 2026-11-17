@@ -767,6 +767,8 @@ public class Day_01 : DayBase
         // Reset server-side tutorial counters when the day starts.
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             TutorialTaskSync.Instance?.ResetServerState();
+        else
+            CatchUpTrashTaskReadyForLateJoin();
 
         _pressButtonCouponsCollected = false;
         _pressButtonVladExited       = false;
@@ -2846,6 +2848,26 @@ public class Day_01 : DayBase
             bar.Show();
         else
             Debug.LogWarning("[Day_01] EnableCheckpointIntegrityPanel: PlayerUI.CheckpointIntegrityBar is not assigned — panel not shown.");
+    }
+
+    /// <summary>
+    /// Late-join safety net (clients only). <see cref="TutorialTaskSync.OnTrashTaskReadyAllClients"/>
+    /// is a one-shot ClientRpc, so a client that connects after the end-of-shift trash/graffiti
+    /// tasks were assigned never runs <see cref="OnTrashTaskReadySync"/> — and the late-join
+    /// <c>CampaignManager.ApplyDay(1)</c> has just forced Checkpoint Integrity OFF via
+    /// <c>SyncForDay(1)</c>. Rebuild only the integrity state from the replicated
+    /// <see cref="TutorialTaskSync.IsTrashTaskReady"/> flag; the objective rows themselves are
+    /// already mirrored from the host by ObjectiveListSync, so they are not re-added here.
+    /// </summary>
+    private void CatchUpTrashTaskReadyForLateJoin()
+    {
+        if (TutorialTaskSync.Instance == null || !TutorialTaskSync.Instance.IsTrashTaskReady) return;
+
+        Debug.Log("[Day_01] Late join after trash task was assigned — enabling Checkpoint Integrity and showing its tutorial.");
+
+        TutorialTaskSync.OnTrashTaskReadyAllClients -= OnTrashTaskReadySync;
+        EnableCheckpointIntegrityPanel();
+        StartCoroutine(ShowTrashAndGraffitiTutorialAfterDusk());
     }
 
     /// <summary>

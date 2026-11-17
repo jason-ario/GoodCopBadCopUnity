@@ -133,21 +133,43 @@ public class TutorialObjectiveItem : MonoBehaviour
     private static string BuildDisplay(string text)
     {
         if (string.IsNullOrEmpty(text)) return BulletPrefix;
+        return Loc.Verbatim(BulletPrefix + TranslateObjective(text));
+    }
 
+    /// <summary>
+    /// Separator <see cref="HUDTaskList"/> uses to compose a task row's English source as
+    /// "ThreatName: ThreatDescription". The combined string has no sheet row, so
+    /// <see cref="TranslateObjective"/> translates each half separately.
+    /// </summary>
+    public const string CompositeSeparator = ": ";
+
+    private static string TranslateObjective(string text)
+    {
         // TranslateFormatted also resolves English formatted from a "{0}" source ("Process 5 subjects 2/5").
         string translated = Loc.TranslateFormatted(text);
-        if (translated == text)
+        if (translated != text) return translated;
+
+        var match = ProgressSuffix.Match(text);
+        if (match.Success)
         {
-            var match = ProgressSuffix.Match(text);
-            if (match.Success)
-            {
-                string head = Loc.TranslateSource(match.Groups[1].Value);
-                if (head != match.Groups[1].Value)
-                    translated = head + match.Groups[2].Value;
-            }
+            string head = Loc.TranslateSource(match.Groups[1].Value);
+            if (head != match.Groups[1].Value)
+                return head + match.Groups[2].Value;
         }
 
-        return Loc.Verbatim(BulletPrefix + translated);
+        // "Name: description" composite (HUDTaskList task-registry rows): translate both halves.
+        int sep = text.IndexOf(CompositeSeparator, System.StringComparison.Ordinal);
+        if (sep > 0)
+        {
+            string name = text.Substring(0, sep);
+            string description = text.Substring(sep + CompositeSeparator.Length);
+            string translatedName = Loc.TranslateSource(name);
+            string translatedDescription = TranslateObjective(description);
+            if (translatedName != name || translatedDescription != description)
+                return translatedName + CompositeSeparator + translatedDescription;
+        }
+
+        return text;
     }
 
     /// <summary>Sets the display text for this objective.</summary>

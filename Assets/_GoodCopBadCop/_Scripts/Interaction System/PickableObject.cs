@@ -1213,7 +1213,7 @@ public class PickableObject : Interactable
 
         // Reuses the normal free-drop broadcast so clients position the object before NT
         // re-enables, exactly as they would for a player-initiated drop.
-        DropBroadcastClientRpc(position, rotation);
+        DropBroadcastClientRpc(position, rotation, ulong.MaxValue, 0);
     }
 
     /// <summary>
@@ -1263,7 +1263,7 @@ public class PickableObject : Interactable
             NetworkTransform placeNt = GetComponent<NetworkTransform>();
             if (placeNt != null) placeNt.enabled = true;
 
-            DropBroadcastClientRpc(groundPos, transform.rotation);
+            DropBroadcastClientRpc(groundPos, transform.rotation, ulong.MaxValue, 0);
             StartForcedDropSettleSync();
             return;
         }
@@ -1601,6 +1601,41 @@ public class PickableObject : Interactable
     [ServerRpc(RequireOwnership = false)]
     public void DropServerRpc(Vector3 position, Quaternion rotation)
     {
+        DropServer(position, rotation, ulong.MaxValue, 0);
+    }
+
+    /// <summary>
+    /// Local-only (never replicated) counter of this client's own hand actions on this object:
+    /// bumped by every local pickup (<see cref="NoteLocalPickup"/>) and every hand drop
+    /// (<see cref="RequestDropNetworked"/>). A drop's echo (<see cref="DropBroadcastClientRpc"/>)
+    /// carries the value sent with the drop; if the counter has moved on by the time the echo
+    /// lands, this client already picked the object back up and the echo is stale.
+    /// </summary>
+    private uint _localHoldActionSeq;
+
+    /// <summary>Call on the picking-up client as part of an optimistic local pickup.</summary>
+    public void NoteLocalPickup() => _localHoldActionSeq++;
+
+    /// <summary>
+    /// Hand-drop entry point for <see cref="PlayerPickupController"/>. Same as
+    /// <see cref="DropServerRpc"/>, but tags the drop so a stale echo can't detach the object
+    /// from this client's hand if it re-grabs it before the server's broadcast comes back.
+    /// </summary>
+    public void RequestDropNetworked(Vector3 position, Quaternion rotation)
+    {
+        _localHoldActionSeq++;
+        if (_localHoldActionSeq == 0) _localHoldActionSeq = 1; // 0 means "untagged"
+        DropFromHandServerRpc(position, rotation, _localHoldActionSeq);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void DropFromHandServerRpc(Vector3 position, Quaternion rotation, uint requestSeq, ServerRpcParams rpcParams = default)
+    {
+        DropServer(position, rotation, rpcParams.Receive.SenderClientId, requestSeq);
+    }
+
+    private void DropServer(Vector3 position, Quaternion rotation, ulong requesterClientId, uint requestSeq)
+    {
         RemoveParent();
         ClearFolderSlotServer();
 
@@ -1613,7 +1648,7 @@ public class PickableObject : Interactable
         NetworkObject.RemoveOwnership();
 
         // Tell every client the exact drop position so they set it before re-enabling NT.
-        DropBroadcastClientRpc(position, rotation);
+        DropBroadcastClientRpc(position, rotation, requesterClientId, requestSeq);
     }
 
     /// <summary>
@@ -1621,10 +1656,30 @@ public class PickableObject : Interactable
     /// so NT never has a chance to interpolate from its stale pre-pickup buffer position.
     /// Also restores parent sync suppressed during the hold. The Rigidbody stays kinematic —
     /// placed objects are stationary; only <see cref="ThrowServerRpc"/> enables physics.
+    /// <para>
+    /// <paramref name="requesterClientId"/>/<paramref name="requestSeq"/> identify a hand drop
+    /// (see <see cref="RequestDropNetworked"/>); forced/server drops pass
+    /// <c>ulong.MaxValue</c>/<c>0</c> and are always applied.
+    /// </para>
     /// </summary>
     [ClientRpc]
-    private void DropBroadcastClientRpc(Vector3 position, Quaternion rotation)
+    private void DropBroadcastClientRpc(Vector3 position, Quaternion rotation, ulong requesterClientId, uint requestSeq)
     {
+        // Stale echo of this client's own drop: on a non-host client, drop -> re-grab can happen
+        // faster than the server round-trip, so the echo lands AFTER PickUpObject has already
+        // constrained the object to this player's hand. Applying it would tear the constraint
+        // off and re-enable NT, leaving the item frozen at the old drop spot while this player
+        // still plays the hold pose. The server already processed drop then pickup in order, so
+        // nothing else needs undoing here.
+        if (requestSeq != 0
+            && NetworkManager != null
+            && requesterClientId == NetworkManager.LocalClientId
+            && requestSeq != _localHoldActionSeq)
+        {
+            Debug.LogWarning($"[PickableObject] Ignored stale drop echo on '{name}' (drop #{requestSeq}, latest local hand action #{_localHoldActionSeq}).", this);
+            return;
+        }
+
         RemoveParent();
         ClearSocketFollow();
         transform.position = position;
@@ -2070,7 +2125,6 @@ public class PickableObject : Interactable
             col.enabled = value;
         }
 
-        if (interactableColliders.Length <= 0) return;
         foreach (var interactableCollider in interactableColliders)
         {
             if (interactableCollider == null) continue;
@@ -2082,6 +2136,11 @@ public class PickableObject : Interactable
             interactableCollider.enabled = value;
             interactableCollider.GetComponent<Collider>().enabled = value;
         }
+
+        // Re-enabling must never leave a carried item with live solid colliders (they push the
+        // holder backwards through walls). Re-assert the held state owned by the collider controller.
+        if (value && IsHeld)
+            _colliderController?.SetHeld();
     }
 
     /// <summary>

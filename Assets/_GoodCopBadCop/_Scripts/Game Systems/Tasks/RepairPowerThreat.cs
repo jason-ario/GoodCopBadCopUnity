@@ -27,20 +27,20 @@ public class RepairPowerThreat : ISystemicThreat
     private bool _isResolved;
     private Step _step = Step.InvestigateFuseBox;
 
-    public string ThreatName => "Restore Power";
+    public string ThreatName => Loc.N("Restore Power");
 
     public string ThreatDescription
     {
         get
         {
-            if (_isResolved) return "Power restored.";
+            if (_isResolved) return Loc.N("Power restored.");
 
             return _step switch
             {
-                Step.InvestigateFuseBox => "Go to the power station and open the fuse box. The booth panel can't fix this outage.",
-                Step.InsertFuses        => "Find and add the fuses to the fuse box.",
-                Step.PullLever          => "Pull the lever to reactivate the power.",
-                _                       => "The grid is down. Replace the blown fuses at the power station's fuse box to restore power.",
+                Step.InvestigateFuseBox => Loc.N("Go to the power station and open the fuse box. The booth panel can't fix this outage."),
+                Step.InsertFuses        => Loc.N("Find and add the fuses to the fuse box."),
+                Step.PullLever          => Loc.N("Pull the lever to reactivate the power."),
+                _                       => Loc.N("The grid is down. Replace the blown fuses at the power station's fuse box to restore power."),
             };
         }
     }

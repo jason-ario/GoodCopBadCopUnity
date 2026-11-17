@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using HighlightPlus;
 using TMPro;
 using UnityEngine;
@@ -48,11 +49,47 @@ public class MailCubbySlot : MonoBehaviour
     [Tooltip("Optional per-cubby outline highlight. Not used by MailCubbyManager (which highlights the configured Mail Cubbies stand roots and Confiscate mail bin together — see MailCubbyManager.HighlightDeliveryDestinations) — kept here only for callers that want to call out one specific cubby. Falls back to GetComponent<HighlightEffect>() if unassigned. SetHighlight() is a no-op if this is left unassigned and no HighlightEffect is found.")]
     [SerializeField] private HighlightEffect _highlightEffect;
 
-    [Tooltip("Optional locker door guarding this cubby's opening (see \"Door Hinge/Locker Door\"). While assigned and closed, packages are rejected even if something manages to clip into the trigger zone — the door's own collider is what normally blocks physical entry, this is just a defensive backstop. Falls back to GetComponentInChildren<LockerDoorInteractable>() if unassigned.")]
+    [Tooltip("Optional locker door guarding this cubby's opening (see \"Door Hinge/Locker Door\"). While assigned and closed, packages cannot be placed into this cubby, and any package sitting inside it cannot be picked up. Falls back to GetComponentInChildren<LockerDoorInteractable>() if unassigned.")]
     [SerializeField] private LockerDoorInteractable _lockerDoor;
 
     /// <summary>The resident this physical cubby is currently labelled for.</summary>
     public SuspectData AssignedResident => _assignedResident;
+
+    /// <summary>Every enabled cubby, for <see cref="IsInsideClosedCubby"/>.</summary>
+    private static readonly List<MailCubbySlot> s_activeSlots = new List<MailCubbySlot>();
+
+    /// <summary>
+    /// True while this cubby has a locker door and that door is closed (as this client sees it).
+    /// A closed cubby rejects placements (see <see cref="PlacementBoard.SetPlacementBlocker"/>) and
+    /// makes any package sitting inside it non-interactable (see <see cref="IsInsideClosedCubby"/>).
+    /// </summary>
+    public bool IsDoorClosed => _lockerDoor != null && !_lockerDoor.IsOpenLocally;
+
+    /// <summary>
+    /// True if <paramref name="point"/> lies inside the volume (<see cref="_triggerZone"/>) of any
+    /// enabled cubby whose locker door is currently closed. Used by
+    /// <see cref="MailPackageItem.IsInteractable"/> so a package shut inside a cubby can't be
+    /// picked back out through the closed door, regardless of how the interaction ray resolves
+    /// against the cubby/door colliders.
+    /// </summary>
+    public static bool IsInsideClosedCubby(Vector3 point)
+    {
+        for (int i = 0; i < s_activeSlots.Count; i++)
+        {
+            MailCubbySlot slot = s_activeSlots[i];
+            if (slot == null || !slot.IsDoorClosed) continue;
+
+            Collider zone = slot._triggerZone;
+            if (zone == null || !zone.enabled) continue;
+            if (!zone.bounds.Contains(point)) continue;
+
+            // ClosestPoint returns the point itself when it is inside the collider.
+            if ((zone.ClosestPoint(point) - point).sqrMagnitude < 0.0001f)
+                return true;
+        }
+
+        return false;
+    }
 
     /// <summary>The full name of the resident assigned to this cubby, matching the format used by <see cref="MailPackageItem.ResidentName"/>. Display/log purposes only — sort-matching uses <see cref="ResidentId"/> instead, since display names are fragile to compare (whitespace, casing, typos between a resident's display name and this cubby's label).</summary>
     public string ResidentName => _assignedResident != null
@@ -126,6 +163,11 @@ public class MailCubbySlot : MonoBehaviour
         if (_lockerDoor == null)
             _lockerDoor = GetComponentInChildren<LockerDoorInteractable>(true);
 
+        // Placement into this cubby is only allowed while its locker door is open — gates the
+        // aim ghost, the snap-radius board search and the commit (see PlacementBoard.IsPlacementBlocked).
+        if (_placementSlot != null)
+            _placementSlot.SetPlacementBlocker(() => IsDoorClosed);
+
         if (_assignedResident == null)
             Debug.LogWarning($"[MailCubbySlot] '{name}' has no assigned resident — this cubby will never accept a delivery.", this);
 
@@ -134,19 +176,28 @@ public class MailCubbySlot : MonoBehaviour
 
     private void OnEnable()
     {
+        if (!s_activeSlots.Contains(this))
+            s_activeSlots.Add(this);
+
         Loc.LanguageChanged += RefreshLabel;
         RefreshLabel();
     }
 
     private void OnDisable()
     {
+        s_activeSlots.Remove(this);
         Loc.LanguageChanged -= RefreshLabel;
     }
 
     private void OnDestroy()
     {
+        s_activeSlots.Remove(this);
+
         if (_placementSlot != null)
+        {
             _placementSlot.OnItemPlaced -= HandleItemPlaced;
+            _placementSlot.SetPlacementBlocker(null);
+        }
     }
 
     /// <summary>
@@ -195,6 +246,14 @@ public class MailCubbySlot : MonoBehaviour
     {
         if (placedObject is not MailPackageItem package) return;
         if (package.IsResolved) return;
+
+        // Defensive backstop: placement is already blocked upstream while the door is closed
+        // (PlacementBoard.IsPlacementBlocked), so this should never be reached with it shut.
+        if (IsDoorClosed)
+        {
+            Debug.LogWarning($"[MailCubbySlot] '{name}' received a package while its locker door is closed — ignoring the sort attempt.", this);
+            return;
+        }
 
         // Optimistically lock the package out of being picked back up the instant it lands in
         // its addressee's cubby, instead of waiting for the RequestSortServerRpc round trip to

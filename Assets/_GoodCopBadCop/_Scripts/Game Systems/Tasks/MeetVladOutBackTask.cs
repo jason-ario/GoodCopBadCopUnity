@@ -6,8 +6,8 @@
 /// </summary>
 public class MeetVladOutBackTask : ISystemicThreat
 {
-    private const string TaskDisplayName = "Meet Vlad out back";
-    private const string TaskDisplayDesc = "He's waiting by the bunker";
+    private static readonly string TaskDisplayName = Loc.N("Meet Vlad out back");
+    private static readonly string TaskDisplayDesc = Loc.N("He's waiting by the bunker");
 
     /// <summary>The currently active instance, or null if none exists.</summary>
     public static MeetVladOutBackTask Current { get; private set; }

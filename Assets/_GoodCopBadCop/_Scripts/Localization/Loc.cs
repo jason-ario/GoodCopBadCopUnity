@@ -437,7 +437,9 @@ public static class Loc
     /// Translates a character / speaker name for display (name tag, dialogue history, interact prompt). Tries the
     /// whole name first ("The Gambler"), then word by word ("Vladislav Syrnikov"). Returns the input unchanged unless
     /// every word is a known name, so ordinary text never gets partially translated. The Names sheet is deliberately
-    /// excluded from render-time lookup: documents, paperwork mismatches and the PC terminal keep their source names.
+    /// excluded from render-time lookup; callers opt in explicitly. Paperwork (ID card, application form) and the PC
+    /// profile DO show translated names, and NameWrongAnomaly misspells them with script-native typos
+    /// (SuspectPaperworkService.MisspellName). PC search stays language-independent via <see cref="NameSearchText"/>.
     /// </summary>
     public static string Name(string english)
     {

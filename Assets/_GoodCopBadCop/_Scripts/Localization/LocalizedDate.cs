@@ -44,7 +44,7 @@ public static class LocalizedDate
 
     /// <summary>
     /// Stand-alone (nominative) month name for headings such as the wall calendar: "October", "Октябрь", "Październik",
-    /// "十月", "10월". Capitalized where the script has case.
+    /// "10月", "10월". Capitalized where the script has case.
     /// </summary>
     public static string StandaloneMonthName(int month) => StandaloneMonthName(month, Loc.CurrentLanguage);
 
@@ -61,8 +61,9 @@ public static class LocalizedDate
             "pt" => PtFull[i],
             "pl" => PlNominative[i],
             "ka" => KaNominative[i],
-            "zh" => ZhNominative[i],
-            "ja" => (i + 1).ToString(CultureInfo.InvariantCulture) + "月",
+            // Modern Chinese writes months with Arabic numerals everywhere, calendars included (GB/T 15835);
+            // "十月" reads literary. "10月" also matches the 年月日 document dates players compare against it.
+            "zh" or "ja" => (i + 1).ToString(CultureInfo.InvariantCulture) + "月",
             "ko" => (i + 1).ToString(CultureInfo.InvariantCulture) + "월",
             _ => CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(i + 1)
         };
@@ -233,6 +234,5 @@ public static class LocalizedDate
     private static readonly string[] PtShort = { "jan.", "fev.", "mar.", "abr.", "maio", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez." };
     private static readonly string[] PlNominative = { "styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień" };
     private static readonly string[] KaNominative = { "იანვარი", "თებერვალი", "მარტი", "აპრილი", "მაისი", "ივნისი", "ივლისი", "აგვისტო", "სექტემბერი", "ოქტომბერი", "ნოემბერი", "დეკემბერი" };
-    private static readonly string[] ZhNominative = { "一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月" };
     private static readonly string[] RomanMonths = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" };
 }

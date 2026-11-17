@@ -5,12 +5,12 @@ using UnityEngine;
 public class TrashCan : Interactable
 {
     private const string DocumentationCategory = "Documentation";
-    private const string DocumentationTutorialIncompleteMessage =
-        "Can't throw away yet";
+    private static string DocumentationTutorialIncompleteMessage => Loc.T("Can't throw away yet");
     private static string SupplyBoxNotEmptyMessage => Loc.T("Empty the box first");
     private static string FolderNotEmptyMessage => Loc.T("Empty the folder first");
     private static string SuspectStillAtWindowMessage => Loc.T("Deliver a verdict first");
-    private const string ConfirmDiscardMessage = "Are you sure you want to throw this away?";
+    private static string ConfirmDiscardTitle => Loc.T("Throw away");
+    private static string ConfirmDiscardMessage => Loc.T("Are you sure you want to throw this away?");
 
     [SerializeField] AudioSource audioSource;
     [SerializeField] AudioClip throwTrashSound;
@@ -110,7 +110,7 @@ public class TrashCan : Interactable
         if (ui == null) return;
 
         ui.ShowGameplayConfirmation(
-            title: "Throw Away",
+            title: ConfirmDiscardTitle,
             body: ConfirmDiscardMessage,
             confirmText: "Yes",
             cancelText: "No",

@@ -63,6 +63,26 @@ public class GameManager : NetworkBehaviour
     public bool HasIntroCutsceneStarted => _networkHasIntroCutsceneStarted.Value;
 
     /// <summary>
+    /// Server-authoritative: true once the host has shown the Day 1 "Go to the booth to start your
+    /// shift" prompt (and the movement tutorial that follows it). Late joiners read it so they don't
+    /// replay onboarding the session has already moved past — clients have no active save slot, so
+    /// <see cref="SaveDataManager.HasSeenIntroTutorial"/> can't gate them.
+    /// </summary>
+    private readonly NetworkVariable<bool> _networkHasShownIntroBoothPrompt = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public bool HasShownIntroBoothPrompt => _networkHasShownIntroBoothPrompt.Value;
+
+    /// <summary>SERVER ONLY. Marks the Day 1 booth prompt as shown on the host.</summary>
+    public void MarkIntroBoothPromptShownServer()
+    {
+        if (!IsServer) return;
+        _networkHasShownIntroBoothPrompt.Value = true;
+    }
+
+    /// <summary>
     /// Marks the intro cutscene as started. Call this server-side when the cutscene is initiated.
     /// </summary>
     public void SetIntroCutsceneStarted()
@@ -458,6 +478,11 @@ public class GameManager : NetworkBehaviour
             SuspectRunRecords.ApplyQuarantineSnapshotFromServer(quarantineNames, quarantineDays);
 
         ShiftManager.Instance.StopIntroCutscene();
+
+        // Day 1 late joiner: skip the booth prompt + movement tutorial if the host already saw it.
+        if (!IsServer && PlayerTutorialUI.Instance != null)
+            PlayerTutorialUI.Instance.CancelIntroPromptIfHostAlreadyShown();
+
         UIController.Instance.ShowPlayerUI();
         MainMenuController.Instance.TransitionToGameplay();
         MainMenuController.Instance.FadeOutCutsceneMusic();

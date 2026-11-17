@@ -66,9 +66,24 @@ public static class IconPrompt
 
     private static string Fragment(string s)
     {
-        s = s.Trim();
+        s = GlueDashes(s.Trim());
         return s.Length == 0 ? s : Loc.Verbatim(s);
     }
+
+    private const char Nbsp = '\u00A0';
+
+    /// <summary>
+    /// Button-hint dashes ("{0} – zbadaj", "(удерживать) — повернуть") must never end or start a wrapped line on
+    /// their own: a leading dash is glued to the next word, and a mid-text dash to the word before it.
+    /// </summary>
+    private static string GlueDashes(string s)
+    {
+        if (s.Length >= 2 && IsDash(s[0]) && s[1] == ' ')
+            s = s[0] + Nbsp.ToString() + s.Substring(2);
+        return s.Replace(" \u2013 ", Nbsp + "\u2013 ").Replace(" \u2014 ", Nbsp + "\u2014 ");
+    }
+
+    private static bool IsDash(char c) => c == '-' || c == '\u2013' || c == '\u2014';
 }
 
 /// <summary>

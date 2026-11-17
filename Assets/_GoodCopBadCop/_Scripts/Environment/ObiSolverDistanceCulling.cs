@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Obi;
+using Unity.Netcode;
 
 /// <summary>
 /// Keeps an ObiSolver's simulation disabled by default, and only enables it
@@ -41,6 +42,23 @@ public class ObiSolverDistanceCulling : MonoBehaviour
              "held, so the rope can visually settle before being frozen. The solver freezes " +
              "sooner than this if the Rigidbody falls asleep first.")]
     [SerializeField] private float settleDuration = 2f;
+
+    [Header("Initial Settle (before first bake)")]
+    [Tooltip("Seconds the solver runs from the blueprint rest pose before the first bake.")]
+    [SerializeField] private float initialSettleDuration = 0.75f;
+
+    [Tooltip("Hard cap on the initial settle, in case the item keeps moving (e.g. client interpolation).")]
+    [SerializeField] private float maxInitialSettleTime = 3f;
+
+    [Tooltip("A per-frame move larger than this (metres) during the initial settle counts as a " +
+             "teleport/network snap and restarts the settle from the rest pose.")]
+    [SerializeField] private float jumpResetDistance = 0.05f;
+
+    [Tooltip("A per-frame rotation larger than this (degrees) during the initial settle counts as a teleport.")]
+    [SerializeField] private float jumpResetAngle = 5f;
+
+    [Tooltip("Max seconds to wait for the NetworkObject to spawn before settling anyway.")]
+    [SerializeField] private float maxSpawnWait = 10f;
 
     private ObiSolver _obiSolver;
     private bool _frozen;
@@ -86,20 +104,105 @@ public class ObiSolverDistanceCulling : MonoBehaviour
         _settleTimer = 0f;
     }
 
+    private bool IsHeld => pickableObject != null && pickableObject.IsHeld;
+
     private System.Collections.IEnumerator Start()
     {
-        // Let the solver run for a couple of frames first so the ropes have an actual
-        // simulated shape (their rest pose) to bake, rather than baking whatever
-        // degenerate/zeroed state they're in before the solver has stepped even once.
-        yield return null;
-        yield return null;
+        // On clients, in-scene/spawned items get snapped to the server's transform during
+        // network sync. If the solver is live when that happens, worldLinearInertiaScale
+        // flings the strands and the first bake freezes them in a stretched pose (it only
+        // corrected itself once someone picked the item up and the solver ran again).
+        // So: wait for the network spawn, then settle from the blueprint rest pose and bake.
+        yield return WaitForNetworkSpawn();
+        yield return null; // let NetworkTransform apply its initial state
+
+        yield return SettleFromRestPose();
 
         _warmedUp = true;
 
-        if (!_frozen && !(pickableObject != null && pickableObject.IsHeld))
+        if (!_frozen && !IsHeld)
         {
             Freeze();
             _obiSolver.enabled = false;
+        }
+    }
+
+    private System.Collections.IEnumerator WaitForNetworkSpawn()
+    {
+        NetworkObject networkObject = GetComponentInParent<NetworkObject>();
+        float timer = 0f;
+        while (networkObject != null
+               && NetworkManager.Singleton != null
+               && NetworkManager.Singleton.IsListening
+               && !networkObject.IsSpawned
+               && timer < maxSpawnWait)
+        {
+            timer += Time.unscaledDeltaTime;
+            yield return null;
+        }
+    }
+
+    /// <summary>
+    /// Resets the ropes to their blueprint pose at the current transform and lets the
+    /// solver run briefly (even off-camera) so the baked mesh is a proper hanging pose.
+    /// Restarts from the rest pose if the item jumps (network snap) mid-settle.
+    /// </summary>
+    private System.Collections.IEnumerator SettleFromRestPose()
+    {
+        if (IsHeld)
+        {
+            yield break;
+        }
+
+        bool previousSimulateWhenInvisible = _obiSolver.simulateWhenInvisible;
+        _obiSolver.simulateWhenInvisible = true;
+
+        ResetRopesToRestPose();
+
+        Vector3 lastPosition = transform.position;
+        Quaternion lastRotation = transform.rotation;
+        float settleTimer = 0f;
+        float totalTimer = 0f;
+        int frames = 0;
+        float jumpSqr = jumpResetDistance * jumpResetDistance;
+
+        while ((settleTimer < initialSettleDuration || frames < 2) && totalTimer < maxInitialSettleTime)
+        {
+            yield return null;
+
+            if (IsHeld)
+            {
+                break;
+            }
+
+            settleTimer += Time.deltaTime;
+            totalTimer += Time.unscaledDeltaTime;
+            frames++;
+
+            bool jumped = (transform.position - lastPosition).sqrMagnitude > jumpSqr
+                          || Quaternion.Angle(transform.rotation, lastRotation) > jumpResetAngle;
+            lastPosition = transform.position;
+            lastRotation = transform.rotation;
+
+            if (jumped)
+            {
+                ResetRopesToRestPose();
+                settleTimer = 0f;
+                frames = 0;
+            }
+        }
+
+        _obiSolver.simulateWhenInvisible = previousSimulateWhenInvisible;
+    }
+
+    private void ResetRopesToRestPose()
+    {
+        foreach (FrozenRope rope in _frozenRopes)
+        {
+            if (rope.liveRenderer != null && rope.liveRenderer.actor != null && rope.liveRenderer.actor.isLoaded)
+            {
+                rope.liveRenderer.actor.ResetParticles();
+            }
         }
     }
 
@@ -116,9 +219,8 @@ public class ObiSolverDistanceCulling : MonoBehaviour
 
     private void Update()
     {
-        // Skip all culling logic for the first couple of frames - Start() is baking an
-        // initial mesh from the solver's actual rest pose so the rope doesn't briefly
-        // vanish/look empty before there's anything valid to freeze into.
+        // Skip all culling logic until Start() has waited for the network spawn and
+        // settled the ropes from their rest pose - it does the first bake itself.
         if (!_warmedUp)
         {
             return;

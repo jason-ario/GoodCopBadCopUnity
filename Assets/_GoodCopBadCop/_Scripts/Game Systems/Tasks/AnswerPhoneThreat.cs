@@ -10,12 +10,12 @@ public class AnswerPhoneThreat : ISystemicThreat
     private readonly string _threatName;
     private readonly string _threatDescription;
 
-    public AnswerPhoneThreat(
-        string threatName = "Answer the Phone",
-        string threatDescription = "The booth phone is ringing — HQ is calling. Pick it up.")
+    /// <param name="threatName">English source text; null uses the default (translated at display time).</param>
+    /// <param name="threatDescription">English source text; null uses the default.</param>
+    public AnswerPhoneThreat(string threatName = null, string threatDescription = null)
     {
-        _threatName = threatName;
-        _threatDescription = threatDescription;
+        _threatName = threatName ?? Loc.N("Answer the Phone");
+        _threatDescription = threatDescription ?? Loc.N("The booth phone is ringing — HQ is calling. Pick it up.");
     }
 
     public string ThreatName => _threatName;

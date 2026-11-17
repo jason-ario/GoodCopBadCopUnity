@@ -9,11 +9,11 @@ public class FixElectricalPanelThreat : ISystemicThreat
 {
     private bool _isResolved;
 
-    public string ThreatName => "Fix the Power";
+    public string ThreatName => Loc.N("Fix the Power");
 
     public string ThreatDescription => _isResolved
-        ? "Power restored."
-        : "Fix the power at the electrical panel: flip every breaker on, then turn the knob.";
+        ? Loc.N("Power restored.")
+        : Loc.N("Fix the power at the electrical panel: flip every breaker on, then turn the knob.");
 
     /// <summary>1 while unresolved, 0 once the power has been restored.</summary>
     public float ThreatLevel => _isResolved ? 0f : 1f;

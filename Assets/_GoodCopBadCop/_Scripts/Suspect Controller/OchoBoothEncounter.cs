@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -151,7 +151,8 @@ public class OchoBoothEncounter : NetworkBehaviour
     {
         SuspectController.OnApplicationFormSpawned -= HandleApplicationFormSpawned;
         SuspectController.OnPaperworkSpawned -= HandlePaperworkSpawned;
-        if (_self != null) _self.ClearUncannyGlitchPresence();
+        // Runs on every peer — clients never receive the server-only OnCurrentSuspectDespawned.
+        if (_self != null) _self.ClearUncannyGlitchPresenceLocal();
         base.OnNetworkDespawn();
     }
 
@@ -179,7 +180,9 @@ public class OchoBoothEncounter : NetworkBehaviour
     {
         SuspectController.OnPaperworkSpawned -= HandlePaperworkSpawned;
         ActivateFakeIdAnomaly(idCard);
-        _self.TriggerUncannyGlitchPresence();
+        // Local, not server-gated: this handler already runs on every peer, and the glitch is a
+        // per-peer visual. The server-gated variant left non-host clients without the effect.
+        _self.TriggerUncannyGlitchPresenceLocal();
     }
 
     /// <summary>
@@ -511,6 +514,7 @@ public class OchoBoothEncounter : NetworkBehaviour
         {
             SFXController.Instance?.Play(_stingerClip);
             SetVisible(false);
+            if (_self != null) _self.ClearUncannyGlitchPresenceLocal();
             yield break;
         }
 
@@ -557,6 +561,9 @@ public class OchoBoothEncounter : NetworkBehaviour
         }
 
         SetVisible(false);
+
+        // He's gone on this peer — end the screen glitch locally (every peer runs this RPC path).
+        if (_self != null) _self.ClearUncannyGlitchPresenceLocal();
 
         // Restore his real transform so nothing is left offset once he's despawned (or in case
         // despawn is delayed for any reason).

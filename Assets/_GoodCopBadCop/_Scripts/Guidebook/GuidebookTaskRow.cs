@@ -47,10 +47,11 @@ public class GuidebookTaskRow : MonoBehaviour
         _threat = threat;
 
         if (_nameLabel != null)
-            _nameLabel.text = Loc.TranslateSource(threat.ThreatName).ToUpper();
+            _nameLabel.text = Loc.TranslateFormatted(threat.ThreatName).ToUpper();
 
+        // Translate here: render-time lookup can't resolve descriptions filled from a "{0}" source.
         if (_descriptionLabel != null)
-            _descriptionLabel.text = threat.ThreatDescription;
+            _descriptionLabel.text = Loc.Verbatim(Loc.TranslateFormatted(threat.ThreatDescription));
 
         if (_rewardLabel != null)
             _rewardLabel.text = $"{threat.ThreatLevel:P0}";

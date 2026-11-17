@@ -329,24 +329,42 @@ namespace GoodCopBadCop.SuspectPaperwork
         {
             if (string.IsNullOrWhiteSpace(value))
                 return Loc.CurrentLanguage == Loc.SourceLanguage ? "WRONG NAME" : Loc.Get("doc.wrong_name");
+            return MisspellName(value, seed);
+        }
+
+        /// <summary>
+        /// Deterministically misspells a (possibly translated) name using typos native to its script, so the mistake
+        /// reads like a clerical error rather than a rendering bug: Latin/Cyrillic/Georgian swap a letter within their
+        /// alphabet, Hangul swaps a syllable's vowel for a similar one (렉 → 랙), and kana/kanji/hanzi swap for a
+        /// look-alike or same-sounding character (シ → ツ, 克 → 科). Whitespace (incl. U+00A0), punctuation and
+        /// characters with no known typo are never touched. Dense scripts (one syllable per character) get at most
+        /// two changes. Returns <paramref name="value"/> + "?" if nothing in it can be misspelled.
+        /// </summary>
+        public static string MisspellName(string value, int seed)
+        {
+            if (string.IsNullOrEmpty(value))
+                return value + "?";
 
             char[] chars = value.ToCharArray();
             List<int> candidates = new();
+            bool dense = false;
             for (int i = 0; i < chars.Length; i++)
             {
-                if (!char.IsWhiteSpace(chars[i]))
-                    candidates.Add(i);
+                if (!CanMisspell(chars[i])) continue;
+                candidates.Add(i);
+                dense |= IsDenseScript(chars[i]);
             }
 
             if (candidates.Count == 0)
                 return value + "?";
 
-            int changes = Mathf.Min(candidates.Count, 1 + PositiveModulo(seed, Mathf.Min(3, candidates.Count)));
+            int maxChanges = Mathf.Min(dense ? 2 : 3, candidates.Count);
+            int changes = 1 + PositiveModulo(seed, maxChanges);
             for (int i = 0; i < changes; i++)
             {
                 int candidateIndex = PositiveModulo(Mix(seed, i), candidates.Count);
                 int charIndex = candidates[candidateIndex];
-                chars[charIndex] = MutateLetterPreservingCase(chars[charIndex], Mix(seed, i + 17));
+                chars[charIndex] = MisspellChar(chars[charIndex], Mix(seed, i + 17));
                 candidates.RemoveAt(candidateIndex);
             }
 
@@ -355,19 +373,82 @@ namespace GoodCopBadCop.SuspectPaperwork
 
         private const string LatinLetters = "abcdefghijklmnopqrstuvwxyz";
         private const string CyrillicLetters = "абвгдежзийклмнопрстуфхцчшщъыьэюя";
+        private const string GeorgianLetters = "აბგდევზთიკლმნოპჟრსტუფქღყშჩცძწჭხჯჰ";
+
+        private static bool IsCyrillic(char c) => c >= '\u0400' && c <= '\u04FF';
+        private static bool IsLatin(char c) => c < '\u0250' && char.IsLetter(c);
+        private static bool IsGeorgian(char c) => GeorgianLetters.IndexOf(c) >= 0;
+        private static bool IsHangulSyllable(char c) => c >= '\uAC00' && c <= '\uD7A3';
+        private static bool IsDenseScript(char c) => IsHangulSyllable(c) || LookAlikes.ContainsKey(c);
+
+        private static bool CanMisspell(char c)
+            => IsLatin(c) || (IsCyrillic(c) && char.IsLetter(c)) || IsGeorgian(c) || IsHangulSyllable(c) || LookAlikes.ContainsKey(c);
+
+        /// <summary>Replaces one character with a typo from the same script. Always returns a different character.</summary>
+        private static char MisspellChar(char original, int seed)
+        {
+            if (LookAlikes.TryGetValue(original, out string options))
+                return options[PositiveModulo(seed, options.Length)];
+            if (IsHangulSyllable(original))
+                return SwapHangulVowel(original);
+            if (IsGeorgian(original))
+                return PickDifferent(GeorgianLetters, original, seed);
+
+            char lower = char.ToLowerInvariant(original);
+            char replacement = PickDifferent(IsCyrillic(lower) ? CyrillicLetters : LatinLetters, lower, seed);
+            return char.IsUpper(original) ? char.ToUpperInvariant(replacement) : replacement;
+        }
+
+        private static char PickDifferent(string alphabet, char original, int seed)
+        {
+            char replacement = alphabet[PositiveModulo(seed, alphabet.Length)];
+            return replacement == original ? alphabet[PositiveModulo(seed + 1, alphabet.Length)] : replacement;
+        }
+
+        // Hangul vowel (jungseong) index → visually/phonetically close vowel: ㅏ↔ㅓ, ㅐ↔ㅔ, ㅗ↔ㅜ, ㅛ↔ㅠ, ㅡ→ㅜ, ㅣ→ㅢ ...
+        private static readonly int[] HangulVowelSwap = { 4, 5, 6, 7, 0, 1, 2, 3, 13, 14, 15, 16, 17, 8, 9, 10, 11, 12, 13, 20, 19 };
+
+        /// <summary>Keeps the syllable's initial and final consonants and swaps its vowel (렉 → 랙, 소 → 수).</summary>
+        private static char SwapHangulVowel(char syllable)
+        {
+            int index = syllable - 0xAC00;
+            int initial = index / 588;
+            int vowel = (index % 588) / 28;
+            int final = index % 28;
+            return (char)(0xAC00 + initial * 588 + HangulVowelSwap[vowel] * 28 + final);
+        }
 
         /// <summary>
-        /// Replaces a letter with another letter from the SAME script (Cyrillic names get Cyrillic typos), preserving
-        /// case. The replacement always differs from the original so the misspelling is guaranteed to be visible.
+        /// Kana and CJK typos: each character maps to look-alike or same-sounding replacements a clerk could plausibly
+        /// write instead (dakuten/small-kana slips, シ/ツ, ソ/ン, 木/本, 克/科). Covers every kana and hanzi/kanji used in
+        /// the Names sheet; characters without an entry (ー, ・, rare kanji) are left alone. Replacements are common
+        /// characters so the Japanese/Chinese document fonts render them.
         /// </summary>
-        private static char MutateLetterPreservingCase(char original, int seed)
+        private static readonly Dictionary<char, string> LookAlikes = BuildLookAlikes(
+            // Katakana
+            "アマァ", "イィ", "ウワゥ", "エェ", "オォ", "カガヤ", "ガカ", "キギ", "ギキ", "クタケ", "グク", "ケクゲ", "ゲケ",
+            "コゴロ", "ゴコ", "サザ", "ザサ", "シツジ", "ジシ", "スヌズ", "ズス", "セゼ", "ゼセ", "ソンゾ", "ゾソ",
+            "タクダ", "ダタ", "チテ", "ツシッ", "ッツ", "テチデ", "デテ", "トド", "ドト", "ナメ", "ニミ", "ヌス", "ネホ",
+            "ノメ", "ハバパ", "バハパ", "パハバ", "ヒビピ", "ビヒピ", "ピヒビ", "フブプ", "ブフプ", "プフブ",
+            "ヘベペ", "ベヘペ", "ペヘベ", "ホボポ", "ボホポ", "ポホボ", "マア", "ミニ", "ムヌ", "メノナ",
+            "ヤャ", "ャヤ", "ユュ", "ュユ", "ヨョ", "ョヨ", "ラヲ", "リソ", "ルレ", "レル", "ロコ", "ワウ", "ヲラ",
+            "ンソ", "ヴウブ", "ァア", "ィイ", "ゥウ", "ェエ", "ォオ",
+            // Hanzi (zh-Hans transliterations) and kanji (ja-JP titles)
+            "阿啊", "列烈", "克科", "谢榭", "比毕", "齐奇", "纳娜", "奇琦", "科柯", "迪笛", "奥澳", "尼妮", "斯思",
+            "埃艾", "姆母", "扎札", "尔儿", "吉基", "维伟", "古谷", "拉啦", "格戈", "万湾", "察查", "伊依", "娅亚",
+            "琳林", "亚娅", "沙莎", "卢芦", "卡咔", "玛马", "丽莉", "穆沐", "特忒", "妮尼", "诺若", "娜纳", "关官",
+            "你您", "帕怕", "夫弗", "莱来", "佩培", "雷蕾", "桑嗓", "德得", "罗萝", "绍邵", "肖萧", "塔搭", "铁帖",
+            "木本", "蒂缔", "弗佛", "季李", "切彻", "利莉", "萨撒", "巴芭", "泽择", "贝呗", "里理", "啥哈", "事是",
+            "达大", "多朵", "舍社", "什仕", "加伽", "贾价", "希稀", "库酷", "洛络", "兹滋", "梅枚", "迈麦", "苏酥",
+            "索锁", "瑟琴", "采彩", "捷睫", "士土", "兵丘", "屠徒", "神伸", "父文", "赌睹", "徒徙", "肉内", "屋居",
+            "西茜", "戈格", "娃哇", "米迷", "基吉", "宁柠", "凯恺");
+
+        private static Dictionary<char, string> BuildLookAlikes(params string[] entries)
         {
-            char lower = char.ToLowerInvariant(original);
-            string alphabet = CyrillicLetters.IndexOf(lower) >= 0 || (lower >= '\u0400' && lower <= '\u04FF') ? CyrillicLetters : LatinLetters;
-            char replacement = alphabet[PositiveModulo(seed, alphabet.Length)];
-            if (replacement == lower)
-                replacement = alphabet[PositiveModulo(seed + 1, alphabet.Length)];
-            return char.IsUpper(original) ? char.ToUpperInvariant(replacement) : replacement;
+            var map = new Dictionary<char, string>();
+            foreach (string entry in entries)
+                map[entry[0]] = entry.Substring(1);
+            return map;
         }
 
         // ── Localized rendering of language-neutral values ───────────────────────────

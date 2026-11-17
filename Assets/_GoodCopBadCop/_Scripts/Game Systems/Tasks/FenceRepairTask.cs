@@ -181,7 +181,7 @@ public class FenceRepairTask : NetworkBehaviour, ISystemicThreat
     /// <summary>Dynamic description updated as fences are repaired.</summary>
     public string TaskDescription =>
         IsComplete
-            ? "All fence segments repaired!"
+            ? Loc.N("All fence segments repaired!")
             : $"{RepairedCount}/{TotalCount}";
 
     /// <summary>Fired on every client whenever the repaired/total counts change.</summary>

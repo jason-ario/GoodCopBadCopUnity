@@ -56,7 +56,7 @@ namespace GoodCopBadCop.Editor.Tests
         [TestCase("en", "October")]
         [TestCase("ru", "Октябрь")]
         [TestCase("pl", "Październik")]
-        [TestCase("zh-Hans", "十月")]
+        [TestCase("zh-Hans", "10月")]
         [TestCase("ko-KR", "10월")]
         public void StandaloneMonth(string lang, string expected)
             => Assert.AreEqual(expected, LocalizedDate.StandaloneMonthName(10, lang));

@@ -334,6 +334,7 @@ public class SuspectCharacter : Interactable
     /// </summary>
     public void ActivateFullMutantForm()
     {
+        _fullMutantFormActive = true;
         if (_baseVersion != null) _baseVersion.SetActive(false);
         if (_mutatedVersion != null) _mutatedVersion.SetActive(true);
 
@@ -349,6 +350,18 @@ public class SuspectCharacter : Interactable
 
         AssignMutatedAnimator();
         ActivateFullMutantFormClientRpc();
+    }
+
+    /// <summary>
+    /// Suspects are always moved on the root (DOTween / NavMeshAgent / NetworkTransform), and their
+    /// Animators usually live on child models. Root motion would only slide the mesh away from its
+    /// collider, e.g. the Vomit clip drifts down and forward each play and sank suspects into the
+    /// booth. Covers base, per-variant and mutated models, including inactive ones.
+    /// </summary>
+    private void DisableRootMotionOnAllAnimators()
+    {
+        foreach (Animator anim in GetComponentsInChildren<Animator>(true))
+            anim.applyRootMotion = false;
     }
 
     /// <summary>
@@ -369,6 +382,7 @@ public class SuspectCharacter : Interactable
         }
 
         animator = mutantAnim;
+        animator.applyRootMotion = false;
 
         var adapter = GetComponent<GoodCopBadCop.SuspectBehaviorAnimation.SuspectBehaviorAnimationAdapter>();
         adapter?.UpdateAnimatorReference(mutantAnim);
@@ -412,6 +426,7 @@ public class SuspectCharacter : Interactable
         if (_mutatedVersion != null && _mutatedVersion.activeSelf)
         {
             if (_isMutant) return; // a real full mutant never reverts
+            _fullMutantFormActive = false;
             _mutatedVersion.SetActive(false);
             _baseVersion.SetActive(true);
             _mutantNetworkAnimator ??= _mutatedVersion.GetComponentInChildren<Unity.Netcode.Components.NetworkAnimator>(true);
@@ -433,6 +448,7 @@ public class SuspectCharacter : Interactable
         }
 
         animator = variantAnim;
+        animator.applyRootMotion = false;
         animator.enabled = !_visualsHidden;
         GetComponent<GoodCopBadCop.SuspectBehaviorAnimation.SuspectBehaviorAnimationAdapter>()?.UpdateAnimatorReference(variantAnim);
 
@@ -528,6 +544,13 @@ public class SuspectCharacter : Interactable
     private void ActivateFullMutantFormClientRpc()
     {
         if (IsServer) return;
+        ApplyFullMutantFormLocal();
+    }
+
+    /// <summary>Client-side visual half of <see cref="ActivateFullMutantForm"/>.</summary>
+    private void ApplyFullMutantFormLocal()
+    {
+        _fullMutantFormActive = true;
         if (_baseVersion != null) _baseVersion.SetActive(false);
         if (_mutatedVersion != null) _mutatedVersion.SetActive(true);
         AssignMutatedAnimator();
@@ -788,8 +811,42 @@ public class SuspectCharacter : Interactable
     [ClientRpc]
     private void SetMutantVoiceClientRpc(bool isMutant = true)
     {
+        // Runs on the host too, so the server keeps an authoritative copy for late-join re-sync.
+        _mutantVoiceActive = isMutant;
         speaking?.SetMutantVoice(isMutant);
     }
+
+    /// <summary>
+    /// Targeted late-join catch-up for the one-shot full-mutant RPCs
+    /// (<see cref="ActivateFullMutantFormClientRpc"/>, <see cref="SetMutantVoiceClientRpc"/>,
+    /// <see cref="TransitionToMutantBehaviorClientRpc"/>). Only applies "on" states: a suspect never
+    /// reverts from full-mutant form, and a reply sent before the server mutated must not undo
+    /// anything set locally by other paths (e.g. the postman's <see cref="ShowMutatedVisualsLocal"/>).
+    /// </summary>
+    [ClientRpc]
+    private void SyncMutantStateClientRpc(bool fullMutantForm, bool mutantVoice, bool updateDisabled,
+        ClientRpcParams rpcParams = default)
+    {
+        if (IsServer) return;
+
+        if (fullMutantForm && !_fullMutantFormActive)
+            ApplyFullMutantFormLocal();
+
+        if (mutantVoice && !_mutantVoiceActive)
+        {
+            _mutantVoiceActive = true;
+            speaking?.SetMutantVoice(true);
+        }
+
+        if (updateDisabled)
+            _suspectUpdateDisabled = true;
+    }
+
+    /// <summary>True once the full-mutant visual form has been applied on this peer.</summary>
+    private bool _fullMutantFormActive;
+
+    /// <summary>Last mutant-voice state set through <see cref="SetMutantVoiceClientRpc"/> on this peer.</summary>
+    private bool _mutantVoiceActive;
 
     [ClientRpc]
     private void PlayUncannyArriveSoundClientRpc()
@@ -1286,6 +1343,7 @@ public class SuspectCharacter : Interactable
     protected override void Awake()
     {
         base.Awake();
+        DisableRootMotionOnAllAnimators();
         handSpawnPos = animator.GetBoneTransform(HumanBodyBones.RightHand);
         suspectRecordViewer = GetComponent<SuspectRecordViewer>();
 
@@ -1415,6 +1473,19 @@ public class SuspectCharacter : Interactable
     public void TriggerUncannyGlitchPresence()
     {
         if (!IsServer) return;
+        TriggerUncannyGlitchPresenceLocal();
+    }
+
+    /// <summary>
+    /// Peer-local variant of <see cref="TriggerUncannyGlitchPresence"/> with no server gate.
+    /// <see cref="GlitchController"/> is a purely local visual, so scripted encounters whose
+    /// trigger already runs on every peer (e.g. Ocho's paperwork beat, raised via a ClientRpc)
+    /// call this so non-host clients get the glitch too. Pair with
+    /// <see cref="ClearUncannyGlitchPresenceLocal"/> on every peer — the server-only
+    /// <see cref="SuspectController.OnCurrentSuspectDespawned"/> never reaches clients.
+    /// </summary>
+    public void TriggerUncannyGlitchPresenceLocal()
+    {
         OnSuspectPresentingUncanny?.Invoke(this, 100);
     }
 
@@ -1430,6 +1501,12 @@ public class SuspectCharacter : Interactable
     public void ClearUncannyGlitchPresence()
     {
         if (!IsServer) return;
+        ClearUncannyGlitchPresenceLocal();
+    }
+
+    /// <summary>Peer-local variant of <see cref="ClearUncannyGlitchPresence"/> with no server gate.</summary>
+    public void ClearUncannyGlitchPresenceLocal()
+    {
         OnSuspectUncannyPresenceCleared?.Invoke(this);
     }
 
@@ -1707,7 +1784,7 @@ public class SuspectCharacter : Interactable
     }
 
     [ClientRpc]
-    private void SyncReplacementClientRpc(bool isReplacement)
+    private void SyncReplacementClientRpc(bool isReplacement, ClientRpcParams rpcParams = default)
     {
         if (IsServer) return;
         _isReplacement = isReplacement;
@@ -1751,10 +1828,55 @@ public class SuspectCharacter : Interactable
             SuspectRunRecords.Instance.SaveRecords();
     }
 
-    private void SyncAnomalySnapshot()
+    /// <summary>
+    /// Server-only. True once this suspect's anomalies have been selected and broadcast at least
+    /// once. Late-join snapshot requests are ignored before this so a client never applies an
+    /// uninitialized (empty) state ahead of the real one.
+    /// </summary>
+    private bool _anomalySnapshotInitialized;
+
+    /// <summary>
+    /// Anomaly selection reaches clients only through the one-shot <see cref="SyncAnomalySnapshotClientRpc"/>
+    /// broadcast at initialization. A client that (re)connects after that sees a freshly spawned
+    /// copy of this suspect with no visual symptoms, so it asks the server for the current snapshot.
+    /// </summary>
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (!IsServer)
+            RequestAnomalySnapshotServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestAnomalySnapshotServerRpc(ServerRpcParams rpcParams = default)
+    {
+        ClientRpcParams target = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { rpcParams.Receive.SenderClientId } }
+        };
+
+        // Legacy world mutants (ActivateAsLegacyMutant) never run an Initialize* method, so the
+        // anomaly gate below must not block the mutant-state catch-up.
+        if (_anomalySnapshotInitialized)
+        {
+            SyncAnomalySnapshot(target);
+
+            if (_isReplacement)
+                SyncReplacementClientRpc(true, target);
+        }
+
+        // Sent after the anomaly snapshot so the mutated form (which hides symptoms) wins.
+        if (_fullMutantFormActive || _mutantVoiceActive || _suspectUpdateDisabled)
+            SyncMutantStateClientRpc(_fullMutantFormActive, _mutantVoiceActive, _suspectUpdateDisabled, target);
+    }
+
+    private void SyncAnomalySnapshot(ClientRpcParams rpcParams = default)
     {
         if (anomalyController == null)
             return;
+
+        _anomalySnapshotInitialized = true;
 
         anomalyController.BuildSnapshot(
             out int[] activeAnomalyIds,
@@ -1774,7 +1896,8 @@ public class SuspectCharacter : Interactable
             tentacleFlatIndices,
             tumorAnomalyIds,
             tumorCounts,
-            tumorFlatIndices);
+            tumorFlatIndices,
+            rpcParams);
     }
 
     [ClientRpc]
@@ -1786,7 +1909,8 @@ public class SuspectCharacter : Interactable
         int[] tentacleFlatIndices,
         int[] tumorAnomalyIds,
         int[] tumorCounts,
-        int[] tumorFlatIndices)
+        int[] tumorFlatIndices,
+        ClientRpcParams rpcParams = default)
     {
         if (IsServer)
             return;

@@ -120,12 +120,15 @@ public class CleanGraffitiTask : NetworkBehaviour, ISystemicThreat, IDailyTask
         ? 1f - Mathf.Clamp01((float)_scrubbed.Value / _totalCount.Value)
         : 0f;
 
-    /// <summary>Dynamic description reflects current scrub progress.</summary>
+    /// <summary>
+    /// Bare "scrubbed/total" counter while in progress (the localized ThreatName already says what
+    /// to do); English words next to live numbers never match a localization row.
+    /// </summary>
     public string ThreatDescription =>
         _isComplete
-            ? $"All {_totalCount.Value} pieces scrubbed!"
+            ? string.Format(Loc.N("All {0} pieces scrubbed!"), _totalCount.Value)
             : _totalCount.Value > 0
-                ? $"Scrub graffiti: {_scrubbed.Value}/{_totalCount.Value}"
+                ? $"{_scrubbed.Value}/{_totalCount.Value}"
                 : string.Empty;
 
     /// <summary>

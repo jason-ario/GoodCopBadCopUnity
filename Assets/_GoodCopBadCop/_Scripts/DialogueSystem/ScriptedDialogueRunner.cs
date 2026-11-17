@@ -57,6 +57,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// </summary>
     public static bool IsScriptedModeActive { get; private set; }
 
+    /// <summary>
+    /// Local-only. True while a scripted sequence actually holds the local player's dialogue lock
+    /// (movement/look). False for participants a sequence deliberately leaves free to move (outside
+    /// players in a sequence without lockOutsidePlayers / world camera), even though
+    /// <see cref="IsScriptedModeActive"/> is true for them. Control/look re-enable guards use this so
+    /// a free participant isn't left stuck after a pause menu (or any other UI) temporarily took control.
+    /// </summary>
+    public static bool IsLocalPlayerDialogueLocked =>
+        IsScriptedModeActive && (Instance == null || Instance._clientEnteredDialogueLock);
+
     // Server-only: true while a scripted sequence is running, independent of whether the host
     // player is a participant. Drives proximity joins and leave/rejoin validation.
     private bool _serverSequenceActive;
@@ -2035,6 +2045,51 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void SetActiveOverrideCamClientRpc(string key, ClientRpcParams rpcParams = default)
     {
         ApplyOverrideCam(key);
+        EnsureLocalDialogueLockForOverrideCam();
+    }
+
+    /// <summary>
+    /// A dialogue camera cut makes this an active, locked dialogue for the local participant. An
+    /// outside participant of a sequence without lockOutsidePlayers / world camera entered scripted
+    /// mode free to move (see <see cref="EnterScriptedModeClientRpc"/>), yet still receives the
+    /// override cams — by default the speaker's booth SuspectCam. Without this they kept walking and
+    /// interacting while the view sat inside the checkpoint, their headless first-person body and
+    /// camera-mounted arms rendered from that camera. Lock them through the normal outside path
+    /// (movement/look/interaction locked, body/arms/held item and other players' bodies, items and
+    /// name tags hidden); every exit path already releases it via ExitScriptedDialogueModeOutside.
+    /// Not used by <see cref="LateJoinClientRpc"/>, which takes the lock itself right after.
+    /// </summary>
+    private void EnsureLocalDialogueLockForOverrideCam()
+    {
+        if (_activeOverrideCam == null || !_activeOverrideCam.activeInHierarchy) return;
+
+        // Active participants only. IsScriptedModeActive is set solely by the participant-targeted
+        // Enter/LateJoin RPCs and cleared when a participant leaves, so overhearing / non-joined /
+        // backed-out players never pass this (they also never receive RunDialogue's participant-
+        // targeted camera cuts, keep their own camera and keep their body visible).
+        if (!IsScriptedModeActive || _clientEnteredDialogueLock) return;
+
+        // Speaker dialogues only. Megaphone sequences broadcast their camera RPC to every client
+        // with no speaker (_clientSpeakerNetId == 0) — players hearing a megaphone are never locked here.
+        if (_clientSpeakerNetId == 0) return;
+
+        if (PlayerInstance.Instance == null || DialogueChoiceSystem.Instance == null) return;
+
+        // A world conversation the player started during the free sequence owns the lock — leave it.
+        if (DialogueChoiceSystem.IsInDialogueMode || SuspectWorldDialogue.IsLocalPlayerInConversation) return;
+
+        Transform speakerRoot = null;
+        if (NetworkManager.Singleton != null &&
+            NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(_clientSpeakerNetId, out var speakerObject))
+            speakerRoot = speakerObject.transform;
+
+        // Outside path: never activates SuspectController's cam (the override cam is already live)
+        // and is released by the outside exit used for every LocalUsesWorldDialoguePath player.
+        EnterOutsideDialogueFacingSpeaker(speakerRoot);
+        _clientEnteredDialogueLock = true;
+
+        Debug.Log("[ScriptedDialogueRunner] Free outside participant locked — dialogue camera cut " +
+                  $"'{_activeOverrideCam.name}' made this an active locked dialogue.");
     }
 
     /// <summary>Local body of <see cref="SetActiveOverrideCamClientRpc"/> — also used by

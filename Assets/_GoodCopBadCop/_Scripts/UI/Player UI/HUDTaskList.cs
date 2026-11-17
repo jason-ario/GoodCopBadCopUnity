@@ -44,22 +44,14 @@ public class HUDTaskList : MonoBehaviour
     {
         TaskRegistry.OnTaskListChanged += Rebuild;
         TaskRegistry.OnTaskStateChanged += RefreshLabels;
-        Loc.LanguageChanged += RelabelForLanguage;
+        // No Loc.LanguageChanged handler: rows hold English source text (see BuildLabel) and
+        // TutorialObjectiveItem re-translates it itself, on the host and on mirroring clients.
     }
 
     private void OnDestroy()
     {
         TaskRegistry.OnTaskListChanged -= Rebuild;
         TaskRegistry.OnTaskStateChanged -= RefreshLabels;
-        Loc.LanguageChanged -= RelabelForLanguage;
-    }
-
-    /// <summary>Rows hold already-translated labels, so rebuild them in the new language (without the progress cue).</summary>
-    private void RelabelForLanguage()
-    {
-        foreach (KeyValuePair<ISystemicThreat, TutorialObjectiveItem> kvp in _rows)
-            if (kvp.Value != null)
-                kvp.Value.ReplaceTextSilently(BuildLabel(kvp.Key));
     }
 
     private void OnEnable() => Rebuild();
@@ -179,13 +171,20 @@ public class HUDTaskList : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Builds the row's ENGLISH source text ("Name" or "Name: description"). It must stay untranslated:
+    /// it becomes the row's <see cref="TutorialObjectiveItem.RawText"/>, which the row re-translates on
+    /// every language change and which <see cref="ObjectiveListSync"/> mirrors from host to clients.
+    /// Pre-translating it here froze the host's language into the row, e.g. "Sort mail" shown in
+    /// Russian to an English client (or after switching language). <see cref="TutorialObjectiveItem"/>
+    /// translates the two halves of the composite separately.
+    /// </summary>
     private static string BuildLabel(ISystemicThreat threat)
     {
-        // Translate each part before composing; the combined "Name: desc" has no source row.
-        string name = Loc.TranslateSource(threat.ThreatName);
-        bool hasDescription = !string.IsNullOrEmpty(threat.ThreatDescription);
-        return Loc.Verbatim(hasDescription
-            ? $"{name}: {Loc.TranslateSource(threat.ThreatDescription)}"
-            : name);
+        string name = threat.ThreatName ?? string.Empty;
+        string description = threat.ThreatDescription;
+        return string.IsNullOrEmpty(description)
+            ? name
+            : name + TutorialObjectiveItem.CompositeSeparator + description;
     }
 }

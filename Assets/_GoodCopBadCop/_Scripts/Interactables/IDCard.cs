@@ -136,7 +136,7 @@ public class IDCard : FolderItem
       birthDateText.text = state.BirthDate;
       expDateText.text = state.ExpirationDate;
       idNoText.text = FormatIdNumber(state.IdNumber);
-      residentText.text = state.IsResident ? "* Resident of Saplavi *" : "Non-Resident";
+      residentText.text = ResidentLabel(state.IsResident);
       ApplyIdVisualState(state.IsFakeId, state.IsResident);
       if (state.IdPhoto != null)
          SetIdPhotoTexture(state.IdPhoto);
@@ -162,9 +162,15 @@ public class IDCard : FolderItem
          expDateText.text = syncedExpiry.Value.ToString();
          idNoText.text = FormatIdNumber(syncedIdNumber.Value.ToString());
       }
-      residentText.text = syncedIsResident.Value ? "* Resident of Saplavi *" : "Non-Resident";
+      residentText.text = ResidentLabel(syncedIsResident.Value);
       ApplyIdVisualState(syncedIsFakeId.Value, syncedIsResident.Value);
    }
+
+   /// <summary>
+   /// "* Resident of Saplavi *" keeps its English literal: the label's own UI row translates it at render time.
+   /// "Non-Resident" has no label row, so it goes through Loc.T (Code.csv).
+   /// </summary>
+   private static string ResidentLabel(bool isResident) => isResident ? "* Resident of Saplavi *" : Loc.T("Non-Resident");
 
    private bool TryBuildLocalized(out SuspectPaperworkState state)
    {
@@ -187,7 +193,7 @@ public class IDCard : FolderItem
    private void OnIdNumberChanged(FixedString512Bytes previous, FixedString512Bytes current) => ApplySyncedTextState();
 
    /// <summary>The ID number is printed in the card's top-right corner with its own label, since there is no separate "ID:" label object.</summary>
-   private static string FormatIdNumber(string idNumber) => string.IsNullOrEmpty(idNumber) ? string.Empty : "ID: " + idNumber;
+   private static string FormatIdNumber(string idNumber) => string.IsNullOrEmpty(idNumber) ? string.Empty : Loc.T("ID: {0}", idNumber);
    private void OnIdPhotoNameChanged(FixedString512Bytes previous, FixedString512Bytes current)
    {
       ApplyIdPhotoByNameOrFallback(current.ToString(), syncedSuspectRef.Value);

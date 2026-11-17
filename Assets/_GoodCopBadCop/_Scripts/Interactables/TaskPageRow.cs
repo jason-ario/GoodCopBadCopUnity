@@ -77,8 +77,9 @@ public class TaskPageRow : MonoBehaviour
     {
         if (_label == null || _threat == null) return;
 
-        string name = Loc.TranslateSource(_threat.ThreatName);
-        string description = Loc.TranslateSource(_threat.ThreatDescription);
+        // TranslateFormatted also resolves descriptions filled from a "{0}" source ("3 mutants remain").
+        string name = Loc.TranslateFormatted(_threat.ThreatName);
+        string description = Loc.TranslateFormatted(_threat.ThreatDescription);
         _label.text = Loc.Verbatim(string.IsNullOrWhiteSpace(description)
             ? $"- {name}"
             : $"- {name} ({description})");

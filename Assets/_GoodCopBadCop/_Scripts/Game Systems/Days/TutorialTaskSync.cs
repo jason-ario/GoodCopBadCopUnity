@@ -79,6 +79,20 @@ public class TutorialTaskSync : NetworkBehaviour
     private bool _windowHandOffBroadcast;
     private bool _trashBagGrabbedBroadcast;
 
+    // ── Replicated state (late-join catch-up) ─────────────────────────────────
+
+    /// <summary>
+    /// Server-written, replicated mirror of <see cref="BroadcastTrashTaskReadyServer"/>.
+    /// <see cref="OnTrashTaskReadyAllClients"/> is a one-shot ClientRpc, so a client that joins
+    /// after the end-of-shift trash/graffiti tasks were assigned never receives it — and never
+    /// enables Checkpoint Integrity. Late joiners read this in <c>Day_01.DayActivated</c> instead.
+    /// </summary>
+    private readonly NetworkVariable<bool> _trashTaskReady = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    /// <summary>True once the server has broadcast the Day 1 end-of-shift trash task this Day 1 run.</summary>
+    public bool IsTrashTaskReady => _trashTaskReady.Value;
+
     // ── NetworkBehaviour lifecycle ────────────────────────────────────────────
 
     public override void OnNetworkSpawn()
@@ -108,6 +122,7 @@ public class TutorialTaskSync : NetworkBehaviour
         _deskFolderPlacedBroadcast = false;
         _windowHandOffBroadcast = false;
         _trashBagGrabbedBroadcast = false;
+        _trashTaskReady.Value = false;
     }
 
     // ── Vlad document pickup ──────────────────────────────────────────────────
@@ -264,6 +279,7 @@ public class TutorialTaskSync : NetworkBehaviour
     public void BroadcastTrashTaskReadyServer()
     {
         if (!IsServer) return;
+        _trashTaskReady.Value = true;
         BroadcastTrashTaskReadyClientRpc();
     }
 

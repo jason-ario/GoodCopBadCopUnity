@@ -336,6 +336,15 @@ public class PlayerPickupController : NetworkBehaviour
                 
                 if ((ObjectPlacer.Instance.IsActive && ObjectPlacer.Instance.IsInRange) || (ObjectPlacer.Instance.deactivatedThisFrame && ObjectPlacer.Instance.WasInRangeWhenDeactivated))
                 {
+                    // The ghost's board may have become blocked since it was shown (e.g. a mail
+                    // cubby's locker door closed) — keep holding instead of committing into it.
+                    PlacementBoard ghostBoard = ObjectPlacer.Instance.PlacementBoard;
+                    if (ghostBoard != null && ghostBoard.IsPlacementBlocked)
+                    {
+                        ObjectPlacer.Instance.DeactivatePlacer();
+                        return;
+                    }
+
                     DropObject();
                 }
             }
@@ -854,6 +863,10 @@ public class PlayerPickupController : NetworkBehaviour
         pickableObject.OnGrabRejected += OnPendingGrabRejected;
         _pendingGrabObject = pickableObject;
 
+        // Mark this as the newest local hand action on the object, so an in-flight echo of an
+        // earlier drop by this client can't strip the hand constraint set up below.
+        pickableObject.NoteLocalPickup();
+
         // Transfer ownership to this client so NetworkTransform replicates from our side.
         // Ownership RPC also claims the holder in one round-trip (no separate ClaimHolderServerRpc needed).
         pickableObject.RequestOwnershipServerRpc();
@@ -1003,6 +1016,13 @@ public class PlayerPickupController : NetworkBehaviour
 
         ObjectPlacer.Instance.DeactivatePlacer();
 
+        // Tear down the hand ParentConstraint PickUpObject attached to this client's camera-arm
+        // slot. Without this the constraint (evaluated after LateUpdate) keeps pinning the item
+        // to our now-unequipped slot, overriding the winner's body-arm follow — the item floats
+        // in mid-air on this screen while the winner plays the hold pose.
+        rejected.RemoveParent();
+        rejected.NetworkObject.AutoObjectParentSync = true;
+
         // Re-enable NetworkTransform: PickUpObject disabled it optimistically so this client's
         // ParentConstraint could drive position, but this client never actually became the
         // holder, so it needs NetworkTransform re-enabled to receive the true holder's updates.
@@ -1012,6 +1032,31 @@ public class PlayerPickupController : NetworkBehaviour
         // Belt-and-suspenders: force local collider state to match the true holder state now,
         // regardless of whether OnHoldingClientChanged has already run on this client this frame.
         rejected.SetInteractable(!rejected.IsHeld);
+
+        // If the winner's held-item state already reached this client, its proxy follow was just
+        // cancelled by the NT re-enable above (SyncWorldObjectToBody treats an enabled NT as
+        // "dropped"). Re-establish it; if it hasn't arrived yet, OnItemValueChanged /
+        // OnHeldObjectRefChanged will apply it normally when it does.
+        ReapplyRemoteHolderFollow(rejected);
+    }
+
+    /// <summary>
+    /// Re-runs <see cref="ApplyBodyConstraint"/> on whichever non-owner player proxy currently
+    /// reports holding <paramref name="item"/>, so its body-arm follow is restored after local
+    /// cleanup re-enabled the item's NetworkTransform.
+    /// </summary>
+    private static void ReapplyRemoteHolderFollow(PickableObject item)
+    {
+        if (item == null || item.NetworkObject == null) return;
+        ulong itemId = item.NetworkObjectId;
+
+        foreach (PlayerPickupController controller in FindObjectsByType<PlayerPickupController>(FindObjectsSortMode.None))
+        {
+            if (controller.IsOwner || !controller.IsSpawned) continue;
+            if (controller.itemEquippedIndex.Value < 0) continue;
+            if (controller._heldObjectRef.Value.NetworkObjectId != itemId) continue;
+            controller.ApplyBodyConstraint();
+        }
     }
     
 
@@ -1233,7 +1278,7 @@ public class PlayerPickupController : NetworkBehaviour
                 else
                 {
                     // Fallback: treat as a normal drop if the slot has no NetworkObject ancestor.
-                    _heldObject.DropServerRpc(dropPos, dropRot);
+                    _heldObject.RequestDropNetworked(dropPos, dropRot);
                 }
 
                 _heldObject.SetParent(dropPoint);
@@ -1244,7 +1289,7 @@ public class PlayerPickupController : NetworkBehaviour
                 // transform and re-enables NetworkTransform there — do NOT re-enable NT here
                 // on the client, because NT would immediately interpolate back toward the
                 // last server-known position (the held slot) before the RPC lands.
-                _heldObject.DropServerRpc(dropPos, dropRot);
+                _heldObject.RequestDropNetworked(dropPos, dropRot);
             }
 
             if (_heldObject is Flashlight flashlight)

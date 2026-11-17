@@ -54,12 +54,18 @@ public sealed class LocalizationTextRuntime : MonoBehaviour, ITextPreprocessor
 
     /// <summary>
     /// Leaves <paramref name="t"/>'s font alone: no language font swap, text preprocessing still applies. For labels
-    /// whose font is chosen per item by code, e.g. Settings language names drawn in their own language's font.
+    /// whose font is chosen per item by code, e.g. Settings language names drawn in their own language's font, or
+    /// digit-only counters that should keep their authored font in every language. If the label was already swapped
+    /// (e.g. by a scan while it was inactive), its authored font and material are restored.
     /// </summary>
     public static void KeepOwnFont(TMP_Text t)
     {
         if (_instance == null || t == null) return;
-        if (_instance._tracked.TryGetValue(t, out var entry)) entry.Font = null;
+        if (_instance._tracked.TryGetValue(t, out var entry))
+        {
+            entry.Font?.Apply(t, null);
+            entry.Font = null;
+        }
         else _instance._tracked[t] = _instance.CreateEntry(t, keepFont: true);
     }
 

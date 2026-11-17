@@ -37,6 +37,7 @@ public class PlacementBoard : MonoBehaviour
     /// </summary>
     public bool AcceptsItem(PickableItemData item)
     {
+        if (IsPlacementBlocked) return false;
         if (acceptedItems == null || acceptedItems.Length == 0) return true;
         if (item == null) return false;
 
@@ -47,6 +48,23 @@ public class PlacementBoard : MonoBehaviour
 
         return false;
     }
+
+    private Func<bool> _placementBlocker;
+
+    /// <summary>
+    /// Registers a runtime condition that temporarily blocks placement on this board (e.g.
+    /// <see cref="MailCubbySlot"/> blocks its slot while its locker door is closed). Pass null to clear.
+    /// </summary>
+    public void SetPlacementBlocker(Func<bool> blocker) => _placementBlocker = blocker;
+
+    /// <summary>
+    /// True while a registered blocker (see <see cref="SetPlacementBlocker"/>) currently forbids
+    /// placement. Folded into <see cref="AcceptsItem"/>, and also checked by
+    /// <see cref="PlayerInteractionController"/>'s nearby-board search and by
+    /// <see cref="PlayerPickupController.DropObject"/> at commit time, so a blocked board can't be
+    /// reached through the snap-radius overlap or an already-active ghost either.
+    /// </summary>
+    public bool IsPlacementBlocked => _placementBlocker != null && _placementBlocker();
 
     /// <summary>
     /// Fired locally whenever an item is successfully placed on this board.

@@ -56,6 +56,24 @@ public class BreakableGlassController : MonoBehaviour
              "Instantiated as a crack overlay at runtime on top of the normal glass mesh.")]
     [SerializeField] private Material _crackMaterial;
 
+    /// <summary>Which side of the pane the rolling shutter covers, relative to the pane's forward axis.</summary>
+    public enum ShutterSide
+    {
+        /// <summary>Guess from the shutter's renderer bounds. Unreliable when the shutter mesh straddles the pane plane.</summary>
+        Auto = 0,
+        /// <summary>The shutter (exterior) is on the pane's +forward side.</summary>
+        PaneForward = 1,
+        /// <summary>The shutter (exterior) is on the pane's -forward side.</summary>
+        PaneBack = 2,
+    }
+
+    [Header("Shutter Shielding")]
+    [Tooltip("Which side of the Normal Glass pane (its local +Z / forward) the rolling shutter covers, i.e. the " +
+             "exterior. A closed shutter shields the pane from player weapons attacking from this side. " +
+             "Auto guesses from the shutter's renderer bounds, which fails for the booth because the shutter " +
+             "mesh almost overlaps the pane plane.")]
+    [SerializeField] private ShutterSide _shutterSideOverride = ShutterSide.PaneForward;
+
     [Header("Health")]
     [Tooltip("Total hits required to smash through the glass. Default 4 gives three " +
              "intermediate damage stages plus the final smash.")]
@@ -169,8 +187,8 @@ public class BreakableGlassController : MonoBehaviour
 
     /// <summary>
     /// Which side of the pane the rolling shutter sits on, relative to the pane's forward axis:
-    /// +1 / -1, or 0 while not yet resolved. The shutter only rolls vertically, so the side never
-    /// changes and is resolved once from the shutter's renderer bounds.
+    /// +1 / -1, or 0 while not yet resolved. Comes from <see cref="_shutterSideOverride"/>; only
+    /// <see cref="ShutterSide.Auto"/> falls back to resolving it once from the shutter's renderer bounds.
     /// </summary>
     private int _shutterSide;
 
@@ -226,6 +244,9 @@ public class BreakableGlassController : MonoBehaviour
 
         Transform pane = _normalGlass.transform;
         paneBounds = GetPaneWorldBounds();
+
+        if (_shutterSideOverride == ShutterSide.PaneForward)   _shutterSide = 1;
+        else if (_shutterSideOverride == ShutterSide.PaneBack) _shutterSide = -1;
 
         if (_shutterSide == 0)
         {

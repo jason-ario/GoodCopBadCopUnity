@@ -246,7 +246,9 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
             // delayed WaitForSeconds and can call SetCanControl(true) after EnterScriptedDialogueMode
             // has locked things, re-locking the cursor and restoring look. Disabling calls are
             // always allowed so the cutscene entry path works correctly.
-            if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
+            // Uses IsLocalPlayerDialogueLocked (not IsScriptedModeActive): a participant the sequence
+            // leaves free to move must get control back after e.g. the pause menu closes.
+            if (value && (ScriptedDialogueRunner.IsLocalPlayerDialogueLocked || DialogueChoiceSystem.IsInDialogueMode))
                 return;
 
             // Players spawn behind the intro story cinematic; the spawn restore (and any other
@@ -1067,7 +1069,7 @@ public class PlayerMovementController : NetworkBehaviour, IPlayerControlsSetting
         // Guard: same race-condition protection as the CanControl setter. Deferred coroutines
         // (dumpster deposit, coin-slot insertion, etc.) call SetCanLook(true) after yielding;
         // if a cutscene started during that yield, look must stay disabled.
-        if (value && (ScriptedDialogueRunner.IsScriptedModeActive || DialogueChoiceSystem.IsInDialogueMode))
+        if (value && (ScriptedDialogueRunner.IsLocalPlayerDialogueLocked || DialogueChoiceSystem.IsInDialogueMode))
             return;
         if (value && IntroCinematicController.Instance != null && IntroCinematicController.Instance.IsPlaying)
             return;

@@ -221,10 +221,14 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
     public float  ScoreWeight => 1f;
     public float  ThreatLevel => _networkThreatLevel.Value;
 
-    /// <summary>Shown in the HUD as "sorted/total", e.g. "Packages sorted 1/30".</summary>
+    /// <summary>
+    /// Bare "sorted/total" counter, e.g. "1/30". Every consumer (HUDTaskList, TaskPageRow) already
+    /// puts the localized <see cref="ThreatName"/> in front; English words baked in next to live
+    /// numbers ("Packages sorted 1/30") never match a localization row and stayed English.
+    /// </summary>
     public string ThreatDescription =>
         _totalCount.Value > 0
-            ? $"Packages sorted {Mathf.Min(_sortedCount.Value, _totalCount.Value)}/{_totalCount.Value}"
+            ? $"{Mathf.Min(_sortedCount.Value, _totalCount.Value)}/{_totalCount.Value}"
             : string.Empty;
 
     // ── IDailyTask ───────────────────────────────────────────────────────────

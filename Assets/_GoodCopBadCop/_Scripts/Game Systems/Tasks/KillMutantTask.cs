@@ -20,7 +20,7 @@ using UnityEngine;
 /// </summary>
 public class KillMutantTask : ISystemicThreat
 {
-    private const string TaskName = "Kill the mutants";
+    private static readonly string TaskName = Loc.N("Kill the mutants");
 
     /// <summary>The currently active instance, or null if none exists.</summary>
     public static KillMutantTask Current { get; private set; }
@@ -45,11 +45,13 @@ public class KillMutantTask : ISystemicThreat
 
     public string ThreatName => TaskName;
 
+    // English text (translated at display time); the count uses a "{0}" source row so
+    // Loc.TranslateFormatted can still match it once the live number is filled in.
     public string ThreatDescription => _killsRemaining > 1
-        ? $"{_killsRemaining} mutants remain"
+        ? string.Format(Loc.N("{0} mutants remain"), _killsRemaining)
         : _killsRemaining == 1
-            ? "1 mutant remains"
-            : "All mutants eliminated.";
+            ? Loc.N("1 mutant remains")
+            : Loc.N("All mutants eliminated.");
 
     public float ThreatLevel  => 0f;
     public float ScoreWeight  => 0f;

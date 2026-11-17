@@ -8,8 +8,15 @@ public class MoneyText : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI moneyText;
 
+    [Tooltip("Keep the authored font in every language. The label only shows digits, which every font has, and a " +
+             "language's UI font (e.g. Oswald for Polish) can be taller or have a different baseline, which breaks the HUD layout.")]
+    [SerializeField] bool keepAuthoredFont = true;
+
     IEnumerator Start()
     {
+        if (keepAuthoredFont && moneyText != null && moneyText.GetComponent<LocalizedText>() == null)
+            LocalizationTextRuntime.KeepOwnFont(moneyText);
+
         while (GlobalHostVariables.Instance == null)
         {
             yield return new WaitForEndOfFrame();

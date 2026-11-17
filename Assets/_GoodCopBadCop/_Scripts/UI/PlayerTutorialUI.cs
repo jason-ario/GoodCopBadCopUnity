@@ -19,6 +19,7 @@ public class PlayerTutorialUI : MonoBehaviour
 
     private Animator _animator;
     private Coroutine _sequenceCoroutine;
+    private Coroutine _introPromptCoroutine;
     private Action _onCloseCallback;
 
     private void Awake()
@@ -63,6 +64,11 @@ public class PlayerTutorialUI : MonoBehaviour
         if (DebugConsole.Instance != null && DebugConsole.Instance.skipToBoothReady) return;
         if (CampaignManager.Instance == null || CampaignManager.Instance.CurrentDay != 1) return;
 
+        // Late joiner on a non-host client: the host has already been shown the booth prompt and
+        // movement tutorial, so the session is past onboarding. (Clients have no active save slot,
+        // so the HasSeenIntroTutorial check below can't catch this.)
+        if (IsHostIntroPromptAlreadyShown()) return;
+
         if (SaveDataManager.Instance != null)
         {
             if (SaveDataManager.Instance.HasSeenIntroTutorial) return;
@@ -70,7 +76,29 @@ public class PlayerTutorialUI : MonoBehaviour
         }
 
         gameObject.SetActive(true);
-        StartCoroutine(DelayedShowBoothMessage(boothMessageDelay));
+        _introPromptCoroutine = StartCoroutine(DelayedShowBoothMessage(boothMessageDelay));
+    }
+
+    private static bool IsLocalServer =>
+        Unity.Netcode.NetworkManager.Singleton != null && Unity.Netcode.NetworkManager.Singleton.IsServer;
+
+    private static bool IsHostIntroPromptAlreadyShown() =>
+        !IsLocalServer && GameManager.Instance != null && GameManager.Instance.HasShownIntroBoothPrompt;
+
+    /// <summary>
+    /// Called on a late-joining client once the server's late-join bootstrap arrives. If the host
+    /// has already shown the Day 1 booth prompt, the pending prompt (and its follow-up movement
+    /// tutorial) is cancelled. This backs up the spawn-time check in case the replicated flag
+    /// wasn't up to date yet when the local player spawned.
+    /// </summary>
+    public void CancelIntroPromptIfHostAlreadyShown()
+    {
+        if (_introPromptCoroutine == null || !IsHostIntroPromptAlreadyShown()) return;
+
+        StopCoroutine(_introPromptCoroutine);
+        _introPromptCoroutine = null;
+        if (_sequenceCoroutine == null)
+            gameObject.SetActive(false);
     }
 
     private IEnumerator DelayedShowBoothMessage(float delay)
@@ -83,11 +111,16 @@ public class PlayerTutorialUI : MonoBehaviour
 
         yield return new WaitForSeconds(delay);
 
+        _introPromptCoroutine = null;
         ShowBoothMessage();
     }
 
     private void ShowBoothMessage()
     {
+        // Host: replicate that the session has moved past the booth prompt so late joiners skip it.
+        if (IsLocalServer && GameManager.Instance != null)
+            GameManager.Instance.MarkIntroBoothPromptShownServer();
+
         Show(Loc.T("Go to the booth to start your shift."), -1f, ShowMovementTutorial);
     }
 

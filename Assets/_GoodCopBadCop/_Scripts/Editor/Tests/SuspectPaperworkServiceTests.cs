@@ -208,6 +208,78 @@ namespace GoodCopBadCop.Editor.Tests
             Assert.IsTrue(char.IsUpper(state.ApplicationFullName[0]));
         }
 
+        private static readonly string[] ScriptSampleNames =
+        {
+            "Alexei Sokolov", "Алексей Соколов", "阿列克谢 索科洛娃", "アレクセイ ソコロワ", "カンケー・ナイ",
+            "神父", "알렉세이 소콜로바", "ალექსეი სოკოლოვა", "Le\u00A0Joueur"
+        };
+
+        [Test]
+        public void MisspellName_StaysInSourceScript_AndAlwaysDiffers()
+        {
+            foreach (string name in ScriptSampleNames)
+            {
+                for (int seed = -50; seed < 50; seed++)
+                {
+                    string misspelled = SuspectPaperworkService.MisspellName(name, seed * 7919);
+                    Assert.AreNotEqual(name, misspelled, $"'{name}' seed {seed}");
+                    Assert.AreEqual(name.Length, misspelled.Length, $"'{name}' seed {seed}");
+                    for (int i = 0; i < name.Length; i++)
+                    {
+                        if (name[i] == misspelled[i]) continue;
+                        Assert.AreEqual(ScriptOf(name[i]), ScriptOf(misspelled[i]),
+                            $"'{name}' -> '{misspelled}': '{name[i]}' became '{misspelled[i]}'");
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void MisspellName_NeverTouchesSeparators()
+        {
+            foreach (string name in ScriptSampleNames)
+            {
+                string misspelled = SuspectPaperworkService.MisspellName(name, 12345);
+                for (int i = 0; i < name.Length; i++)
+                {
+                    if (char.IsWhiteSpace(name[i]) || name[i] == '・' || name[i] == 'ー')
+                        Assert.AreEqual(name[i], misspelled[i], $"'{name}' separator at {i} changed");
+                }
+            }
+        }
+
+        [Test]
+        public void MisspellName_DenseScripts_ChangeAtMostTwoCharacters()
+        {
+            foreach (string name in new[] { "阿列克谢 索科洛娃", "アレクセイ ソコロワ", "알렉세이 소콜로바" })
+            {
+                for (int seed = 0; seed < 100; seed++)
+                {
+                    string misspelled = SuspectPaperworkService.MisspellName(name, seed * 104729);
+                    int changed = name.Where((c, i) => c != misspelled[i]).Count();
+                    Assert.That(changed, Is.InRange(1, 2), $"'{name}' -> '{misspelled}'");
+                }
+            }
+        }
+
+        [Test]
+        public void MisspellName_IsDeterministic()
+        {
+            foreach (string name in ScriptSampleNames)
+                Assert.AreEqual(SuspectPaperworkService.MisspellName(name, 42), SuspectPaperworkService.MisspellName(name, 42));
+        }
+
+        private static string ScriptOf(char c)
+        {
+            if (c >= '\uAC00' && c <= '\uD7A3') return "Hangul";
+            if (c >= '\u30A0' && c <= '\u30FF') return "Katakana";
+            if (c >= '\u4E00' && c <= '\u9FFF') return "Han";
+            if (c >= '\u10A0' && c <= '\u10FF') return "Georgian";
+            if (c >= '\u0400' && c <= '\u04FF') return "Cyrillic";
+            if (c < '\u0250' && char.IsLetter(c)) return "Latin";
+            return "Other:" + (int)c;
+        }
+
         [Test]
         public void BuildForPreview_ExpirationDateAnomaly_ChangesOnlyApplicationExpirationDate()
         {

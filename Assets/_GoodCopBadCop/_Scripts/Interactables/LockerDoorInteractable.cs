@@ -47,6 +47,14 @@ public class LockerDoorInteractable : Interactable
     public bool IsOpen => _isOpen.Value;
 
     /// <summary>
+    /// True while the door is open as this client currently sees it (the locally predicted /
+    /// applied state, see <see cref="_predictedOpen"/>). Used for client-side interaction gating
+    /// (e.g. <see cref="MailCubbySlot"/> blocking placement into / pickup from a closed cubby) so
+    /// gating matches the visible door the instant the local player toggles it.
+    /// </summary>
+    public bool IsOpenLocally => _predictedOpen;
+
+    /// <summary>
     /// Local-only mirror of what this client has already applied visually. Reading
     /// <see cref="_isOpen"/>'s NetworkVariable directly to decide the next toggle is unsafe: if the
     /// player clicks again before the previous toggle's server round-trip has synced back down,

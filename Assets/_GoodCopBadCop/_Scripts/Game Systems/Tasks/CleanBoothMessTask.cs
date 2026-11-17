@@ -107,8 +107,9 @@ public class CleanBoothMessTask : NetworkBehaviour, ISystemicThreat
 
     public string ThreatDescription =>
         (_networkRemainingBlood.Value + _networkRemainingJunk.Value) > 0
-            ? $"Blood to scrub: {_networkRemainingBlood.Value}  |  Junk to bag: {_networkRemainingJunk.Value}"
-            : "Booth cleaned!";
+            ? string.Format(Loc.N("Blood to scrub: {0}  |  Junk to bag: {1}"),
+                _networkRemainingBlood.Value, _networkRemainingJunk.Value)
+            : Loc.N("Booth cleaned!");
 
     /// <summary>Not used — this is a day-start task, not a night-phase threat.</summary>
     public void BeginNightPhase() { }

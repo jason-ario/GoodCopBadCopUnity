@@ -256,8 +256,8 @@ public class FollowTrailThreat : NetworkBehaviour, ISystemicThreat, IDailyTask
     public float  ThreatLevel       => _networkThreatLevel.Value;
 
     public string ThreatDescription => _isDiscovered.Value
-        ? "Trail investigated."
-        : (_networkThreatLevel.Value > 0 ? string.Empty : "No active trail.");
+        ? Loc.N("Trail investigated.")
+        : (_networkThreatLevel.Value > 0 ? string.Empty : Loc.N("No active trail."));
 
     // ── IDailyTask ───────────────────────────────────────────────────────────
 

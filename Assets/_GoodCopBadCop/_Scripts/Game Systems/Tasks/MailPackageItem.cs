@@ -146,7 +146,14 @@ public class MailPackageItem : PickableObject
     /// <summary>True once this package has been sorted (server-confirmed or optimistically on this peer). Sorted packages can never be picked up again.</summary>
     public bool IsSorted => _isSorted.Value || _sortedLocally;
 
-    public override bool IsInteractable => base.IsInteractable && !IsSorted;
+    /// <summary>
+    /// Sorted packages are never interactable, and neither is a package shut inside a mail cubby
+    /// whose locker door is closed (see <see cref="MailCubbySlot.IsInsideClosedCubby"/>) — it can
+    /// only be taken back out once that door is open again.
+    /// </summary>
+    public override bool IsInteractable => base.IsInteractable && !IsSorted && !IsShutInClosedCubby;
+
+    private bool IsShutInClosedCubby => MailCubbySlot.IsInsideClosedCubby(transform.position);
 
     /// <summary>
     /// Unsorted packages show their delivery call-out (<see cref="HighlightHold.MailDelivery"/>) with
@@ -203,7 +210,7 @@ public class MailPackageItem : PickableObject
 
     public override void Interact(PlayerInteractionController player)
     {
-        if (IsSorted) return;
+        if (IsSorted || IsShutInClosedCubby) return;
         base.Interact(player);
     }
 

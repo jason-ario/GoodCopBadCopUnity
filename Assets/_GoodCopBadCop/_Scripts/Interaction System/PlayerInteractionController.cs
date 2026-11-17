@@ -1139,6 +1139,11 @@ public class PlayerInteractionController : NetworkBehaviour
             PlacementBoard board = col.GetComponentInChildren<PlacementBoard>();
             if (board == null) continue;
 
+            // A temporarily blocked board (e.g. a mail cubby slot behind its closed locker door)
+            // must not be snapped to through the overlap sphere — skip it so nearby free
+            // placement behaves as if it weren't there.
+            if (board.IsPlacementBlocked) continue;
+
             float distance = Vector3.Distance(point, col.ClosestPoint(point));
             if (distance < closestDistance)
             {
@@ -1174,6 +1179,14 @@ public class PlayerInteractionController : NetworkBehaviour
 
         PlacementBoard board = ObjectPlacer.Instance.PlacementBoard;
         if (board == null || !board.ShowGhostWhileAiming) return false;
+
+        // Board became blocked since the ghost was shown (e.g. a mail cubby's locker door was
+        // closed) — drop the stale ghost and let the press fall through to normal world interact.
+        if (board.IsPlacementBlocked)
+        {
+            ObjectPlacer.Instance.DeactivatePlacer();
+            return false;
+        }
 
         _playerPickupController.DropObject();
         return true;

@@ -80,10 +80,14 @@ public class ProcessResidentsTask : NetworkBehaviour, ISystemicThreat
         ? 1f - Mathf.Clamp01((float)_processedCount.Value / _totalCount.Value)
         : 0f;
 
-    /// <summary>Shown in the HUD as "Process residents X/Y".</summary>
+    /// <summary>
+    /// Bare "X/Y" counter. Every consumer (TaskPageRow, HUDTaskList, GuidebookTaskRow) already prefixes
+    /// the localized <see cref="ThreatName"/>, so no English words belong here — a baked-in
+    /// "Process residents X/Y" never matched a sheet row and showed up untranslated.
+    /// </summary>
     public string ThreatDescription =>
         _totalCount.Value > 0
-            ? $"Process residents {Mathf.Min(_processedCount.Value, _totalCount.Value)}/{_totalCount.Value}"
+            ? $"{Mathf.Min(_processedCount.Value, _totalCount.Value)}/{_totalCount.Value}"
             : string.Empty;
 
     /// <summary>No-op — this task is driven by the day/suspect cycle, not the night phase.</summary>
