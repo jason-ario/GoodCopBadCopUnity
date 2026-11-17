@@ -4,8 +4,9 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// Drives the "Thanks for Playing the Demo" end screen shown when the final campaign day completes.
 /// Provides buttons to wishlist on Steam and return to the main menu.
-/// Demo vs playtest content (title/body variants, survey button) is swapped by a
-/// <see cref="DemoModeMenuToggle"/> on the same GameObject, driven by <see cref="GameSettings.IsDemo"/>.
+/// Demo vs playtest title/body variants and the survey button are swapped by a
+/// <see cref="DemoModeMenuToggle"/> on the same GameObject, driven by <see cref="GameSettings.IsDemo"/>
+/// and <see cref="GameSettings.SurveyEnabled"/> respectively.
 /// Opened via <see cref="UIController.ShowThanksForPlayingScreen"/>; closed when the player leaves the session.
 /// Voice chat keeps running while this screen is up (see <see cref="AudioManager.SilenceWorldAudio"/>).
 /// </summary>

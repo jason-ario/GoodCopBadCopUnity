@@ -2,27 +2,41 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Swaps UI content when the build targets the Steam demo
-/// (<see cref="GameSettings.IsDemo"/>, i.e. Game Settings > Build Channel = Demo).
-/// Used on the main menu and on the Thanks For Playing end screen (demo title/body, no survey button).
-/// Re-applies on every enable, so screens that start inactive pick up the current channel when shown.
-/// In demo builds every object in <see cref="_hideInDemo"/> is deactivated, every object in
-/// <see cref="_showInDemo"/> is activated, and each <see cref="OpenWebLink"/> in
-/// <see cref="_redirectLinks"/> is pointed at <see cref="_demoUrl"/>. Non-demo builds get the
-/// inverse visibility and their originally authored URLs.
+/// Swaps UI content based on Game Settings:
+/// <list type="bullet">
+/// <item><b>Demo lists</b> follow <see cref="GameSettings.IsDemo"/> (Build Channel = Demo), e.g. demo title/body text.</item>
+/// <item><b>Survey lists</b> follow <see cref="GameSettings.SurveyEnabled"/>, independent of the channel, so the
+/// survey can be shown in Demo builds too.</item>
+/// </list>
+/// Used on the main menu and on the Thanks For Playing end screen.
+/// Re-applies on every enable, so screens that start inactive pick up the current settings when shown.
+/// Each <see cref="OpenWebLink"/> in a redirect list is pointed at <see cref="_demoUrl"/> while its condition
+/// holds (Demo build / survey disabled), and otherwise keeps its originally authored URL.
 /// </summary>
 public class DemoModeMenuToggle : MonoBehaviour
 {
-    [Tooltip("Objects shown in Playtest/Release builds and hidden in Demo builds (e.g. survey UI).")]
+    [Header("Demo (Build Channel = Demo)")]
+    [Tooltip("Objects shown in Playtest/Release builds and hidden in Demo builds.")]
     [SerializeField] private List<GameObject> _hideInDemo = new();
 
-    [Tooltip("Objects hidden in Playtest/Release builds and shown in Demo builds (e.g. wishlist replacement).")]
+    [Tooltip("Objects hidden in Playtest/Release builds and shown in Demo builds.")]
     [SerializeField] private List<GameObject> _showInDemo = new();
 
     [Tooltip("Links whose URL is replaced with Demo Url in Demo builds.")]
     [SerializeField] private List<OpenWebLink> _redirectLinks = new();
 
-    [Tooltip("URL used by Redirect Links in Demo builds.")]
+    [Header("Survey (Game Settings > Survey Enabled)")]
+    [Tooltip("Survey UI: shown when Survey Enabled is on, hidden when off.")]
+    [SerializeField] private List<GameObject> _surveyObjects = new();
+
+    [Tooltip("Replacement UI (e.g. wishlist label): shown when Survey Enabled is off, hidden when on.")]
+    [SerializeField] private List<GameObject> _showWhenSurveyDisabled = new();
+
+    [Tooltip("Links whose URL is replaced with Demo Url when Survey Enabled is off.")]
+    [SerializeField] private List<OpenWebLink> _redirectWhenSurveyDisabled = new();
+
+    [Header("Links")]
+    [Tooltip("URL used by redirected links (Steam store page).")]
     [SerializeField] private string _demoUrl = "https://store.steampowered.com/app/3262820/Uncanny_Valley_Checkpoint/";
 
     private readonly Dictionary<OpenWebLink, string> _originalUrls = new();
@@ -31,22 +45,35 @@ public class DemoModeMenuToggle : MonoBehaviour
 
     private void OnEnable() => Apply();
 
-    /// <summary>Applies demo or non-demo visibility and link targets from the current Game Settings.</summary>
+    /// <summary>Applies demo and survey visibility and link targets from the current Game Settings.</summary>
     public void Apply()
     {
-        bool isDemo = GameSettings.Instance.IsDemo;
+        var settings = GameSettings.Instance;
+        bool isDemo = settings.IsDemo;
+        bool surveyEnabled = settings.SurveyEnabled;
 
-        foreach (var go in _hideInDemo)
-            if (go != null && go.activeSelf == isDemo) go.SetActive(!isDemo);
+        SetActive(_hideInDemo, !isDemo);
+        SetActive(_showInDemo, isDemo);
+        Redirect(_redirectLinks, isDemo);
 
-        foreach (var go in _showInDemo)
-            if (go != null && go.activeSelf != isDemo) go.SetActive(isDemo);
+        SetActive(_surveyObjects, surveyEnabled);
+        SetActive(_showWhenSurveyDisabled, !surveyEnabled);
+        Redirect(_redirectWhenSurveyDisabled, !surveyEnabled);
+    }
 
-        foreach (var link in _redirectLinks)
+    private static void SetActive(List<GameObject> objects, bool active)
+    {
+        foreach (var go in objects)
+            if (go != null && go.activeSelf != active) go.SetActive(active);
+    }
+
+    private void Redirect(List<OpenWebLink> links, bool redirect)
+    {
+        foreach (var link in links)
         {
             if (link == null) continue;
             if (!_originalUrls.ContainsKey(link)) _originalUrls[link] = link.Url;
-            link.Url = isDemo && !string.IsNullOrWhiteSpace(_demoUrl) ? _demoUrl : _originalUrls[link];
+            link.Url = redirect && !string.IsNullOrWhiteSpace(_demoUrl) ? _demoUrl : _originalUrls[link];
         }
     }
 }

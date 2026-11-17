@@ -8,6 +8,7 @@ public class UIWobble : MonoBehaviour
     
     private RectTransform rectTransform;
     private Vector3 originalPosition;
+    private Vector3 extraOffset;
     private bool hasOriginalPosition;
     private float elapsedTime;
     private float randomPhase;
@@ -65,7 +66,21 @@ public class UIWobble : MonoBehaviour
         offsetX += Random.Range(-wobbleProfile.noiseAmount, wobbleProfile.noiseAmount);
         offsetY += Random.Range(-wobbleProfile.noiseAmount, wobbleProfile.noiseAmount);
         
-        rectTransform.anchoredPosition = originalPosition + new Vector3(offsetX, offsetY, 0) * intensity;
+        rectTransform.anchoredPosition = originalPosition + extraOffset + new Vector3(offsetX, offsetY, 0) * intensity;
+    }
+
+    /// <summary>
+    /// Adds a persistent offset on top of the rest position (e.g. a hover slide), so other
+    /// scripts can move the element without fighting the wobble's per-frame position writes.
+    /// </summary>
+    public void SetExtraOffset(Vector2 offset)
+    {
+        CacheOriginalPosition();
+        extraOffset = offset;
+
+        bool wobbling = isActiveAndEnabled && wobbleProfile != null && intensity > 0f;
+        if (!wobbling && rectTransform != null)
+            rectTransform.anchoredPosition = originalPosition + extraOffset;
     }
 
     public void SetWobbleProfile(TMPWobbleProfile profile)

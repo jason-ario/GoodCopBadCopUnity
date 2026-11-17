@@ -146,11 +146,22 @@ public class GameSettings : ScriptableObject
     }
 
     [Header("Survey")]
-    [Tooltip("When enabled, the playtest survey opens in the default browser when the application exits. " +
-             "Always skipped in Demo builds (Build Channel = Demo).")]
+    [Tooltip("When enabled, survey UI (main menu survey panel/button, Thanks For Playing survey button) is shown " +
+             "in every build channel, including Demo. When disabled, it is hidden and replaced by the wishlist " +
+             "variant (see DemoModeMenuToggle survey lists).")]
+    [SerializeField] private bool _surveyEnabled = true;
+
+    [Tooltip("When enabled (and Survey Enabled is on), the survey opens in the default browser when the application exits.")]
     [SerializeField] private bool _openSurveyOnGameExit = true;
 
-    /// <summary>Whether the playtest survey opens automatically when the application exits.</summary>
+    /// <summary>Whether survey UI is shown. Independent of <see cref="Channel"/>.</summary>
+    public bool SurveyEnabled
+    {
+        get => _surveyEnabled;
+        set => _surveyEnabled = value;
+    }
+
+    /// <summary>Whether the survey opens automatically when the application exits. Requires <see cref="SurveyEnabled"/>.</summary>
     public bool OpenSurveyOnGameExit
     {
         get => _openSurveyOnGameExit;
