@@ -20,10 +20,6 @@ public class RagdollController : MonoBehaviour
     [Tooltip("Switch ragdoll bodies to ContinuousSpeculative collision detection on activation so fast-moving limbs " +
              "can't tunnel through thin walls.")]
     [SerializeField] private bool continuousCollisionOnActivate = true;
-    [Tooltip("Keep the ragdoll on the correct side of thin walls (see RagdollWallGuard): bones that start " +
-             "inside/through geometry are pulled back on activation, and any body whose physics step crosses " +
-             "geometry is reverted. Only runs on the peer that simulates the ragdoll.")]
-    [SerializeField] private bool containInsideWalls = true;
 
     [Header("Settle Freeze (Performance)")]
     [Tooltip("After the ragdoll activates and comes to rest, switch every bone Rigidbody to kinematic so the " +
@@ -64,9 +60,6 @@ public class RagdollController : MonoBehaviour
     private bool _isFrozen;
     private bool _isNetworkProxy;
 
-    private RagdollWallGuard _wallGuard;
-    private bool _wallGuardTracking;
-
     private const int DefaultLayer = 0;
     private const float SettleCheckInterval = 0.25f;
 
@@ -90,8 +83,6 @@ public class RagdollController : MonoBehaviour
     public void SetNetworkProxy(bool proxy)
     {
         _isNetworkProxy = proxy;
-        if (proxy)
-            _wallGuardTracking = false;
         if (proxy && IsRagdollActive)
             FreezeRagdoll();
     }
@@ -134,60 +125,6 @@ public class RagdollController : MonoBehaviour
         SetRagdollActive(activateOnAwake);
     }
 
-    private void Start()
-    {
-        // Late joiner: a player who died before this client connected arrives with PlayerHealth's
-        // dead state as an initial value, which never raises OnDeath — so the body would stand
-        // there un-ragdolled. Rebuild the corpse here; its pose comes from RagdollPoseSync.
-        if (_playerHealth == null || _networkObject == null || !_networkObject.IsSpawned) return;
-        if (_networkObject.NetworkManager == null || _networkObject.NetworkManager.IsServer) return;
-        if (!_playerHealth.IsDead || _playerHealth.SpawnedDead || IsRagdollActive) return;
-
-        // A resurrected / burned-away corpse is handled by CorpseResurrectionController.
-        CorpseResurrectionController corpse = GetComponent<CorpseResurrectionController>();
-        if (corpse != null && (corpse.IsResurrected || corpse.IsBurnedAway)) return;
-
-        OnDeath();
-    }
-
-    private void FixedUpdate()
-    {
-        if (!_wallGuardTracking) return;
-
-        if (!IsRagdollActive || _isFrozen || _isNetworkProxy)
-        {
-            _wallGuardTracking = false;
-            return;
-        }
-
-        _wallGuard.Step();
-    }
-
-    /// <summary>Root of the character this ragdoll belongs to (its NetworkObject, else this transform).</summary>
-    private Transform OwnerRoot
-    {
-        get
-        {
-            NetworkObject no = _networkObject != null ? _networkObject : GetComponentInParent<NetworkObject>();
-            return no != null ? no.transform : transform;
-        }
-    }
-
-    /// <summary>
-    /// A point known to be in open space on the character's side of any wall: the centre of its
-    /// CharacterController, else its NavMeshAgent capsule (the agent is always on walkable space).
-    /// </summary>
-    private Vector3 GetSafeAnchor()
-    {
-        if (_characterController != null)
-            return _characterController.transform.TransformPoint(_characterController.center);
-
-        Transform root = OwnerRoot;
-        UnityEngine.AI.NavMeshAgent agent = root.GetComponent<UnityEngine.AI.NavMeshAgent>();
-        float height = agent != null ? Mathf.Min(agent.height * 0.5f, 1f) : 0.5f;
-        return root.position + Vector3.up * height;
-    }
-
     private void OnEnable()
     {
         GoodCopBadCop.EnvironmentSystem.UnderwaterZone.OnPlayerBodyUnderwaterStateChanged += HandleUnderwaterStateChanged;
@@ -209,10 +146,8 @@ public class RagdollController : MonoBehaviour
 
     private void HandleUnderwaterStateChanged(bool isUnderwater)
     {
-        // The event tracks the LOCAL player's body, so only that player's own ragdoll may react.
-        // (Mutant ragdolls have no PlayerHealth; ragdolls simulated for other bodies get their
-        // underwater state from UnderwaterZone.IsPointUnderwater in ActivateRagdoll instead.)
-        if (_playerHealth == null || (_networkObject != null && !_networkObject.IsOwner))
+        // Only apply to the local player's ragdoll
+        if (_networkObject != null && !_networkObject.IsOwner)
             return;
 
         _isUnderwater = isUnderwater;
@@ -231,17 +166,7 @@ public class RagdollController : MonoBehaviour
 
     private void OnDeath()
     {
-        // Server-authoritative corpse (same as mutants): only the server simulates; every client,
-        // including the dead player's own, follows its pose through RagdollPoseSync. Otherwise
-        // each peer drops its own ragdoll from a slightly different pose and they never agree.
-        bool networked = _networkObject != null && _networkObject.IsSpawned && _networkObject.NetworkManager != null;
-        if (networked && !_networkObject.NetworkManager.IsServer)
-            SetNetworkProxy(true);
-
         ActivateRagdoll();
-
-        if (networked)
-            RagdollPoseSync.Attach(_networkObject, this);
 
         if (headTransform != null)
             headTransform.localScale = Vector3.one;
@@ -307,11 +232,6 @@ public class RagdollController : MonoBehaviour
             rb.angularVelocity = Vector3.zero;
             rb.WakeUp();
         }
-
-        // The simulating peer may not be this body's owner (server simulating a client's corpse),
-        // so check the zones directly rather than relying only on the local-player event.
-        if (!_isNetworkProxy && GoodCopBadCop.EnvironmentSystem.UnderwaterZone.IsPointUnderwater(GetSafeAnchor()))
-            _isUnderwater = true;
 
         // If already inside an underwater zone, apply buoyancy damping immediately
         if (_isUnderwater)
@@ -449,18 +369,6 @@ public class RagdollController : MonoBehaviour
         // Leaving ragdoll mode or (re-)entering it always cancels a pending/finished settle freeze.
         StopFreezeTimer();
         _isFrozen = false;
-        _wallGuardTracking = false;
-
-        // Simulating peer only: pull bones that start inside/through a wall back to the
-        // character's side BEFORE they go dynamic (the Animator was just disabled above, so the
-        // pose is held). See RagdollWallGuard.
-        bool guardWalls = active && containInsideWalls && !_isNetworkProxy && ragdollRigidbodies.Length > 0;
-        if (guardWalls)
-        {
-            _wallGuard ??= new RagdollWallGuard(OwnerRoot, ragdollRigidbodies);
-            if (_wallGuard.ResolveActivationPose(GetSafeAnchor()))
-                Physics.SyncTransforms();
-        }
 
         foreach (var rb in ragdollRigidbodies)
         {
@@ -476,12 +384,6 @@ public class RagdollController : MonoBehaviour
             FreezeRagdoll();
         else if (active)
             StartFreezeTimer();
-
-        if (guardWalls)
-        {
-            _wallGuard.BeginTracking();
-            _wallGuardTracking = true;
-        }
 
         foreach (var col in ragdollColliders)
         {

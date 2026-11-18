@@ -155,14 +155,6 @@ public class RagdollPoseSync : MonoBehaviour
 
         if (!_hasClientTarget) return;
 
-        // Ragdoll was switched off (e.g. a player corpse resurrected into a walking mutant):
-        // stop writing bones so the Animator owns them again.
-        if (!_ragdoll.IsRagdollActive)
-        {
-            _hasClientTarget = false;
-            return;
-        }
-
         float t = 1f - Mathf.Exp(-ClientBlendRate * Time.deltaTime);
         for (int i = 0; i < _bones.Length; i++)
         {
@@ -183,11 +175,7 @@ public class RagdollPoseSync : MonoBehaviour
 
     private void OnPoseReceived(bool isFinal, bool snap)
     {
-        // Not ragdolled here (yet, or any more): ignore. A client that activates later binds
-        // and requests a fresh snapshot, so nothing is lost.
-        if (!_ragdoll.IsRagdollActive) return;
-
-        // Never let the client simulate a server-driven corpse.
+        // A pose can beat the corpse-state RPC/NetworkVariable; never let the client simulate.
         if (!_ragdoll.IsNetworkProxy) _ragdoll.SetNetworkProxy(true);
 
         if (snap)

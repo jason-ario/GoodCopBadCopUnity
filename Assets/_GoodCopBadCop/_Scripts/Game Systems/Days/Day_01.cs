@@ -356,10 +356,15 @@ public class Day_01 : DayBase
     [Tooltip("The Biological Exam Notebook — hidden for the entirety of Day 1.")]
     [SerializeField] private ExamNotebook _biologicalNotebook;
 
-    [Tooltip("The Hammer used to fix perimeter fences — not interactable until the first mutant " +
-             "breach clears (if it damaged any fences). Force-highlighted and pointed at with a " +
-             "tutorial arrow at that point, until the player picks it up for the first time.")]
+    [Tooltip("The primary Hammer used to fix perimeter fences. Always interactable. When the first " +
+             "mutant breach clears (and damaged fences), it is force-highlighted and pointed at with a " +
+             "tutorial arrow — unless a hammer is already held, in which case the fence tutorial " +
+             "overlay shows immediately.")]
     [SerializeField] private PickableObject _hammer;
+
+    [Tooltip("Every other hammer in the level. Never highlighted, but holding or picking up any of " +
+             "these also satisfies the post-breach hammer tutorial.")]
+    [SerializeField] private PickableObject[] _otherHammers;
 
     [Header("Day 1 — Mutant Breach Tutorial")]
     [Tooltip("Preset used for Day 1's scripted first breach — triggered directly (bypassing the " +
@@ -558,6 +563,10 @@ public class Day_01 : DayBase
     private bool _fencesResolved;
     private bool _goreResolved;
 
+    // Latches the post-breach hammer beat (call-out or overlay) to once per day on this peer.
+    private bool _hammerTutorialStarted;
+    private bool _hammerTutorialShown;
+
     // Once-per-day latches for the clock-out step. The post-breach barrier above is polled from
     // every cleanup event (fence repaired, gore deposited), so once both
     // flags are true ANY further event would re-run the epilogue and add a second identical
@@ -657,6 +666,8 @@ public class Day_01 : DayBase
         ShowClockInArrow(false);
         _taskClockIn = null;
         _docsFilingComplete = false;
+        _hammerTutorialStarted = false;
+        _hammerTutorialShown = false;
         _tutorialFolderStamped = false;
         _tutorialFolderHandedToVlad = false;
         _markedStampFolder = null;
@@ -689,9 +700,10 @@ public class Day_01 : DayBase
             _mutationNotebook?.SetInteractableNetworked(false);
             _biologicalNotebook?.SetInteractableNetworked(false);
 
-            // The hammer isn't introduced until the post-breach "Fix Perimeter Fences" tutorial
-            // later this shift (see ShowHammerTutorial) — stays non-interactable until then.
-            _hammer?.SetInteractableNetworked(false);
+            // Hammers are always usable. The post-breach "Fix Perimeter Fences" beat
+            // (ShowHammerTutorial) adapts to whether one is already held. Explicitly unlock in
+            // case an older session/save left the primary hammer's NetworkVariable locked.
+            SetAllHammersInteractable(true);
 
             // The checkpoint shovels stay non-interactable until the first mutant breach begins —
             // see OnMutantBreachStarted, which unlocks them the moment the alarm sounds.
@@ -934,6 +946,9 @@ public class Day_01 : DayBase
         _taskOpenBunker = null;
         _taskGoToBed = null;
         _breachEpilogueAdvanced = false;
+        ClearHammerCallOut();
+        _hammerTutorialStarted = false;
+        _hammerTutorialShown = false;
         _clockOutTaskShown = false;
         _bunkerStepStarted = false;
         _openBunkerTaskShown = false;
@@ -3709,63 +3724,99 @@ public class Day_01 : DayBase
     }
 
     /// <summary>
-    /// Unlocks the Hammer, force-highlights it, and points a world-space tutorial arrow at it —
-    /// both stay active until the player picks it up for the first time, at which point
-    /// <see cref="OnHammerPickedUpFirstTime"/> clears them and shows the fence tutorial overlay.
+    /// Post-breach "Fix Perimeter Fences" hammer beat. Hammers are interactable all day, so:
+    ///   - If any hammer is already held (by anyone), the fence tutorial overlay shows right away.
+    ///   - Otherwise the primary hammer is force-highlighted with a tutorial arrow, and the first
+    ///     pickup of ANY tracked hammer clears the call-out and shows the overlay.
     /// </summary>
     private void ShowHammerTutorial()
     {
-        if (_hammer == null)
+        if (_hammerTutorialStarted) return;
+
+        if (_hammer == null && !AnyHammerAssigned())
         {
             _fencesResolved = true;
             TryCompleteMutantBreachGate();
             return;
         }
 
-        _hammer.SetInteractableNetworked(true);
+        _hammerTutorialStarted = true;
 
-        // Co-op race: each peer runs this on its own local timer (breach-cleared barks + the
-        // 0.5s fence-count wait), but the hammer unlocks for everyone the moment the FIRST peer
-        // gets here. A teammate can therefore already be holding it by the time a slower peer
-        // arrives. OnPickedUpNetworked only fires on the not-held -> held transition, so
-        // subscribing now would never fire and the arrow/highlight would stay attached to the
-        // hammer in the other player's hand forever. Treat "already held by anyone" exactly
-        // like the pickup itself: skip the call-out and go straight to the fence tutorial.
-        if (_hammer.IsHeld)
+        // "Held by anyone" counts. Co-op peers reach this on their own local timers, and
+        // OnPickedUpNetworked only fires on the not-held -> held transition, so a hammer that is
+        // already in someone's hand would never fire it — the arrow would stick to that hand.
+        if (IsAnyHammerHeld())
         {
-            OnHammerPickedUpFirstTime();
+            OnAnyHammerPickedUp();
             return;
         }
 
-        _hammer.SetForceHighlight(true);
-        TutorialMarkerManager.Instance?.Mark(_hammer.transform);
+        if (_hammer != null)
+        {
+            _hammer.SetForceHighlight(true);
+            TutorialMarkerManager.Instance?.Mark(_hammer.transform);
+        }
 
-        // Use the networked pickup signal (fires on every client, including the server,
-        // driven by the authoritative _holdingClientId NetworkVariable) rather than the
-        // local-only OnPickedUpEvent — so ANY player picking it up clears the highlight/arrow
-        // and triggers the fence tutorial on every peer, as if the local player grabbed it.
-        // Unsubscribe first so a repeated call can never double-subscribe.
-        _hammer.OnPickedUpNetworked -= OnHammerPickedUpFirstTime;
-        _hammer.OnPickedUpNetworked += OnHammerPickedUpFirstTime;
+        // Networked pickup signal (fires on every peer, driven by the authoritative
+        // _holdingClientId NetworkVariable), so any player grabbing any hammer advances everyone.
+        ForEachHammer(h =>
+        {
+            h.OnPickedUpNetworked -= OnAnyHammerPickedUp;
+            h.OnPickedUpNetworked += OnAnyHammerPickedUp;
+        });
     }
 
     /// <summary>
-    /// Fires the first time ANY player picks up the Hammer after the breach (on every
-    /// client, via <see cref="PickableObject.OnPickedUpNetworked"/>). Clears the
-    /// highlight/arrow, then shows the "fix a fence with a hammer" tutorial overlay.
+    /// Fires the first time ANY player holds ANY hammer during the post-breach beat (on every
+    /// peer). Clears the highlight/arrow, then shows the "fix a fence with a hammer" overlay once.
     /// </summary>
-    private void OnHammerPickedUpFirstTime()
+    private void OnAnyHammerPickedUp()
     {
-        if (_hammer != null)
-        {
-            _hammer.OnPickedUpNetworked -= OnHammerPickedUpFirstTime;
-            _hammer.SetForceHighlight(false);
-            TutorialMarkerManager.Instance?.Unmark(_hammer.transform);
-        }
+        ClearHammerCallOut();
+
+        if (_hammerTutorialShown) return;
+        _hammerTutorialShown = true;
 
         // Checkpoint Integrity is already enabled (and its tutorial shown) when the trash/graffiti
         // tasks are assigned — see EnableCheckpointIntegrityPanel / ShowTrashAndGraffitiTutorialAfterDusk.
         TutorialOverlay.Instance?.ShowFixFenceTutorial();
+    }
+
+    /// <summary>Unsubscribes every hammer and removes the primary hammer's highlight/arrow. Idempotent.</summary>
+    private void ClearHammerCallOut()
+    {
+        ForEachHammer(h => h.OnPickedUpNetworked -= OnAnyHammerPickedUp);
+
+        if (_hammer != null)
+        {
+            _hammer.SetForceHighlight(false);
+            TutorialMarkerManager.Instance?.Unmark(_hammer.transform);
+        }
+    }
+
+    private void SetAllHammersInteractable(bool interactable) =>
+        ForEachHammer(h => h.SetInteractableNetworked(interactable));
+
+    private bool IsAnyHammerHeld()
+    {
+        bool held = false;
+        ForEachHammer(h => held |= h.IsHeld);
+        return held;
+    }
+
+    private bool AnyHammerAssigned()
+    {
+        bool any = false;
+        ForEachHammer(_ => any = true);
+        return any;
+    }
+
+    private void ForEachHammer(System.Action<PickableObject> action)
+    {
+        if (_hammer != null) action(_hammer);
+        if (_otherHammers == null) return;
+        foreach (PickableObject h in _otherHammers)
+            if (h != null && h != _hammer) action(h);
     }
 
     /// <summary>
@@ -3866,8 +3917,8 @@ public class Day_01 : DayBase
 
     /// <summary>
     /// Server-only. Unlocks what Day 1's opening tutorial had unlocked by Dusk (folders, doc exam,
-    /// stamps, lever) while keeping the breach shovels and hammer locked for their own post-shift
-    /// tutorial beats. Used instead of <see cref="ForceUnlockTutorialItems"/> for a Dusk resume.
+    /// stamps, lever) while keeping the breach shovels locked for their own post-shift tutorial
+    /// beat (hammers are never locked). Used instead of <see cref="ForceUnlockTutorialItems"/> for a Dusk resume.
     /// </summary>
     public void UnlockTutorialItemsForDuskResume()
     {
@@ -4076,12 +4127,9 @@ public class Day_01 : DayBase
         _breachShovel1?.UnlockInteractableNetworked();
         _breachShovel2?.UnlockInteractableNetworked();
 
-        // The hammer is locked in DayActivated (_hammer?.SetInteractableNetworked(false)) until
-        // the post-breach "Fix Perimeter Fences" tutorial unlocks it later on Day 1 — see
-        // ShowHammerTutorial. That unlock only ever runs while Day 1 is active, so a save
-        // resumed on Day 2+ (where Day 1 never activates) would otherwise leave the hammer
-        // permanently non-interactable. Force it unlocked here too.
-        _hammer?.SetInteractableNetworked(true);
+        // Hammers are no longer tutorial-locked, but older sessions could have left the primary
+        // hammer's interactable NetworkVariable false. Safety net for saves resumed on Day 2+.
+        SetAllHammersInteractable(true);
 
         Debug.Log("[Day_01] ForceUnlockTutorialItems: tutorial-gated items (incl. lever and hammer) unlocked for a resumed save past Day 1.");
     }

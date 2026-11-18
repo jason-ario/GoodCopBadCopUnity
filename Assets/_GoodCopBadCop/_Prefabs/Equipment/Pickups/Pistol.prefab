@@ -84,11 +84,15 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Pistol
+  interactVerb: 
   highlightNameFilter: 
   holdHighlightVisibleRange: 50
   holdHighlightFadeDuration: 0.5
   holdHighlightPulseSpeed: 0.6
-  holdHighlightPulseMinIntensity: 0.35
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   itemData: {fileID: 11400000, guid: 5caf33b77dd741944b0fd05ae9e1b587, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
@@ -99,6 +103,12 @@ MonoBehaviour:
   _bulletVisualPrefab: {fileID: 7016460300817658079, guid: 3429994b3a928324ab0deff933726522, type: 3}
   _damage: 25
   _bulletRange: 150
+  _fireGate:
+    _shootStateTag: GunShoot
+    _minInterval: 0.1
+    _fallbackCooldown: 0.6
+    _enterTimeout: 0.3
+    _maxLock: 3
   _shootSound: {fileID: 8300000, guid: 0e5ec5d798406aa4699be8c44dd7599f, type: 3}
   _emptySound: {fileID: 8300000, guid: 09730ae2b9e60004c945c0b2dde283b6, type: 3}
   _reloadSound: {fileID: 8300000, guid: dd7a1f81e159ed24a8da9c6bb92bc32d, type: 3}
@@ -505,7 +515,7 @@ Rigidbody:
   serializedVersion: 5
   m_Mass: 1
   m_LinearDamping: 0
-  m_AngularDamping: 0.05
+  m_AngularDamping: 2
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}

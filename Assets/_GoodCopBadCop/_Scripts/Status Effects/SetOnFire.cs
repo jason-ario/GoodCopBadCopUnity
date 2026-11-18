@@ -97,32 +97,74 @@ public class SetOnFire : MonoBehaviour
     }
 
     /// <summary>
-    /// Collects bone transforms for fire spawning.
-    /// For humanoid rigs uses <see cref="HumanBodyBones"/> via the Animator.
-    /// For generic rigs falls back to <see cref="SkinnedMeshRenderer.bones"/>.
+    /// Collects the transforms fire is attached to, in order of preference:
+    /// humanoid <see cref="HumanBodyBones"/> via the Animator → <see cref="SkinnedMeshRenderer.bones"/>
+    /// of every skinned mesh (generic rigs such as the rat) → static mesh renderers (unrigged
+    /// creatures such as the roach) → this transform. Never returns an empty list, so every
+    /// character that can be reached by the flame always ignites and takes fire damage.
+    /// Missing (null) bone slots are skipped — one would otherwise throw inside
+    /// <see cref="SpawnFireOverTime"/> and silently cancel the burn.
     /// </summary>
     private List<Transform> CollectBones()
     {
+        var bones = new List<Transform>();
+        var seen = new HashSet<Transform>();
+
+        void Add(Transform t)
+        {
+            if (t != null && seen.Add(t)) bones.Add(t);
+        }
+
         Animator anim = animator != null ? animator : GetComponentInChildren<Animator>();
 
         if (anim != null && anim.isHuman)
         {
-            var bones = new List<Transform>();
             foreach (HumanBodyBones bone in System.Enum.GetValues(typeof(HumanBodyBones)))
             {
                 if (bone == HumanBodyBones.LastBone) continue;
-                Transform t = anim.GetBoneTransform(bone);
-                if (t != null) bones.Add(t);
+                Add(anim.GetBoneTransform(bone));
             }
-            return bones;
+            if (bones.Count > 0) return bones;
         }
 
-        // Generic rig: read bone transforms directly from the SkinnedMeshRenderer.
-        SkinnedMeshRenderer smr = GetComponentInChildren<SkinnedMeshRenderer>();
-        if (smr != null && smr.bones.Length > 0)
-            return new List<Transform>(smr.bones);
+        // Generic rig: read bone transforms directly from the skinned meshes.
+        foreach (SkinnedMeshRenderer smr in GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            foreach (Transform t in smr.bones)
+                Add(t);
+            if (smr.bones.Length == 0)
+                Add(smr.rootBone != null ? smr.rootBone : smr.transform);
+        }
+        if (bones.Count > 0) return bones;
 
-        return new List<Transform>();
+        // Unrigged mesh: attach fire to the mesh renderers themselves.
+        foreach (MeshRenderer mr in GetComponentsInChildren<MeshRenderer>())
+            if (mr.enabled) Add(mr.transform);
+        if (bones.Count > 0) return bones;
+
+        Add(transform);
+        return bones;
+    }
+
+    /// <summary>
+    /// World position for a fire emitter on <paramref name="anchor"/>. Bones use the midpoint
+    /// to their first child; a static mesh renderer (no bones to spread across) uses a random
+    /// point inside its bounds so repeated ignitions cover the body instead of stacking.
+    /// </summary>
+    private static Vector3 GetFirePosition(Transform anchor)
+    {
+        if (anchor.TryGetComponent(out MeshRenderer mr) && mr.enabled)
+        {
+            Bounds b = mr.bounds;
+            Vector3 jitter = Vector3.Scale(b.extents, new Vector3(
+                Random.Range(-0.6f, 0.6f), Random.Range(-0.2f, 0.6f), Random.Range(-0.6f, 0.6f)));
+            return b.center + jitter;
+        }
+
+        if (anchor.childCount > 0)
+            return Vector3.Lerp(anchor.position, anchor.GetChild(0).position, 0.5f);
+
+        return anchor.position;
     }
 
     private IEnumerator SpawnFireOverTime(List<Transform> bones)
@@ -131,10 +173,9 @@ public class SetOnFire : MonoBehaviour
         {
             if (!_isOnFire) yield break;
             if (LiveFireCount() >= maxFireInstances) yield break;
+            if (boneTransform == null) continue; // bone destroyed mid-burn (e.g. gibbed)
 
-            Vector3 worldPos = boneTransform.position;
-            if (boneTransform.childCount > 0)
-                worldPos = Vector3.Lerp(boneTransform.position, boneTransform.GetChild(0).position, 0.5f);
+            Vector3 worldPos = GetFirePosition(boneTransform);
 
             GameObject instance = Instantiate(firePrefab, boneTransform);
             instance.transform.position = worldPos;

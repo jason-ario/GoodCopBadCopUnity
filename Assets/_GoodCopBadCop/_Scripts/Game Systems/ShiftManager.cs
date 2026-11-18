@@ -2332,7 +2332,7 @@ public class ShiftManager : NetworkBehaviour
             if (day1 == null)
                 Debug.LogWarning("[ShiftManager] ResumeSavedDay — Day_01 component not found; tutorial-gated items could not be force-unlocked.");
             else if (_currentDay == 1 && atDusk)
-                day1.UnlockTutorialItemsForDuskResume(); // shovels/hammer stay locked for the breach tutorial
+                day1.UnlockTutorialItemsForDuskResume(); // shovels stay locked for the breach tutorial
             else
                 day1.ForceUnlockTutorialItems();
 

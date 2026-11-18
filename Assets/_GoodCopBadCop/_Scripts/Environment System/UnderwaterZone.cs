@@ -47,24 +47,6 @@ namespace GoodCopBadCop.EnvironmentSystem
 
         private static Transform _playerBodyTransform;
 
-        private static readonly System.Collections.Generic.List<UnderwaterZone> s_zones = new();
-
-        /// <summary>
-        /// True when <paramref name="worldPoint"/> is inside any enabled zone. Used by the server to
-        /// apply underwater damping to ragdolls it simulates for other players' bodies, which the
-        /// local-player <see cref="OnPlayerBodyUnderwaterStateChanged"/> event doesn't cover.
-        /// </summary>
-        public static bool IsPointUnderwater(Vector3 worldPoint)
-        {
-            foreach (UnderwaterZone zone in s_zones)
-                if (zone != null && zone._collider != null && zone._collider.bounds.Contains(worldPoint))
-                    return true;
-            return false;
-        }
-
-        private void OnEnable() => s_zones.Add(this);
-        private void OnDisable() => s_zones.Remove(this);
-
         /// <summary>
         /// Register the local player's root transform so all zones track body position independently.
         /// Call from <c>PlayerMovementController.OnNetworkSpawn</c> for the local player only.

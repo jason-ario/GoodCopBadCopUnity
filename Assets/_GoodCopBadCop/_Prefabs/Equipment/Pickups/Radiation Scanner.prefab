@@ -100,6 +100,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Radiation Scanner
       objectReference: {fileID: 0}
+    - target: {fileID: 9009281007635988876, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
+      propertyPath: m_AngularDamping
+      value: 2
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 5235500818728641357, guid: bb983ac9f9e7c1445a8b4c2106307b41, type: 3}
     m_RemovedGameObjects: []
@@ -192,7 +196,15 @@ MonoBehaviour:
   itemsThatCanInteractWith:
   - {fileID: 11400000, guid: 7e9da4fcec610e64a92059e8f29988a0, type: 2}
   interactText: Geiger Counter
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   itemData: {fileID: 11400000, guid: 6a1a2824fbdfaf34c85385d034e46c27, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
