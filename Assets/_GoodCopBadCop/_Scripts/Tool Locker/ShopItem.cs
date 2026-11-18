@@ -5,8 +5,16 @@ using UnityEngine;
 [RequireComponent(typeof(HighlightEffect))]
 public class ShopItem : MonoBehaviour, IHoverable, IClickable
 {
-    [SerializeField] private string name;
-    public string Name => name; 
+    [SerializeField, LocalizeField] private string name;
+
+    /// <summary>
+    /// English identifier (also used to find the item over the network and in save data). Never show it
+    /// directly in UI; use <see cref="DisplayName"/>.
+    /// </summary>
+    public string Name => name;
+
+    /// <summary><see cref="Name"/> translated into the current language for display.</summary>
+    public string DisplayName => Loc.TranslateSource(name);
     public PickableItemData pickableItemData;
 
     private HighlightEffect _highlightEffect;

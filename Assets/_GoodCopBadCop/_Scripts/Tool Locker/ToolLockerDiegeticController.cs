@@ -228,7 +228,7 @@ public class ToolLockerDiegeticController : DiegeticViewController
 
     private void ShowPrompt(ShopItem item)
     {
-        _cursorPrompt?.Show($"{item.Name}  <sprite=0>  {item.Price}");
+        _cursorPrompt?.Show($"{item.DisplayName}  <sprite=0>  {item.Price}");
     }
 
     private void ClearPrompt()

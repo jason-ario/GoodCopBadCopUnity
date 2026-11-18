@@ -37,7 +37,7 @@ public class ToolShopController : MonoBehaviour
     private static string HoldingObjectMessage => Loc.T("Put down what you're holding first!");
     private static string PurchaseSuccessMessage => Loc.T("Item purchased!");
     private static string NotEnoughMoneyMessage => Loc.T("Not enough coupons!");
-    private static readonly string LockedButtonLabel = "Locked";
+    private static string LockedButtonLabel => Loc.T("Locked");
     private const float BuyButtonLockedAlpha = 0.45f;
 
     private void OnEnable()
@@ -126,7 +126,7 @@ public class ToolShopController : MonoBehaviour
         _selectedItemIsLocked = isLocked || isUnavailable;
 
         _itemPreviewSpawner.SpawnAndFrame(shopItem, isUnavailable);
-        itemPreviewText.text = isUnavailable ? "???" : shopItem.Name;
+        itemPreviewText.text = isUnavailable ? "???" : shopItem.DisplayName;
 
         if (isUnavailable)
         {
@@ -142,7 +142,7 @@ public class ToolShopController : MonoBehaviour
         }
         else
         {
-            _buyText.text = "Buy " + "<sprite=0>" + shopItem.Price;
+            _buyText.text = Loc.T("Buy") + " <sprite=0>" + shopItem.Price;
             if (_buyButtonCanvasGroup != null)
                 _buyButtonCanvasGroup.alpha = 1f;
         }
@@ -272,7 +272,7 @@ public class ToolShopController : MonoBehaviour
         GetViewForItem(item)?.RefreshPrice();
 
         if (_selectedShopItem == item && !_selectedItemIsLocked)
-            _buyText.text = "Buy " + "<sprite=0>" + item.Price;
+            _buyText.text = Loc.T("Buy") + " <sprite=0>" + item.Price;
     }
 
     /// <summary>

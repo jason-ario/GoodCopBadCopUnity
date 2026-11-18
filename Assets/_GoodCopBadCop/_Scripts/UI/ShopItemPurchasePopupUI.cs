@@ -50,14 +50,16 @@ public class ShopItemPurchasePopupUI : MonoBehaviour
         _onBuy = onBuy;
         _onCancel = onCancel;
         _price = item.Price;
-        _titleLabel.text = string.IsNullOrEmpty(titleOverride) ? $"Buy {item.Name}" : titleOverride;
+        _titleLabel.text = string.IsNullOrEmpty(titleOverride)
+            ? Loc.T("Buy {0}", item.DisplayName)
+            : Loc.TranslateSource(titleOverride);
         _priceLabel.text = $"<sprite=0>  {item.Price}";
         // Preview is handled by the in-world Cinemachine zoom camera.
 
         // Description comes from the item's PickableItemData (when assigned) — action-style
         // shop interactables with no pickableItemData (e.g. WorldPurchaseActionInteractable)
         // simply hide the label rather than show blank space.
-        string description = item.pickableItemData != null ? item.pickableItemData.Description : null;
+        string description = item.pickableItemData != null ? Loc.TranslateSource(item.pickableItemData.Description) : null;
         if (_descriptionLabel != null)
         {
             _descriptionLabel.gameObject.SetActive(!string.IsNullOrEmpty(description));

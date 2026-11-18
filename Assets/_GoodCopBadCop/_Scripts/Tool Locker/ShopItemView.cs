@@ -43,7 +43,7 @@ public class ShopItemView : MonoBehaviour
     {
         if (_shopItem == null) return;
         bool available = _shopItem.IsAvailable;
-        shopItemName.text = available ? _shopItem.Name : UnavailableLabel;
+        shopItemName.text = available ? _shopItem.DisplayName : UnavailableLabel;
         shopItemPrice.text = available ? "<sprite=0>" + _shopItem.Price : UnavailableLabel;
     }
 
