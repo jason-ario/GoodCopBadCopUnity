@@ -190,6 +190,15 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             if (hitShutter)
                 ShutterController.Instance?.OnHitByPlayerWeapon();
 
+            // Loose physics objects (gore, junk, soccer ball): one push per object, scaled by the
+            // pellets that struck it (gore also bleeds). Networked by the objects themselves.
+            foreach (PhysicsPelletHit physicsHit in _physicsHits.Values)
+            {
+                float strength = Mathf.Min(physicsHit.Pellets * PhysicsStrengthPerPellet, PhysicsMaxStrength);
+                CombatHitUtility.ApplyWeaponImpact(physicsHit.Collider, physicsHit.Point, cam.transform.forward, strength);
+            }
+            _physicsHits.Clear();
+
             FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, mutantPelletPoints, playerRefs, playerPellets,
                 playerPoints, suspectRefs, suspectPoints, hitGlass, hitShutter, propPoints, pelletEndPoints);
         }
@@ -214,6 +223,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         Dictionary<NetworkObject, Vector3> playerFirstPoints = new();
         Dictionary<NetworkObject, Vector3> suspectHits = new();
         Dictionary<HittableProp, Vector3> propHits = new();
+        _physicsHits.Clear();
         hitGlass = false;
         hitShutter = false;
         pelletEndPoints = new Vector3[_pelletCount];
@@ -309,6 +319,17 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
                 // Every remaining branch stops the pellet here.
                 pelletEndPoints[i] = hit.point;
+
+                // Loose physics objects (gore, junk, soccer ball) — pellets add up per object.
+                Component physicsTarget = CombatHitUtility.GetWeaponPhysicsTarget(hit.collider);
+                if (physicsTarget != null)
+                {
+                    if (_physicsHits.TryGetValue(physicsTarget, out PhysicsPelletHit existing))
+                        _physicsHits[physicsTarget] = new PhysicsPelletHit(existing.Collider, existing.Point, existing.Pellets + 1);
+                    else
+                        _physicsHits[physicsTarget] = new PhysicsPelletHit(hit.collider, hit.point, 1);
+                    break;
+                }
 
                 Transform root = hit.collider.transform.root;
                 if (root.CompareTag("Player"))
@@ -469,6 +490,30 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     /// Rejects impossible reports only; never re-litigates a legitimate pellet.
     /// </summary>
     private const float MaxReportedHitDistance = 6f;
+
+    /// <summary>Physics push strength each pellet adds on gore / junk / the soccer ball (pistol round = 1).</summary>
+    private const float PhysicsStrengthPerPellet = 0.35f;
+
+    /// <summary>Cap on one blast's physics push per object.</summary>
+    private const float PhysicsMaxStrength = 2f;
+
+    /// <summary>Pellets that struck one loose physics object in a blast: first collider/point plus count.</summary>
+    private readonly struct PhysicsPelletHit
+    {
+        public readonly Collider Collider;
+        public readonly Vector3 Point;
+        public readonly int Pellets;
+
+        public PhysicsPelletHit(Collider collider, Vector3 point, int pellets)
+        {
+            Collider = collider;
+            Point    = point;
+            Pellets  = pellets;
+        }
+    }
+
+    /// <summary>Filled by <see cref="ResolveBlast"/>, consumed right after in OnStartUse (shooter only).</summary>
+    private readonly Dictionary<Component, PhysicsPelletHit> _physicsHits = new();
 
     /// <summary>
     /// Server-side: validates the shooter, spends a round, then applies the per-target pellet counts

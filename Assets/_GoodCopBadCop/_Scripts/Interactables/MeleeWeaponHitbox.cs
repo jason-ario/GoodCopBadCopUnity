@@ -90,7 +90,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         Glass       = 5,
         Prop        = 6,
         Shutter     = 7,
+        Physics     = 8, // local only — gore / junk / soccer ball push, never sent to the server
     }
+
+    /// <summary>Physics push strength of a melee hit on gore / junk / the soccer ball (pistol round = 1).</summary>
+    private const float WeaponImpactStrength = 1.4f;
+
+    /// <summary>Collider of the loose physics object the last <see cref="ResolveLocalHit"/> chose (HitKind.Physics).</summary>
+    private Collider _physicsHitCollider;
 
     public override void OnNetworkSpawn()
     {
@@ -125,7 +132,11 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         // weapon's head/tip) rather than the struck surface's closest point, so the effect always
         // reads as coming from the weapon making contact, not from the target's geometry.
         Vector3 effectOrigin = _hitEffectSpawnPoint != null ? _hitEffectSpawnPoint.position : attackOrigin;
-        bool isEnvironment = kind == HitKind.Environment || kind == HitKind.Prop || kind == HitKind.Shutter;
+
+        // Gore reads as a fleshy hit; a soccer ball or trash reads as hitting an object.
+        bool physicsIsGore = kind == HitKind.Physics && CombatHitUtility.IsGoreTarget(_physicsHitCollider);
+        bool isEnvironment = kind == HitKind.Environment || kind == HitKind.Prop || kind == HitKind.Shutter
+                             || (kind == HitKind.Physics && !physicsIsGore);
 
         if (isEnvironment)
         {
@@ -152,6 +163,14 @@ public class MeleeWeaponHitbox : NetworkBehaviour
 
             if (IsServer) RelayShutterHit(NetworkManager.Singleton.LocalClientId);
             else          ReportShutterHitServerRpc();
+            return;
+        }
+
+        if (kind == HitKind.Physics)
+        {
+            // Small push (gore also bleeds), networked by the object itself.
+            CombatHitUtility.ApplyWeaponImpact(_physicsHitCollider, hitPoint, hitPoint - GetSwingerPosition(attackOrigin), WeaponImpactStrength);
+            _physicsHitCollider = null;
             return;
         }
 
@@ -213,6 +232,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         Vector3 propHitPosition = attackOrigin;
         bool shutterHit = false;
         Vector3 shutterHitPosition = attackOrigin;
+        _physicsHitCollider = null;
+        Vector3 physicsHitPosition = attackOrigin;
 
         for (int i = 0; i < hitCount; i++)
         {
@@ -290,6 +311,23 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 return HitKind.Player;
             }
 
+            // Loose physics objects (gore, junk, soccer ball): outrank plain geometry and props but
+            // not live targets or glass, so they are only chosen after the loop.
+            Component physicsTarget = CombatHitUtility.GetWeaponPhysicsTarget(col);
+            if (physicsTarget != null)
+            {
+                if (_physicsHitCollider == null)
+                {
+                    Vector3 physicsPoint = SafeClosestPoint(col, attackOrigin);
+                    if (!checkLineOfSight || HasLineOfSight(eye, physicsPoint, col, physicsTarget))
+                    {
+                        _physicsHitCollider = col;
+                        physicsHitPosition  = physicsPoint;
+                    }
+                }
+                continue;
+            }
+
             // Everything below is only worth considering if the swinger can actually see it. The
             // glass pane is built from several colliders, so its own siblings mustn't block it.
             Vector3 surfacePoint = SafeClosestPoint(col, attackOrigin);
@@ -337,6 +375,12 @@ public class MeleeWeaponHitbox : NetworkBehaviour
                 hitPoint = surfacePoint;
                 return HitKind.Glass;
             }
+        }
+
+        if (_physicsHitCollider != null)
+        {
+            hitPoint = physicsHitPosition;
+            return HitKind.Physics;
         }
 
         if (propHit)

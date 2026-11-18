@@ -46,9 +46,9 @@ public class WorldShopItemInteractable : Interactable
 
     // ─── Constants ────────────────────────────────────────────────────────────
 
-    private const string HoldingObjectMessage  = "Put down what you're holding first!";
-    private const string PurchaseSuccessMessage = "Item purchased!";
-    private const string NotEnoughMoneyMessage  = "Not enough coupons!";
+    private static string HoldingObjectMessage   => Loc.T("Put down what you're holding first!");
+    private static string PurchaseSuccessMessage => Loc.T("Item purchased!");
+    private static string NotEnoughMoneyMessage  => Loc.T("Not enough coupons!");
     private const float  ZoomPaddingMultiplier  = 1.5f;
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────

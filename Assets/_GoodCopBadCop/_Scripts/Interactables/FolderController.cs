@@ -634,7 +634,7 @@ public class FolderController : PickableObject
                 {
                     // Folder landed upside-down (e.g. after being thrown) — can't stamp its underside.
                     Debug.Log("[FolderController] Stamp blocked: folder is not facing upward.");
-                    UIController.Instance?.ShowShopNotification("<color=red>Folder must be face-up to stamp!</color>");
+                    UIController.Instance?.ShowShopNotification("<color=red>" + Loc.T("Folder must be face-up to stamp!") + "</color>");
                     return;
                 }
 
@@ -677,7 +677,7 @@ public class FolderController : PickableObject
             else
             {
                 // This notebook's page is already filed — tell the player instead of silently doing nothing.
-                UIController.Instance?.ShowShopNotification("<color=red>File already added</color>");
+                UIController.Instance?.ShowShopNotification("<color=red>" + Loc.T("File already added") + "</color>");
             }
         }
     }
@@ -839,7 +839,7 @@ public class FolderController : PickableObject
     [ClientRpc]
     private void QuarantineFullClientRpc(ClientRpcParams clientRpcParams = default)
     {
-        UIController.Instance?.ShowShopNotification("<color=red>5/5 quarantine slots full!</color>");
+        UIController.Instance?.ShowShopNotification("<color=red>" + Loc.T("5/5 quarantine slots full!") + "</color>");
     }
 
     [ClientRpc]
@@ -851,7 +851,7 @@ public class FolderController : PickableObject
     [ClientRpc]
     private void NotEnoughInkClientRpc(ClientRpcParams clientRpcParams = default)
     {
-        UIController.Instance?.ShowShopNotification("<color=red>NOT ENOUGH INK</color>");
+        UIController.Instance?.ShowShopNotification("<color=red>" + Loc.T("NOT ENOUGH INK") + "</color>");
     }
 
     [ClientRpc]

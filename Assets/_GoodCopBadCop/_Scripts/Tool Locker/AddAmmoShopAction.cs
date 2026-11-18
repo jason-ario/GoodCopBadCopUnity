@@ -12,7 +12,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "AddAmmoShopAction", menuName = "Good Cop Bad Cop/Shop/Actions/Add Ammo")]
 public class AddAmmoShopAction : ShopPurchaseAction
 {
-    private const string ReserveFullMessage = "Ammo reserve full!";
+    private static string ReserveFullMessage => Loc.T("Ammo reserve full!");
 
     [Tooltip("Which ammo reserve this purchase feeds.")]
     public AmmoType ammoType = AmmoType.Pistol;

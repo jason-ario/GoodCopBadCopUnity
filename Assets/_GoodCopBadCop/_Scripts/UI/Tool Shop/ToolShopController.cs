@@ -34,8 +34,9 @@ public class ToolShopController : MonoBehaviour
     private bool _initialized;
     private CanvasGroup _buyButtonCanvasGroup;
 
-    private static readonly string HoldingObjectMessage = "Put down what you're holding first!";
-    private static readonly string PurchaseSuccessMessage = "Item purchased!";
+    private static string HoldingObjectMessage => Loc.T("Put down what you're holding first!");
+    private static string PurchaseSuccessMessage => Loc.T("Item purchased!");
+    private static string NotEnoughMoneyMessage => Loc.T("Not enough coupons!");
     private static readonly string LockedButtonLabel = "Locked";
     private const float BuyButtonLockedAlpha = 0.45f;
 
@@ -192,7 +193,7 @@ public class ToolShopController : MonoBehaviour
 
             if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value < _selectedShopItem.Price)
             {
-                UIController.Instance.ShowShopNotification("Not enough coupons!");
+                UIController.Instance.ShowShopNotification(NotEnoughMoneyMessage);
                 return;
             }
 
@@ -209,7 +210,7 @@ public class ToolShopController : MonoBehaviour
 
             if (GlobalHostVariables.Instance != null && GlobalHostVariables.Instance.money.Value < _selectedShopItem.Price)
             {
-                UIController.Instance.ShowShopNotification("Not enough coupons!");
+                UIController.Instance.ShowShopNotification(NotEnoughMoneyMessage);
                 return;
             }
 

@@ -194,8 +194,19 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         else if (hit.Kind == ShotKind.Shutter)
             ShutterController.Instance?.OnHitByPlayerWeapon();
 
+        // Loose physics objects (gore, junk, soccer ball) get a small push (gore also bleeds).
+        // Routed through their own networking, so the server shot report stays a plain miss.
+        if (hit.Kind == ShotKind.Physics)
+        {
+            CombatHitUtility.ApplyWeaponImpact(hit.Collider, hit.Point, cam.transform.forward, WeaponImpactStrength);
+            hit = new FireHit(ShotKind.None, default, hit.Point);
+        }
+
         FireServerRpc(cam.transform.forward, (byte)hit.Kind, hit.TargetRef, hit.Point);
     }
+
+    /// <summary>Physics push strength of one pistol round on gore / junk / the soccer ball.</summary>
+    private const float WeaponImpactStrength = 1f;
 
     /// <summary>What a locally-resolved shot connected with. Sent to the server as a byte.</summary>
     private enum ShotKind : byte
@@ -207,6 +218,7 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         Prop    = 4,
         Suspect = 5,
         Shutter = 6,
+        Physics = 7, // local only — never sent to the server
     }
 
     private readonly struct FireHit
@@ -214,12 +226,14 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         public readonly ShotKind Kind;
         public readonly NetworkObjectReference TargetRef;
         public readonly Vector3 Point;
+        public readonly Collider Collider;
 
-        public FireHit(ShotKind kind, NetworkObjectReference targetRef, Vector3 point)
+        public FireHit(ShotKind kind, NetworkObjectReference targetRef, Vector3 point, Collider collider = null)
         {
             Kind      = kind;
             TargetRef = targetRef;
             Point     = point;
+            Collider  = collider;
         }
     }
 
@@ -296,6 +310,10 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             // Fences and gates are open mesh — shots pass through them, matching melee weapons.
             if (CombatHitUtility.IsBulletPassthrough(hit.collider))
                 continue;
+
+            // Loose physics objects (gore, junk, soccer ball) — pushed, and they stop the shot.
+            if (CombatHitUtility.GetWeaponPhysicsTarget(hit.collider) != null)
+                return new FireHit(ShotKind.Physics, default, hit.point, hit.collider);
 
             if (hit.collider.transform.root.CompareTag("Player"))
             {

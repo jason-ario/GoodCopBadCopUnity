@@ -23,7 +23,7 @@ public class MiniFridgeDiegeticController : DiegeticViewController
 
     // ─── Constants ────────────────────────────────────────────────────────────
 
-    private const string HoldingObjectMessage = "Put down what you're holding first!";
+    private static string HoldingObjectMessage => Loc.T("Put down what you're holding first!");
     private const float MaxRayDistance = 100f;
 
     // ─── Public API ──────────────────────────────────────────────────────────

@@ -113,6 +113,10 @@ public class PlayerHealth : NetworkBehaviour
     private void Awake()
     {
         _playerInstance = GetComponent<PlayerInstance>();
+
+        // Shared blood for gore hits (gore pieces have no character to supply their own).
+        if (_hitParticlePrefab != null && CombatHitUtility.SharedBloodHitPrefab == null)
+            CombatHitUtility.SharedBloodHitPrefab = _hitParticlePrefab;
     }
 
     public override void OnNetworkSpawn()

@@ -208,7 +208,7 @@ public class GuardPurchasePoint : Interactable
         RefreshVisualState();
 
         if (!newValue) return;
-        UIController.Instance.ShowPurchaseNotification("Guard hired! Will arrive tomorrow.");
+        UIController.Instance.ShowPurchaseNotification(Loc.T("Guard hired! Will arrive tomorrow."));
     }
 
     /// <summary>

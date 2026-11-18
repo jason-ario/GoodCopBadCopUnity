@@ -731,7 +731,7 @@ public class PlayerPickupController : NetworkBehaviour
     private void PurchaseFailedClientRpc(ClientRpcParams clientRpcParams = default)
     {
         if (!IsOwner) return;
-        UIController.Instance.ShowShopNotification("Not enough coupons!");
+        UIController.Instance.ShowShopNotification(Loc.T("Not enough coupons!"));
     }
 
     /// <summary>

@@ -183,6 +183,6 @@ public class GlobalHostVariables : NetworkBehaviour
     [ClientRpc]
     private void WorldPurchaseRejectedClientRpc(string message, ClientRpcParams clientRpcParams = default)
     {
-        UIController.Instance?.ShowShopNotification(message);
+        UIController.Instance?.ShowShopNotification(Loc.TranslateSource(message));
     }
 }

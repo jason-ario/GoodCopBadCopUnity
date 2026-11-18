@@ -48,6 +48,12 @@ public class KickablePhysicsBody : MonoBehaviour
     [Tooltip("Server-side minimum seconds between accepted kicks on this piece.")]
     [SerializeField, Min(0f)] private float _serverKickCooldown = 0.15f;
 
+    [Header("Weapon Hits (guns / melee)")]
+    [Tooltip("Velocity change (m/s) given by a weapon hit at strength 1 (about one pistol shot).")]
+    [SerializeField, Min(0f)] private float _weaponHitSpeed = 2.5f;
+    [Tooltip("Server sanity check: max distance between a reported weapon hit point and this piece's colliders.")]
+    [SerializeField, Min(0f)] private float _weaponHitMaxReportDistance = 4f;
+
     [Header("Ragdoll")]
     [Tooltip("Build Rigidbodies + CharacterJoints on collider bones (server-only, first wake) for pieces that have no authored ragdoll.")]
     [SerializeField] private bool _autoBuildRagdoll = true;
@@ -89,6 +95,13 @@ public class KickablePhysicsBody : MonoBehaviour
     private NetworkObject _netObj;
     private Rigidbody _rootRb;
     private Collider[] _allColliders;
+    private JunkItem _junk;
+
+    /// <summary>
+    /// True for organic remains (gore, body parts, guts) — the same rule the trash bag uses for its
+    /// squish (<see cref="JunkItem.IsBurnable"/>). Weapon hits on gore bleed; on trash they don't.
+    /// </summary>
+    public bool IsGore => _junk != null && _junk.IsBurnable;
 
     /// <summary>Bones whose local pose is synced; identical order on every peer (computed in Awake).</summary>
     private Transform[] _poseBones = System.Array.Empty<Transform>();
@@ -145,6 +158,7 @@ public class KickablePhysicsBody : MonoBehaviour
     {
         _netObj = GetComponent<NetworkObject>();
         _rootRb = GetComponent<Rigidbody>();
+        _junk = GetComponent<JunkItem>();
         _allColliders = GetComponentsInChildren<Collider>(true);
         _animators = GetComponentsInChildren<Animator>(true);
 
@@ -278,9 +292,26 @@ public class KickablePhysicsBody : MonoBehaviour
     /// <param name="playerSpeed">Kicker's horizontal speed, scales strength between walk and run.</param>
     public void ApplyKickServer(Vector3 direction, Vector3 point, float playerSpeed)
     {
+        float strength = Mathf.Lerp(_walkKickStrength, 1f, Mathf.InverseLerp(1.2f, 6f, playerSpeed));
+        ApplyImpulseServer(direction, point, _kickSpeed * strength);
+    }
+
+    /// <summary>
+    /// Server-only. Small push from a gun/melee hit (see <see cref="RequestWeaponHit"/>). Same
+    /// path as a foot kick (flattened, lifted, nearest limb takes it), scaled by
+    /// <see cref="_weaponHitSpeed"/>. <paramref name="strength"/> is clamped to 0–2.
+    /// </summary>
+    public void ApplyWeaponHitServer(Vector3 direction, Vector3 point, float strength)
+    {
+        ApplyImpulseServer(direction, point, _weaponHitSpeed * Mathf.Clamp(strength, 0f, 2f));
+    }
+
+    private void ApplyImpulseServer(Vector3 direction, Vector3 point, float speed)
+    {
         if (!IsServerRole || _rootRb == null || _isHeld) return;
         if (Time.time - _lastServerKickTime < _serverKickCooldown) return;
         if (!AnyColliderEnabled()) return; // held / hidden (e.g. Vlad during the cutscene)
+        if (speed <= 0f) return;
 
         _lastServerKickTime = Time.time;
 
@@ -288,8 +319,7 @@ public class KickablePhysicsBody : MonoBehaviour
         if (direction.sqrMagnitude < 0.0001f) direction = transform.forward;
         direction = (direction.normalized + Vector3.up * _kickUpward).normalized;
 
-        float strength = Mathf.Lerp(_walkKickStrength, 1f, Mathf.InverseLerp(1.2f, 6f, playerSpeed));
-        Vector3 deltaV = direction * (_kickSpeed * strength);
+        Vector3 deltaV = direction * speed;
 
         if (HasRig)
         {
@@ -308,6 +338,40 @@ public class KickablePhysicsBody : MonoBehaviour
             _rootAwakeTime = 0f;
             _restTime = 0f;
         }
+    }
+
+    // ── Weapon hits (guns / melee) ───────────────────────────────────────────
+
+    /// <summary>
+    /// Runs on the attacking player's machine when a gun/melee hit lands on this piece. Gore bleeds
+    /// instantly for the attacker; the server applies the push (<see cref="ApplyWeaponHitServer"/>)
+    /// and replays the blood for everyone else.
+    /// </summary>
+    public void RequestWeaponHit(Vector3 point, Vector3 direction, float strength)
+    {
+        if (_netObj == null || !_netObj.IsSpawned || _netObj.NetworkManager == null) return;
+
+        if (IsGore)
+            CombatHitUtility.SpawnSharedBloodHit(point);
+
+        NetworkManager nm = _netObj.NetworkManager;
+        if (nm.IsServer)
+            HandleWeaponHitServer(point, direction, strength, nm.LocalClientId);
+        else
+            Messaging.SendWeaponHit(_netObj, point, direction, strength);
+    }
+
+    private void HandleWeaponHitServer(Vector3 point, Vector3 direction, float strength, ulong senderClientId)
+    {
+        if (!IsServerRole) return;
+
+        // Sanity bound, NOT a hit test — rejects a report that could only come from a bug.
+        if (CombatHitUtility.DistanceToTarget(this, point) > _weaponHitMaxReportDistance) return;
+
+        ApplyWeaponHitServer(direction, point, strength);
+
+        if (IsGore)
+            Messaging.BroadcastBloodHit(this, point, senderClientId);
     }
 
     /// <summary>
@@ -688,6 +752,8 @@ public class KickablePhysicsBody : MonoBehaviour
     {
         private const string PoseMessage = "KickablePhysicsBody.Pose";
         private const string RequestMessage = "KickablePhysicsBody.RequestPose";
+        private const string WeaponHitMessage = "KickablePhysicsBody.WeaponHit";
+        private const string BloodHitMessage = "KickablePhysicsBody.BloodHit";
 
         private static CustomMessagingManager s_registeredOn;
         private static readonly List<ulong> s_targets = new();
@@ -701,6 +767,67 @@ public class KickablePhysicsBody : MonoBehaviour
             s_registeredOn = nm.CustomMessagingManager;
             s_registeredOn.RegisterNamedMessageHandler(PoseMessage, OnPoseMessage);
             s_registeredOn.RegisterNamedMessageHandler(RequestMessage, OnRequestMessage);
+            s_registeredOn.RegisterNamedMessageHandler(WeaponHitMessage, OnWeaponHitMessage);
+            s_registeredOn.RegisterNamedMessageHandler(BloodHitMessage, OnBloodHitMessage);
+        }
+
+        /// <summary>Client → server: a weapon hit this piece at <paramref name="point"/>.</summary>
+        public static void SendWeaponHit(NetworkObject netObj, Vector3 point, Vector3 direction, float strength)
+        {
+            NetworkManager nm = netObj.NetworkManager;
+            if (nm == null || nm.CustomMessagingManager == null) return;
+            EnsureRegistered();
+
+            using var writer = new FastBufferWriter(sizeof(ulong) + 7 * sizeof(float), Allocator.Temp);
+            writer.WriteValueSafe(netObj.NetworkObjectId);
+            writer.WriteValueSafe(point);
+            writer.WriteValueSafe(direction);
+            writer.WriteValueSafe(strength);
+            nm.CustomMessagingManager.SendNamedMessage(WeaponHitMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.Reliable);
+        }
+
+        /// <summary>Server → every client except the server and the attacker (who already bled locally).</summary>
+        public static void BroadcastBloodHit(KickablePhysicsBody body, Vector3 point, ulong excludeClientId)
+        {
+            NetworkManager nm = body._netObj.NetworkManager;
+            if (nm == null || nm.CustomMessagingManager == null) return;
+
+            // The host's local bleed happened in RequestWeaponHit when it was the attacker; when a
+            // remote client attacked, the host still needs to see it.
+            if (excludeClientId != nm.LocalClientId)
+                CombatHitUtility.SpawnSharedBloodHit(point);
+
+            s_targets.Clear();
+            foreach (ulong id in nm.ConnectedClientsIds)
+                if (id != nm.LocalClientId && id != excludeClientId) s_targets.Add(id);
+            if (s_targets.Count == 0) return;
+
+            using var writer = new FastBufferWriter(3 * sizeof(float), Allocator.Temp);
+            writer.WriteValueSafe(point);
+            nm.CustomMessagingManager.SendNamedMessage(BloodHitMessage, s_targets, writer, NetworkDelivery.Unreliable);
+        }
+
+        private static void OnWeaponHitMessage(ulong senderClientId, FastBufferReader reader)
+        {
+            NetworkManager nm = NetworkManager.Singleton;
+            if (nm == null || !nm.IsServer) return;
+
+            reader.ReadValueSafe(out ulong id);
+            reader.ReadValueSafe(out Vector3 point);
+            reader.ReadValueSafe(out Vector3 direction);
+            reader.ReadValueSafe(out float strength);
+
+            KickablePhysicsBody body = Find(nm, id);
+            if (body != null)
+                body.HandleWeaponHitServer(point, direction, strength, senderClientId);
+        }
+
+        private static void OnBloodHitMessage(ulong senderClientId, FastBufferReader reader)
+        {
+            if (senderClientId != NetworkManager.ServerClientId) return;
+
+            reader.ReadValueSafe(out Vector3 point);
+            CombatHitUtility.SpawnSharedBloodHit(point);
         }
 
         public static void RequestPose(NetworkObject netObj)

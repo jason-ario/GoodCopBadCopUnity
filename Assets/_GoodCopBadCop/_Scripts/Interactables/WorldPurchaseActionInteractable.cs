@@ -93,10 +93,12 @@ public class WorldPurchaseActionInteractable : Interactable
 
     // ─── Constants ─────────────────────────────────────────────────────────────
 
-    private const string PurchaseSuccessMessage = "Done!";
-    private const string NotEnoughMoneyMessage  = "Not enough coupons!";
-    private const string AlreadyPurchasedMessage = "Already purchased!";
-    private const string PurchaseUnavailableMessage = "Not available yet, try again in a moment.";
+    // English source text: these may be sent to clients over RPC (Loc.N keeps English on the wire),
+    // and every display site translates with Loc.T / Loc.TranslateSource.
+    private static readonly string PurchaseSuccessMessage = Loc.N("Done!");
+    private static readonly string NotEnoughMoneyMessage  = Loc.N("Not enough coupons!");
+    private static readonly string AlreadyPurchasedMessage = Loc.N("Already purchased!");
+    private static readonly string PurchaseUnavailableMessage = Loc.N("Not available yet, try again in a moment.");
 
     // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -315,12 +317,12 @@ public class WorldPurchaseActionInteractable : Interactable
             // No route to the host at all. Never apply the effect locally — that would only change
             // THIS player's world.
             Debug.LogWarning($"[WorldPurchaseActionInteractable] '{name}' is not network-spawned on this client and no relay is available; purchase not sent.");
-            UIController.Instance.ShowShopNotification(PurchaseUnavailableMessage);
+            UIController.Instance.ShowShopNotification(Loc.T(PurchaseUnavailableMessage));
             ClosePurchaseView();
             return;
         }
 
-        UIController.Instance.ShowPurchaseNotification(PurchaseSuccessMessage);
+        UIController.Instance.ShowPurchaseNotification(Loc.T(PurchaseSuccessMessage));
         ClosePurchaseView();
     }
 
@@ -336,7 +338,7 @@ public class WorldPurchaseActionInteractable : Interactable
         if (GlobalHostVariables.Instance != null &&
             GlobalHostVariables.Instance.money.Value < _shopItem.Price)
         {
-            UIController.Instance.ShowShopNotification(NotEnoughMoneyMessage);
+            UIController.Instance.ShowShopNotification(Loc.T(NotEnoughMoneyMessage));
             return false;
         }
         return true;
@@ -465,7 +467,7 @@ public class WorldPurchaseActionInteractable : Interactable
     [ClientRpc]
     private void PurchaseRejectedClientRpc(string message, ClientRpcParams clientRpcParams = default)
     {
-        UIController.Instance?.ShowShopNotification(message);
+        UIController.Instance?.ShowShopNotification(Loc.TranslateSource(message));
     }
 
     /// <summary>

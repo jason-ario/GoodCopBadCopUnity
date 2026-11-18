@@ -8,6 +8,60 @@ public static class CombatHitUtility
 {
     private static readonly List<Collider> ColliderBuffer = new List<Collider>(64);
 
+    // ── Weapon physics targets (kickable junk / gore, soccer ball) ───────────
+
+    /// <summary>
+    /// Blood hit particle used for gore that has no character of its own to supply one. Registered
+    /// by <see cref="PlayerHealth"/> from its serialized hit particle (the same blood every body uses).
+    /// </summary>
+    public static GameObject SharedBloodHitPrefab { get; set; }
+
+    /// <summary>Spawns <see cref="SharedBloodHitPrefab"/> at <paramref name="point"/> (local only).</summary>
+    public static void SpawnSharedBloodHit(Vector3 point)
+    {
+        if (SharedBloodHitPrefab == null) return;
+
+        GameObject fx = Object.Instantiate(SharedBloodHitPrefab, point, Quaternion.identity);
+        if (fx.GetComponentInChildren<AutoDestroy>() == null)
+            fx.AddComponent<AutoDestroy>();
+    }
+
+    /// <summary>
+    /// The loose physics object a weapon hit on <paramref name="collider"/> should push, or null: a
+    /// <see cref="SoccerBall"/> or <see cref="KickablePhysicsBody"/> junk (gore, Vlad pieces, trash).
+    /// Doubles as a per-object key so multi-pellet blasts push each object once.
+    /// </summary>
+    public static Component GetWeaponPhysicsTarget(Collider collider)
+    {
+        if (collider == null || collider.isTrigger) return null;
+
+        SoccerBall ball = collider.GetComponentInParent<SoccerBall>();
+        if (ball != null) return ball;
+
+        return collider.GetComponentInParent<KickablePhysicsBody>();
+    }
+
+    /// <summary>True when a weapon hit on <paramref name="collider"/> lands on gore that should bleed.</summary>
+    public static bool IsGoreTarget(Collider collider)
+    {
+        KickablePhysicsBody body = collider != null ? collider.GetComponentInParent<KickablePhysicsBody>() : null;
+        return body != null && body.IsGore;
+    }
+
+    /// <summary>
+    /// Runs on the attacking player's machine. Gives a gun/melee hit's small physics push to a
+    /// soccer ball or kickable junk piece (gore also bleeds). Purely cosmetic; never damages.
+    /// <paramref name="strength"/> is roughly 1 for a pistol shot.
+    /// </summary>
+    public static void ApplyWeaponImpact(Collider collider, Vector3 point, Vector3 direction, float strength)
+    {
+        Component target = GetWeaponPhysicsTarget(collider);
+        if (target is SoccerBall ball)
+            ball.RequestWeaponHit(direction, strength);
+        else if (target is KickablePhysicsBody body)
+            body.RequestWeaponHit(point, direction, strength);
+    }
+
     /// <summary>
     /// True when weapons should pass through <paramref name="collider"/>: open-mesh perimeter
     /// fences (<see cref="PerimiterFence"/>), fence gates (<see cref="GateController"/>), and
