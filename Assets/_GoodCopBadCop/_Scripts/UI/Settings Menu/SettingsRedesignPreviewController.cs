@@ -330,6 +330,10 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
 
         [SerializeField] private Sprite dropdownSelectedSprite;
+        [Tooltip("Played when a row is clicked or a setting value changes (same clip as the Text Button prefab's click).")]
+        [SerializeField] private AudioClip rowClickSfx;
+        [Tooltip("Multiplied into a row's background color while hovered (mouse) or focused (gamepad/keyboard).")]
+        [SerializeField] private Color rowHighlightTint = new Color(.55f, .55f, .55f, 1f);
         private Sprite tabHighlightSprite;
         private Sprite normalBackgroundSprite;
         private RectTransform trackTemplate;
@@ -641,6 +645,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 root.sizeDelta = new Vector2(1110.5f, 56f);
                 rowObject.SetActive(false);
                 rows.Add(CacheRow(root));
+                BindRowPointer(rowObject, i, gamepadCell: false);
             }
         }
 
@@ -1153,6 +1158,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             SettingsPreviewSliderHitArea receiver = row.SliderHitArea.GetComponent<SettingsPreviewSliderHitArea>();
             receiver.PointerChanged = data => SetSliderFromPointer(index, data);
+            receiver.PointerPressed = PlayRowClickSfx;
         }
 
         private static void AddEvent(EventTrigger trigger, EventTriggerType type, Action<BaseEventData> callback)
@@ -1334,6 +1340,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         private void SelectDropdownOption(int settingIndex, int optionIndex)
         {
+            PlayRowClickSfx();
             Setting setting = activeSettings[settingIndex];
             setting.Index = optionIndex;
             rows[settingIndex].Value.text = setting.DisplayValue;

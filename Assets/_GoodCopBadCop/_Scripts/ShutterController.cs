@@ -25,6 +25,8 @@ public class ShutterController : MonoBehaviour
     [SerializeField] private int shakeVibrato = 24;
     [Tooltip("Maximum rotational offset (degrees) during the shake, layered on top of the positional shake for extra impact.")]
     [SerializeField] private float shakeRotationStrength = 6f;
+    [Tooltip("Also shake the shutter when a player's melee weapon or gunshot hits it (the hit sound always plays).")]
+    [SerializeField] private bool shakeOnWeaponHit = true;
 
     private Tween _shakeTween;
     private Tween _shakeRotationTween;
@@ -78,10 +80,25 @@ public class ShutterController : MonoBehaviour
     /// </summary>
     public void OnHitByMutant()
     {
+        PlayHitFeedback(shake: true);
+    }
+
+    /// <summary>
+    /// Same bang sound as <see cref="OnHitByMutant"/>, for a player's melee swing or gunshot hitting
+    /// the closed shutter. Called locally on the attacker, then on every other client via the weapon's
+    /// ClientRpc (<see cref="MeleeWeaponHitbox"/>, <see cref="Pistol"/>, <see cref="Shotgun"/>).
+    /// </summary>
+    public void OnHitByPlayerWeapon()
+    {
+        PlayHitFeedback(shakeOnWeaponHit);
+    }
+
+    private void PlayHitFeedback(bool shake)
+    {
         if (hitClip != null)
             audioSource.PlayOneShot(hitClip, hitVolume);
 
-        if (shutterVisual != null)
+        if (shake && shutterVisual != null)
         {
             // Kill any in-progress shake before starting a new one so rapid hits don't stack.
             _shakeTween?.Kill(complete: true);

@@ -45,6 +45,8 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
         // -1 = nothing focused (pointer mode). [0, RowCount) = rows, [RowCount, FocusableCount) = footer buttons.
         private int focusIndex = -1;
+        // Row under the mouse (-1 = none). Only drawn while no gamepad/keyboard focus is active.
+        private int hoveredRowIndex = -1;
         private Button hoveredFooterButton;
         private readonly List<Button> footerButtonsBuffer = new List<Button>();
 
@@ -385,28 +387,33 @@ namespace GoodCopBadCop.UI.SettingsMenu
             else ExecuteEvents.Execute(button.gameObject, data, ExecuteEvents.pointerExitHandler);
         }
 
-        /// <summary>Base row colors + locked keyboard binding dimming + gamepad focus highlight.</summary>
+        /// <summary>
+        /// Base row colors + locked keyboard binding dimming + highlight. The highlight (darker background,
+        /// white text) is shared by gamepad/keyboard focus and mouse hover; focus wins while it is active.
+        /// </summary>
         private void ApplyRowStyle(int index)
         {
             if (!IsValidRowIndex(index)) return;
 
             Row row = rows[index];
             Setting setting = activeSettings[index];
-            bool focused = index == focusIndex;
+            bool supported = IsSupported(setting);
+            // Gamepad focus also shows on unsupported rows so the cursor is never lost; hover only on usable rows.
+            bool highlighted = focusIndex >= 0 ? index == focusIndex : index == hoveredRowIndex && supported;
             bool lockedKeyboard = setting.Control == Control.Rebind && !RebindableInput.IsKeyboardRebindable(setting.RebindAction);
             bool lockedGamepad = setting.Control == Control.Rebind && !RebindableInput.IsGamepadRebindable(setting.RebindAction);
 
-            ApplyRowAppearance(row, IsSupported(setting));
+            ApplyRowAppearance(row, supported);
             if (lockedKeyboard) row.Value.color = LockedBindingTextColor;
             if (row.GamepadValue != null) row.GamepadValue.color = lockedGamepad ? LockedBindingTextColor : row.Label.color;
 
             if (row.Background != null)
             {
-                row.Background.sprite = focused && dropdownSelectedSprite != null ? dropdownSelectedSprite : normalBackgroundSprite;
-                if (focused) row.Background.color = Color.white;
+                row.Background.sprite = normalBackgroundSprite;
+                if (highlighted) row.Background.color *= rowHighlightTint;
             }
 
-            if (!focused) return;
+            if (!highlighted) return;
             row.Label.color = Color.white;
             if (!lockedKeyboard) row.Value.color = Color.white;
             if (row.GamepadValue != null && !lockedGamepad) row.GamepadValue.color = Color.white;
@@ -440,6 +447,64 @@ namespace GoodCopBadCop.UI.SettingsMenu
             settingsScrollRect.verticalNormalizedPosition = Mathf.Clamp01(settingsScrollRect.verticalNormalizedPosition);
         }
 
+        // ── Mouse hover / click feedback ───────────────────────────────────────────
+
+        /// <summary>Hooks a pooled row (hover + press) or its gamepad cell (press only) to the shared row feedback.</summary>
+        private void BindRowPointer(GameObject target, int index, bool gamepadCell)
+        {
+            if (target == null || index < 0) return;
+            SettingsPreviewRowPointer pointer = target.GetComponent<SettingsPreviewRowPointer>();
+            if (pointer == null) pointer = target.AddComponent<SettingsPreviewRowPointer>();
+
+            if (gamepadCell)
+            {
+                pointer.HoverChanged = null;
+                pointer.Pressed = () => OnGamepadCellPointerPressed(index);
+            }
+            else
+            {
+                pointer.HoverChanged = hovered => OnRowPointerHover(index, hovered);
+                pointer.Pressed = () => OnRowPointerPressed(index);
+            }
+        }
+
+        private void OnRowPointerHover(int index, bool hovered)
+        {
+            int previous = hoveredRowIndex;
+            if (hovered) hoveredRowIndex = index;
+            else if (hoveredRowIndex == index) hoveredRowIndex = -1;
+            if (previous == hoveredRowIndex || focusIndex >= 0) return;
+
+            ApplyRowStyle(previous);
+            ApplyRowStyle(hoveredRowIndex);
+        }
+
+        /// <summary>Click sound on pointer down (like TextButton), only for rows whose click does something.</summary>
+        private void OnRowPointerPressed(int index)
+        {
+            if (IsListeningForRebind || !IsValidRowIndex(index)) return;
+            Row row = rows[index];
+            if (row.Button == null || !row.Button.interactable) return;
+
+            Setting setting = activeSettings[index];
+            bool acts = setting.Control == Control.Dropdown
+                        || setting.Control == Control.Toggle
+                        || (setting.Control == Control.Rebind && RebindableInput.IsKeyboardRebindable(setting.RebindAction));
+            if (acts) PlayRowClickSfx();
+        }
+
+        private void OnGamepadCellPointerPressed(int index)
+        {
+            if (IsListeningForRebind || !IsValidRowIndex(index)) return;
+            Button button = rows[index].GamepadButton;
+            if (button != null && button.isActiveAndEnabled && button.interactable) PlayRowClickSfx();
+        }
+
+        private void PlayRowClickSfx()
+        {
+            if (rowClickSfx != null) SFXController.Instance?.Play(rowClickSfx);
+        }
+
         // ── Actions on the focused element ─────────────────────────────────────────
 
         private void AdjustFocused(int direction)
@@ -468,6 +533,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                     StepSlider(focusIndex, direction);
                     break;
                 case Control.Toggle:
+                    PlayRowClickSfx();
                     FlipToggle(focusIndex);
                     break;
             }
@@ -482,6 +548,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
                 : Mathf.Ceil(setting.Value / SliderStep) * SliderStep - SliderStep;
             target = Mathf.Clamp(target, setting.MinValue, setting.MaxValue);
             if (Mathf.Approximately(target, setting.Value)) return;
+            PlayRowClickSfx();
             SetSliderValue(index, target);
         }
 
@@ -502,12 +569,18 @@ namespace GoodCopBadCop.UI.SettingsMenu
             switch (setting.Control)
             {
                 case Control.Dropdown:
+                    PlayRowClickSfx();
                     ToggleDropdown(focusIndex);
                     break;
                 case Control.Toggle:
+                    PlayRowClickSfx();
                     FlipToggle(focusIndex);
                     break;
                 case Control.Rebind:
+                    bool rebindable = fromGamepad
+                        ? RebindableInput.IsGamepadRebindable(setting.RebindAction)
+                        : RebindableInput.IsKeyboardRebindable(setting.RebindAction);
+                    if (rebindable) PlayRowClickSfx();
                     if (fromGamepad) BeginGamepadRebind(focusIndex);
                     else BeginRebind(focusIndex);
                     break;
@@ -679,6 +752,7 @@ namespace GoodCopBadCop.UI.SettingsMenu
 
             row.GamepadValue = text;
             row.GamepadButton = button;
+            BindRowPointer(cellObject, rows.IndexOf(row), gamepadCell: true);
 
             RectTransform sourceDivider = row.Root.Find("Value Divider") as RectTransform;
             if (sourceDivider != null && row.GamepadDivider == null)

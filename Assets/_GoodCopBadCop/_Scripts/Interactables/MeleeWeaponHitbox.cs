@@ -89,6 +89,7 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         Player      = 4,
         Glass       = 5,
         Prop        = 6,
+        Shutter     = 7,
     }
 
     public override void OnNetworkSpawn()
@@ -124,8 +125,9 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         // weapon's head/tip) rather than the struck surface's closest point, so the effect always
         // reads as coming from the weapon making contact, not from the target's geometry.
         Vector3 effectOrigin = _hitEffectSpawnPoint != null ? _hitEffectSpawnPoint.position : attackOrigin;
+        bool isEnvironment = kind == HitKind.Environment || kind == HitKind.Prop || kind == HitKind.Shutter;
 
-        if (kind == HitKind.Environment || kind == HitKind.Prop)
+        if (isEnvironment)
         {
             SpawnHitEffect(_environmentHitEffectPrefab, effectOrigin);
             OnEnvironmentHit?.Invoke();
@@ -139,9 +141,18 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         // Relay the impact so every other client hears/sees it as a world event at the weapon tip.
         if (kind != HitKind.None)
         {
-            bool isEnvironment = kind == HitKind.Environment || kind == HitKind.Prop;
             if (IsServer) RelayImpact(isEnvironment, effectOrigin, NetworkManager.Singleton.LocalClientId);
             else          ReportImpactServerRpc(isEnvironment, effectOrigin);
+        }
+
+        if (kind == HitKind.Shutter)
+        {
+            // Cosmetic only: the shutter bang, played here instantly and relayed to everyone else.
+            ShutterController.Instance?.OnHitByPlayerWeapon();
+
+            if (IsServer) RelayShutterHit(NetworkManager.Singleton.LocalClientId);
+            else          ReportShutterHitServerRpc();
+            return;
         }
 
         if (kind == HitKind.Prop)
@@ -200,6 +211,8 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         Vector3 firstNonSelfHitPosition = attackOrigin;
         bool propHit = false;
         Vector3 propHitPosition = attackOrigin;
+        bool shutterHit = false;
+        Vector3 shutterHitPosition = attackOrigin;
 
         for (int i = 0; i < hitCount; i++)
         {
@@ -310,10 +323,16 @@ public class MeleeWeaponHitbox : NetworkBehaviour
             // the existing visual ClientRpcs below already do.
             if (glass != null && !glass.IsSmashed)
             {
-                // A closed shutter on the swinger's side shields the pane, so skip it (a solid
-                // pane collider has already been recorded above as plain environment geometry).
+                // A closed shutter on the swinger's side shields the pane: the swing lands on the shutter.
                 if (glass.IsShieldedFrom(GetSwingerPosition(attackOrigin)))
+                {
+                    if (!shutterHit)
+                    {
+                        shutterHit = true;
+                        shutterHitPosition = surfacePoint;
+                    }
                     continue;
+                }
 
                 hitPoint = surfacePoint;
                 return HitKind.Glass;
@@ -324,6 +343,26 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         {
             hitPoint = propHitPosition;
             return HitKind.Prop;
+        }
+
+        // The shutter has no collider, so a swing reaching into the window opening (e.g. through
+        // smashed glass) is tested geometrically: eye -> the far edge of the swing sphere.
+        if (!shutterHit && checkLineOfSight)
+        {
+            BreakableGlassController booth = BreakableGlassController.Instance;
+            Vector3 toTip = attackOrigin - eye;
+            Vector3 reach = attackOrigin + (toTip.sqrMagnitude > 0.0001f ? toTip.normalized * hitRadius : Vector3.zero);
+            if (booth != null && booth.TryGetShutterCrossing(eye, reach, out Vector3 crossing))
+            {
+                shutterHit = true;
+                shutterHitPosition = crossing;
+            }
+        }
+
+        if (shutterHit)
+        {
+            hitPoint = shutterHitPosition;
+            return HitKind.Shutter;
         }
 
         if (anyNonSelfHit)
@@ -610,6 +649,29 @@ public class MeleeWeaponHitbox : NetworkBehaviour
         });
     }
 
+    /// <summary>Server-side relay of a swing hitting the closed shutter to every other client.</summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ReportShutterHitServerRpc(ServerRpcParams rpcParams = default)
+    {
+        RelayShutterHit(rpcParams.Receive.SenderClientId);
+    }
+
+    private void RelayShutterHit(ulong senderClientId)
+    {
+        if (!IsServer) return;
+
+        List<ulong> targets = new List<ulong>();
+        foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
+            if (id != senderClientId) targets.Add(id);
+
+        if (targets.Count == 0) return;
+
+        ShutterHitClientRpc(new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = targets }
+        });
+    }
+
     /// <summary>Resolves a component on a reported target, tolerating it living on a child of the NetworkObject.</summary>
     private static T FindOn<T>(NetworkObject netObj) where T : Component
     {
@@ -645,6 +707,13 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     private void PropHitClientRpc(Vector3 hitPoint, Vector3 direction, ClientRpcParams clientRpcParams = default)
     {
         HittableProp.TryHitAt(hitPoint, direction);
+    }
+
+    /// <summary>Plays the shutter bang on non-swinging clients when a swing hits the closed shutter.</summary>
+    [ClientRpc]
+    private void ShutterHitClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        ShutterController.Instance?.OnHitByPlayerWeapon();
     }
 
     /// <summary>Replays a swing's impact particles and world sound on non-swinging clients.</summary>

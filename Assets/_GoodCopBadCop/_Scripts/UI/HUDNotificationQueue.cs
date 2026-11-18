@@ -70,12 +70,28 @@ public class HUDNotificationQueue : MonoBehaviour
 
     private void OnEnable()
     {
+        Loc.LanguageChanged += OnLanguageChanged;
+
         if (_entries.Count > 0 && _processor == null)
             _processor = StartCoroutine(ProcessQueue());
     }
 
+    /// <summary>
+    /// A typewriter reveal in progress tracks visible characters from the old language's layout, so
+    /// a switch mid-reveal would leave the new translation cut short. Snap the on-screen entry to its
+    /// full text; render-time localization and the label's language font redraw it in the new language.
+    /// Callers should pass English source text (not pre-translated <c>Loc.T</c>) for this to follow the switch.
+    /// </summary>
+    private void OnLanguageChanged()
+    {
+        if (_current != null && _textReveal != null)
+            _textReveal.SetTextInstant(_current.Message);
+    }
+
     private void OnDisable()
     {
+        Loc.LanguageChanged -= OnLanguageChanged;
+
         // Unity stops coroutines when the object is disabled. Reset display state; entries stay
         // queued and resume in OnEnable.
         _processor = null;

@@ -216,17 +216,39 @@ public class BreakableGlassController : MonoBehaviour
     /// the glass is intact or smashed. The shutter has no collider, so line-of-sight checks (e.g.
     /// melee) must call this to stop reaching through a closed shutter.
     /// </summary>
-    public bool IsLineBlockedByShutter(Vector3 from, Vector3 to)
+    public bool IsLineBlockedByShutter(Vector3 from, Vector3 to) => TryGetShutterCrossing(from, to, out _);
+
+    /// <summary>
+    /// Same test as <see cref="IsLineBlockedByShutter"/>, also returning where the segment meets the
+    /// closed shutter (on the window plane).
+    /// </summary>
+    public bool TryGetShutterCrossing(Vector3 from, Vector3 to, out Vector3 crossing)
     {
+        crossing = default;
         if (!TryGetClosedShutterPlane(out Bounds paneBounds, out Vector3 towardShutter)) return false;
 
         float fromDot = Vector3.Dot(from - paneBounds.center, towardShutter);
         float toDot   = Vector3.Dot(to   - paneBounds.center, towardShutter);
         if (fromDot * toDot >= 0f) return false; // Doesn't cross the window plane.
 
-        Vector3 crossing = Vector3.Lerp(from, to, fromDot / (fromDot - toDot));
+        crossing = Vector3.Lerp(from, to, fromDot / (fromDot - toDot));
         paneBounds.Expand(ShutterCoverMargin * 2f);
         return paneBounds.Contains(crossing);
+    }
+
+    /// <summary>
+    /// Hitscan version of <see cref="TryGetShutterCrossing"/>: true when a ray of length
+    /// <paramref name="maxDistance"/> meets the closed shutter. <paramref name="distance"/> is
+    /// along the ray. Guns use this because the shutter has no collider to raycast against.
+    /// </summary>
+    public bool TryGetShutterRayHit(Vector3 origin, Vector3 direction, float maxDistance,
+        out float distance, out Vector3 point)
+    {
+        distance = float.PositiveInfinity;
+        point    = default;
+        if (!TryGetShutterCrossing(origin, origin + direction * maxDistance, out point)) return false;
+        distance = Vector3.Distance(origin, point);
+        return true;
     }
 
     /// <summary>

@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
+using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
 
@@ -73,8 +73,8 @@ public class DailyFaxContentsController : MonoBehaviour
         string date = LocalizedDate.Format(StartDate.AddDays(index), LocalizedDate.Style.Named, uppercase: true);
         dateText.text = date;
 
-        headerText.text = "DAILY INTELLIGENCE BRIEFING";
-        subheaderText.text = "NEWLY CLASSIFIED THREATS";
+        headerText.text = Loc.T("DAILY INTELLIGENCE BRIEFING");
+        subheaderText.text = Loc.T("NEWLY CLASSIFIED THREATS");
 
         string[] newUnlocks = _unlockProgression != null
             ? _unlockProgression.GetNewUnlocksForDay(day)
@@ -85,22 +85,35 @@ public class DailyFaxContentsController : MonoBehaviour
             sb.AppendLine($"• {FormatAnomalyName(typeName)}");
 
         if (sb.Length == 0)
-            sb.AppendLine("NO NEW THREATS CLASSIFIED TODAY");
+            sb.AppendLine(Loc.T("NO NEW THREATS CLASSIFIED TODAY"));
 
         unlockListText.text = sb.ToString().TrimEnd();
-        footerText.text = "CONFIDENTIAL — AUTHORIZED PERSONNEL ONLY";
+        footerText.text = Loc.T("CONFIDENTIAL — AUTHORIZED PERSONNEL ONLY");
 
         StartCoroutine(CameraSnapshot());
     }
 
-    /// <summary>Converts a CamelCase anomaly type name to a human-readable fax entry.</summary>
+    /// <summary>
+    /// Player-facing anomaly name for the fax: the shared <see cref="AnomalyDisplayNames"/> entry (matching the
+    /// guidebook), translated through the guidebook's localized display names, then upper-cased in document style.
+    /// </summary>
     private static string FormatAnomalyName(string typeName)
     {
-        if (string.IsNullOrEmpty(typeName)) return typeName;
-        string stripped = typeName.EndsWith("Anomaly", StringComparison.Ordinal)
-            ? typeName[..^"Anomaly".Length]
-            : typeName;
-        return Regex.Replace(stripped, "(?<!^)([A-Z])", " $1").ToUpper();
+        string name = Loc.TranslateSource(AnomalyDisplayNames.Get(typeName));
+        return DocumentUpper(name);
+    }
+
+    /// <summary>
+    /// Upper-cases with the current language's culture. Georgian is left as-is: its Mtavruli capitals are rarely
+    /// covered by fonts, and the source text is already caseless in practice.
+    /// </summary>
+    private static string DocumentUpper(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.IndexOf(Loc.Marker, StringComparison.Ordinal) >= 0) return text;
+        string lang = Loc.CurrentLanguage ?? "";
+        if (lang.StartsWith("ka", StringComparison.OrdinalIgnoreCase)) return text;
+        try { return text.ToUpper(CultureInfo.GetCultureInfo(lang)); }
+        catch (CultureNotFoundException) { return text.ToUpperInvariant(); }
     }
 
     /// <summary>

@@ -116,7 +116,11 @@ public class SortMailTask : NetworkBehaviour, ISystemicThreat, IDailyTask
              "again. It keeps repeating until a player opens the gate.")]
     [SerializeField, Min(0f)] private float _gateAlertRepeatInterval = 5f;
 
-    private static string GateWaitingMessage => Loc.T("A shipment is waiting at the gate.");
+    // English source, NOT Loc.T: this alert loops for a long time, so a pre-translated string would stay
+    // frozen in the old language after a language switch (and lose glyphs under the new language's font).
+    // The HUD label's render-time localization translates it on every draw instead. Loc.N keeps the
+    // literal in the Localization scan's "Code strings".
+    private static readonly string GateWaitingMessage = Loc.N("A shipment is waiting at the gate.");
 
     [Header("Sorting Destination Tutorial")]
     [Tooltip("Arrows/outlines on the sorting destinations (Mail Cubbies stands, Confiscate bin). Shown " +

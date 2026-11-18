@@ -177,7 +177,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 out NetworkObjectReference[] mutantRefs, out int[] mutantPellets, out Vector3[] mutantPelletPoints,
                 out NetworkObjectReference[] playerRefs, out int[] playerPellets, out Vector3[] playerPoints,
                 out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
-                out bool hitGlass, out Vector3[] propPoints, out Vector3[] pelletEndPoints);
+                out bool hitGlass, out bool hitShutter, out Vector3[] propPoints, out Vector3[] pelletEndPoints);
 
             SpawnPelletTrails(pelletEndPoints);
 
@@ -186,8 +186,12 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             foreach (Vector3 point in propPoints)
                 HittableProp.TryHitAt(point, cam.transform.forward);
 
+            // One shutter bang per blast, however many pellets hit it.
+            if (hitShutter)
+                ShutterController.Instance?.OnHitByPlayerWeapon();
+
             FireServerRpc(cam.transform.forward, mutantRefs, mutantPellets, mutantPelletPoints, playerRefs, playerPellets,
-                playerPoints, suspectRefs, suspectPoints, hitGlass, propPoints, pelletEndPoints);
+                playerPoints, suspectRefs, suspectPoints, hitGlass, hitShutter, propPoints, pelletEndPoints);
         }
     }
 
@@ -203,7 +207,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         out NetworkObjectReference[] mutantRefs, out int[] mutantPellets, out Vector3[] mutantPelletPoints,
         out NetworkObjectReference[] playerRefs, out int[] playerPellets, out Vector3[] playerPoints,
         out NetworkObjectReference[] suspectRefs, out Vector3[] suspectPoints,
-        out bool hitGlass, out Vector3[] propPoints, out Vector3[] pelletEndPoints)
+        out bool hitGlass, out bool hitShutter, out Vector3[] propPoints, out Vector3[] pelletEndPoints)
     {
         Dictionary<NetworkObject, List<Vector3>> mutantHits = new();
         Dictionary<NetworkObject, int> playerHits = new();
@@ -211,9 +215,11 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         Dictionary<NetworkObject, Vector3> suspectHits = new();
         Dictionary<HittableProp, Vector3> propHits = new();
         hitGlass = false;
+        hitShutter = false;
         pelletEndPoints = new Vector3[_pelletCount];
 
         ulong localClientId = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClientId : 0;
+        BreakableGlassController booth = BreakableGlassController.Instance;
 
         for (int i = 0; i < _pelletCount; i++)
         {
@@ -221,6 +227,13 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
             // Where this pellet's tracer ends: full range unless a blocking hit below shortens it.
             pelletEndPoints[i] = rayOrigin + pelletDirection * _bulletRange;
+
+            // The closed shutter has no collider, so it is tested geometrically: anything past the
+            // point where the pellet meets it is hidden behind it.
+            float shutterDistance = float.PositiveInfinity;
+            Vector3 shutterPoint = default;
+            booth?.TryGetShutterRayHit(rayOrigin, pelletDirection, _bulletRange, out shutterDistance, out shutterPoint);
+            bool pelletReachesShutter = !float.IsPositiveInfinity(shutterDistance);
 
             // Uses RaycastAll (sorted by distance) instead of a plain Raycast so trigger colliders
             // can be inspected without letting them silently block the pellet. A resurrected
@@ -230,14 +243,21 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
             // click detectors, task areas, etc.), and those must stay completely transparent to
             // pellets, exactly like before.
             RaycastHit[] pelletHits = Physics.RaycastAll(rayOrigin, pelletDirection, _bulletRange, Physics.AllLayers, QueryTriggerInteraction.Collide);
-            if (pelletHits.Length == 0)
-                continue;
-
             System.Array.Sort(pelletHits, (a, b) => a.distance.CompareTo(b.distance));
 
-            for (int h = 0; h < pelletHits.Length; h++)
+            bool pastShutter = false;
+            int h = 0;
+            for (; h < pelletHits.Length; h++)
             {
                 RaycastHit hit = pelletHits[h];
+
+                // Past the closed shutter. The intact pane sits on the shutter plane, so it is left
+                // to the glass branch below, which decides by side.
+                if (hit.distance > shutterDistance && !IsIntactBoothGlass(hit.collider))
+                {
+                    pastShutter = true;
+                    break;
+                }
 
                 // IsActive matters here: every Player prefab carries a dormant MutantEnemy (see
                 // CorpseResurrectionController) so it can later resurrect into a chasing mutant
@@ -313,9 +333,12 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
                 BreakableGlassController glassHit = hit.collider.GetComponentInParent<BreakableGlassController>();
                 if (glassHit != null && !glassHit.IsSmashed)
                 {
-                    // A closed shutter on the shooter's side shields the pane: the pellet stops dead.
+                    // A closed shutter on the shooter's side shields the pane: the pellet hits the shutter.
                     if (glassHit.IsShieldedFrom(rayOrigin))
+                    {
+                        hitShutter = true;
                         break;
+                    }
                     hitGlass = true;
                 }
 
@@ -326,6 +349,13 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
                 // Solid geometry (or handled glass/prop) — this blocks the pellet either way.
                 break;
+            }
+
+            // Ran past the shutter plane, or flew on through nothing but triggers / open mesh.
+            if (pelletReachesShutter && (pastShutter || h >= pelletHits.Length))
+            {
+                pelletEndPoints[i] = shutterPoint;
+                hitShutter = true;
             }
         }
 
@@ -455,7 +485,7 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
         NetworkObjectReference[] mutantRefs, int[] mutantPellets, Vector3[] mutantPelletPoints,
         NetworkObjectReference[] playerRefs, int[] playerPellets, Vector3[] playerPoints,
         NetworkObjectReference[] suspectRefs, Vector3[] suspectPoints,
-        bool hitGlass, Vector3[] propPoints, Vector3[] pelletEndPoints, ServerRpcParams rpcParams = default)
+        bool hitGlass, bool hitShutter, Vector3[] propPoints, Vector3[] pelletEndPoints, ServerRpcParams rpcParams = default)
     {
         ulong shooterClientId = rpcParams.Receive.SenderClientId;
 
@@ -484,6 +514,13 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
 
         if (soundTargets.Count > 0)
             PlayShootSoundClientRpc(pelletEndPoints, new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = soundTargets }
+            });
+
+        // Shutter bang for everyone except the shooter, who already heard it.
+        if (hitShutter && soundTargets.Count > 0)
+            ShotgunShutterHitClientRpc(new ClientRpcParams
             {
                 Send = new ClientRpcSendParams { TargetClientIds = soundTargets }
             });
@@ -641,6 +678,19 @@ public class Shotgun : PickableObject, IAmmoProvider, IInventoryReloadable
     {
         foreach (Vector3 point in hitPoints)
             HittableProp.TryHitAt(point, direction);
+    }
+
+    /// <summary>Plays the shutter bang on non-shooting clients when a blast hits the closed shutter.</summary>
+    [ClientRpc]
+    private void ShotgunShutterHitClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        ShutterController.Instance?.OnHitByPlayerWeapon();
+    }
+
+    private static bool IsIntactBoothGlass(Collider col)
+    {
+        BreakableGlassController glass = col.GetComponentInParent<BreakableGlassController>();
+        return glass != null && !glass.IsSmashed;
     }
 
     /// <summary>

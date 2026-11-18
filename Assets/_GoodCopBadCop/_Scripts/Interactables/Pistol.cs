@@ -191,6 +191,8 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         // Cosmetic prop reaction plays instantly for the shooter; the server relays it to others.
         if (hit.Kind == ShotKind.Prop)
             HittableProp.TryHitAt(hit.Point, cam.transform.forward);
+        else if (hit.Kind == ShotKind.Shutter)
+            ShutterController.Instance?.OnHitByPlayerWeapon();
 
         FireServerRpc(cam.transform.forward, (byte)hit.Kind, hit.TargetRef, hit.Point);
     }
@@ -204,6 +206,7 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         Glass   = 3,
         Prop    = 4,
         Suspect = 5,
+        Shutter = 6,
     }
 
     private readonly struct FireHit
@@ -233,8 +236,18 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         // everywhere for non-physical logic volumes (interaction zones, click detectors, task
         // areas, etc.), and those must stay completely transparent to bullets, exactly like before.
         RaycastHit[] hits = Physics.RaycastAll(rayOrigin, rayDirection, _bulletRange, Physics.AllLayers, QueryTriggerInteraction.Collide);
+
+        // The closed shutter has no collider, so it is tested geometrically: anything past the point
+        // where the ray meets it is hidden behind it (e.g. shooting out through a smashed window).
+        BreakableGlassController booth = BreakableGlassController.Instance;
+        float shutterDistance = float.PositiveInfinity;
+        Vector3 shutterPoint = default;
+        booth?.TryGetShutterRayHit(rayOrigin, rayDirection, _bulletRange, out shutterDistance, out shutterPoint);
+
         if (hits.Length == 0)
-            return new FireHit(ShotKind.None, default, rayOrigin);
+            return float.IsPositiveInfinity(shutterDistance)
+                ? new FireHit(ShotKind.None, default, rayOrigin)
+                : new FireHit(ShotKind.Shutter, default, shutterPoint);
 
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
@@ -244,6 +257,10 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         {
             RaycastHit hit = hits[i];
 
+            // Past the closed shutter. The intact pane sits on the shutter plane, so it is left to
+            // the glass branch below, which decides by side.
+            if (hit.distance > shutterDistance && !IsIntactBoothGlass(hit.collider))
+                return new FireHit(ShotKind.Shutter, default, shutterPoint);
             // IsActive matters here: every Player prefab carries a dormant MutantEnemy (see
             // CorpseResurrectionController) so it can later resurrect into a chasing mutant while
             // still alive/uninfected. Without the IsActive check, a shot at a perfectly living
@@ -298,9 +315,9 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             BreakableGlassController glass = hit.collider.GetComponentInParent<BreakableGlassController>();
             if (glass != null && !glass.IsSmashed)
             {
-                // A closed shutter on the shooter's side shields the pane: the shot stops dead.
+                // A closed shutter on the shooter's side shields the pane: the shot hits the shutter.
                 if (glass.IsShieldedFrom(rayOrigin))
-                    return new FireHit(ShotKind.None, default, hit.point);
+                    return new FireHit(ShotKind.Shutter, default, hit.point);
                 return new FireHit(ShotKind.Glass, default, hit.point);
             }
 
@@ -311,7 +328,15 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
             return new FireHit(ShotKind.None, default, hit.point);
         }
 
-        return new FireHit(ShotKind.None, default, rayOrigin);
+        return float.IsPositiveInfinity(shutterDistance)
+            ? new FireHit(ShotKind.None, default, rayOrigin)
+            : new FireHit(ShotKind.Shutter, default, shutterPoint);
+    }
+
+    private static bool IsIntactBoothGlass(Collider col)
+    {
+        BreakableGlassController glass = col.GetComponentInParent<BreakableGlassController>();
+        return glass != null && !glass.IsSmashed;
     }
 
     /// <summary>
@@ -412,6 +437,21 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
         Vector3 rayDirection, ulong shooterClientId)
     {
         if (kind == ShotKind.None) return;
+
+        if (kind == ShotKind.Shutter)
+        {
+            // Cosmetic only — the shooter already heard it locally.
+            List<ulong> shutterTargets = new List<ulong>();
+            foreach (ulong id in NetworkManager.Singleton.ConnectedClientsIds)
+                if (id != shooterClientId) shutterTargets.Add(id);
+
+            if (shutterTargets.Count > 0)
+                ShutterHitClientRpc(new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams { TargetClientIds = shutterTargets }
+                });
+            return;
+        }
 
         if (kind == ShotKind.Glass)
         {
@@ -523,6 +563,13 @@ public class Pistol : PickableObject, IAmmoProvider, IInventoryReloadable
     private void PropHitClientRpc(Vector3 hitPoint, Vector3 direction, ClientRpcParams clientRpcParams = default)
     {
         HittableProp.TryHitAt(hitPoint, direction);
+    }
+
+    /// <summary>Plays the shutter bang on non-shooting clients when a shot hits the closed shutter.</summary>
+    [ClientRpc]
+    private void ShutterHitClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        ShutterController.Instance?.OnHitByPlayerWeapon();
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using DG.Tweening;
+using FIMSpace.FLook;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -35,6 +36,10 @@ public class GiorgiPhantomEncounter : NetworkBehaviour
 
     [Tooltip("The creepy face material swapped in for the normal face.")]
     [SerializeField] private Material _creepyFaceMaterial;
+
+    [Tooltip("Head-look on the phantom root. Pointed at each peer's own Camera.main once he reaches the " +
+             "window, the same way SuspectController.EnableLook does for normal suspects.")]
+    [SerializeField] private FLookAnimator _lookAnimator;
 
     [Header("Walk-in")]
     [Tooltip("Walk speed to the booth window (units/second). Normal suspects use 1.5.")]
@@ -111,6 +116,7 @@ public class GiorgiPhantomEncounter : NetworkBehaviour
     {
         if (_animator == null) _animator = GetComponentInChildren<Animator>(true);
         if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
+        if (_lookAnimator == null) _lookAnimator = GetComponentInChildren<FLookAnimator>(true);
         _renderers = GetComponentsInChildren<Renderer>(true);
         DisableNavigation();
         ApplyCreepyFace();
@@ -182,6 +188,9 @@ public class GiorgiPhantomEncounter : NetworkBehaviour
 
         SetPose(Pose.Idle);
         yield return transform.DORotateQuaternion(standPoint.rotation, _arrivalTurnDuration).SetLink(gameObject).WaitForCompletion();
+
+        // Stare at the player camera like a normal suspect does on arrival.
+        EnableLookClientRpc();
 
         // 2. Wait for an audience, exactly like a suspect waiting to say their entry line.
         if (_waitForBoothReady)
@@ -288,6 +297,16 @@ public class GiorgiPhantomEncounter : NetworkBehaviour
         // Only the walk-in uses the walk cycle; he stays in idle while phasing through the booth.
         _animator.SetBool(WalkingHash, pose == Pose.Walking);
         _animator.speed = 1f;
+    }
+
+    /// <summary>Every peer: point the head-look at this machine's rendering camera.</summary>
+    [ClientRpc]
+    private void EnableLookClientRpc()
+    {
+        if (_lookAnimator == null) return;
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null) return;
+        _lookAnimator.ObjectToFollow = mainCamera.transform;
     }
 
     [ClientRpc]

@@ -11,9 +11,12 @@ namespace GoodCopBadCop.UI.SettingsMenu
     public sealed class SettingsPreviewSliderHitArea : MonoBehaviour, IPointerDownHandler, IDragHandler
     {
         public Action<PointerEventData> PointerChanged;
+        /// <summary>Fires once per press (not per drag step), e.g. for the click sound.</summary>
+        public Action PointerPressed;
 
         public void OnPointerDown(PointerEventData eventData)
         {
+            PointerPressed?.Invoke();
             PointerChanged?.Invoke(eventData);
         }
 
