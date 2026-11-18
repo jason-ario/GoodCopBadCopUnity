@@ -111,6 +111,10 @@ public class MainMenuController : MonoBehaviour
         UIController.Instance.ClosePlayerUI();
         settingsMenuView.SetVisible(false);
 
+        // Cursor state survives scene reloads: a Main.unity reload from gameplay (lost connection,
+        // host ended the session) arrives here with the gameplay lock still applied.
+        EnforceMenuCursor();
+
 #if UNITY_EDITOR
         if (_debugSkipToGame)
         {
@@ -233,6 +237,28 @@ public class MainMenuController : MonoBehaviour
 
         canvasGroup.interactable = interactable;
         canvasGroup.blocksRaycasts = interactable;
+    }
+
+    /// <summary>
+    /// The menu (home, join, pre-game lobby) owns the cursor while it is shown and no local player
+    /// exists yet. Once a player spawns, gameplay systems own it again.
+    /// </summary>
+    private bool OwnsCursor => mainMenu != null && mainMenu.activeInHierarchy && PlayerInstance.Instance == null;
+
+    private void EnforceMenuCursor()
+    {
+        if (!OwnsCursor) return;
+        if (Cursor.visible && Cursor.lockState == CursorLockMode.None) return;
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    private void LateUpdate()
+    {
+        // Failsafe: late writers (focus restore re-applying a stale lock, despawn teardown) must
+        // never leave the menu without a cursor.
+        EnforceMenuCursor();
     }
 
     private void Update()

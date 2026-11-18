@@ -29,7 +29,8 @@ public interface IPickupSlot { }
 // LMB / RT always uses the item in hand: InteractWithItem() for tool-style targets
 // (GetItemTargetKey == UseItem — stamp a folder, draw on paper, light a fire pit, vaccinate) AND for
 // Interact-key deposit/insert targets (LMB is an alternative to E there — put the stamp back,
-// bag junk, throw away), otherwise the item's own use in place (PickableObject.OnStartUse, verb
+// bag junk, throw away — unless the held item's UseItemAppliesToInteractTargets is false, e.g. the
+// exam notebook, whose LMB always opens checklist mode), otherwise the item's own use in place (PickableObject.OnStartUse, verb
 // from GetHeldUseVerb()). UseItem targets stay LMB-only (E does the target's own Interact()).
 // It never triggers Interact(). Inside cursor-driven diegetic views (PC, panels, lockers…) LMB
 // still clicks UI as before.

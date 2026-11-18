@@ -6,6 +6,7 @@ using UnityEngine;
 /// (Tools Locker, Mini Fridge, Bunker Door, Electrical Panel) and prevents a second
 /// player from entering the same view while another player is already using it.
 /// Attach to the same GameObject as the interactable's <see cref="NetworkObject"/>.
+/// The server frees the slot automatically if the occupant disconnects mid-interaction.
 /// </summary>
 public class DiegeticOccupancy : NetworkBehaviour
 {
@@ -59,11 +60,38 @@ public class DiegeticOccupancy : NetworkBehaviour
         ReleaseServerRpc();
     }
 
+    public override void OnNetworkSpawn()
+    {
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+    }
+
+    // A client that quits mid-interaction (Alt+F4, crash, timeout) never sends ReleaseServerRpc,
+    // so the server must free the slot itself. Otherwise the interactable stays "busy" for good,
+    // even after the player reconnects, because they come back with a new client ID.
+    private void OnClientDisconnected(ulong clientId)
+    {
+        if (!IsServer || NetworkManager.Singleton == null || NetworkManager.Singleton.ShutdownInProgress) return;
+        if (_occupantClientId.Value == clientId)
+            _occupantClientId.Value = NoOccupant;
+    }
+
     [ServerRpc(RequireOwnership = false)]
     private void ClaimServerRpc(ulong clientId)
     {
-        if (_occupantClientId.Value == NoOccupant)
-            _occupantClientId.Value = clientId;
+        if (_occupantClientId.Value != NoOccupant) return;
+
+        // Ignore a claim that arrives for a client that already left, so it can't lock the slot
+        // after OnClientDisconnected has already run.
+        if (NetworkManager != null && !NetworkManager.ConnectedClients.ContainsKey(clientId)) return;
+
+        _occupantClientId.Value = clientId;
     }
 
     [ServerRpc(RequireOwnership = false)]

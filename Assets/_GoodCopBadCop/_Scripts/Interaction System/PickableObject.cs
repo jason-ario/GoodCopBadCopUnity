@@ -2229,6 +2229,15 @@ public class PickableObject : Interactable
     /// Every subclass whose <see cref="OnStartUse"/> does something must override this.
     /// </summary>
     public virtual string GetHeldUseVerb() => null;
+    /// <summary>
+    /// When true (default), LMB / RT with this item in hand also applies it to Interact-key
+    /// deposit targets (<see cref="HeldItemTargetKey.Interact"/>) as an alternative to E.
+    /// Override to false for items whose LMB must always be their own in-place use
+    /// (e.g. <see cref="ExamNotebook"/>: LMB opens checklist mode, E tears a page into a folder).
+    /// </summary>
+    public virtual bool UseItemAppliesToInteractTargets => true;
+
+
 
     public virtual void OnStartUse()
     {

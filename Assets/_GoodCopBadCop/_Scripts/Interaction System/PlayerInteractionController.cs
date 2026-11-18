@@ -673,7 +673,8 @@ public class PlayerInteractionController : NetworkBehaviour
 
                     // HUD "[LMB/RT] {verb}" covers both keys' item actions: LMB also applies the
                     // held item on E (deposit/insert) targets (see TryItemUse).
-                    TargetItemUseVerb = canApplyHeldItem ? itemVerb : null;
+                    // Items that opt out of LMB-on-E-targets fall back to their own use verb (null here).
+                    TargetItemUseVerb = canApplyHeldItem && (!applyOnInteract || heldForUse.UseItemAppliesToInteractTargets) ? itemVerb : null;
 
                     // Reticle shows "[E] {verb}" only; LMB on E-targets is surfaced by the HUD prompt above.
                     reticle.SetInteractState(true, interactable.interactText, showKey, true, interactable.ShowInteractHint && !applyOnInteract, holdVerb, useVerb, actionVerb);
@@ -1345,8 +1346,16 @@ public class PlayerInteractionController : NetworkBehaviour
         // Deposit / insert targets (HeldItemTargetKey.Interact — put the stamp back in the ink pad,
         // bag junk, throw away…) also accept LMB / RT, so E and LMB both apply the held item there.
         // Only the target action fires: the item is not also used in place.
+        // Items that opt out (UseItemAppliesToInteractTargets == false, e.g. the exam notebook)
+        // keep LMB for their own use; the deposit stays on E only.
         if (AppliesHeldItemOnInteract(interactable))
         {
+            if (!_playerPickupController.HeldObject.UseItemAppliesToInteractTargets)
+            {
+                _playerPickupController.TryUseObject();
+                return;
+            }
+
             interactable.InteractWithItem(this, _playerPickupController.HeldObject);
             ClearReticlePromptAfterInteract();
             return;

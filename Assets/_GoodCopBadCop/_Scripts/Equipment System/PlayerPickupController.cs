@@ -1547,6 +1547,20 @@ public class PlayerPickupController : NetworkBehaviour
             _playerAnimationController.SetRightArmRigWeightSmooth(0,.25f);
             _playerAnimationController.RightArmIKTarget = null;
         }
+
+        // The first-person arm targets must be released too. PlayerAnimationController.LateUpdate
+        // re-solves the cam left arm toward CamLeftArmRigIKTarget while the rig is fading out; if
+        // it still points at this item's grip (now riding the stowed/dropped item), the cam arm is
+        // dragged toward it and left in that pose, so the next item (e.g. mop) sits wrong in hand.
+        // Only cleared when owned by this item so interactables (Telephone, Lever) keep theirs.
+        Transform sourceRoot = source.transform;
+        Transform camLeft = _playerAnimationController.CamLeftArmRigIKTarget;
+        if (camLeft == null || camLeft.IsChildOf(sourceRoot))
+            _playerAnimationController.CamLeftArmRigIKTarget = null;
+
+        Transform camRight = _playerAnimationController.CamRightArmRigIKTarget;
+        if (camRight == null || camRight.IsChildOf(sourceRoot))
+            _playerAnimationController.CamRightArmRigIKTarget = null;
     }
 
     /// <summary>

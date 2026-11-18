@@ -1040,6 +1040,9 @@ public class ExamNotebook : PickableObject
     /// <summary>LMB opens the notebook for checklist marking; nothing while a page is being added to a folder.</summary>
     public override string GetHeldUseVerb() => addingToFolder ? null : Loc.N("Open");
 
+    /// <summary>Tearing a page into a folder is Interact-only (E / West); LMB always opens checklist mode.</summary>
+    public override bool UseItemAppliesToInteractTargets => false;
+
     public override void OnStartUse()
     {
         if (addingToFolder)
