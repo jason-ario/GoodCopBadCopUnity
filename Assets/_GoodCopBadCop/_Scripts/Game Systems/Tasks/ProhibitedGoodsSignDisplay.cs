@@ -45,11 +45,13 @@ public class ProhibitedGoodsSignDisplay : MonoBehaviour
 
     private void OnEnable()
     {
+        Loc.LanguageChanged += RefreshDisplay;
         TryBind();
     }
 
     private void OnDisable()
     {
+        Loc.LanguageChanged -= RefreshDisplay;
         Unbind();
     }
 
@@ -81,6 +83,9 @@ public class ProhibitedGoodsSignDisplay : MonoBehaviour
         RefreshDisplay();
     }
 
+    // Also runs on Loc.LanguageChanged: TranslateSource bakes the current language into the label (with the
+    // already-localized marker, so render-time localization skips it), while each label's LocalizedText swaps
+    // to the new language's font. Without re-translating here, the old language's glyphs render as tofu boxes.
     private void RefreshDisplay()
     {
         if (_boundTask == null || _goodsTypeTexts == null) return;
@@ -89,7 +94,7 @@ public class ProhibitedGoodsSignDisplay : MonoBehaviour
         for (int i = 0; i < _goodsTypeTexts.Length; i++)
         {
             if (_goodsTypeTexts[i] == null) continue;
-            _goodsTypeTexts[i].text = i < prohibited.Count ? Loc.TranslateSource(prohibited[i].ToString()) : _emptySlotText;
+            _goodsTypeTexts[i].text = i < prohibited.Count ? Loc.TranslateSource(prohibited[i].ToString()) : Loc.TranslateSource(_emptySlotText);
         }
     }
     

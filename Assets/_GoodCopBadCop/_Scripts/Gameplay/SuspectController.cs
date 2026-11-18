@@ -372,6 +372,12 @@ public class SuspectController : NetworkBehaviour
     /// </summary>
     private readonly HashSet<string> _correctCategoryTypeNames = new HashSet<string>();
 
+    /// <summary>
+    /// Type-name strings for every category with at least one active anomaly on the suspect.
+    /// Populated by CalculateCategoryScores; used by PayOutResults to detect false evidence.
+    /// </summary>
+    private readonly HashSet<string> _activeCategoryTypeNames = new HashSet<string>();
+
     // Individual symptom (anomaly instance) counts for the post-verdict popup — populated by
     // CalculateCategoryScores. Distinct from the category-level fields above: a single checked
     // category box can cover multiple active anomaly instances, and the popup should reflect
@@ -380,22 +386,18 @@ public class SuspectController : NetworkBehaviour
     private int _symptomsTotal = 0;
 
     [Header("Coupon Payouts")]
-    [Tooltip("Bonus coupons awarded when every active category is identified with zero false positives.")]
-    [SerializeField] int couponPerfectAnomaliesBonus = 2;
-    [Tooltip("Maximum bonus coupons awarded when 100% of anomaly categories are identified. Scales linearly with percent caught (0% = 0 bonus, 100% = full bonus).")]
+    [Tooltip("Fixed coupons for a perfect inspection: every active category identified with no false claims (a clean suspect with nothing ticked also counts). Not scaled by the earnings multiplier.")]
+    [SerializeField] int couponPerfectAnomaliesBonus = 5;
+    [Tooltip("Coupons awarded at 100% checklist accuracy; the payout is accuracy x this x the earnings multiplier. Accuracy = correct / (active categories + falsely ticked categories), so false ticks lower it. There is no flat base reward.")]
     [SerializeField] int couponMaxPercentBonus = 8;
-    [Tooltip("Coupons deducted per category the player checked that had no active anomalies.")]
-    [SerializeField] int couponPenaltyPerFalsePositiveAnomaly = 2;
-    [Tooltip("Flat base reward always paid out regardless of checklist accuracy. Not scaled by the earnings multiplier.")]
-    [SerializeField] int couponBaseReward = 10;
-    [Tooltip("Extra coupons awarded per evidence item placed in the folder for a correctly identified category.")]
+    [Tooltip("Coupons per evidence item filed for a correctly identified category, scaled by evidence accuracy (correct items / (correct + items for categories the suspect doesn't have)).")]
     [SerializeField] int couponPerEvidenceItem = 1;
-    [Tooltip("Global economy multiplier applied to positive payout components (percent, perfect, evidence). The base reward and penalties are not scaled. 1.5 = +50% earnings.")]
-    [SerializeField, Min(0f)] float couponEarningsMultiplier = 1.5f;
+    [Tooltip("Reward multiplier applied to the accuracy reward and evidence bonus (not the fixed perfect bonus). With a 10-coupon accuracy reward, 2.5 pays 25 at 100% accuracy (30 with the perfect bonus).")]
+    [SerializeField, Min(0f)] float couponEarningsMultiplier = 2.5f;
 
-    /// <summary>Scales a positive reward amount by couponEarningsMultiplier, rounding half away from zero.</summary>
-    private int ScaleEarnings(int amount) =>
-        (int)System.Math.Round(amount * couponEarningsMultiplier, System.MidpointRounding.AwayFromZero);
+    /// <summary>Rounds a coupon amount half away from zero.</summary>
+    private static int RoundCoupons(float amount) =>
+        (int)System.Math.Round(amount, System.MidpointRounding.AwayFromZero);
     
     private void Awake()
     {
@@ -1555,6 +1557,7 @@ public class SuspectController : NetworkBehaviour
         _categoriesMissed = 0;
         _totalActiveCategories = 0;
         _correctCategoryTypeNames.Clear();
+        _activeCategoryTypeNames.Clear();
         _symptomsFound = 0;
         _symptomsTotal = 0;
 
@@ -1579,7 +1582,11 @@ public class SuspectController : NetworkBehaviour
             bool hasAnomaly = ac.HasActiveAnomalyOfCategory(category);
             bool wasChecked = checkedCategories.Contains(category);
 
-            if (hasAnomaly) _totalActiveCategories++;
+            if (hasAnomaly)
+            {
+                _totalActiveCategories++;
+                _activeCategoryTypeNames.Add(category);
+            }
 
             if (wasChecked && hasAnomaly)
             {
@@ -1601,12 +1608,19 @@ public class SuspectController : NetworkBehaviour
                 _symptomsFound++;
         }
 
-        // Accuracy = fraction of active categories correctly identified.
-        // A clean suspect (no active categories) is 100% only if the player made no false claims.
-        if (_totalActiveCategories == 0)
-            return _categoriesFalsePositive == 0 ? 100 : 0;
+        return Mathf.RoundToInt(GetChecklistAccuracy() * 100f);
+    }
 
-        return Mathf.Max(0, (_categoriesCorrect * 100) / _totalActiveCategories);
+    /// <summary>
+    /// Checklist accuracy (0–1) that counts false claims:
+    /// correct / (active categories + falsely ticked categories).
+    /// Ticking every box no longer scores 100%. With 1 active category, ticking all 5 scores 20%.
+    /// A clean suspect is 100% with no ticks and 0% with any tick.
+    /// </summary>
+    private float GetChecklistAccuracy()
+    {
+        int denominator = _totalActiveCategories + _categoriesFalsePositive;
+        return denominator > 0 ? (float)_categoriesCorrect / denominator : 1f;
     }
 
     /// <summary>
@@ -1634,8 +1648,10 @@ public class SuspectController : NetworkBehaviour
     /// Calculates coupons from the category scoring fields, spawns them at the ATM,
     /// and broadcasts popup notifications to every connected client.
     /// Must only be called on the server after CalculateCategoryScores has run.
-    /// The percent-based reward scales linearly from 0 to couponMaxPercentBonus depending on
-    /// the fraction of active anomaly categories the player correctly identified.
+    /// The payout is checklist accuracy x couponMaxPercentBonus x couponEarningsMultiplier, plus the
+    /// perfect bonus and the evidence bonus. There is no flat base reward. Accuracy is
+    /// correct / (active + falsely ticked), so false claims lower it.
+    /// The evidence bonus is scaled by evidence accuracy in the same way.
     /// The perfect-identification bonus and the evidence bonus are sent separately so each popup
     /// can name the reason it was earned.
     /// Returns the total coupons issued so the verdict can be itemized on the end-of-shift report.
@@ -1644,30 +1660,28 @@ public class SuspectController : NetworkBehaviour
     {
         if (!IsServer) return 0;
 
-        // Compute percent of active anomaly categories correctly identified (0.0 – 1.0).
-        // A clean suspect (no active categories) counts as 100% if no false positives were made.
-        float percentCaught = _totalActiveCategories > 0
+        // False claims never take coupons away. They only shrink what the player earns.
+        // Each reward is computed twice: "full" (as if no false claims were made) and "earned"
+        // (scaled by accuracy). The difference is shown as a single negative "False Claims" popup,
+        // so the popups add up to the payout.
+
+        // Checklist accuracy (0.0 – 1.0): correct / (active + falsely ticked). False ticks lower it.
+        float percentCaught = GetChecklistAccuracy();
+
+        // Share of active categories found, ignoring false ticks. A clean suspect counts as 100%.
+        float percentFound = _totalActiveCategories > 0
             ? (float)_categoriesCorrect / _totalActiveCategories
-            : (_categoriesFalsePositive == 0 ? 1f : 0f);
+            : 1f;
 
-        // Reward scales linearly from 0 to couponMaxPercentBonus based on percent caught.
-        int percentReward = (int)System.Math.Round(
-            percentCaught * couponMaxPercentBonus * couponEarningsMultiplier,
-            System.MidpointRounding.AwayFromZero);
+        int fullPercentReward = RoundCoupons(percentFound * couponMaxPercentBonus * couponEarningsMultiplier);
+        int percentReward = RoundCoupons(percentCaught * couponMaxPercentBonus * couponEarningsMultiplier);
 
-        // Penalty for falsely claimed categories (checking a box when there is no anomaly there).
-        int falsePenalty = _categoriesFalsePositive * couponPenaltyPerFalsePositiveAnomaly;
-
-        // Perfect bonus: every active category found and no false positives.
-        int perfectBonusAmount = (_categoriesCorrect == _totalActiveCategories
-                                  && _categoriesFalsePositive == 0
-                                  && _totalActiveCategories > 0)
-            ? ScaleEarnings(couponPerfectAnomaliesBonus)
-            : 0;
-
-        // Evidence bonus: extra coupons per proof document filed for a correctly identified category.
-        // Placing evidence for a category with no active anomaly gives no bonus and no penalty.
-        int evidenceBonus = 0;
+        // Evidence accuracy: proof filed for a correctly identified category is correct, proof for a
+        // category the suspect doesn't have is false. Proof for a real but unticked category counts
+        // as neither. The bonus is correct items x per-item value x evidence accuracy, so filing
+        // extra proof for anomalies that aren't there reduces the bonus.
+        int correctEvidence = 0;
+        int falseEvidence = 0;
         if (spawnedFolder != null)
         {
             System.Collections.Generic.Dictionary<AnomalyCategory, int> evidenceCounts =
@@ -1675,17 +1689,35 @@ public class SuspectController : NetworkBehaviour
 
             foreach (var kvp in evidenceCounts)
             {
-                if (_correctCategoryTypeNames.Contains(kvp.Key.ToTypeName()))
-                    evidenceBonus += kvp.Value * couponPerEvidenceItem;
+                string typeName = kvp.Key.ToTypeName();
+                if (_correctCategoryTypeNames.Contains(typeName))
+                    correctEvidence += kvp.Value;
+                else if (!_activeCategoryTypeNames.Contains(typeName))
+                    falseEvidence += kvp.Value;
             }
         }
 
-        evidenceBonus = ScaleEarnings(evidenceBonus);
-        // Base reward is a flat payout and is intentionally NOT scaled by couponEarningsMultiplier.
-        int baseReward = couponBaseReward;
+        int evidenceTotal = correctEvidence + falseEvidence;
+        float evidenceAccuracy = evidenceTotal > 0 ? (float)correctEvidence / evidenceTotal : 1f;
+        int fullEvidenceBonus = RoundCoupons(correctEvidence * couponPerEvidenceItem * couponEarningsMultiplier);
+        int evidenceBonus = RoundCoupons(correctEvidence * couponPerEvidenceItem * evidenceAccuracy * couponEarningsMultiplier);
 
-        int totalCoupons = Mathf.Max(0,
-            baseReward + percentReward - falsePenalty + perfectBonusAmount + evidenceBonus);
+        // Coupons forfeited to false claims (shown as a negative popup; never taken from the player).
+        int falseClaimCount = _categoriesFalsePositive + falseEvidence;
+        int falseClaimForfeit = Mathf.Max(0, fullPercentReward - percentReward)
+                              + Mathf.Max(0, fullEvidenceBonus - evidenceBonus);
+
+        // Perfect bonus (fixed, unscaled): every active category found, no false ticks, and no false
+        // evidence. A clean suspect with nothing ticked and no false evidence also counts as perfect.
+        int perfectBonusAmount = (_categoriesCorrect == _totalActiveCategories
+                                  && _categoriesFalsePositive == 0
+                                  && falseEvidence == 0)
+            ? couponPerfectAnomaliesBonus
+            : 0;
+
+        // Payout = accuracy x reward x multiplier, plus the perfect bonus (and evidence bonus).
+        // There is no flat base reward, and every component is non-negative.
+        int totalCoupons = percentReward + perfectBonusAmount + evidenceBonus;
 
         int couponsDispensed = 0;
         if (ATM.Instance != null)
@@ -1695,17 +1727,22 @@ public class SuspectController : NetworkBehaviour
 
         Debug.Log(
             $"Payout — Correct categories: {_categoriesCorrect}/{_totalActiveCategories}, " +
-            $"Percent caught: {percentCaught:P0}, False positives: {_categoriesFalsePositive}, " +
-            $"Earnings x{couponEarningsMultiplier:0.##}, Base: +{baseReward}, Percent reward: +{percentReward}, " +
-            $"False penalty: -{falsePenalty}, Perfect bonus: +{perfectBonusAmount}, " +
-            $"Evidence bonus: +{evidenceBonus}, Total: {totalCoupons}");
+            $"Checklist accuracy: {percentCaught:P0}, False positives: {_categoriesFalsePositive}, " +
+            $"Evidence: {correctEvidence} correct / {falseEvidence} false ({evidenceAccuracy:P0}), " +
+            $"Earnings x{couponEarningsMultiplier:0.##}, " +
+            $"Percent reward: +{percentReward} (of {fullPercentReward}), Perfect bonus: +{perfectBonusAmount}, " +
+            $"Evidence bonus: +{evidenceBonus} (of {fullEvidenceBonus}), " +
+            $"False claims: {falseClaimCount} (forfeited {falseClaimForfeit}), Total: {totalCoupons}");
 
+        // Popups show the full rewards, then the forfeit, so they add up to the earned amounts.
         ShowScoringResultsClientRpc(
-            percentReward,
+            fullPercentReward,
             _symptomsFound,
             _symptomsTotal,
             perfectBonusAmount,
-            evidenceBonus,
+            fullEvidenceBonus,
+            falseClaimCount,
+            falseClaimForfeit,
             totalCoupons);
 
         // What the ATM actually paid (after the checkpoint integrity multiplier, or 0 without power).
@@ -1719,9 +1756,12 @@ public class SuspectController : NetworkBehaviour
         int symptomsTotal,
         int perfectBonusAmount,
         int evidenceBonusAmount,
+        int falseClaimCount,
+        int falseClaimForfeit,
         int totalCoupons)
     {
-        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, symptomsFound, symptomsTotal, perfectBonusAmount, evidenceBonusAmount, totalCoupons));
+        StartCoroutine(ShowCashPopUpSequence(anomalyAmount, symptomsFound, symptomsTotal, perfectBonusAmount,
+            evidenceBonusAmount, falseClaimCount, falseClaimForfeit, totalCoupons));
     }
 
     private IEnumerator ShowCashPopUpSequence(
@@ -1730,6 +1770,8 @@ public class SuspectController : NetworkBehaviour
         int symptomsTotal,
         int perfectBonusAmount,
         int evidenceBonusAmount,
+        int falseClaimCount,
+        int falseClaimForfeit,
         int totalCoupons)
     {
         yield return new WaitForSeconds(2f);
@@ -1753,6 +1795,14 @@ public class SuspectController : NetworkBehaviour
         if (evidenceBonusAmount > 0)
         {
             UIController.Instance.ShowCashPopUpNotification(evidenceBonusAmount, Loc.T("Evidence Filed"));
+            yield return new WaitForSeconds(2f);
+        }
+
+        // Message 4: Coupons forfeited to false claims (ticked boxes or filed evidence for anomalies
+        // the suspect doesn't have). Shown as a negative amount; it reduces earnings, never the base.
+        if (falseClaimCount > 0 && falseClaimForfeit > 0)
+        {
+            UIController.Instance.ShowCashPopUpNotification(-falseClaimForfeit, Loc.T("False Claims ({0})", falseClaimCount));
             yield return new WaitForSeconds(2f);
         }
 

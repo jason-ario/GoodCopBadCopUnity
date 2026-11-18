@@ -435,12 +435,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1595241044
+  GlobalObjectIdHash: 2998920629
   InScenePlacedSourceGlobalObjectIdHash: 2998920629
+  m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
   Ownership: 1
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
+  m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
   SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
@@ -463,7 +465,15 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   itemsThatCanInteractWith: []
   interactText: Trash Bag
+  interactVerb: 
   highlightNameFilter: 
+  holdHighlightVisibleRange: 50
+  holdHighlightFadeDuration: 0.5
+  holdHighlightPulseSpeed: 0.6
+  holdHighlightPulseMinOpacity: 0.4
+  overlayPulseFadeRange: 30
+  overlayPulseNearHide: 5
+  overlayPulseNearFadeWidth: 3
   itemData: {fileID: 11400000, guid: 3f72a61bb81a80f4ba4322badfb053ed, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
@@ -471,6 +481,8 @@ MonoBehaviour:
   _blendShapeTweenDuration: 0.4
   _useSound: {fileID: 8300000, guid: e918e8314e5423245b7a9dc36a43bfd3, type: 3}
   _goreSplatSound: {fileID: 8300000, guid: 07384a7fcf4682c41a4016158c6a8899, type: 3}
+  _goreSplatVolume: 0.85
+  _goreSplatPitchRange: {x: 0.9, y: 1.1}
 --- !u!135 &6413690275662010405
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -478,7 +490,7 @@ SphereCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3208812104768617437}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: a800eae6fd6b9eb4e87d39c117351446, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0

@@ -713,6 +713,21 @@ public class MutantEnemy : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    // Corpse state for late joiners. Connected clients get the death through the existing
+    // ClientRpcs (which keep their ordering relative to the gore RPCs); clients that join later
+    // never receive those, so OnNetworkSpawn re-applies the corpse from these values.
+    private readonly NetworkVariable<bool> _isPermanentCorpse = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
+    private readonly NetworkVariable<bool> _isCorpseJunkCollectible = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Awake()
@@ -771,6 +786,15 @@ public class MutantEnemy : NetworkBehaviour
         // All clients show the screen-top boss health bar while this mutant is flagged as a boss.
         _bossDisplayName.OnValueChanged += OnBossDisplayNameChanged;
         RefreshBossHealthBar();
+
+        // Late joiner arriving after a permanent kill: it never received the death ClientRpcs,
+        // so rebuild the corpse locally (pose then comes from RagdollPoseSync's snapshot).
+        if (!IsServer && _isPermanentCorpse.Value)
+        {
+            ApplyCorpseStateLocal();
+            if (_isCorpseJunkCollectible.Value)
+                ApplyCorpseJunkPickupState();
+        }
 
         // Server-only: any corpse still lingering (deathBehaviour == PlayAnimation, see Die())
         // gets swept away the next time a day starts, regardless of where it died.
@@ -3396,20 +3420,47 @@ public class MutantEnemy : NetworkBehaviour
     }
 
     /// <summary>
-    /// Switches this mutant's ragdoll on (rigidbodies dynamic, ragdoll colliders enabled) and
-    /// disables its Animator, via the assigned <see cref="ragdollController"/>. No-op if none
-    /// is assigned. See <see cref="RagdollController.EnableRagdoll"/>.
+    /// Switches this mutant's ragdoll on (ragdoll colliders enabled, Animator disabled) via the
+    /// assigned <see cref="ragdollController"/>. No-op if none is assigned. Only the server
+    /// simulates it: on clients the ragdoll is a kinematic network proxy whose bones follow the
+    /// server's pose through <see cref="RagdollPoseSync"/>, so every peer sees the same corpse.
     /// </summary>
     private void EnableRagdoll()
     {
-        if (ragdollController != null)
-            ragdollController.ActivateRagdoll();
+        if (ragdollController == null)
+            return;
+
+        if (IsSpawned && !IsServer)
+            ragdollController.SetNetworkProxy(true); // before activating, so it never simulates here
+
+        ragdollController.ActivateRagdoll();
+
+        if (IsSpawned)
+            RagdollPoseSync.Attach(NetworkObject, ragdollController);
     }
 
     [ClientRpc]
     private void EnableRagdollClientRpc()
     {
+        if (IsServer) return; // host already ran EnableRagdoll() in Die()
         EnableRagdoll();
+    }
+
+    /// <summary>
+    /// Client-side rebuild of everything <see cref="Die"/> does to the body on a permanent kill
+    /// (colliders, procedural IK, ragdoll/death pose). Used for late joiners, who never received
+    /// the individual death ClientRpcs. Idempotent.
+    /// </summary>
+    private void ApplyCorpseStateLocal()
+    {
+        DisableColliders();
+        DisableLegsAnimators();
+        DisableLookAnimator();
+        EnableRagdoll();
+
+        if (ragdollController == null && deathBehaviour == DeathBehaviour.PlayAnimation &&
+            animator != null && !string.IsNullOrEmpty(deathBoolName))
+            animator.SetBool(deathBoolName, true);
     }
 
     /// <summary>
@@ -3563,10 +3614,13 @@ public class MutantEnemy : NetworkBehaviour
         RunDeathStep("disable look animator", () => { DisableLookAnimator(); DisableLookAnimatorClientRpc(); });
 
         // Enable ragdoll physics (and disable the Animator driving the rig) on death so the
-        // corpse falls naturally instead of playing a canned death animation. Applied locally
-        // (server) and broadcast to all clients. Runs after DisableColliders() above so the
-        // ragdoll's own colliders (disabled by that blanket pass) end up enabled again.
+        // corpse falls naturally instead of playing a canned death animation. Only the server
+        // simulates; clients follow its pose via RagdollPoseSync (see EnableRagdoll). Runs after
+        // DisableColliders() above so the ragdoll's own colliders end up enabled again.
         RunDeathStep("enable ragdoll", () => { EnableRagdoll(); EnableRagdollClientRpc(); });
+
+        // Replicated so clients that join later still see the corpse (see OnNetworkSpawn).
+        RunDeathStep("corpse state", () => _isPermanentCorpse.Value = true);
 
         if (deathBehaviour == DeathBehaviour.PlayAnimation)
             RunDeathStep("death animation", TriggerDeathAnimationClientRpc);
@@ -3659,11 +3713,13 @@ public class MutantEnemy : NetworkBehaviour
         if (TakeOutTrashTask.Instance == null)
         {
             ApplyCorpseJunkPickupState();
+            _isCorpseJunkCollectible.Value = true;
             EnableCorpseJunkPickupClientRpc();
             yield break;
         }
 
         ApplyCorpseJunkPickupState();
+        _isCorpseJunkCollectible.Value = true;
         EnableCorpseJunkPickupClientRpc();
 
         // RegisterExternalJunkItem owns the zone check. An out-of-zone corpse stays baggable but
@@ -3680,6 +3736,9 @@ public class MutantEnemy : NetworkBehaviour
 
     private void ApplyCorpseJunkPickupState()
     {
+        if (corpseJunkItem == null)
+            return;
+
         corpseJunkItem.enabled = true;
 
         if (corpseJunkInteractionCollider != null)
