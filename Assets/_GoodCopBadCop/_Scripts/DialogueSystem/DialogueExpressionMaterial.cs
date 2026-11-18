@@ -21,7 +21,7 @@ public struct DialogueExpressionEntry
 /// <see cref="ScriptedDialogueRunner"/> calls <see cref="SetExpression"/> on every client at the
 /// start of each NPC line using the node/choice <c>expression</c> key. An empty or unknown key
 /// restores the default material. The expression also reverts automatically once this character
-/// is no longer <see cref="ScriptedDialogueRunner.ActiveDialogueSpeakerNetId"/>, so an abandoned,
+/// is no longer in an active scripted dialogue (<see cref="ScriptedDialogueRunner.IsSpeakerInActiveDialogue"/>), so an abandoned,
 /// force-exited or completed sequence never leaves the mask stuck on a non-default face.
 ///
 /// Place on the suspect root (or any child under its NetworkObject).
@@ -96,7 +96,7 @@ public class DialogueExpressionMaterial : MonoBehaviour
 
         // Revert once this character's scripted sequence has ended (any exit path).
         if (_networkObject == null || !_networkObject.IsSpawned ||
-            ScriptedDialogueRunner.ActiveDialogueSpeakerNetId != _networkObject.NetworkObjectId)
+            !ScriptedDialogueRunner.IsSpeakerInActiveDialogue(_networkObject.NetworkObjectId))
         {
             ResetExpression();
         }

@@ -602,6 +602,17 @@ public class CampaignManager : NetworkBehaviour
                 playerRadiation.ResetRadiation();
 
             PlayerHealth playerHealth = client.PlayerObject.GetComponent<PlayerHealth>();
+
+            // Never heal a dead player in place: their object is a ragdolled corpse with
+            // NetworkTransform disabled, so a same-object reset "revives" them only on their own
+            // screen while every other peer (and the server's hitboxes) keeps the corpse.
+            // ReviveManager gives them a fresh player object during the day transition.
+            if (playerHealth != null && playerHealth.IsDead)
+            {
+                Debug.Log($"[CampaignManager] Client {client.ClientId} is dead — leaving the new-day revive to ReviveManager.");
+                continue;
+            }
+
             if (playerHealth != null)
                 playerHealth.ResetHealth();
 

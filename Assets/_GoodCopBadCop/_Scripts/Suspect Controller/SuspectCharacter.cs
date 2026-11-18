@@ -229,15 +229,14 @@ public class SuspectCharacter : Interactable
     }
 
     /// <summary>
-    /// True on any machine while this character is the speaker of the active scripted dialogue.
+    /// True on any machine while this character is the speaker of an active scripted dialogue
+    /// (any session slot — several conversations with different NPCs can run in parallel).
     /// A player not in that conversation joins it by interacting with the speaker (no proximity
     /// pull-in mid-conversation), so this bypasses <see cref="_interactionLocked"/> — e.g. Day 1's
     /// hard-locked tutorial Vlad — for the join only. Verdict/mutant/walk-in gates still apply.
     /// </summary>
     private bool IsActiveScriptedSpeaker =>
-        IsSpawned && ScriptedDialogueRunner.Instance != null &&
-        ScriptedDialogueRunner.ActiveDialogueSpeakerNetId != 0 &&
-        ScriptedDialogueRunner.ActiveDialogueSpeakerNetId == NetworkObjectId;
+        IsSpawned && ScriptedDialogueRunner.IsSpeakerInActiveDialogue(NetworkObjectId);
 
     public override bool IsInteractable => base.IsInteractable
         && (((!_interactionLocked.Value || IsActiveScriptedSpeaker) && !_verdictClosed.Value && !_mutantInteractionClosed.Value && !_walkingToBooth.Value) || IsJunkCollectible);
@@ -2102,10 +2101,10 @@ public class SuspectCharacter : Interactable
         // A player who backed out of (or never joined) an active scripted dialogue with this
         // suspect joins by interacting with them — resumes wherever the dialogue presently is,
         // rather than restarting it. Mid-conversation arrivals are never pulled in by proximity.
-        var runner = ScriptedDialogueRunner.Instance;
-        if (runner != null && IsActiveScriptedSpeaker)
+        // The join goes to the session slot running THIS suspect's conversation.
+        if (IsActiveScriptedSpeaker)
         {
-            runner.RequestRejoinScriptedDialogueServerRpc();
+            ScriptedDialogueRunner.FindSlotForSpeaker(NetworkObjectId)?.RequestRejoinScriptedDialogueServerRpc();
             return;
         }
 
@@ -2190,7 +2189,13 @@ public class SuspectCharacter : Interactable
 
         if (IsServer)
         {
-            SuspectEncounterManager.Instance?.TryStartIntroDialogue(this, player.OwnerClientId);
+            // Mirror the client path (IntroUnavailableClientRpc): if the intro can't start right
+            // now (e.g. another scripted sequence is running), open the question conversation.
+            if (SuspectEncounterManager.Instance != null &&
+                SuspectEncounterManager.Instance.TryStartIntroDialogue(this, player.OwnerClientId))
+                return;
+            if (!DialogueChoiceSystem.IsInDialogueMode)
+                OpenWorldDialogue();
             return;
         }
 

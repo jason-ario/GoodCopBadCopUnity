@@ -191,14 +191,40 @@ public class SpeakingInteraction : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        if (!s_spawned.Contains(this)) s_spawned.Add(this);
         if (IsServer && NetworkManager.Singleton != null)
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
     }
 
     public override void OnNetworkDespawn()
     {
+        s_spawned.Remove(this);
         if (IsServer && NetworkManager.Singleton != null)
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+    }
+
+    private static readonly List<SpeakingInteraction> s_spawned = new List<SpeakingInteraction>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => s_spawned.Clear();
+
+    /// <summary>
+    /// Server-only. True when <paramref name="clientId"/> is a participant of a world (question)
+    /// conversation with any speaker other than <paramref name="exceptSpeakerRoot"/>. Used by
+    /// <see cref="ScriptedDialogueRunner"/> so a scripted conversation never pulls in a player who
+    /// is busy talking to a different NPC.
+    /// </summary>
+    public static bool IsClientInAnyWorldConversation(ulong clientId, Transform exceptSpeakerRoot = null)
+    {
+        for (int i = 0; i < s_spawned.Count; i++)
+        {
+            SpeakingInteraction s = s_spawned[i];
+            if (s == null || !s._worldParticipants.Contains(clientId)) continue;
+            if (exceptSpeakerRoot != null && (s.transform == exceptSpeakerRoot || s.transform.IsChildOf(exceptSpeakerRoot)))
+                continue;
+            return true;
+        }
+        return false;
     }
 
     // Releases this client's engagement participation if it disconnects mid-conversation, so a
@@ -317,12 +343,13 @@ public class SpeakingInteraction : NetworkBehaviour
     [ClientRpc]
     private void SayClientRpc(string dialogue, bool clearHistory, bool waitForInput)
     {
-        // Barks/one-off lines have no participant set: only players within overhear range
-        // of this speaker see the subtitle. Audio still plays (it is spatialized).
-        if (OverhearRange.IsLocalPlayerWithin(transform))
+        // Barks/one-off lines have no participant set: only free players within overhear range
+        // of this speaker see the subtitle — never a player busy in a conversation with someone
+        // else, whose own waiting line would otherwise be evicted. Audio still plays (spatialized).
+        if (OverhearRange.CanLocalPlayerOverhear(transform))
             DialogueManager.Instance.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory, waitForInput,
-                overhearSource: transform, participantsAlwaysSee: false);
-        else if (clearHistory)
+                overhearSource: transform, participantsAlwaysSee: false, speakerNetId: NetworkObjectId);
+        else if (clearHistory && !OverhearRange.IsLocalPlayerConversationParticipant)
             DialogueManager.Instance.ClearHistory();
 
         AudioClip[] clips = VoiceAudioClips;
@@ -383,14 +410,15 @@ public class SpeakingInteraction : NetworkBehaviour
             // Cut the camera before the subtitle so the shot is live from the first word.
             OnWorldLineCamera?.Invoke(cameraKey ?? string.Empty);
             DialogueManager.Instance?.SpawnSubtitles(dialogue, SpeakerName, Color.white, false, clearHistory,
-                waitForInput);
+                waitForInput, speakerNetId: NetworkObjectId);
         }
         else
         {
-            if (clearHistory)
+            // Never wipe the screen of a player who is in their own (different) conversation.
+            if (clearHistory && !OverhearRange.IsLocalPlayerConversationParticipant)
                 DialogueManager.Instance?.ClearHistory();
 
-            if (IsLocalPlayerWithinOverhearProximity())
+            if (OverhearRange.CanLocalPlayerOverhear(transform))
             {
                 if (GameSettings.Instance.WorldDialogueOverhearMode == GameSettings.OverhearSubtitleMode.NormalSubtitles)
                 {
@@ -723,8 +751,9 @@ public class SpeakingInteraction : NetworkBehaviour
         SetWorldAwaitingAdvanceClientRpc(false, _worldGateId, WorldParticipantRpcParams());
 
         // Reuse the shared subtitle-advance broadcast so the waiting line is cleared for every
-        // participant exactly the same way a normal (non-voted) advance would clear it.
-        DialogueManager.Instance.AdvanceDialogueServerRpc();
+        // participant exactly the same way a normal (non-voted) advance would clear it — scoped
+        // to this speaker so parallel conversations elsewhere keep their own line and voice.
+        DialogueManager.Instance.AdvanceDialogueServerRpc(NetworkObjectId);
 
         Action callback = _onWorldAdvanceOpened;
         _onWorldAdvanceOpened = null;
@@ -800,7 +829,7 @@ public class SpeakingInteraction : NetworkBehaviour
         _worldChoiceSubmissions[senderId] = choiceIndex;
         _worldChoicePlayerNames[senderId] = playerName;
 
-        HighlightWorldChoiceForOthersClientRpc(choiceIndex, senderId);
+        HighlightWorldChoiceForOthersClientRpc(choiceIndex, senderId, WorldParticipantRpcParams());
 
         int required = Mathf.Max(1, _worldParticipants.Count);
 
@@ -811,11 +840,18 @@ public class SpeakingInteraction : NetworkBehaviour
             ResolveWorldChoiceVote();
     }
 
-    /// <summary>Highlights the submitted choice on every client except the sender, who already highlighted locally.</summary>
+    /// <summary>
+    /// Highlights the submitted choice for this conversation's other participants (the sender
+    /// already highlighted locally). Sent only to this NPC's world participants, and re-checked
+    /// locally, so a player in a parallel conversation never sees another conversation's pick
+    /// light up on their own choice panel.
+    /// </summary>
     [ClientRpc]
-    private void HighlightWorldChoiceForOthersClientRpc(int choiceIndex, ulong senderClientId)
+    private void HighlightWorldChoiceForOthersClientRpc(int choiceIndex, ulong senderClientId, ClientRpcParams rpcParams = default)
     {
         if (NetworkManager.Singleton.LocalClientId == senderClientId) return;
+        if (!SuspectWorldDialogue.TryGetLocalConversationSpeaker(out SpeakingInteraction localSpeaker) ||
+            localSpeaker != this) return;
         DialogueChoiceSystem.Instance?.HighlightChoice(choiceIndex);
     }
 
@@ -968,8 +1004,10 @@ public class SpeakingInteraction : NetworkBehaviour
                 // SpawnSubtitles call): a regular subtitle would be immediately wiped out by
                 // DestroyPreviousSubtitles the instant the NPC's response line spawns below it,
                 // exactly the bug ShowChoiceEcho/HideChoiceEcho already exists to avoid.
-                DialogueManager.Instance?.ShowChoiceEcho(choiceText, playerName, Color.white,
-                    overhearSource: transform, participantsAlwaysSee: false);
+                // Skipped for a player busy in a different conversation (it would replace their echo).
+                if (!OverhearRange.IsLocalPlayerInOtherConversation(transform))
+                    DialogueManager.Instance?.ShowChoiceEcho(choiceText, playerName, Color.white,
+                        overhearSource: transform, participantsAlwaysSee: false);
             }
             else if (winnerPlayerNetId != 0 &&
                      NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(winnerPlayerNetId, out var netObj))

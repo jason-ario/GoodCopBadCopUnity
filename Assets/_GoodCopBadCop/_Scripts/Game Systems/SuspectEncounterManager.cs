@@ -210,6 +210,14 @@ public class SuspectEncounterManager : MonoBehaviour
         if (!NetworkManager.Singleton.ConnectedClients.ContainsKey(initiatingClientId))
             return false;
 
+        // Optional intros are player-initiated: if this suspect can't start a conversation right
+        // now (it's already talking, a megaphone dialogue is playing, or every slot is busy),
+        // reject without marking it played; the caller falls back to the question conversation
+        // and the intro stays available for a later interaction. Other players' conversations
+        // with other NPCs do NOT block it — those run in parallel session slots.
+        if (!ScriptedDialogueRunner.Instance.CanStartSpeakerSequenceNow(suspect))
+            return false;
+
         // Mark before starting the coroutine so two near-simultaneous interaction requests
         // cannot start the same intro twice.
         MarkEncountered(suspect.Data);

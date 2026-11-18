@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// Server-authoritative manager for reviving dead players.
-/// Handles both mid-game revives (lobby spawn points) and new-day revives (outside bunker spawn points).
+/// Handles both mid-game revives (lobby/booth spawn points) and new-day revives (inside bunker spawn points).
 /// Subscribe to <see cref="OnPlayerRevived"/> to react to revive events across the codebase.
 /// </summary>
 public class ReviveManager : NetworkBehaviour
@@ -44,15 +44,18 @@ public class ReviveManager : NetworkBehaviour
         Instance = this;
     }
 
+    // The ShiftManager this server subscribed OnDayStart on (null until subscribed).
+    private ShiftManager _dayStartSource;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        if (IsServer && ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart += ReviveDeadPlayersForNewDay;
-
         if (IsServer)
+        {
+            TrySubscribeDayStartServer();
             RefreshRosterServer();
+        }
     }
 
     private void Update()
@@ -61,6 +64,10 @@ public class ReviveManager : NetworkBehaviour
             return;
 
         _nextRosterRefreshTime = Time.unscaledTime + RosterRefreshInterval;
+
+        // ShiftManager may not exist yet when this spawns; keep trying so the new-day
+        // fallback revive is never silently skipped.
+        TrySubscribeDayStartServer();
         RefreshRosterServer();
     }
 
@@ -68,8 +75,22 @@ public class ReviveManager : NetworkBehaviour
     {
         base.OnNetworkDespawn();
 
-        if (ShiftManager.Instance != null)
-            ShiftManager.Instance.OnDayStart -= ReviveDeadPlayersForNewDay;
+        if (_dayStartSource != null)
+            _dayStartSource.OnDayStart -= ReviveDeadPlayersForNewDay;
+        _dayStartSource = null;
+    }
+
+    private void TrySubscribeDayStartServer()
+    {
+        ShiftManager shift = ShiftManager.Instance;
+        if (shift == null || shift == _dayStartSource)
+            return;
+
+        if (_dayStartSource != null)
+            _dayStartSource.OnDayStart -= ReviveDeadPlayersForNewDay;
+
+        _dayStartSource = shift;
+        _dayStartSource.OnDayStart += ReviveDeadPlayersForNewDay;
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
@@ -80,7 +101,7 @@ public class ReviveManager : NetworkBehaviour
     /// </summary>
     /// <param name="clientId">The client to revive.</param>
     /// <param name="isNewDay">
-    /// When <c>true</c>, spawns at outside bunker spawn points (new-day revival).
+    /// When <c>true</c>, spawns at inside bunker spawn points (new-day revival).
     /// When <c>false</c>, spawns at lobby spawn points (mid-game revival).
     /// </param>
     public void RevivePlayer(ulong clientId, bool isNewDay)
@@ -152,9 +173,17 @@ public class ReviveManager : NetworkBehaviour
     // ── Server-only logic ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Revives all dead players at the start of a new day, spawning them at outside bunker spawn points.
+    /// Revives every dead player for a new day with a fresh player object at the inside-bunker
+    /// spawn (the old body stays behind as a corpse). Called by <see cref="ShiftManager"/> while
+    /// the day-transition screen is black, and again on OnDayStart as a fallback; players who
+    /// are already alive are skipped, so repeated calls are harmless.
+    /// Dead players must never be healed in place (<see cref="PlayerHealth.ResetHealth"/>): that
+    /// leaves the ragdolled corpse with NetworkTransform disabled, so other peers never see the
+    /// "revived" player move and the server's hitboxes stay where the body fell.
     /// SERVER ONLY.
     /// </summary>
+    public void ReviveDeadPlayersForNewDayServer() => ReviveDeadPlayersForNewDay();
+
     private void ReviveDeadPlayersForNewDay()
     {
         if (!IsServer) return;
@@ -162,17 +191,25 @@ public class ReviveManager : NetworkBehaviour
         // The day has passed: players who died and left yesterday rejoin alive.
         _deadIdentityDays.Clear();
 
+        // Snapshot first: a revive replaces PlayerObjects while we iterate.
+        var deadClientIds = new System.Collections.Generic.List<ulong>();
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            if (client.PlayerObject == null) continue;
+            if (client.PlayerObject == null || DevSpectatorRegistry.IsSpectator(client.ClientId)) continue;
 
             var health = client.PlayerObject.GetComponent<PlayerHealth>();
             if (health != null && health.IsDead)
-            {
-                Debug.Log($"[ReviveManager] Auto-reviving dead player (client {client.ClientId}) for new day.");
-                RevivePlayerServer(client.ClientId, isNewDay: true);
-            }
+                deadClientIds.Add(client.ClientId);
         }
+
+        foreach (ulong clientId in deadClientIds)
+        {
+            Debug.Log($"[ReviveManager] Auto-reviving dead player (client {clientId}) for new day.");
+            RevivePlayerServer(clientId, isNewDay: true);
+        }
+
+        if (deadClientIds.Count > 0)
+            RefreshRosterServer();
     }
 
     /// <summary>
@@ -347,7 +384,7 @@ public class ReviveManager : NetworkBehaviour
             corpse.PrepareForPlayerObjectReplacement();
 
             bool replacementSpawned = isNewDay
-                ? PlayerSpawner.Instance.ReplacePlayerAtOutsideBunker(clientId)
+                ? PlayerSpawner.Instance.ReplacePlayerAtInsideBunker(clientId)
                 : spawnAtBooth
                     ? PlayerSpawner.Instance.ReplacePlayerAtBooth(clientId)
                     : PlayerSpawner.Instance.ReplacePlayerAtLobby(clientId, isSinglePlayer);
@@ -367,7 +404,7 @@ public class ReviveManager : NetworkBehaviour
             }
 
             if (isNewDay)
-                PlayerSpawner.Instance.SpawnPlayerAtOutsideBunker(clientId);
+                PlayerSpawner.Instance.SpawnPlayerAtInsideBunker(clientId);
             else if (spawnAtBooth)
                 PlayerSpawner.Instance.SpawnPlayerAtBooth(clientId);
             else

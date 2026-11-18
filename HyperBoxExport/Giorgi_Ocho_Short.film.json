@@ -1,0 +1,886 @@
+{
+  "format": "film-studio/0.1",
+  "meta": {
+    "title": "Giorgi Ocho Short",
+    "fps": 30,
+    "resolution": [1920, 1080],
+    "notes": "Exported from the Unity scene \"Giorgi Ocho Short\" with the HyperBox Exporter. Materials are standard PBR (custom shaders fall back to their textures). Lightmaps themselves don't come over (bounce light is approximated). Lighting from Unity: Render pipeline: URP, Linear colour space. Sky: captured the skybox (\"Skybox/Procedural\") as a panorama image. Ambient light: from the skybox, ×1. Fog: off. Post-processing: none found, so like Unity there's no tonemapping."
+  },
+  "environment": {
+    "sky": "day",
+    "sun": {
+      "elevation_deg": 50,
+      "azimuth_deg": -150,
+      "energy": 1,
+      "color": "#fff4d6"
+    },
+    "sky_texture": "Giorgi_Ocho_Short_models/sky.png",
+    "ambient_energy": 1,
+    "tonemap": "linear",
+    "glow": false
+  },
+  "actors": [
+    {
+      "id": "player",
+      "name": "Player",
+      "kind": "character",
+      "transform": {
+        "position": [33.3339, 3.8603, -14.4622],
+        "rotation_deg": [0, 180, 0]
+      },
+      "asset": {
+        "type": "gltf",
+        "path": "Giorgi_Ocho_Short_models/Player.glb",
+        "name": "Player"
+      },
+      "rig": {
+        "bone_map": {
+          "Hips": "mixamorig_Hips",
+          "LeftUpperLeg": "mixamorig_LeftUpLeg",
+          "RightUpperLeg": "mixamorig_RightUpLeg",
+          "LeftLowerLeg": "mixamorig_LeftLeg",
+          "RightLowerLeg": "mixamorig_RightLeg",
+          "LeftFoot": "mixamorig_LeftFoot",
+          "RightFoot": "mixamorig_RightFoot",
+          "Spine": "mixamorig_Spine",
+          "Chest": "mixamorig_Spine1",
+          "Neck": "mixamorig_Neck",
+          "Head": "mixamorig_Head",
+          "LeftShoulder": "mixamorig_LeftShoulder",
+          "RightShoulder": "mixamorig_RightShoulder",
+          "LeftUpperArm": "mixamorig_LeftArm",
+          "RightUpperArm": "mixamorig_RightArm",
+          "LeftLowerArm": "mixamorig_LeftForeArm",
+          "RightLowerArm": "mixamorig_RightForeArm",
+          "LeftHand": "mixamorig_LeftHand",
+          "RightHand": "mixamorig_RightHand",
+          "LeftToes": "mixamorig_LeftToeBase",
+          "RightToes": "mixamorig_RightToeBase",
+          "LeftThumbMetacarpal": "mixamorig_LeftHandThumb1",
+          "LeftThumbProximal": "mixamorig_LeftHandThumb2",
+          "LeftThumbDistal": "mixamorig_LeftHandThumb3",
+          "LeftIndexProximal": "mixamorig_LeftHandIndex1",
+          "LeftIndexIntermediate": "mixamorig_LeftHandIndex2",
+          "LeftIndexDistal": "mixamorig_LeftHandIndex3",
+          "LeftMiddleProximal": "mixamorig_LeftHandMiddle1",
+          "LeftMiddleIntermediate": "mixamorig_LeftHandMiddle2",
+          "LeftMiddleDistal": "mixamorig_LeftHandMiddle3",
+          "LeftRingProximal": "mixamorig_LeftHandRing1",
+          "LeftRingIntermediate": "mixamorig_LeftHandRing2",
+          "LeftRingDistal": "mixamorig_LeftHandRing3",
+          "LeftLittleProximal": "mixamorig_LeftHandPinky1",
+          "LeftLittleIntermediate": "mixamorig_LeftHandPinky2",
+          "LeftLittleDistal": "mixamorig_LeftHandPinky3",
+          "RightThumbMetacarpal": "mixamorig_RightHandThumb1",
+          "RightThumbProximal": "mixamorig_RightHandThumb2",
+          "RightThumbDistal": "mixamorig_RightHandThumb3",
+          "RightIndexProximal": "mixamorig_RightHandIndex1",
+          "RightIndexIntermediate": "mixamorig_RightHandIndex2",
+          "RightIndexDistal": "mixamorig_RightHandIndex3",
+          "RightMiddleProximal": "mixamorig_RightHandMiddle1",
+          "RightMiddleIntermediate": "mixamorig_RightHandMiddle2",
+          "RightMiddleDistal": "mixamorig_RightHandMiddle3",
+          "RightRingProximal": "mixamorig_RightHandRing1",
+          "RightRingIntermediate": "mixamorig_RightHandRing2",
+          "RightRingDistal": "mixamorig_RightHandRing3",
+          "RightLittleProximal": "mixamorig_RightHandPinky1",
+          "RightLittleIntermediate": "mixamorig_RightHandPinky2",
+          "RightLittleDistal": "mixamorig_RightHandPinky3",
+          "UpperChest": "mixamorig_Spine2"
+        }
+      }
+    },
+    {
+      "id": "suspect_ocho",
+      "name": "Suspect_Ocho",
+      "kind": "character",
+      "transform": {
+        "position": [33.3688, 3.898, -14.321],
+        "rotation_deg": [0, -179.9999, 0]
+      },
+      "asset": {
+        "type": "gltf",
+        "path": "Giorgi_Ocho_Short_models/Suspect_Ocho.glb",
+        "name": "Suspect_Ocho"
+      },
+      "rig": {
+        "bone_map": {
+          "Hips": "metarig",
+          "LeftUpperLeg": "thigh.L",
+          "RightUpperLeg": "thigh.R",
+          "LeftLowerLeg": "shin.L",
+          "RightLowerLeg": "shin.R",
+          "LeftFoot": "foot.L",
+          "RightFoot": "foot.R",
+          "Spine": "spine.001",
+          "Chest": "spine.002",
+          "Neck": "spine.004",
+          "Head": "spine.005",
+          "LeftShoulder": "shoulder.L",
+          "RightShoulder": "shoulder.R",
+          "LeftUpperArm": "upper_arm.L",
+          "RightUpperArm": "upper_arm.R",
+          "LeftLowerArm": "forearm.L",
+          "RightLowerArm": "forearm.R",
+          "LeftHand": "hand.L",
+          "RightHand": "hand.R",
+          "LeftToes": "toe.L",
+          "RightToes": "toe.R",
+          "LeftThumbMetacarpal": "thumb.01.L",
+          "LeftThumbProximal": "thumb.02.L",
+          "LeftThumbDistal": "thumb.03.L",
+          "LeftIndexProximal": "f_index.01.L",
+          "LeftIndexIntermediate": "f_index.02.L",
+          "LeftIndexDistal": "f_index.03.L",
+          "LeftMiddleProximal": "f_middle.01.L",
+          "LeftMiddleIntermediate": "f_middle.02.L",
+          "LeftMiddleDistal": "f_middle.03.L",
+          "LeftRingProximal": "f_ring.01.L",
+          "LeftRingIntermediate": "f_ring.02.L",
+          "LeftRingDistal": "f_ring.03.L",
+          "LeftLittleProximal": "f_pinky.01.L",
+          "LeftLittleIntermediate": "f_pinky.02.L",
+          "LeftLittleDistal": "f_pinky.03.L",
+          "RightThumbMetacarpal": "thumb.01.R",
+          "RightThumbProximal": "thumb.02.R",
+          "RightThumbDistal": "thumb.03.R",
+          "RightIndexProximal": "f_index.01.R",
+          "RightIndexIntermediate": "f_index.02.R",
+          "RightIndexDistal": "f_index.03.R",
+          "RightMiddleProximal": "f_middle.01.R",
+          "RightMiddleIntermediate": "f_middle.02.R",
+          "RightMiddleDistal": "f_middle.03.R",
+          "RightRingProximal": "f_ring.01.R",
+          "RightRingIntermediate": "f_ring.02.R",
+          "RightRingDistal": "f_ring.03.R",
+          "RightLittleProximal": "f_pinky.01.R",
+          "RightLittleIntermediate": "f_pinky.02.R",
+          "RightLittleDistal": "f_pinky.03.R",
+          "UpperChest": "spine.003"
+        }
+      }
+    },
+    {
+      "id": "meshy_ai_sovietspeechpodium_1118173035_i",
+      "name": "Meshy_AI_SovietSpeechPodium_1118173035_image-to-3d-texture",
+      "kind": "prop",
+      "transform": {
+        "position": [33.3344, 5.018, -15.548],
+        "rotation_deg": [-90, -179.9999, 0],
+        "scale": [100, 100, 100]
+      },
+      "asset": {
+        "type": "gltf",
+        "path": "Giorgi_Ocho_Short_models/Meshy_AI_SovietSpeechPodium_1118173035_image-to-3d-texture.glb",
+        "name": "Meshy_AI_SovietSpeechPodium_1118173035_image-to-3d-texture"
+      }
+    },
+    {
+      "id": "point_light",
+      "name": "Player/CinemachineCamera/Point Light",
+      "kind": "light",
+      "transform": {
+        "position": [33.3339, 6.6583, -14.8623],
+        "rotation_deg": [0, 0.0003, 0]
+      },
+      "light": {
+        "type": "omni",
+        "color": "#f8f9c7",
+        "energy": 0.1,
+        "range": 4.72,
+        "shadows": false
+      }
+    }
+  ],
+  "cameras": [
+    {
+      "id": "main_camera",
+      "name": "Main Camera",
+      "fov": 60,
+      "transform": {
+        "position": [0, 1, -10],
+        "rotation_deg": [0, 180, 0]
+      }
+    },
+    {
+      "id": "camera",
+      "name": "Player/Camera",
+      "fov": 65,
+      "transform": {
+        "position": [33.3339, 6.3113, -14.5692],
+        "rotation_deg": [0, 0, 0]
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "target": "player",
+      "property": "animation",
+      "keys": [
+        {
+          "t": 0,
+          "v": "Walking Backward",
+          "blend": 0,
+          "loop": true
+        }
+      ]
+    },
+    {
+      "target": "suspect_ocho",
+      "property": "animation",
+      "keys": [
+        {
+          "t": 0,
+          "v": "Breathing Idle",
+          "blend": 0,
+          "loop": true
+        }
+      ]
+    }
+  ],
+  "animation_sets": [
+    {
+      "id": "player_clips",
+      "name": "Player clips (from Unity)",
+      "path": "Giorgi_Ocho_Short_models/Player.glb",
+      "clips": [
+        {
+          "name": "Walking Backward",
+          "length": 1.2333,
+          "loop": true
+        },
+        {
+          "name": "Breathing Idle",
+          "length": 6.7,
+          "loop": true
+        },
+        {
+          "name": "Walking",
+          "length": 1.0333,
+          "loop": true
+        },
+        {
+          "name": "Left Strafe",
+          "length": 1.0333,
+          "loop": true
+        },
+        {
+          "name": "Right Strafe",
+          "length": 1.0333,
+          "loop": true
+        },
+        {
+          "name": "Sitting",
+          "length": 3,
+          "loop": true
+        },
+        {
+          "name": "Close Folder",
+          "length": 1.3833,
+          "loop": false
+        },
+        {
+          "name": "Running Backward",
+          "length": 0.6333,
+          "loop": true
+        },
+        {
+          "name": "Slow Run",
+          "length": 0.7333,
+          "loop": true
+        },
+        {
+          "name": "Left Strafe",
+          "length": 1.0333,
+          "loop": true
+        },
+        {
+          "name": "Right Strafe",
+          "length": 1.0333,
+          "loop": true
+        },
+        {
+          "name": "Jump",
+          "length": 0.4667,
+          "loop": false
+        },
+        {
+          "name": "Crouch Walk Back",
+          "length": 1.3667,
+          "loop": true
+        },
+        {
+          "name": "Crouched",
+          "length": 1.5,
+          "loop": false
+        },
+        {
+          "name": "Crouch walk",
+          "length": 1.0667,
+          "loop": true
+        },
+        {
+          "name": "Crouch walk left",
+          "length": 1.2667,
+          "loop": true
+        },
+        {
+          "name": "Crouch Walk Right",
+          "length": 1.1,
+          "loop": true
+        },
+        {
+          "name": "Fall",
+          "length": 0,
+          "loop": true
+        },
+        {
+          "name": "Land",
+          "length": 0.2833,
+          "loop": true
+        },
+        {
+          "name": "Hit",
+          "length": 1,
+          "loop": false
+        },
+        {
+          "name": "Pulling out newspaper and reading it",
+          "length": 8.15,
+          "loop": false
+        },
+        {
+          "name": "Holding Beer",
+          "length": 2,
+          "loop": true
+        },
+        {
+          "name": "Holding Pencil",
+          "length": 2,
+          "loop": true
+        },
+        {
+          "name": "Hold Envelope",
+          "length": 1.2333,
+          "loop": true
+        },
+        {
+          "name": "Turn Radio Left",
+          "length": 0.8333,
+          "loop": true
+        },
+        {
+          "name": "Turning Radio",
+          "length": 0,
+          "loop": true
+        },
+        {
+          "name": "Turning Radio Right",
+          "length": 0.8333,
+          "loop": true
+        },
+        {
+          "name": "Holding Thermometer Gun",
+          "length": 3,
+          "loop": false
+        },
+        {
+          "name": "Using Thermometer Gun",
+          "length": 3,
+          "loop": false
+        },
+        {
+          "name": "Close Switch",
+          "length": 0.95,
+          "loop": false
+        },
+        {
+          "name": "Open Switch",
+          "length": 0.95,
+          "loop": false
+        },
+        {
+          "name": "Press Button",
+          "length": 0.9833,
+          "loop": false
+        },
+        {
+          "name": "Holding ID Card",
+          "length": 1.9833,
+          "loop": false
+        },
+        {
+          "name": "Inspect ID Card (Body)",
+          "length": 2,
+          "loop": true
+        },
+        {
+          "name": "Holding Newspaper",
+          "length": 2.0167,
+          "loop": true
+        },
+        {
+          "name": "Reading Newspaper",
+          "length": 1.9833,
+          "loop": true
+        },
+        {
+          "name": "Holding Flashlight",
+          "length": 1.45,
+          "loop": false
+        },
+        {
+          "name": "Holding Stamp",
+          "length": 2,
+          "loop": true
+        },
+        {
+          "name": "Hold Cigarette",
+          "length": 4.0333,
+          "loop": false
+        },
+        {
+          "name": "Smoking Cigarette Body",
+          "length": 0.5833,
+          "loop": false
+        },
+        {
+          "name": "Hold Shovel",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Attack With Shovel",
+          "length": 0.85,
+          "loop": false
+        },
+        {
+          "name": "Hammer",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Swing Hammer",
+          "length": 0.7,
+          "loop": false
+        },
+        {
+          "name": "Hold Coin",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Grab Handle",
+          "length": 0.1667,
+          "loop": false
+        },
+        {
+          "name": "Hold Khinkali",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Eat Khinkali",
+          "length": 1.8167,
+          "loop": false
+        },
+        {
+          "name": "Holding Polaroid",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Analyzing Polaroid",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Hold Pistol",
+          "length": 2,
+          "loop": true
+        },
+        {
+          "name": "Shoot pistol",
+          "length": 0.85,
+          "loop": false
+        },
+        {
+          "name": "Holding Vaccine",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Use Vaccine",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Right hand grip",
+          "length": 1,
+          "loop": false
+        },
+        {
+          "name": "Holding Trash Bag",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Throw Trash Bag",
+          "length": 0.95,
+          "loop": false
+        },
+        {
+          "name": "Holding Paper Up",
+          "length": 3,
+          "loop": true
+        },
+        {
+          "name": "Holding Paper",
+          "length": 3,
+          "loop": false
+        },
+        {
+          "name": "Holding Shotfun",
+          "length": 3.6071,
+          "loop": true
+        },
+        {
+          "name": "Holding Box",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Shoot Shotgun",
+          "length": 0.7333,
+          "loop": false
+        },
+        {
+          "name": "Holding Folder",
+          "length": 2.3167,
+          "loop": false
+        },
+        {
+          "name": "Open Folder",
+          "length": 1.3167,
+          "loop": false
+        },
+        {
+          "name": "Holding Exam Notebook",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Notebook Inspect",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Rip Out Page",
+          "length": 1.1333,
+          "loop": false
+        },
+        {
+          "name": "Take Pill",
+          "length": 2.7167,
+          "loop": false
+        },
+        {
+          "name": "Open Guidebook",
+          "length": 4,
+          "loop": false
+        },
+        {
+          "name": "Holding Folder Open",
+          "length": 0,
+          "loop": false
+        },
+        {
+          "name": "Holding Mop",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Using Mop",
+          "length": 0.7,
+          "loop": true
+        },
+        {
+          "name": "Hold Camera",
+          "length": 1.5167,
+          "loop": false
+        },
+        {
+          "name": "Take Photo",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Holding Flamethrower",
+          "length": 3,
+          "loop": false
+        },
+        {
+          "name": "Open Door",
+          "length": 1,
+          "loop": false
+        },
+        {
+          "name": "Shrugging",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "Waving",
+          "length": 4.7333,
+          "loop": false
+        },
+        {
+          "name": "Pointing",
+          "length": 2.7667,
+          "loop": false
+        },
+        {
+          "name": "Throw Up New",
+          "length": 1.9667,
+          "loop": false
+        },
+        {
+          "name": "Hip Hop Dance",
+          "length": 3.8667,
+          "loop": false
+        },
+        {
+          "name": "Thumbs up",
+          "length": 3.3333,
+          "loop": false
+        },
+        {
+          "name": "Middle Finger",
+          "length": 3.2333,
+          "loop": false
+        },
+        {
+          "name": "Laying coughing",
+          "length": 1.6667,
+          "loop": false
+        },
+        {
+          "name": "Grab Phone",
+          "length": 1.5667,
+          "loop": false
+        },
+        {
+          "name": "HoldingPhone",
+          "length": 0,
+          "loop": true
+        },
+        {
+          "name": "Left Hand Grip",
+          "length": 1,
+          "loop": false
+        }
+      ]
+    },
+    {
+      "id": "suspect_ocho_clips",
+      "name": "Suspect_Ocho clips (from Unity)",
+      "path": "Giorgi_Ocho_Short_models/Suspect_Ocho.glb",
+      "clips": [
+        {
+          "name": "Sitting Idle",
+          "length": 4.3,
+          "loop": true
+        },
+        {
+          "name": "Breathing Idle",
+          "length": 6.7,
+          "loop": true
+        },
+        {
+          "name": "Walking",
+          "length": 1.0333,
+          "loop": true
+        },
+        {
+          "name": "Give",
+          "length": 2.4333,
+          "loop": false
+        },
+        {
+          "name": "Shot Up",
+          "length": 3.1333,
+          "loop": true
+        },
+        {
+          "name": "Die",
+          "length": 2.6,
+          "loop": false
+        },
+        {
+          "name": "Shocked 1",
+          "length": 3.1333,
+          "loop": true
+        },
+        {
+          "name": "Being Restrained",
+          "length": 11.7333,
+          "loop": false
+        },
+        {
+          "name": "Aiming Rifle",
+          "length": 3.1,
+          "loop": true
+        },
+        {
+          "name": "Firing Rifle",
+          "length": 0.2667,
+          "loop": true
+        },
+        {
+          "name": "Opening Door Inwards",
+          "length": 5.2333,
+          "loop": false
+        },
+        {
+          "name": "Throw",
+          "length": 2.2,
+          "loop": false
+        },
+        {
+          "name": "Hit",
+          "length": 1,
+          "loop": false
+        },
+        {
+          "name": "Throw Up New",
+          "length": 1.9667,
+          "loop": false
+        },
+        {
+          "name": "Zombie run",
+          "length": 0.7333,
+          "loop": true
+        },
+        {
+          "name": "Mutant Man Climb",
+          "length": 1.2,
+          "loop": false
+        },
+        {
+          "name": "Attack",
+          "length": 2.6333,
+          "loop": true
+        },
+        {
+          "name": "Bang on window",
+          "length": 1.3333,
+          "loop": true
+        },
+        {
+          "name": "Slow Run",
+          "length": 0.7333,
+          "loop": true
+        },
+        {
+          "name": "Restraining new new new",
+          "length": 12.0667,
+          "loop": false
+        },
+        {
+          "name": "Body Twitch",
+          "length": 0.4167,
+          "loop": false
+        },
+        {
+          "name": "Hand Twitch 1",
+          "length": 0.5,
+          "loop": false
+        },
+        {
+          "name": "hand Twitch 2",
+          "length": 0.3333,
+          "loop": false
+        },
+        {
+          "name": "Head Spin",
+          "length": 0.7,
+          "loop": false
+        },
+        {
+          "name": "Head Twitch",
+          "length": 0.3333,
+          "loop": false
+        },
+        {
+          "name": "Talking",
+          "length": 3.9333,
+          "loop": false
+        },
+        {
+          "name": "Cocky head turn",
+          "length": 2.5333,
+          "loop": true
+        },
+        {
+          "name": "being cocky",
+          "length": 2.6333,
+          "loop": false
+        },
+        {
+          "name": "Shrugging",
+          "length": 2,
+          "loop": false
+        },
+        {
+          "name": "look away gesture",
+          "length": 1.8,
+          "loop": false
+        },
+        {
+          "name": "Pointing",
+          "length": 2.7667,
+          "loop": false
+        },
+        {
+          "name": "Being Cocky",
+          "length": 2.9,
+          "loop": false
+        },
+        {
+          "name": "Big Guy Laughing",
+          "length": 9.7667,
+          "loop": false
+        },
+        {
+          "name": "SarcasticHeadNod",
+          "length": 2.0667,
+          "loop": false
+        },
+        {
+          "name": "Fake Coughing",
+          "length": 1.8167,
+          "loop": false
+        },
+        {
+          "name": "Laughing",
+          "length": 2.8333,
+          "loop": false
+        },
+        {
+          "name": "Hit",
+          "length": 1,
+          "loop": false
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot_1",
+      "name": "Player/Camera",
+      "camera": "camera",
+      "start": 0,
+      "end": 5
+    }
+  ]
+}

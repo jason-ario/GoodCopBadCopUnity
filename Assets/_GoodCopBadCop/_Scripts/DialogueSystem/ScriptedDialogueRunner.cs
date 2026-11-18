@@ -46,16 +46,62 @@ public class ScriptedCameraEntry
 /// </summary>
 public class ScriptedDialogueRunner : NetworkBehaviour
 {
+    // =========================================================================
+    // Session slots
+    // -------------------------------------------------------------------------
+    // Every ScriptedDialogueRunner component on the runner GameObject is one conversation
+    // SESSION SLOT. Each component owns a complete, independent copy of the sequence state
+    // (speaker, participants, advance/choice gates, camera key, client-side lock/input state) and
+    // its own RPC channel, so several conversations with different NPCs run in parallel without
+    // touching each other — e.g. the host talking to the Postman outside while Player 2 talks to
+    // Ivan at the booth. The FIRST component is the primary: it carries the inspector config
+    // (copied to the other slots at runtime) and is the public facade (Instance) that dispatches
+    // every PlayDialogue / PlayMegaphoneDialogue to a free slot.
+    //
+    // Rules enforced by the dispatcher (server):
+    //  * One session per speaker: a second sequence for the same NPC waits for the first.
+    //  * A player is a participant of at most one session (seeding, proximity/interaction joins
+    //    and self-joins skip players engaged in another session or in a world conversation).
+    //  * LOCKED megaphone dialogues broadcast to and lock every player, so they run alone: they
+    //    wait for every session to finish, and new character sessions wait behind them.
+    //  * UNLOCKED megaphone / phone dialogues run in parallel with character sessions: they only
+    //    reach players who are free when they start, and a listener who gets pulled into a
+    //    character conversation is released from them. One megaphone voice plays at a time.
+    //  * Barks never touch gates/participants and are not dispatched.
+    // =========================================================================
+
     public static ScriptedDialogueRunner Instance { get; private set; }
+
+    private static readonly List<ScriptedDialogueRunner> s_slots = new();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        s_slots.Clear();
+        Instance = null;
+        IsMegaphoneBarkActive = false;
+    }
+
+    private ScriptedDialogueRunner _primary;
+    private bool IsPrimary => _primary == null || _primary == this;
 
     /// <summary>
     /// True on the local client only while it is a participant in a scripted dialogue
-    /// sequence (set by the participant-targeted Enter/LateJoin client RPCs). Never written by
-    /// server-side logic, so a non-participant host is not treated as a participant.
-    /// Used by <see cref="DialogueManager.WaitForInputRoutine"/> to route E-key advances
-    /// through <see cref="AdvanceScriptedLineServerRpc"/> instead of the standard advance RPC.
+    /// sequence in any session slot (set by the participant-targeted Enter/LateJoin client RPCs).
+    /// Never written by server-side logic, so a non-participant host is not treated as a participant.
     /// </summary>
-    public static bool IsScriptedModeActive { get; private set; }
+    public static bool IsScriptedModeActive
+    {
+        get
+        {
+            for (int i = 0; i < s_slots.Count; i++)
+                if (s_slots[i] != null && s_slots[i]._clientIsParticipant) return true;
+            return false;
+        }
+    }
+
+    // Local: this slot put the local player into scripted mode (participant of this session).
+    private bool _clientIsParticipant;
 
     /// <summary>
     /// Local-only. True while a scripted sequence actually holds the local player's dialogue lock
@@ -64,15 +110,74 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// <see cref="IsScriptedModeActive"/> is true for them. Control/look re-enable guards use this so
     /// a free participant isn't left stuck after a pause menu (or any other UI) temporarily took control.
     /// </summary>
-    public static bool IsLocalPlayerDialogueLocked =>
-        IsScriptedModeActive && (Instance == null || Instance._clientEnteredDialogueLock);
+    public static bool IsLocalPlayerDialogueLocked
+    {
+        get
+        {
+            for (int i = 0; i < s_slots.Count; i++)
+            {
+                var s = s_slots[i];
+                if (s != null && s._clientIsParticipant && s._clientEnteredDialogueLock) return true;
+            }
+            return false;
+        }
+    }
 
     // Server-only: true while a scripted sequence is running, independent of whether the host
     // player is a participant. Drives proximity joins and leave/rejoin validation.
     private bool _serverSequenceActive;
 
-    /// <summary>Server-only. True while a scripted dialogue sequence is running on the server.</summary>
-    public bool IsServerSequenceActive => IsServer && (_serverSequenceActive || _megaphoneSequenceActive);
+    /// <summary>
+    /// Server-only. True while any session slot runs, holds (deferExit) or has queued a scripted or
+    /// megaphone sequence. Use <see cref="CanStartSpeakerSequenceNow"/> to ask whether a specific
+    /// NPC could start a conversation right now without waiting.
+    /// </summary>
+    public bool IsServerSequenceActive
+    {
+        get
+        {
+            if (!IsServer) return false;
+            var primary = IsPrimary ? this : _primary;
+            if (primary._pending.Count > 0) return true;
+            for (int i = 0; i < s_slots.Count; i++)
+            {
+                var s = s_slots[i];
+                if (s != null && (s.IsSlotBusy || s._serverSequenceActive || s._megaphoneSequenceActive)) return true;
+            }
+            return false;
+        }
+    }
+
+    // Server-only, per slot: a dispatched sequence coroutine is running on this slot.
+    private bool _sequenceRunning;
+
+    // Server-only, per slot: the running sequence is a megaphone dialogue (and whether it locks players).
+    private bool _runningMegaphone;
+    private bool _runningMegaphoneLocked;
+
+    private bool IsRunningUnlockedMegaphone => _sequenceRunning && _runningMegaphone && !_runningMegaphoneLocked;
+
+    // Server-only, per slot: a deferExit sequence finished on this slot and scripted mode is still
+    // held for its participants until ExitScriptedMode or a chained PlayMegaphoneDialogue.
+    private bool _deferredExitHold;
+
+    // Server-only, per slot: NetworkObjectId of the NPC this slot is running/holding (0 = none).
+    private ulong _reservedSpeakerNetId;
+
+    private bool IsSlotBusy => _sequenceRunning || _deferredExitHold;
+
+    // Server-only, primary: requests waiting for a free slot / their speaker / a megaphone.
+    private sealed class PendingSequence
+    {
+        public string Label;
+        public bool IsMegaphone;
+        public bool Unlocked;
+        public ulong SpeakerNetId;
+        public ScriptedDialogueRunner ChainSlot;
+        public Func<ScriptedDialogueRunner, IEnumerator> Run;
+        public bool LoggedWait;
+    }
+    private readonly List<PendingSequence> _pending = new();
 
     // Server-only: true while RunMegaphoneDialogue is running. Megaphone sequences enter
     // scripted mode for every client (broadcast), unlike participant-targeted suspect dialogue.
@@ -259,9 +364,20 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// True while the active scripted line is unskippable and its typewriter is still revealing.
     /// Input sites must neither complete the reveal nor advance until this clears.
     /// </summary>
-    public static bool IsUnskippableRevealActive =>
-        Instance != null && Instance._clientRevealUnskippable && Instance._clientIsWaitingForInput &&
-        DialogueManager.Instance != null && DialogueManager.Instance.IsAnySubtitleRevealing();
+    public static bool IsUnskippableRevealActive
+    {
+        get
+        {
+            if (DialogueManager.Instance == null) return false;
+            for (int i = 0; i < s_slots.Count; i++)
+            {
+                var s = s_slots[i];
+                if (s != null && s._clientRevealUnskippable && s._clientIsWaitingForInput)
+                    return DialogueManager.Instance.IsAnySubtitleRevealing();
+            }
+            return false;
+        }
+    }
 
     // Local: true once this runner has actually put the local player into DialogueChoiceSystem's
     // dialogue lock (EnterScriptedModeClientRpc / LateJoinClientRpc). False for sequences that
@@ -301,49 +417,134 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private string _currentCameraKey = string.Empty;
 
     // NetworkObjectId of the current dialogue speaker — set on participants by
-    // EnterScriptedModeClientRpc and on late joiners by LateJoinClientRpc.
-    // Used by SuspectController.ResolveCurrentDialogueSpeakerCam() to find the speaker's per-character cameras.
-    // Reset to 0 when exiting scripted mode.
+    // EnterScriptedModeClientRpc and on late joiners by LateJoinClientRpc. Reset to 0 on exit/leave.
     private ulong _clientSpeakerNetId;
 
     /// <summary>
-    /// NetworkObjectId of the current dialogue speaker on all clients. Zero when no dialogue is active.
-    /// Read by <see cref="SuspectController"/> to resolve the speaker's per-character cameras.
+    /// Local client: NetworkObjectId of the NPC the local player is in a scripted conversation with
+    /// (any slot), or 0. Read by <see cref="SuspectController"/> / <see cref="DialogueChoiceSystem"/>
+    /// to resolve the speaker's per-character cameras. Kept valid through the exit callbacks.
     /// </summary>
-    public ulong CurrentSpeakerNetId => _clientSpeakerNetId;
+    public ulong CurrentSpeakerNetId => LocalSpeakerNetId;
+
+    /// <inheritdoc cref="CurrentSpeakerNetId"/>
+    public static ulong LocalSpeakerNetId
+    {
+        get
+        {
+            ulong fallback = 0;
+            for (int i = 0; i < s_slots.Count; i++)
+            {
+                var s = s_slots[i];
+                if (s == null || s._clientSpeakerNetId == 0) continue;
+                if (s._clientIsParticipant) return s._clientSpeakerNetId;
+                if (fallback == 0) fallback = s._clientSpeakerNetId;
+            }
+            return fallback;
+        }
+    }
+
+    // Set on all clients (via broadcast RPC, regardless of participation) to the NetworkObjectId of
+    // the NPC this slot is running a scripted dialogue with, or 0. Stays valid for players who left
+    // the dialogue or never joined it, so talking to that NPC again rejoins the right session.
+    private ulong _broadcastSpeakerNetId;
 
     /// <summary>
-    /// Set on all clients (via broadcast RPC, regardless of participation) to the
-    /// <c>NetworkObjectId</c> of the suspect currently running a scripted dialogue, or 0 when
-    /// none is active. Unlike <see cref="IsScriptedModeActive"/> — which only reflects the
-    /// local client's own lock state — this stays valid for players who left the dialogue or
-    /// never joined it, so <see cref="SuspectCharacter.Interact"/> can detect that talking to
-    /// this suspect again should rejoin an in-progress sequence rather than no-op.
+    /// Any machine: true while <paramref name="speakerNetId"/> is the speaker of a scripted session
+    /// (broadcast to every client regardless of participation).
     /// </summary>
-    public static ulong ActiveDialogueSpeakerNetId { get; private set; }
+    public static bool IsSpeakerInActiveDialogue(ulong speakerNetId) =>
+        speakerNetId != 0 && FindSlotForSpeaker(speakerNetId) != null;
+
+    /// <summary>Any machine: true while some scripted session runs with a speaker other than <paramref name="exceptSpeakerNetId"/>.</summary>
+    public static bool IsAnyOtherSpeakerInActiveDialogue(ulong exceptSpeakerNetId)
+    {
+        for (int i = 0; i < s_slots.Count; i++)
+        {
+            var s = s_slots[i];
+            if (s != null && s._broadcastSpeakerNetId != 0 && s._broadcastSpeakerNetId != exceptSpeakerNetId)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>Any machine: the session slot currently running a scripted dialogue with <paramref name="speakerNetId"/>, or null.</summary>
+    public static ScriptedDialogueRunner FindSlotForSpeaker(ulong speakerNetId)
+    {
+        if (speakerNetId == 0) return null;
+        for (int i = 0; i < s_slots.Count; i++)
+        {
+            var s = s_slots[i];
+            if (s != null && s._broadcastSpeakerNetId == speakerNetId) return s;
+        }
+        return null;
+    }
+
+    /// <summary>Local client: true while the local player is a participant of <paramref name="speakerNetId"/>'s scripted session.</summary>
+    public static bool IsLocalParticipantOfSpeaker(ulong speakerNetId)
+    {
+        var slot = FindSlotForSpeaker(speakerNetId);
+        return slot != null && slot._clientIsParticipant;
+    }
 
     private void Awake()
     {
-        Instance = this;
+        var all = GetComponents<ScriptedDialogueRunner>();
+        _primary = all.Length > 0 ? all[0] : this;
 
-        // Static state survives between Editor Play Mode sessions (and can be left stuck true
-        // if a dialogue coroutine is interrupted mid-sequence, e.g. by a day transition or scene
-        // reload that destroys this NetworkObject before RunDialogue reaches its cleanup).
-        // Reset explicitly — mirrors the equivalent fix already applied in
-        // DialogueChoiceSystem.Awake() for IsInDialogueMode. Without this, UIController.ShowPlayerUI()
-        // permanently refuses to reveal the HUD because its guard checks this flag.
-        IsScriptedModeActive = false;
-        IsMegaphoneBarkActive = false;
+        if (IsPrimary)
+            Instance = this;
+        else
+            CopyConfigFrom(_primary);
+
+        if (!s_slots.Contains(this))
+        {
+            s_slots.Add(this);
+            // Keep component order so slot indices match on every machine.
+            s_slots.Sort((a, b) => Array.IndexOf(all, a).CompareTo(Array.IndexOf(all, b)));
+        }
+
+        if (IsPrimary)
+            IsMegaphoneBarkActive = false;
+    }
+
+    /// <summary>
+    /// Secondary slots are plain extra components with default values: copy the primary's inspector
+    /// configuration so every slot resolves cameras, wobble/font indices and timings identically.
+    /// </summary>
+    private void CopyConfigFrom(ScriptedDialogueRunner src)
+    {
+        if (src == null || src == this) return;
+        _cameras = src._cameras;
+        _megaphoneSpeakerName = src._megaphoneSpeakerName;
+        _megaphoneSpeakerColor = src._megaphoneSpeakerColor;
+        _barkLineHoldSeconds = src._barkLineHoldSeconds;
+        _barkRevealTimeoutSeconds = src._barkRevealTimeoutSeconds;
+        _defaultWobbleProfile = src._defaultWobbleProfile;
+        _additionalWobbleProfiles = src._additionalWobbleProfiles;
+        _additionalFontAssets = src._additionalFontAssets;
+        _advanceTimeoutSeconds = src._advanceTimeoutSeconds;
+        _joinRadius = src._joinRadius;
+        _proximityJoinMidSequence = src._proximityJoinMidSequence;
+        _glassBangTrigger = src._glassBangTrigger;
+        _glassBangImpactDelay = src._glassBangImpactDelay;
+        _glassBangCanSmash = src._glassBangCanSmash;
+        _glassBangImpulseSource = src._glassBangImpulseSource;
     }
 
     public override void OnDestroy()
     {
-        // Safety net: if this object is destroyed while a scripted dialogue coroutine is
-        // still running (e.g. mid-sequence day transition), the coroutine is silently killed
-        // and never reaches the normal exit cleanup that clears this flag. Clear it here so a
-        // future ShowPlayerUI() call is never blocked forever by a leaked lock.
-        IsScriptedModeActive = false;
-        IsMegaphoneBarkActive = false;
+        // Safety net: if this object is destroyed while a scripted dialogue coroutine is still
+        // running (e.g. mid-sequence day transition), the coroutine is silently killed and never
+        // reaches the normal exit cleanup. Dropping the slot clears its contribution to
+        // IsScriptedModeActive so a future ShowPlayerUI() call is never blocked by a leaked lock.
+        _clientIsParticipant = false;
+        s_slots.Remove(this);
+        if (Instance == this)
+        {
+            Instance = null;
+            IsMegaphoneBarkActive = false;
+        }
         base.OnDestroy();
     }
 
@@ -358,6 +559,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         if (NetworkManager.Singleton != null)
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+        _sequenceRunning = false;
+        _runningMegaphone = false;
+        _runningMegaphoneLocked = false;
+        _deferredExitHold = false;
+        _reservedSpeakerNetId = 0;
+        _pending.Clear();
         base.OnNetworkDespawn();
     }
 
@@ -395,6 +602,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server-only. True when <paramref name="clientId"/> is already in another conversation: a
+    /// participant of a different busy session slot, or in a world (question) conversation with
+    /// any NPC. Such a player is never seeded, pulled in or self-joined here — they finish their
+    /// own conversation first and can then join this one by interacting with its speaker.
+    /// </summary>
+    private bool IsClientEngagedElsewhere(ulong clientId)
+    {
+        if (IsClientInOtherSession(clientId)) return true;
+        return SpeakingInteraction.IsClientInAnyWorldConversation(clientId, _currentSpeakerTransform);
+    }
 
     /// <summary>
     /// Builds a <see cref="ClientRpcParams"/> that targets only the current
@@ -475,43 +694,282 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             return;
         }
 
-        StartCoroutine(RunDialogue(
-            speaker,
-            dialogue,
-            onComplete,
-            deferExit,
-            lockOutsidePlayers,
-            initialParticipantClientId,
-            joinByInteractionOnly,
-            allowParticipantExit,
-            hideNonParticipantUI,
-            participantRadius,
-            useWorldDialogueCamera,
-            onAbandoned));
+        if (!IsPrimary)
+        {
+            _primary.PlayDialogue(speaker, dialogue, onComplete, deferExit, lockOutsidePlayers,
+                initialParticipantClientId, joinByInteractionOnly, allowParticipantExit,
+                hideNonParticipantUI, participantRadius, useWorldDialogueCamera, onAbandoned);
+            return;
+        }
+
+        NetworkObject speakerNetObj = speaker.GetComponent<NetworkObject>();
+        Enqueue(new PendingSequence
+        {
+            Label = dialogue.name,
+            IsMegaphone = false,
+            SpeakerNetId = speakerNetObj != null ? speakerNetObj.NetworkObjectId : 0UL,
+            Run = slot => slot.RunDialogue(
+                speaker,
+                dialogue,
+                onComplete,
+                deferExit,
+                lockOutsidePlayers,
+                initialParticipantClientId,
+                joinByInteractionOnly,
+                allowParticipantExit,
+                hideNonParticipantUI,
+                participantRadius,
+                useWorldDialogueCamera,
+                onAbandoned)
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Session dispatch (server, primary)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Server, primary only. True when a scripted conversation with <paramref name="speaker"/>
+    /// would start immediately: no megaphone dialogue is running or waiting, the speaker has no
+    /// running/held/queued session, and a slot is free. Player-initiated optional dialogues
+    /// (booth intros, the Postman) check this and fall back instead of being queued.
+    /// </summary>
+    public bool CanStartSpeakerSequenceNow(SuspectCharacter speaker)
+    {
+        if (!IsServer || speaker == null) return false;
+        if (!IsPrimary) return _primary.CanStartSpeakerSequenceNow(speaker);
+
+        NetworkObject netObj = speaker.GetComponent<NetworkObject>();
+        ulong speakerNetId = netObj != null ? netObj.NetworkObjectId : 0UL;
+
+        foreach (var p in _pending)
+        {
+            if (p.SpeakerNetId == speakerNetId && !p.IsMegaphone) return false;
+            if (p.IsMegaphone && (!p.Unlocked || p.ChainSlot != null)) return false;
+        }
+
+        bool anyFree = false;
+        foreach (var s in s_slots)
+        {
+            if (s == null) continue;
+            if (s._sequenceRunning && s._runningMegaphoneLocked) return false;
+            if (s.IsSlotBusy && s._reservedSpeakerNetId == speakerNetId) return false;
+            if (!s.IsSlotBusy) anyFree = true;
+        }
+        return anyFree;
+    }
+
+    private void Enqueue(PendingSequence request)
+    {
+        _pending.Add(request);
+        TryStartPending();
     }
 
     /// <summary>
-    /// Switches the active override camera to the entry matching <paramref name="key"/>.
-    /// An empty key deactivates any active override. Must be called on the server.
+    /// Server, primary. Starts every pending request that may run now, in request order:
+    /// <list type="bullet">
+    /// <item>Character sequence: a free slot, no other session for its speaker, and no locked
+    ///       megaphone running or waiting.</item>
+    /// <item>Locked (or deferExit-chained) megaphone: every slot idle — its own chain slot only has
+    ///       to finish its coroutine. While it waits, later character requests wait too so it
+    ///       can't be starved.</item>
+    /// <item>Unlocked megaphone / phone call: a free slot and no other megaphone playing; runs in
+    ///       parallel with character conversations.</item>
+    /// </list>
+    /// </summary>
+    private void TryStartPending()
+    {
+        if (!IsServer || _pending.Count == 0) return;
+
+        bool anyMegaphoneRunning = false;
+        bool lockedMegaphoneRunning = false;
+        foreach (var s in s_slots)
+        {
+            if (s == null || !s._sequenceRunning || !s._runningMegaphone) continue;
+            anyMegaphoneRunning = true;
+            if (s._runningMegaphoneLocked) lockedMegaphoneRunning = true;
+        }
+
+        bool megaphoneWaiting = false;          // any earlier megaphone still queued (FIFO among megaphones)
+        bool exclusiveMegaphoneWaiting = false; // an earlier locked/chained megaphone still queued
+        var blockedSpeakers = new HashSet<ulong>();
+
+        for (int i = 0; i < _pending.Count; i++)
+        {
+            PendingSequence p = _pending[i];
+            ScriptedDialogueRunner slot = null;
+
+            if (p.IsMegaphone)
+            {
+                if (p.ChainSlot != null && !p.ChainSlot._deferredExitHold)
+                    p.ChainSlot = null; // hold already released (ExitScriptedMode) — run normally
+
+                bool exclusive = !p.Unlocked || p.ChainSlot != null;
+                if (exclusive)
+                {
+                    bool othersIdle = !anyMegaphoneRunning && !megaphoneWaiting;
+                    foreach (var s in s_slots)
+                    {
+                        if (s == null || !othersIdle) continue;
+                        othersIdle = s == p.ChainSlot ? !s._sequenceRunning : !s.IsSlotBusy;
+                    }
+                    if (othersIdle)
+                        slot = p.ChainSlot != null ? p.ChainSlot : FirstFreeSlot();
+                }
+                else if (!anyMegaphoneRunning && !megaphoneWaiting)
+                {
+                    slot = FirstFreeSlot();
+                }
+
+                if (slot == null)
+                {
+                    megaphoneWaiting = true;
+                    if (exclusive) exclusiveMegaphoneWaiting = true;
+                    LogWaitOnce(p, exclusive
+                        ? "waiting for every conversation to end before the (locking) megaphone plays"
+                        : "waiting for another megaphone line or a free conversation slot");
+                    continue;
+                }
+            }
+            else
+            {
+                if (lockedMegaphoneRunning || exclusiveMegaphoneWaiting)
+                {
+                    LogWaitOnce(p, "waiting behind a megaphone dialogue that locks every player");
+                    continue;
+                }
+
+                if (blockedSpeakers.Contains(p.SpeakerNetId) || IsSpeakerReserved(p.SpeakerNetId))
+                {
+                    blockedSpeakers.Add(p.SpeakerNetId);
+                    LogWaitOnce(p, "its speaker is already in another conversation");
+                    continue;
+                }
+
+                slot = FirstFreeSlot();
+                if (slot == null)
+                {
+                    blockedSpeakers.Add(p.SpeakerNetId);
+                    LogWaitOnce(p, $"all {s_slots.Count} conversation slots are busy");
+                    continue;
+                }
+            }
+
+            _pending.RemoveAt(i);
+            i--;
+
+            slot._sequenceRunning = true;
+            slot._runningMegaphone = p.IsMegaphone;
+            slot._runningMegaphoneLocked = p.IsMegaphone && (!p.Unlocked || p.ChainSlot == slot);
+            if (p.ChainSlot == slot) slot._deferredExitHold = false;
+            if (!p.IsMegaphone) slot._reservedSpeakerNetId = p.SpeakerNetId;
+            if (p.IsMegaphone)
+            {
+                anyMegaphoneRunning = true;
+                if (slot._runningMegaphoneLocked) lockedMegaphoneRunning = true;
+            }
+
+            slot.StartCoroutine(slot.RunSlotSequence(p));
+        }
+    }
+
+    private static void LogWaitOnce(PendingSequence p, string reason)
+    {
+        if (p.LoggedWait) return;
+        p.LoggedWait = true;
+        Debug.Log($"[ScriptedDialogueRunner] '{p.Label}' queued — {reason}.");
+    }
+
+    private static ScriptedDialogueRunner FirstFreeSlot()
+    {
+        foreach (var s in s_slots)
+            if (s != null && s.IsSpawned && !s.IsSlotBusy) return s;
+        return null;
+    }
+
+    private static bool IsSpeakerReserved(ulong speakerNetId)
+    {
+        if (speakerNetId == 0) return false;
+        foreach (var s in s_slots)
+            if (s != null && s.IsSlotBusy && s._reservedSpeakerNetId == speakerNetId) return true;
+        return false;
+    }
+
+    private IEnumerator RunSlotSequence(PendingSequence p)
+    {
+        Debug.Log($"[ScriptedDialogueRunner] Slot {s_slots.IndexOf(this)} running '{p.Label}'.");
+        yield return StartCoroutine(p.Run(this));
+
+        _sequenceRunning = false;
+        _runningMegaphone = false;
+        _runningMegaphoneLocked = false;
+        if (!_deferredExitHold) _reservedSpeakerNetId = 0;
+
+        var primary = IsPrimary ? this : _primary;
+        primary.TryStartPending();
+    }
+
+    /// <summary>Server, primary: retries queued requests once per frame while any are waiting.</summary>
+    private void ServerDispatchTick()
+    {
+        if (IsServer && IsPrimary && _pending.Count > 0)
+            TryStartPending();
+    }
+
+    /// <summary>
+    /// Switches the active override camera to the entry matching <paramref name="key"/> for every
+    /// running session. An empty key deactivates any active override. Must be called on the server.
     /// </summary>
     public void SwitchCamera(string key)
     {
         if (!IsServer) return;
+        foreach (var s in s_slots)
+            if (s != null && s.IsSlotBusy) s.SwitchCameraLocal(key);
+    }
+
+    private void SwitchCameraLocal(string key)
+    {
         _currentCameraKey = key ?? string.Empty;
         SetActiveOverrideCamClientRpc(key ?? string.Empty, BuildParticipantRpcParams());
     }
 
     /// <summary>
-    /// Manually exits scripted dialogue mode and deactivates any active override camera.
-    /// Use this when a previous <see cref="PlayDialogue"/> call was made with
-    /// <c>deferExit: true</c> and no subsequent dialogue method will end the session.
-    /// Must be called on the server.
+    /// Releases every session held open by a <c>deferExit: true</c> <see cref="PlayDialogue"/>
+    /// (exits scripted mode for its participants and deactivates its override camera). Sessions of
+    /// other conversations are untouched. Must be called on the server.
     /// </summary>
     public void ExitScriptedMode()
     {
         if (!IsServer) return;
+        foreach (var s in s_slots.ToArray())
+            if (s != null && s._deferredExitHold) s.ExitSlotScriptedMode();
+        (IsPrimary ? this : _primary).TryStartPending();
+    }
+
+    /// <summary>
+    /// Server-only. Force-ends every running or held scripted session for its participants (e.g.
+    /// the intro cutscene or end-of-shift report taking over). Running sequences keep going with no
+    /// participants and auto-advance to their end, so their completion callbacks still fire.
+    /// </summary>
+    public void ForceExitAllScriptedModes()
+    {
+        if (!IsServer) return;
+        foreach (var s in s_slots.ToArray())
+        {
+            if (s == null || !(s.IsSlotBusy || s._serverSequenceActive || s._megaphoneSequenceActive)) continue;
+            bool running = s._sequenceRunning;
+            s.ExitSlotScriptedMode();
+            if (running) s.BeginUnattendedDrain();
+        }
+    }
+
+    /// <summary>Server-only. Exits scripted mode for this slot's participants and clears its session state.</summary>
+    private void ExitSlotScriptedMode()
+    {
         // Clear the server-side flag immediately so CheckProximityJoins stops running.
         _serverSequenceActive = false;
+        _deferredExitHold = false;
+        if (!_sequenceRunning) _reservedSpeakerNetId = 0;
         ulong speakerNetId = _currentSpeakerTransform != null
             ? _currentSpeakerTransform.GetComponent<NetworkObject>()?.NetworkObjectId ?? 0UL
             : 0UL;
@@ -531,20 +989,38 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         ExitScriptedModeClientRpc(false, exitRecipients);
     }
 
+    // Server, per slot: a force-exited sequence auto-advances every remaining gate with nobody in it.
+    private bool _drainUnattended;
+
+    private void BeginUnattendedDrain()
+    {
+        _drainUnattended = true;
+        TryAutoAdvanceIfUnattended();
+    }
+
     /// <summary>
     /// Deactivates the active suspect camera and any override camera without exiting scripted
-    /// mode. Use when transitioning to a cinematic or neutral-camera phase mid-session while
-    /// keeping the player locked in scripted mode (e.g. before a cutscene plays mid-sequence).
+    /// mode, for every session held by deferExit (or, if none, every running session). Use when
+    /// transitioning to a cinematic phase mid-session while keeping its players locked.
     /// Must be called on the server.
     /// </summary>
     public void ClearCamerasKeepMode()
     {
         if (!IsServer) return;
-        ClearCamerasKeepModeClientRpc();
+        bool anyHeld = false;
+        foreach (var s in s_slots)
+            if (s != null && s._deferredExitHold) anyHeld = true;
+
+        foreach (var s in s_slots)
+        {
+            if (s == null) continue;
+            if (anyHeld ? s._deferredExitHold : s._sequenceRunning)
+                s.ClearCamerasKeepModeClientRpc(s.BuildParticipantRpcParams());
+        }
     }
 
     [ClientRpc]
-    private void ClearCamerasKeepModeClientRpc()
+    private void ClearCamerasKeepModeClientRpc(ClientRpcParams rpcParams = default)
     {
         DeactivateOverrideCam();
         SuspectController.Instance?.SetSuspectCamActive(false);
@@ -607,7 +1083,28 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         string speakerName = string.IsNullOrEmpty(speakerNameOverride) ? _megaphoneSpeakerName : speakerNameOverride;
         Color speakerColor = speakerColorOverride ?? _megaphoneSpeakerColor;
 
-        StartCoroutine(RunMegaphoneDialogue(dialogue, onComplete, unlocked, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource));
+        if (!IsPrimary)
+        {
+            _primary.PlayMegaphoneDialogue(dialogue, onComplete, unlocked, speakerNameOverride,
+                speakerColorOverride, useAlternateVoice, useTelephoneAudioSource);
+            return;
+        }
+
+        // A megaphone requested while a deferExit session holds scripted mode is that session's
+        // chained continuation (e.g. Day 1 soldier -> post-Alexei megaphone): it runs on the
+        // same slot and takes over the hold instead of waiting behind it.
+        ScriptedDialogueRunner chainSlot = null;
+        foreach (var s in s_slots)
+            if (s != null && s._deferredExitHold) { chainSlot = s; break; }
+
+        Enqueue(new PendingSequence
+        {
+            Label = dialogue.name,
+            IsMegaphone = true,
+            Unlocked = unlocked,
+            ChainSlot = chainSlot,
+            Run = slot => slot.RunMegaphoneDialogue(dialogue, onComplete, unlocked, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource)
+        });
     }
 
     /// <summary>
@@ -647,6 +1144,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     private void Update()
     {
+        ServerDispatchTick();
         // Server (legacy, opt-in): late-join players who walk into proximity of the active
         // speaker. Off by default — mid-conversation arrivals join by interacting with the
         // speaker instead (SuspectCharacter.Interact -> RequestRejoinScriptedDialogueServerRpc).
@@ -667,7 +1165,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // In a sequence that leaves the player free to move (not in scripted mode locally),
         // the Interact key belongs to world interaction whenever it's aimed at something
         // interactable — that press must not double as an advance vote.
-        bool interactOwnedByWorld = !IsScriptedModeActive && LocalPlayerHasWorldInteractTarget();
+        bool interactOwnedByWorld = !_clientIsParticipant && LocalPlayerHasWorldInteractTarget();
 
         // Q or the "Back" button lets the local player leave the scripted dialogue early —
         // checked before the advance/skip input so it never also fires an advance vote.
@@ -769,10 +1267,22 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         bool allowParticipantExit = false, bool hideNonParticipantUI = true,
         float participantRadius = -1f, bool useWorldDialogueCamera = false, Action onAbandoned = null)
     {
-        ulong speakerNetId = speaker.GetComponent<NetworkObject>().NetworkObjectId;
+        // The request may have waited in the dispatch queue — the speaker can be gone by now.
+        NetworkObject speakerNetObj = speaker != null ? speaker.GetComponent<NetworkObject>() : null;
+        if (speakerNetObj == null || !speakerNetObj.IsSpawned)
+        {
+            Debug.LogWarning($"[ScriptedDialogueRunner] '{(dialogue != null ? dialogue.name : "null")}' skipped — " +
+                             "speaker was destroyed/despawned while the dialogue was queued.");
+            try { onComplete?.Invoke(); }
+            catch (Exception e) { Debug.LogException(e); }
+            yield break;
+        }
+
+        ulong speakerNetId = speakerNetObj.NetworkObjectId;
         _activeJoinRadius = participantRadius;
         _useWorldDialogueCamera = useWorldDialogueCamera;
         _abandoned = false;
+        _drainUnattended = false;
 
         Debug.Log($"[ScriptedDialogueRunner] RunDialogue — IsSpawned={IsSpawned}, IsServer={IsServer}, speakerNetId={speakerNetId}, deferExit={deferExit}");
 
@@ -819,8 +1329,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Target camera RPCs to participants — far-away players must not have their
             // camera hijacked by a dialogue they are not yet part of.
             SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty, BuildParticipantRpcParams());
-            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
-            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride));
+            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride), speakerNetId);
+            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride), speakerNetId);
 
             // Reset the previous trigger and force idle before firing the next animation.
             // This prevents a skipped trigger from continuing to play into the new line.
@@ -881,6 +1391,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             ExitScriptedModeClientRpc(lockOutsidePlayers, exitRecipients);
             yield return null;
         }
+        else
+        {
+            // Scripted mode stays held for the caller's chained follow-up; keep other sequences
+            // queued until ExitScriptedMode or a chained megaphone releases it.
+            _deferredExitHold = true;
+        }
 
         onComplete?.Invoke();
         Debug.Log($"[ScriptedDialogueRunner] Scripted dialogue complete (deferExit={deferExit}).");
@@ -925,6 +1441,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         _scriptedAdvanceReady = false;
         _advanceSet.Clear();
+        if (_drainUnattended) TryAutoAdvanceIfUnattended();
         yield return new WaitUntil(() => _scriptedAdvanceReady);
     }
 
@@ -941,9 +1458,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         ulong senderId = rpcParams.Receive.SenderClientId;
 
         // A player who submits an advance is clearly nearby — add them to the participant
-        // set if they somehow weren't included at the proximity-seeding step.
+        // set if they somehow weren't included at the proximity-seeding step. A player who is in
+        // a different conversation never votes here (a stale input from them is dropped).
         if (!_participants.Contains(senderId))
         {
+            if (IsClientEngagedElsewhere(senderId)) return;
             _participants.Add(senderId);
             Debug.Log($"[ScriptedDialogueRunner] Client {senderId} self-joined participants via advance.");
         }
@@ -963,9 +1482,25 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     private IEnumerator AdvanceTimeoutCoroutine()
     {
-        ShowAdvanceTimerClientRpc(_advanceTimeoutSeconds);
+        ShowAdvanceTimerClientRpc(_advanceTimeoutSeconds, BuildParticipantRpcParams());
         yield return new WaitForSeconds(_advanceTimeoutSeconds);
         OpenAdvanceGate();
+    }
+
+    /// <summary>
+    /// Server: the key <see cref="DialogueManager"/> uses to scope a subtitle/voice advance to this
+    /// conversation only — this slot's speaker NetworkObjectId, or
+    /// <see cref="DialogueManager.MegaphoneSpeakerKey"/> for a megaphone/phone sequence.
+    /// </summary>
+    private ulong CurrentAdvanceKey
+    {
+        get
+        {
+            if (_megaphoneSequenceActive || _runningMegaphone || _currentSpeakerTransform == null)
+                return DialogueManager.MegaphoneSpeakerKey;
+            NetworkObject netObj = _currentSpeakerTransform.GetComponent<NetworkObject>();
+            return netObj != null ? netObj.NetworkObjectId : DialogueManager.MegaphoneSpeakerKey;
+        }
     }
 
     private void OpenAdvanceGate()
@@ -979,10 +1514,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             _advanceTimerCoroutine = null;
         }
 
-        HideAdvanceTimerClientRpc();
+        HideAdvanceTimerClientRpc(BuildParticipantRpcParams());
 
-        // Unblocks WaitForInputRoutine on all clients so subtitles clear correctly.
-        DialogueManager.Instance.AdvanceDialogueServerRpc();
+        // Unblocks WaitForInputRoutine and clears the waiting line — scoped to THIS conversation's
+        // speaker, so a parallel conversation's subtitle/voice on any client is left untouched.
+        DialogueManager.Instance.AdvanceDialogueServerRpc(CurrentAdvanceKey);
     }
 
     // -------------------------------------------------------------------------
@@ -1013,18 +1549,28 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _participants.Clear();
         _leftParticipants.Clear();
 
+        // Players already in another conversation (another session slot or a world conversation)
+        // are never pulled in — they can join by interacting with this speaker once they're free.
+        var available = new List<ulong>();
+        foreach (ulong clientId in DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton))
+            if (!IsClientEngagedElsewhere(clientId)) available.Add(clientId);
+
         if (_joinByInteractionOnly && initialParticipantClientId != ulong.MaxValue)
         {
-            _participants.Add(initialParticipantClientId);
+            if (!IsClientEngagedElsewhere(initialParticipantClientId))
+            {
+                _participants.Add(initialParticipantClientId);
+                ReleaseFromUnlockedMegaphones(initialParticipantClientId);
+            }
             Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — optional intro started by client {initialParticipantClientId}.");
             return;
         }
 
-        // No speaker to measure against — include everyone so the dialogue is never unblockable.
+        // No speaker to measure against — include everyone free so the dialogue is never unblockable.
         if (_currentSpeakerTransform == null)
         {
-            _participants.UnionWith(DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton));
-            Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — all {_participants.Count} clients seeded (no speaker transform).");
+            _participants.UnionWith(available);
+            LogSeedResult("all free clients seeded (no speaker transform)");
             return;
         }
 
@@ -1034,24 +1580,22 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // partner stays free (overhearing subtitles) and joins by interacting with the speaker.
         if (lockOutsidePlayers)
         {
-            foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+            foreach (ulong clientId in available)
             {
                 if (IsClientWithinJoinRadius(clientId, speakerPos))
                     _participants.Add(clientId);
             }
 
             // Fallback: nobody in range (e.g. the trigger player stepped back during the
-            // settle beat) — take only the nearest player, never the whole session.
-            if (_participants.Count == 0 && TryGetNearestClient(speakerPos, out ulong nearest))
+            // settle beat) — take only the nearest free player, never the whole session.
+            if (_participants.Count == 0 && TryGetNearestClient(speakerPos, available, out ulong nearest))
                 _participants.Add(nearest);
-            if (_participants.Count == 0)
-                _participants.UnionWith(DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton));
 
-            Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — forced: {_participants.Count}/{NetworkManager.Singleton.ConnectedClientsIds.Count} in range (radius={EffectiveJoinRadius}).");
+            LogSeedResult($"forced: {_participants.Count} in range (radius={EffectiveJoinRadius})");
             return;
         }
 
-        foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+        foreach (ulong clientId in available)
         {
             // Inside players are always in the booth and will always enter dialogue mode —
             // include them regardless of exact distance to avoid seeding race conditions
@@ -1060,11 +1604,24 @@ public class ScriptedDialogueRunner : NetworkBehaviour
                 _participants.Add(clientId);
         }
 
-        // Fallback: if no one is close, include all so the dialogue is never unblockable.
+        // Fallback: if no free player is close, include every free player so the dialogue is never
+        // unblockable.
         if (_participants.Count == 0)
-            _participants.UnionWith(DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton));
+            _participants.UnionWith(available);
 
-        Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — {_participants.Count}/{NetworkManager.Singleton.ConnectedClientsIds.Count} participants seeded.");
+        LogSeedResult($"{_participants.Count} participants seeded");
+    }
+
+    private void LogSeedResult(string summary)
+    {
+        foreach (ulong clientId in _participants)
+            ReleaseFromUnlockedMegaphones(clientId);
+
+        if (_participants.Count == 0)
+            Debug.Log("[ScriptedDialogueRunner] SeedParticipants — every player is busy in another conversation; " +
+                      "the dialogue waits on its first line until a player joins by interacting with the speaker.");
+        else
+            Debug.Log($"[ScriptedDialogueRunner] SeedParticipants — {summary} of {NetworkManager.Singleton.ConnectedClientsIds.Count} clients.");
     }
 
     /// <summary>
@@ -1091,6 +1648,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Players who explicitly left must interact with the speaker again to rejoin —
             // proximity alone should not pull them back in.
             if (_leftParticipants.Contains(clientId)) continue;
+            if (IsClientEngagedElsewhere(clientId)) continue;
             if (!IsClientWithinJoinRadius(clientId, speakerPos)) continue;
 
             JoinParticipant(clientId);
@@ -1107,6 +1665,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     {
         _leftParticipants.Remove(clientId);
         _participants.Add(clientId);
+        ReleaseFromUnlockedMegaphones(clientId);
         Debug.Log($"[ScriptedDialogueRunner] Client {clientId} joined/rejoined the dialogue.");
 
         ulong speakerNetId = _currentSpeakerTransform != null
@@ -1196,7 +1755,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         {
             _choiceResolved = true;
             _resolvedChoiceIndex = 0;
-            HideAdvanceTimerClientRpc();
+            HideAdvanceTimerClientRpc(BuildParticipantRpcParams());
         }
 
         // Also clears the current subtitle line on every client.
@@ -1205,9 +1764,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     /// <summary>
-    /// Called by <see cref="SuspectCharacter.Interact"/> when a player who left (or never
-    /// joined) the current speaker's dialogue interacts with them again. Rejoins the advance
-    /// and choice gates and resumes wherever the dialogue presently is.
+    /// Called by <see cref="SuspectCharacter.Interact"/> (on the slot running that speaker, see
+    /// <see cref="FindSlotForSpeaker"/>) when a player who left — or never joined — the speaker's
+    /// dialogue interacts with them. Rejoins the advance and choice gates and resumes wherever the
+    /// dialogue presently is. Works for any player who is not in another scripted session, so a
+    /// player who finished their own conversation can walk over and join a teammate's.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
     public void RequestRejoinScriptedDialogueServerRpc(ServerRpcParams rpcParams = default)
@@ -1216,8 +1777,51 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
         ulong senderId = rpcParams.Receive.SenderClientId;
         if (_participants.Contains(senderId)) return; // already in
+        if (IsClientInOtherSession(senderId))
+        {
+            Debug.Log($"[ScriptedDialogueRunner] Client {senderId} can't join — already in another scripted conversation.");
+            return;
+        }
 
         JoinParticipant(senderId);
+    }
+
+    /// <summary>
+    /// Server-only. True when <paramref name="clientId"/> is a participant of another busy session
+    /// slot. Listeners of an unlocked megaphone/phone line don't count — they're free to move and
+    /// get released from it when they join a conversation (<see cref="ReleaseFromUnlockedMegaphones"/>).
+    /// </summary>
+    private bool IsClientInOtherSession(ulong clientId)
+    {
+        for (int i = 0; i < s_slots.Count; i++)
+        {
+            var s = s_slots[i];
+            if (s == null || s == this || s.IsRunningUnlockedMegaphone) continue;
+            if ((s.IsSlotBusy || s._serverSequenceActive) && s._participants.Contains(clientId)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Server-only. <paramref name="clientId"/> just became a participant of this character
+    /// session: drop them from any unlocked megaphone/phone line running in parallel, so its gate
+    /// stops waiting on them and their input/screen belong to this conversation only.
+    /// </summary>
+    private void ReleaseFromUnlockedMegaphones(ulong clientId)
+    {
+        for (int i = 0; i < s_slots.Count; i++)
+        {
+            var s = s_slots[i];
+            if (s == null || s == this || !s.IsRunningUnlockedMegaphone) continue;
+            if (!s._participants.Remove(clientId)) continue;
+
+            s._advanceSet.Remove(clientId);
+            var single = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } } };
+            s.SetAwaitingInputClientRpc(false, false, single);
+            s.SetActiveOverrideCamClientRpc(string.Empty, single);
+            Debug.Log($"[ScriptedDialogueRunner] Client {clientId} released from a parallel megaphone line to join a conversation.");
+            s.RecheckGatesAfterParticipantChange();
+        }
     }
 
     /// <summary>
@@ -1227,10 +1831,11 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ClientRpc]
     private void ExitScriptedModeForClientRpc(ClientRpcParams rpcParams = default)
     {
-        IsScriptedModeActive = false;
+        _clientIsParticipant = false;
         _clientIsWaitingForInput = false;
         _clientRevealUnskippable = false;
         HideLeaveBackButtonLocal();
+        DialogueAdvanceTimer.Instance?.Hide();
 
         DeactivateOverrideCam();
         RestoreSpeakerLook();
@@ -1238,7 +1843,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Same ownership rule as ExitScriptedModeClientRpc: never tear down a world
         // conversation's dialogue lock that this sequence didn't put the player into.
         if (WorldConversationOwnsLocalDialogueLock())
+        {
+            _clientSpeakerNetId = 0;
             return;
+        }
         _clientEnteredDialogueLock = false;
 
         DialogueChoiceSystem.Instance?.HideChoicePanel();
@@ -1251,14 +1859,18 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         if (PlayerInstance.Instance == null)
         {
             UIController.Instance?.ShowPlayerUI();
+            _clientSpeakerNetId = 0;
             return;
         }
 
+        // The exit reads the speaker (LocalSpeakerNetId) to block re-entry / drop its cam, so the
+        // speaker id is only cleared afterwards.
         if (LocalUsesWorldDialoguePath)
             DialogueChoiceSystem.Instance?.ExitScriptedDialogueModeOutside();
         else
             DialogueChoiceSystem.Instance?.ExitScriptedDialogueMode();
         _clientWorldCameraMode = false;
+        _clientSpeakerNetId = 0;
 
         // ExitScriptedDialogueMode clears the dialogue flag that ShowPlayerUI guards against.
         // Restoring the HUD before that exit can leave it hidden after a player leaves early.
@@ -1332,7 +1944,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         }
 
         if (hadTimer)
-            HideAdvanceTimerClientRpc();
+            HideAdvanceTimerClientRpc(BuildParticipantRpcParams());
     }
 
     /// <summary>
@@ -1348,14 +1960,14 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         return Vector3.Distance(origin, client.PlayerObject.transform.position) <= EffectiveJoinRadius;
     }
 
-    /// <summary>Finds the connected client whose PlayerObject is closest to <paramref name="origin"/>.</summary>
-    private bool TryGetNearestClient(Vector3 origin, out ulong nearestClientId)
+    /// <summary>Finds the candidate client whose PlayerObject is closest to <paramref name="origin"/>.</summary>
+    private bool TryGetNearestClient(Vector3 origin, List<ulong> candidates, out ulong nearestClientId)
     {
         nearestClientId = ulong.MaxValue;
         float best = float.MaxValue;
         foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
         {
-            if (client.PlayerObject == null) continue;
+            if (client.PlayerObject == null || !candidates.Contains(client.ClientId)) continue;
             float d = Vector3.Distance(origin, client.PlayerObject.transform.position);
             if (d < best) { best = d; nearestClientId = client.ClientId; }
         }
@@ -1383,7 +1995,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void LateJoinClientRpc(ulong speakerNetId, bool isWaitingForInput, bool canLeave,
         string cameraKey, bool worldCamera = false, ClientRpcParams rpcParams = default)
     {
-        IsScriptedModeActive = true;
+        _clientIsParticipant = true;
         _clientIsWaitingForInput = isWaitingForInput;
         _clientWorldCameraMode = worldCamera;
 
@@ -1451,14 +2063,17 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         bool useAlternateVoice,
         bool useTelephoneAudioSource = false)
     {
-        // Megaphone lines and the awaiting-input signal are broadcast to every client, so every
-        // player must count toward the advance gate. Without this, _participants is empty (or
-        // stale from a previous sequence) for a standalone megaphone sequence, and the first
-        // advancer self-joins as the only participant — required == 1 — letting one player
-        // skip every line instantly with no countdown for the other.
+        // Megaphone lines and the awaiting-input signal reach every listener, so every listener
+        // must count toward the advance gate. Without this, _participants is empty (or stale from
+        // a previous sequence) for a standalone megaphone sequence, and the first advancer
+        // self-joins as the only participant — required == 1 — letting one player skip every line
+        // instantly with no countdown for the other. A LOCKED megaphone runs alone (dispatcher) and
+        // takes every player; an UNLOCKED one runs in parallel with conversations and only takes
+        // players who are free right now — players talking to an NPC are left completely alone.
         _participants.Clear();
         _leftParticipants.Clear();
-        _participants.UnionWith(DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton));
+        foreach (ulong clientId in DevSpectatorRegistry.PlayerClientIds(NetworkManager.Singleton))
+            if (!unlocked || !IsClientEngagedElsewhere(clientId)) _participants.Add(clientId);
 
         // When unlocked, the player is already free (caller called ExitScriptedMode first).
         // Skipping EnterScriptedModeClientRpc keeps movement and the first-person camera active
@@ -1472,25 +2087,36 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             // Still mark the player as "in cutscene" for mutant-immunity purposes even though
             // movement and the camera stay free — ExitScriptedModeClientRpc below always clears
             // this again once the sequence ends.
-            SetCutsceneImmunityClientRpc(true);
+            SetCutsceneImmunityClientRpc(true, MegaphoneTargets);
 
         yield return null; // flush RPCs before the first line
 
         foreach (var node in dialogue.nodes)
         {
-            SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty);
-            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
-            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride));
+            SetActiveOverrideCamClientRpc(node.cameraTrigger ?? string.Empty, MegaphoneTargets);
+            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride), 0UL, MegaphoneTargets);
+            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride), 0UL, MegaphoneTargets);
             yield return StartCoroutine(SayMegaphoneLineAndWait(node.npcLine, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource));
             SetSpeakerSpeakingClientRpc(false);
         }
 
-        // The broadcast exit below ends any chained (deferExit) dialogue for everyone too.
+        // The exit below also ends any chained (deferExit) dialogue — including its speaker
+        // registration, so that NPC no longer reads as "in a conversation".
+        if (_currentSpeakerTransform != null)
+        {
+            NetworkObject chainedSpeaker = _currentSpeakerTransform.GetComponent<NetworkObject>();
+            if (chainedSpeaker != null) HideInWorldSubtitleClientRpc(chainedSpeaker.NetworkObjectId);
+            _currentSpeakerTransform = null;
+            SetActiveDialogueSpeakerClientRpc(0);
+        }
+        // Captured before clearing: everyone for a locked megaphone, its listeners for an unlocked one.
+        ClientRpcParams exitRecipients = MegaphoneTargets;
         _megaphoneSequenceActive = false;
         _serverSequenceActive = false;
+        _deferredExitHold = false;
         _participants.Clear();
         _leftParticipants.Clear();
-        ExitScriptedModeClientRpc();
+        ExitScriptedModeClientRpc(false, exitRecipients);
         yield return null;
 
         onComplete?.Invoke();
@@ -1500,12 +2126,19 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private IEnumerator SayMegaphoneLineAndWait(string text, string speakerName, Color speakerColor, bool useAlternateVoice, bool useTelephoneAudioSource = false)
     {
         _awaitingScriptedInput = true;
-        SetAwaitingInputClientRpc(true);
-        SayMegaphoneLineClientRpc(text, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource);
+        SetAwaitingInputClientRpc(true, false, MegaphoneTargets);
+        SayMegaphoneLineClientRpc(text, speakerName, speakerColor, useAlternateVoice, useTelephoneAudioSource,
+            waitForInput: true, MegaphoneTargets);
         yield return StartCoroutine(WaitForScriptedAdvance());
         SetAwaitingInputClientRpc(false);
         _awaitingScriptedInput = false;
     }
+
+    /// <summary>
+    /// Server: recipients of this slot's megaphone RPCs — every client for a locked megaphone
+    /// (it runs alone), only its listeners for an unlocked one running beside conversations.
+    /// </summary>
+    private ClientRpcParams MegaphoneTargets => _megaphoneSequenceActive ? default : BuildParticipantRpcParams();
 
     /// <summary>
     /// Server: plays every line of <paramref name="dialogue"/> as an input-free bark (see
@@ -1527,8 +2160,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         {
             if (node == null || string.IsNullOrWhiteSpace(node.npcLine)) continue;
 
-            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride));
-            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride));
+            SetWobbleClientRpc(ResolveWobbleProfileIndex(node.wobbleProfileOverride), BarkSpeakerKey);
+            SetFontClientRpc(ResolveFontAssetIndex(node.fontOverride), BarkSpeakerKey);
             SayMegaphoneLineClientRpc(node.npcLine, speakerName, speakerColor, useAlternateVoice,
                 useTelephoneAudioSource: false, waitForInput: false);
 
@@ -1584,7 +2217,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// fades out on its own display timer.
     /// </summary>
     [ClientRpc]
-    private void SayMegaphoneLineClientRpc(string text, string speakerName, Color speakerColor, bool useAlternateVoice, bool useTelephoneAudioSource = false, bool waitForInput = true)
+    private void SayMegaphoneLineClientRpc(string text, string speakerName, Color speakerColor, bool useAlternateVoice,
+        bool useTelephoneAudioSource = false, bool waitForInput = true, ClientRpcParams rpcParams = default)
     {
         var mgr = MegaphoneDialogueManager.Instance;
         AudioClip[] clips = mgr != null
@@ -1610,11 +2244,16 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         if (!useTelephoneAudioSource)
             mgr?.SetSpeakerSpeaking(true);
 
-        DialogueManager.Instance.SpawnSubtitles(text, speakerName, speakerColor,
-            isPlayer: false, clearHistory: false, waitForInput: waitForInput);
+        // A bark (no input) is ambient: a player busy in a conversation still hears it, but its
+        // subtitle would evict their own conversation's line, so it isn't shown to them.
+        bool showSubtitle = waitForInput || !OverhearRange.IsLocalPlayerConversationParticipant;
+        if (showSubtitle)
+            DialogueManager.Instance.SpawnSubtitles(text, speakerName, speakerColor,
+                isPlayer: false, clearHistory: false, waitForInput: waitForInput,
+                speakerNetId: DialogueManager.MegaphoneSpeakerKey);
 
         if (clips.Length > 0 && source != null)
-            DialogueManager.Instance.PlayDialogueAudio(text, clips, source);
+            DialogueManager.Instance.PlayDialogueAudio(text, clips, source, ownerKey: DialogueManager.MegaphoneSpeakerKey);
     }
 
     [ClientRpc]
@@ -1638,6 +2277,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _awaitingScriptedChoice = true;
         _activeChoiceTexts = new[] { node.choices[0].playerChoiceText, node.choices[1].playerChoiceText };
         ShowChoicesClientRpc(_activeChoiceTexts[0], _activeChoiceTexts[1], BuildParticipantRpcParams());
+        if (_drainUnattended) TryAutoAdvanceIfUnattended();
 
         yield return new WaitUntil(() => _choiceResolved);
         _awaitingScriptedChoice = false;
@@ -1683,7 +2323,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ClientRpc]
     private void SetActiveDialogueSpeakerClientRpc(ulong speakerNetId)
     {
-        ActiveDialogueSpeakerNetId = speakerNetId;
+        _broadcastSpeakerNetId = speakerNetId;
 
         // Sequence ended (or a new one started): drop an echo this client only overheard, but
         // never a newer echo that has since replaced it (e.g. from world dialogue).
@@ -1735,7 +2375,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// megaphone instruction) but must still count as "in dialogue" for combat purposes.
     /// </summary>
     [ClientRpc]
-    private void SetCutsceneImmunityClientRpc(bool value)
+    private void SetCutsceneImmunityClientRpc(bool value, ClientRpcParams rpcParams = default)
     {
         PlayerInstance.Instance?.SetIsInCutscene(value);
     }
@@ -1744,7 +2384,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     private void EnterScriptedModeClientRpc(ulong speakerNetId, bool lockOutsidePlayers = false,
         bool canLeave = false, bool worldCamera = false, ClientRpcParams rpcParams = default)
     {
-        IsScriptedModeActive = true;
+        _clientIsParticipant = true;
         _clientWorldCameraMode = worldCamera;
 
         // A forced conversation cancels any open gameplay Yes/No popup (e.g. trash-can discard)
@@ -1928,7 +2568,10 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     [ClientRpc]
     private void ExitScriptedModeClientRpc(bool lockOutsidePlayers = false, ClientRpcParams rpcParams = default)
     {
-        IsScriptedModeActive = false;
+        _clientIsParticipant = false;
+        _clientIsWaitingForInput = false;
+        _clientRevealUnskippable = false;
+        DialogueAdvanceTimer.Instance?.Hide();
         RestoreSpeakerLook();
 
         // The sequence ended naturally: its "leave" Back button must go with it (the outside/world
@@ -1992,14 +2635,15 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     // Client RPCs — advance timer UI
     // -------------------------------------------------------------------------
 
+    // Targeted to this session's participants so a parallel conversation's timer UI is untouched.
     [ClientRpc]
-    private void ShowAdvanceTimerClientRpc(float duration)
+    private void ShowAdvanceTimerClientRpc(float duration, ClientRpcParams rpcParams = default)
     {
         DialogueAdvanceTimer.Instance?.Show(duration);
     }
 
     [ClientRpc]
-    private void HideAdvanceTimerClientRpc()
+    private void HideAdvanceTimerClientRpc(ClientRpcParams rpcParams = default)
     {
         DialogueAdvanceTimer.Instance?.Hide();
     }
@@ -2067,7 +2711,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Enter/LateJoin RPCs and cleared when a participant leaves, so overhearing / non-joined /
         // backed-out players never pass this (they also never receive RunDialogue's participant-
         // targeted camera cuts, keep their own camera and keep their body visible).
-        if (!IsScriptedModeActive || _clientEnteredDialogueLock) return;
+        if (!_clientIsParticipant || _clientEnteredDialogueLock) return;
 
         // Speaker dialogues only. Megaphone sequences broadcast their camera RPC to every client
         // with no speaker (_clientSpeakerNetId == 0) — players hearing a megaphone are never locked here.
@@ -2219,9 +2863,30 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// <see cref="_additionalWobbleProfiles"/>.
     /// </summary>
     [ClientRpc]
-    private void SetWobbleClientRpc(int profileIndex)
+    private void SetWobbleClientRpc(int profileIndex, ulong speakerNetId, ClientRpcParams rpcParams = default)
     {
+        if (!LocalReceivesLinesFrom(speakerNetId)) return;
         DialogueManager.Instance.SetNextLineWobbleProfile(ResolveWobbleProfileByIndex(profileIndex));
+    }
+
+    // Speaker key for megaphone barks: shown to every free player, skipped for a player who is in a
+    // conversation (the bark's subtitle would evict their own line — see SayMegaphoneLineClientRpc).
+    private const ulong BarkSpeakerKey = ulong.MaxValue;
+
+    /// <summary>
+    /// Local: whether this client will actually spawn the next subtitle from
+    /// <paramref name="speakerNetId"/> (0 = megaphone dialogue, always shown to its recipients;
+    /// <see cref="BarkSpeakerKey"/> = bark). Per-line priming (wobble/font) is skipped otherwise,
+    /// so it can't leak onto a parallel conversation's line.
+    /// </summary>
+    private bool LocalReceivesLinesFrom(ulong speakerNetId)
+    {
+        if (speakerNetId == BarkSpeakerKey) return !OverhearRange.IsLocalPlayerConversationParticipant;
+        if (speakerNetId == 0 || _clientIsParticipant) return true;
+        if (NetworkManager.Singleton == null ||
+            !NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
+            return false;
+        return OverhearRange.CanLocalPlayerSee(netObj.transform);
     }
 
     /// <summary>
@@ -2275,8 +2940,9 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// override); 0+ indexes into <see cref="_additionalFontAssets"/>.
     /// </summary>
     [ClientRpc]
-    private void SetFontClientRpc(int fontIndex)
+    private void SetFontClientRpc(int fontIndex, ulong speakerNetId, ClientRpcParams rpcParams = default)
     {
+        if (!LocalReceivesLinesFrom(speakerNetId)) return;
         DialogueManager.Instance.SetNextLineFontOverride(ResolveFontAssetByIndex(fontIndex));
     }
 
@@ -2370,6 +3036,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         // Add self-joining participant (same rationale as in AdvanceScriptedLineServerRpc).
         if (!_participants.Contains(senderId))
         {
+            if (IsClientEngagedElsewhere(senderId)) return;
             _participants.Add(senderId);
             Debug.Log($"[ScriptedDialogueRunner] Client {senderId} self-joined participants via choice submission.");
         }
@@ -2377,8 +3044,8 @@ public class ScriptedDialogueRunner : NetworkBehaviour
         _choiceSubmissions[senderId] = choiceIndex;
         _choicePlayerNames[senderId] = playerName;
 
-        // Broadcast highlight to everyone except the sender (they already highlighted locally).
-        HighlightChoiceForOthersClientRpc(choiceIndex, senderId);
+        // Highlight for this session's other participants (the sender already highlighted locally).
+        HighlightChoiceForOthersClientRpc(choiceIndex, senderId, BuildParticipantRpcParams());
 
         int required = Mathf.Max(1, _participants.Count);
 
@@ -2391,7 +3058,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
 
     private IEnumerator ChoiceTimeoutCoroutine()
     {
-        ShowAdvanceTimerClientRpc(_advanceTimeoutSeconds);
+        ShowAdvanceTimerClientRpc(_advanceTimeoutSeconds, BuildParticipantRpcParams());
         yield return new WaitForSeconds(_advanceTimeoutSeconds);
         ResolveChoices();
     }
@@ -2411,7 +3078,7 @@ public class ScriptedDialogueRunner : NetworkBehaviour
             _choiceTimerCoroutine = null;
         }
 
-        HideAdvanceTimerClientRpc();
+        HideAdvanceTimerClientRpc(BuildParticipantRpcParams());
 
         var submitted = new List<int>(_choiceSubmissions.Values);
 
@@ -2436,34 +3103,38 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     /// who already highlighted locally in <see cref="OnLocalPlayerPickedChoice"/>.
     /// </summary>
     [ClientRpc]
-    private void HighlightChoiceForOthersClientRpc(int choiceIndex, ulong senderClientId)
+    private void HighlightChoiceForOthersClientRpc(int choiceIndex, ulong senderClientId, ClientRpcParams rpcParams = default)
     {
         if (NetworkManager.Singleton.LocalClientId == senderClientId) return;
+        if (!_clientIsParticipant) return;
         DialogueChoiceSystem.Instance?.HighlightChoice(choiceIndex);
     }
 
     /// <summary>
-    /// Sent after both players have chosen (or the timeout fired). Hides the choice panel,
-    /// clears all highlights, then spawns the winning player's spoken line as a subtitle on
-    /// all clients before the NPC delivers their response.
+    /// Sent after both players have chosen (or the timeout fired). For this session's
+    /// participants it hides the choice panel and clears highlights; everyone who can see the
+    /// conversation then gets the winning player's spoken line as a subtitle before the NPC
+    /// delivers their response.
     /// </summary>
     [ClientRpc]
     private void FinalizeChoiceClientRpc(string choiceText, string playerName, ulong winnerClientId)
     {
-        DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
-        DialogueChoiceSystem.Instance?.HideChoicePanel();
+        // Only participants of THIS scripted dialogue own the choice panel on screen — a player in
+        // a parallel conversation keeps their own panel (and their own highlights) untouched.
+        bool isParticipant = _clientIsParticipant;
+        if (isParticipant)
+        {
+            DialogueChoiceSystem.Instance?.ResetChoiceHighlights();
+            DialogueChoiceSystem.Instance?.HideChoicePanel();
+        }
 
         Transform conversationSource = ResolveActiveDialogueSpeakerTransform();
 
-        // Only participants of THIS scripted dialogue get the echo unconditionally.
-        // OverhearRange.CanLocalPlayerSee is not used here because it treats a player in ANY
-        // conversation (e.g. booth dialogue mode) as a participant, and it treats an unresolved
-        // (null) source as audible. Either case leaked a lone choice echo to a far-away player.
-        bool isParticipant = IsScriptedModeActive;
         if (!isParticipant)
         {
-            // Non-participants: fail closed when the speaker can't be located, else pure range.
-            if (conversationSource == null || !OverhearRange.IsLocalPlayerWithin(conversationSource)) return;
+            // Non-participants: fail closed when the speaker can't be located, else overhear
+            // range — never while the local player is in a different conversation.
+            if (conversationSource == null || !OverhearRange.CanLocalPlayerOverhear(conversationSource)) return;
         }
 
         bool isLocalWinner = NetworkManager.Singleton != null &&
@@ -2477,12 +3148,12 @@ public class ScriptedDialogueRunner : NetworkBehaviour
     }
 
     /// <summary>
-    /// Client-side lookup of the transform for <see cref="ActiveDialogueSpeakerNetId"/> (broadcast
-    /// to every client regardless of participation). Returns null when no speaker is active/spawned.
+    /// Client-side lookup of the transform for this slot's broadcast speaker (sent to every client
+    /// regardless of participation). Returns null when no speaker is active/spawned.
     /// </summary>
-    private static Transform ResolveActiveDialogueSpeakerTransform()
+    private Transform ResolveActiveDialogueSpeakerTransform()
     {
-        ulong netId = ActiveDialogueSpeakerNetId;
+        ulong netId = _broadcastSpeakerNetId;
         if (netId == 0 || NetworkManager.Singleton == null || NetworkManager.Singleton.SpawnManager == null)
             return null;
         return NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(netId, out var netObj)

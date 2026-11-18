@@ -486,7 +486,9 @@ namespace GoodCopBadCop.Postman
             if ((_state != PostmanVisitState.Waiting && !walkingOff) || _dialogueRunning) return;
 
             ScriptedDialogueRunner runner = ScriptedDialogueRunner.Instance;
-            if (runner == null || runner.IsServerSequenceActive) return;
+            // Only blocked by HIS own conversation (or a megaphone / no free slot) — another player
+            // talking to a different NPC runs in a parallel session slot.
+            if (runner == null || !runner.CanStartSpeakerSequenceNow(_character)) return;
 
             PostmanDayDialogue set = GetDialogueForDay(CurrentDay);
             if (set == null) return;

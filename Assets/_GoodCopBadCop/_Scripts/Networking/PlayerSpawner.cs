@@ -144,6 +144,21 @@ public class PlayerSpawner : NetworkBehaviour
         SpawnPlayerAtPoint(clientId, GetInsideBunkerSpawnPoint(clientId), isOutside: false);
     }
 
+    /// <summary>
+    /// Replaces a client's current player object with a newly spawned player at the
+    /// inside-bunker point while keeping the previous object spawned as a corpse.
+    /// Used when a dead player is revived for a new day, which always starts locked inside.
+    /// SERVER ONLY.
+    /// </summary>
+    public bool ReplacePlayerAtInsideBunker(ulong clientId)
+    {
+        return SpawnPlayerAtPoint(
+            clientId,
+            GetInsideBunkerSpawnPoint(clientId),
+            isOutside: false,
+            replaceExistingPlayerObject: true) != null;
+    }
+
     private NetworkObject SpawnPlayerAtPoint(ulong clientId, Transform spawnPoint, bool isOutside, bool replaceExistingPlayerObject = false)
     {
         if (!NetworkManager.Singleton.IsServer)

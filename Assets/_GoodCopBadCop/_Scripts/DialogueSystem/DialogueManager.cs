@@ -13,8 +13,22 @@ public class DialogueManager : NetworkBehaviour
     public static DialogueManager Instance;
     [SerializeField] private float secondsPerCharacter = 0.06f;
     [SerializeField] private float subtitleLingerSeconds = 1f;
-    Coroutine audioDialogueCoroutine;
-    private AudioSource _activeDialogueSource;
+
+    // Character/phone voice playback, one coroutine per AudioSource. Several conversations (one per
+    // NPC) can talk at the same time, so a new line only stops the voice already playing on ITS OWN
+    // speaker's source — never another conversation's.
+    private readonly Dictionary<AudioSource, Coroutine> _dialogueAudioCoroutines = new Dictionary<AudioSource, Coroutine>();
+
+    // Conversation key that started each source's voice line (see PlayDialogueAudio ownerKey).
+    private readonly Dictionary<AudioSource, ulong> _dialogueAudioOwners = new Dictionary<AudioSource, ulong>();
+
+    /// <summary>
+    /// Conversation key for scripted megaphone / phone dialogue lines (no NPC NetworkObject). Its
+    /// advance clears only the megaphone's own waiting line and voice, so a megaphone/phone line
+    /// running beside an NPC conversation never touches that conversation.
+    /// </summary>
+    public const ulong MegaphoneSpeakerKey = ulong.MaxValue - 1;
+
     private AudioSource _activeMegaphoneSource;
     private Coroutine _subtitleDestroyCoroutine;
 
@@ -59,6 +73,9 @@ public class DialogueManager : NetworkBehaviour
     [SerializeField] private CanvasGroup dialogueCanvasGroup;
 
     private Subtitles _waitingSubtitle;
+
+    // Speaker (NetworkObjectId) whose conversation owns _waitingSubtitle; ulong.MaxValue = none/legacy.
+    private ulong _waitingSubtitleSpeakerNetId = ulong.MaxValue;
 
     /// <summary>
     /// The persistent "player choice echo" line spawned by <see cref="ShowChoiceEcho"/>.
@@ -149,7 +166,7 @@ public class DialogueManager : NetworkBehaviour
 
         if (waitForInput)
         {
-            StartCoroutine(WaitForInputRoutine(onComplete));
+            StartCoroutine(WaitForInputRoutine(onComplete, networkObjectId));
         }
     }
 
@@ -174,8 +191,6 @@ public class DialogueManager : NetworkBehaviour
     private void SayDialogueClientRpc(string dialogue, ulong networkObjectId, bool clearHistory = false,
         bool waitForInput = false, bool playLaughSfx = false)
     {
-        StopDialogueAudio();
-
         SpeakingInteraction speaking = null;
         if (networkObjectId != ulong.MaxValue &&
             NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(networkObjectId, out var netObj))
@@ -192,19 +207,23 @@ public class DialogueManager : NetworkBehaviour
             return;
         }
 
+        ulong speakerNetId = speaking.NetworkObjectId;
+
         // A non-participant still receives scripted dialogue subtitles, but cannot advance the
         // sequence. Do not show them a misleading continue prompt; unscripted callers retain
-        // their existing wait-for-input behaviour.
+        // their existing wait-for-input behaviour. Scoped per speaker: several scripted
+        // conversations can run in parallel.
         bool showWaitForInput = waitForInput &&
-            (ScriptedDialogueRunner.ActiveDialogueSpeakerNetId == 0 || ScriptedDialogueRunner.IsScriptedModeActive);
+            (!ScriptedDialogueRunner.IsSpeakerInActiveDialogue(speakerNetId) ||
+             ScriptedDialogueRunner.IsLocalParticipantOfSpeaker(speakerNetId));
 
         // Booth/suspect and scripted lines are broadcast to every client. Only conversation
-        // participants and players within overhear range of the speaker see the subtitle;
-        // everyone else just hears the (spatialized) voice audio.
+        // participants and free players within overhear range of the speaker see the subtitle;
+        // everyone else (including players in a different conversation) just hears the voice.
         if (OverhearRange.CanLocalPlayerSee(speaking.transform))
             SpawnSubtitles(dialogue, speaking.SpeakerName, Color.white, false, clearHistory, showWaitForInput,
-                overhearSource: speaking.transform);
-        else if (clearHistory)
+                overhearSource: speaking.transform, speakerNetId: speakerNetId);
+        else if (clearHistory && !OverhearRange.IsLocalPlayerConversationParticipant)
             ClearHistory();
 
         // Lines flagged to play a laugh instead of normal speech (e.g. ScriptedDialogueNode/
@@ -212,6 +231,7 @@ public class DialogueManager : NetworkBehaviour
         // entirely, playing the speaker's laugh SFX in its place instead.
         if (playLaughSfx)
         {
+            StopDialogueAudio(speaking.AudioSource);
             speaking.PlayLaugh();
         }
         else if (!speaking.IsLaughing)
@@ -220,18 +240,22 @@ public class DialogueManager : NetworkBehaviour
         }
     }
 
-    public void PlayDialogueAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null, bool isMutant = false)
+    /// <param name="ownerKey">Conversation key (NPC NetworkObjectId or <see cref="MegaphoneSpeakerKey"/>) whose advance should stop this line; default = none.</param>
+    public void PlayDialogueAudio(string dialogue, AudioClip[] audioClips, AudioSource audioSource, UnityAction onComplete = null,
+        bool isMutant = false, ulong ownerKey = ulong.MaxValue)
     {
-        StopDialogueAudio();
+        StopDialogueAudio(audioSource);
         if (audioClips.Length == 0) { onComplete?.Invoke(); return; }
         if (audioSource == null) { onComplete?.Invoke(); return; }
-        
-        audioDialogueCoroutine = StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete, isMutant, isMegaphone: false));
+
+        _dialogueAudioOwners[audioSource] = ownerKey;
+        _dialogueAudioCoroutines[audioSource] =
+            StartCoroutine(PlayDialogueAudio(dialogue, audioSource, audioClips, onComplete, isMutant, isMegaphone: false));
     }
 
     /// <summary>
     /// Plays audio for a megaphone bark using a dedicated coroutine slot that is
-    /// independent of <see cref="audioDialogueCoroutine"/>. Character speech calls
+    /// independent of the character voice coroutines. Character speech calls
     /// (SayDialogue → StopDialogueAudio) will not cancel this playback, ensuring
     /// <paramref name="onComplete"/> always fires.
     /// </summary>
@@ -267,15 +291,11 @@ public class DialogueManager : NetworkBehaviour
         audioSource.pitch = 1f;
         float basePitch = 1f;
 
-        // Track the active source so StopDialogueAudio / megaphone stop can call Stop() on it.
-        // isMegaphone is passed explicitly by the caller (PlayMegaphoneAudio vs. PlayDialogueAudio)
-        // rather than inferred from coincidental state — inferring it from whether
-        // _megaphoneAudioCoroutine happened to be non-null caused suspect dialogue audio to be
-        // mistaken for megaphone audio (and vice versa) whenever both were in flight together.
+        // Track the active megaphone source so a megaphone stop can call Stop() on it. Character
+        // sources are tracked by _dialogueAudioCoroutines. isMegaphone is passed explicitly by the
+        // caller (PlayMegaphoneAudio vs. PlayDialogueAudio) rather than inferred from state.
         if (isMegaphone)
             _activeMegaphoneSource = audioSource;
-        else
-            _activeDialogueSource = audioSource;
 
         // Halved again (0.25f) on top of the existing 0.5f scale-down so voice clip
         // playback covers roughly a quarter of the raw text-length estimate — dialogue
@@ -322,37 +342,81 @@ public class DialogueManager : NetworkBehaviour
 
         audioSource.pitch = basePitch;
 
+        // A coroutine only reaches this point if it was never stopped, i.e. it is still the one
+        // registered for its source (starting a new line on a source always stops the old one).
         if (isMegaphone)
             _activeMegaphoneSource = null;
         else
-            _activeDialogueSource = null;
-
-        onComplete?.Invoke();
-        audioDialogueCoroutine = null;
-    }
-
-    void StopDialogueAudio()
-    {
-        if (audioDialogueCoroutine != null)
         {
-            StopCoroutine(audioDialogueCoroutine);
-            audioDialogueCoroutine = null;
+            _dialogueAudioCoroutines.Remove(audioSource);
+            _dialogueAudioOwners.Remove(audioSource);
         }
 
-        if (_activeDialogueSource != null)
+        onComplete?.Invoke();
+    }
+
+    /// <summary>Stops every character/phone voice line playing on this client.</summary>
+    void StopDialogueAudio()
+    {
+        foreach (var kvp in _dialogueAudioCoroutines)
         {
-            _activeDialogueSource.Stop();
-            _activeDialogueSource = null;
+            if (kvp.Value != null) StopCoroutine(kvp.Value);
+            if (kvp.Key != null) kvp.Key.Stop();
+        }
+        _dialogueAudioCoroutines.Clear();
+        _dialogueAudioOwners.Clear();
+    }
+
+    /// <summary>Stops only the voice line playing on <paramref name="source"/> (one speaker).</summary>
+    void StopDialogueAudio(AudioSource source)
+    {
+        if (source == null) return;
+        if (_dialogueAudioCoroutines.TryGetValue(source, out Coroutine running))
+        {
+            if (running != null) StopCoroutine(running);
+            _dialogueAudioCoroutines.Remove(source);
+            _dialogueAudioOwners.Remove(source);
+            source.Stop();
         }
     }
 
     /// <summary>
-    /// Immediately stops dialogue audio on the local client.
-    /// The active subtitle is left intact and will disappear on its natural timer.
+    /// Stops the voice of one conversation: every line started for <paramref name="speakerNetId"/>
+    /// (see PlayDialogueAudio ownerKey) plus that NPC's own voice source. Stops every voice for the
+    /// legacy global key <see cref="ulong.MaxValue"/>.
+    /// </summary>
+    void StopDialogueAudioForSpeaker(ulong speakerNetId)
+    {
+        if (speakerNetId == ulong.MaxValue)
+        {
+            StopDialogueAudio();
+            return;
+        }
+
+        var owned = new List<AudioSource>();
+        foreach (var kvp in _dialogueAudioOwners)
+            if (kvp.Value == speakerNetId) owned.Add(kvp.Key);
+        foreach (var source in owned)
+            StopDialogueAudio(source);
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.SpawnManager != null &&
+            NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(speakerNetId, out var netObj))
+        {
+            var speaking = netObj.GetComponent<SpeakingInteraction>();
+            if (speaking != null) StopDialogueAudio(speaking.AudioSource);
+        }
+    }
+
+    /// <summary>
+    /// Immediately stops the local player's conversation partner's voice line (every voice if the
+    /// partner can't be resolved). The active subtitle is left intact and disappears on its timer.
     /// </summary>
     public void SkipCurrentLine()
     {
-        StopDialogueAudio();
+        if (OverhearRange.TryGetLocalConversationPartner(out SpeakingInteraction partner))
+            StopDialogueAudio(partner.AudioSource);
+        else
+            StopDialogueAudio();
     }
 
     /// <summary>
@@ -459,9 +523,10 @@ public class DialogueManager : NetworkBehaviour
 
     /// <param name="overhearSource">Optional speaker/conversation source; while set, the subtitle hides live whenever the local player is out of overhear range (see <see cref="OverhearSubtitleGate"/>). Leave null for unconditional lines (phone, megaphone).</param>
     /// <param name="participantsAlwaysSee">With <paramref name="overhearSource"/>: conversation participants ignore the range check.</param>
+    /// <param name="speakerNetId">NetworkObjectId of the speaking NPC (<see cref="ulong.MaxValue"/> for speaker-less lines). A wait-for-input line remembers it so only that conversation's advance clears it.</param>
     public GameObject SpawnSubtitles(string text, string characterName = null, Color nameColor = default,
         bool isPlayer = false, bool clearHistory = false, bool waitForInput = false,
-        Transform overhearSource = null, bool participantsAlwaysSee = true)
+        Transform overhearSource = null, bool participantsAlwaysSee = true, ulong speakerNetId = ulong.MaxValue)
     {
         DestroyPreviousSubtitles();
 
@@ -503,11 +568,13 @@ public class DialogueManager : NetworkBehaviour
         if (waitForInput)
         {
             _waitingSubtitle = subtitles;
+            _waitingSubtitleSpeakerNetId = speakerNetId;
             subtitles.ShowContinuePrompt(true);
         }
         else
         {
             _waitingSubtitle = null;
+            _waitingSubtitleSpeakerNetId = ulong.MaxValue;
             float duration = text.Length * secondsPerCharacter + subtitleLingerSeconds;
 
             // If the choice echo survived eviction above (protected) to coexist with this
@@ -530,7 +597,7 @@ public class DialogueManager : NetworkBehaviour
     /// <summary>
     /// Returns true while dialogue audio is actively playing.
     /// </summary>
-    public bool IsSpeaking => audioDialogueCoroutine != null;
+    public bool IsSpeaking => _dialogueAudioCoroutines.Count > 0;
 
     /// <summary>
     /// True while one or more subtitle instances are present in the subtitles container.
@@ -550,8 +617,6 @@ public class DialogueManager : NetworkBehaviour
             return false;
         }
     }
-
-    private bool _dialogueInputReceived = false;
 
     // -------------------------------------------------------------------------
     // Wobble text — consumed once when the next NPC subtitle is spawned.
@@ -588,40 +653,75 @@ public class DialogueManager : NetworkBehaviour
     public void SetNextLineFontOverride(TMP_FontAsset font) => _nextLineFontOverride = font;
 
     /// <summary>
-    /// Called by any client pressing Space — notifies the server to advance for everyone.
+    /// Advances the waiting dialogue line for everyone. <paramref name="speakerNetId"/> scopes the
+    /// advance to one conversation (that NPC's NetworkObjectId): only a waiting line owned by that
+    /// speaker is cleared and only that speaker's voice stops, so parallel conversations with other
+    /// NPCs are untouched. <see cref="ulong.MaxValue"/> (default) is the legacy global advance used
+    /// by speaker-less lines (megaphone) and unscripted callers.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    public void AdvanceDialogueServerRpc()
+    public void AdvanceDialogueServerRpc(ulong speakerNetId = ulong.MaxValue)
     {
-        AdvanceDialogueClientRpc();
+        AdvanceDialogueClientRpc(speakerNetId);
     }
 
+    // Advance counters consumed by WaitForInputRoutine (see there).
+    private int _anyAdvanceCount;
+    private int _globalAdvanceCount;
+    private readonly Dictionary<ulong, int> _speakerAdvanceCounts = new Dictionary<ulong, int>();
+
+    private int SpeakerAdvanceCount(ulong speakerNetId) =>
+        _speakerAdvanceCounts.TryGetValue(speakerNetId, out int count) ? count : 0;
+
     [ClientRpc]
-    private void AdvanceDialogueClientRpc()
+    private void AdvanceDialogueClientRpc(ulong speakerNetId)
     {
-        _dialogueInputReceived = true;
-        StopDialogueAudio();
+        _anyAdvanceCount++;
+        if (speakerNetId == ulong.MaxValue)
+            _globalAdvanceCount++;
+        else
+            _speakerAdvanceCounts[speakerNetId] = SpeakerAdvanceCount(speakerNetId) + 1;
+
+        StopDialogueAudioForSpeaker(speakerNetId);
 
         // WaitForInputRoutine runs only on the server (SayDialogue is always called server-side
         // in scripted sequences), so non-host clients have no coroutine that would call
         // ClearHistory() after this flag is set. Without this explicit clear, the final
         // waitForInput subtitle in a session stays on screen indefinitely on client machines
         // because there is no subsequent SpawnSubtitles call to evict it via
-        // DestroyPreviousSubtitles(). On the host, WaitForInputRoutine will also call
-        // ClearHistory() on the next frame — that second call is a safe no-op.
-        if (_waitingSubtitle != null)
+        // DestroyPreviousSubtitles(). Only the line owned by the advancing conversation is
+        // cleared — another conversation's waiting line on this screen stays.
+        if (_waitingSubtitle != null && OwnsWaitingSubtitle(speakerNetId))
         {
             ClearHistory();
             _waitingSubtitle = null;
+            _waitingSubtitleSpeakerNetId = ulong.MaxValue;
         }
     }
 
-    public IEnumerator WaitForInputRoutine(Action onComplete = null)
+    /// <summary>True when an advance for <paramref name="speakerNetId"/> may clear the current waiting line.</summary>
+    private bool OwnsWaitingSubtitle(ulong speakerNetId) =>
+        speakerNetId == ulong.MaxValue || _waitingSubtitleSpeakerNetId == ulong.MaxValue ||
+        _waitingSubtitleSpeakerNetId == speakerNetId;
+
+    /// <summary>
+    /// Waits until the line is advanced. With a <paramref name="speakerNetId"/> it completes on that
+    /// speaker's advance (or a global one) only, so concurrent conversations on the server don't
+    /// complete each other's lines; with the default <see cref="ulong.MaxValue"/> any advance completes it.
+    /// </summary>
+    public IEnumerator WaitForInputRoutine(Action onComplete = null, ulong speakerNetId = ulong.MaxValue)
     {
-        _dialogueInputReceived = false;
+        int startAny = _anyAdvanceCount;
+        int startGlobal = _globalAdvanceCount;
+        int startSpeaker = SpeakerAdvanceCount(speakerNetId);
+
+        bool Advanced() => speakerNetId == ulong.MaxValue
+            ? _anyAdvanceCount != startAny
+            : _globalAdvanceCount != startGlobal || SpeakerAdvanceCount(speakerNetId) != startSpeaker;
+
         yield return null;
 
-        while (!_dialogueInputReceived)
+        while (!Advanced())
         {
             // During scripted dialogue, ScriptedDialogueRunner.Update() is the sole owner of
             // raw input handling (skip-reveal-then-advance) and drives this routine indirectly
@@ -636,9 +736,12 @@ public class DialogueManager : NetworkBehaviour
             // megaphone line) would read the same E press and call AdvanceDialogueServerRpc
             // directly — an un-gated broadcast that clears the world line for EVERY client
             // instantly, so one player could skip lines for both without waiting for the timer.
+            // Only the line this routine waits on may be advanced from here, and never a line of a
+            // scripted conversation (those advance solely through ScriptedDialogueRunner's gate).
             if (!ScriptedDialogueRunner.IsScriptedModeActive && !SuspectWorldDialogue.IsLocalPlayerInConversation &&
                 !ScriptedDialogueRunner.IsUnskippableRevealActive &&
-                _waitingSubtitle != null && IsAdvanceInputPressed())
+                !ScriptedDialogueRunner.IsSpeakerInActiveDialogue(speakerNetId) &&
+                _waitingSubtitle != null && OwnsWaitingSubtitle(speakerNetId) && IsAdvanceInputPressed())
             {
                 if (!_waitingSubtitle.IsPromptActive)
                 {
@@ -648,22 +751,22 @@ public class DialogueManager : NetworkBehaviour
                 }
                 else
                 {
-                    // During scripted dialogue, route through the multi-player advance gate so
-                    // both players must confirm (or the timeout fires) before the sequence continues.
-                    if (ScriptedDialogueRunner.IsScriptedModeActive)
-                        ScriptedDialogueRunner.Instance.AdvanceScriptedLineServerRpc();
-                    else
-                    {
-                        Debug.Log("[WorldGate] Un-gated AdvanceDialogueServerRpc from WaitForInputRoutine (local input).");
-                        AdvanceDialogueServerRpc();
-                    }
+                    Debug.Log("[WorldGate] Un-gated AdvanceDialogueServerRpc from WaitForInputRoutine (local input).");
+                    AdvanceDialogueServerRpc(speakerNetId);
                 }
             }
             yield return null;
         }
 
-        ClearHistory();
-        _waitingSubtitle = null;
+        // Clear only this conversation's waiting line (AdvanceDialogueClientRpc normally already
+        // did) — never a parallel conversation's line that is on the host's screen. Legacy
+        // speaker-less routines keep the original unconditional clear.
+        if (speakerNetId == ulong.MaxValue || (_waitingSubtitle != null && OwnsWaitingSubtitle(speakerNetId)))
+        {
+            ClearHistory();
+            _waitingSubtitle = null;
+            _waitingSubtitleSpeakerNetId = ulong.MaxValue;
+        }
         onComplete?.Invoke();
     }
 
@@ -724,6 +827,7 @@ public class DialogueManager : NetworkBehaviour
         CancelSubtitleDestroy();
         HideChoiceEcho();
         _waitingSubtitle = null;
+        _waitingSubtitleSpeakerNetId = ulong.MaxValue;
 
         if (subtitlesContainer == null) return;
         foreach (Transform child in subtitlesContainer)

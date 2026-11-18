@@ -2444,9 +2444,9 @@ public class SuspectController : NetworkBehaviour
         suspect?.ForceEndDialogueForVerdictLocal();
         DialogueChoiceSystem.Instance?.ForceExitDialogueForVerdict();
 
-        ulong scriptedSpeaker = ScriptedDialogueRunner.ActiveDialogueSpeakerNetId;
-        bool unrelatedScriptedSequence = scriptedSpeaker != 0UL &&
-            (suspectNetObj == null || scriptedSpeaker != suspectNetObj.NetworkObjectId);
+        // Don't wipe subtitles that belong to another scripted conversation still running.
+        bool unrelatedScriptedSequence = ScriptedDialogueRunner.IsAnyOtherSpeakerInActiveDialogue(
+            suspectNetObj != null ? suspectNetObj.NetworkObjectId : 0UL);
         if (!unrelatedScriptedSequence)
             DialogueManager.Instance?.ForceClearAllSubtitles();
     }

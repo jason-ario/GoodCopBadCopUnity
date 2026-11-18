@@ -1536,6 +1536,10 @@ public class ShiftManager : NetworkBehaviour
                 _campaignAdvancedForCurrentReport = false;
             else
                 CampaignManager.Instance.AdvanceDay();
+
+            // Players who died yesterday get a fresh player object at the inside-bunker spawn
+            // while nobody can see it (CampaignManager no longer heals dead players in place).
+            ReviveManager.Instance?.ReviveDeadPlayersForNewDayServer();
         }
 
         // Health and radiation have now been fully reset for the new day (or the campaign has
@@ -1544,7 +1548,10 @@ public class ShiftManager : NetworkBehaviour
 
         // Teleport the local player to their inside-bunker spawn while the screen is dark,
         // and force the bunker door closed so the new day always starts locked inside.
-        if (PlayerInstance.Instance != null)
+        // Skip a still-dead local player: that object is the corpse being replaced by the
+        // server's revive, and its replacement already spawns at the inside-bunker point.
+        if (PlayerInstance.Instance != null &&
+            (PlayerInstance.Instance.PlayerHealth == null || !PlayerInstance.Instance.PlayerHealth.IsDead))
         {
             Transform bunkerSpawn = PlayerSpawner.Instance.GetInsideBunkerSpawnPoint(PlayerInstance.Instance.OwnerClientId);
             PlayerInstance.Instance.SetPosition(bunkerSpawn);
@@ -1889,7 +1896,7 @@ public class ShiftManager : NetworkBehaviour
     {
         if (!IsServer) return;
         if (ScriptedDialogueRunner.Instance != null && ScriptedDialogueRunner.Instance.IsServerSequenceActive)
-            ScriptedDialogueRunner.Instance.ExitScriptedMode();
+            ScriptedDialogueRunner.Instance.ForceExitAllScriptedModes();
     }
 
     [ClientRpc]

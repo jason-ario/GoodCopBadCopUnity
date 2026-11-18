@@ -170,6 +170,26 @@ public class SuspectWorldDialogue : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Local-only. The <see cref="SpeakingInteraction"/> of the NPC the local player is currently in
+    /// a world conversation with. Used by <see cref="OverhearRange"/> so a player only sees their own
+    /// conversation's subtitles while other conversations run in parallel.
+    /// </summary>
+    public static bool TryGetLocalConversationSpeaker(out SpeakingInteraction speakingInteraction)
+    {
+        for (int i = 0; i < _instances.Count; i++)
+        {
+            SuspectWorldDialogue dialogue = _instances[i];
+            if (dialogue != null && dialogue._inConversation && dialogue.speaking != null)
+            {
+                speakingInteraction = dialogue.speaking;
+                return true;
+            }
+        }
+        speakingInteraction = null;
+        return false;
+    }
+
     private void Awake()
     {
         if (startSitting && animator != null)

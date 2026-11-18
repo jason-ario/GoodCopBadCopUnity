@@ -145,7 +145,7 @@ public class VomitAnomaly : VitalsAnomaly
     /// True while this suspect is in any conversation. Uses only state replicated to every
     /// machine so the per-machine vomit loops gate identically:
     /// world/booth question dialogue (<see cref="SpeakingInteraction.IsEngaged"/>, a NetworkVariable)
-    /// and scripted sequences (<see cref="ScriptedDialogueRunner.ActiveDialogueSpeakerNetId"/>, broadcast to all clients).
+    /// and scripted sequences (<see cref="ScriptedDialogueRunner.IsSpeakerInActiveDialogue"/>, broadcast to all clients).
     /// </summary>
     private bool IsSuspectInConversation()
     {
@@ -155,8 +155,7 @@ public class VomitAnomaly : VitalsAnomaly
         if (speaking != null && speaking.IsSpawned && speaking.IsEngaged)
             return true;
 
-        ulong activeSpeaker = ScriptedDialogueRunner.ActiveDialogueSpeakerNetId;
-        return activeSpeaker != 0 && _suspect.IsSpawned && _suspect.NetworkObjectId == activeSpeaker;
+        return _suspect.IsSpawned && ScriptedDialogueRunner.IsSpeakerInActiveDialogue(_suspect.NetworkObjectId);
     }
 
     private void PlayVomitEvent()
