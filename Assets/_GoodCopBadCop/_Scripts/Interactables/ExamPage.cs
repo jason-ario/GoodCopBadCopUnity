@@ -662,6 +662,27 @@ public class ExamPage : FolderItem
     {
         AnomalyUnlockManager.OnAnomalyUnlocked += OnAnomalyUnlocked;
         _activePages.Add(this);
+
+        // Pages are deactivated while stowed, delivered in a supply box, or hidden for the
+        // guidebook, so they miss any OnAnomalyUnlocked fired in that window. Remote clients rely
+        // entirely on those runtime unlocks (they never read the save), so re-sync here — but only
+        // when something actually changed, to avoid an extra overlapping snapshot on every enable.
+        if (HasStaleLockStates())
+            RefreshLockStates();
+    }
+
+    /// <summary>True when any checklist item's applied lock state no longer matches AnomalyUnlockManager.</summary>
+    private bool HasStaleLockStates()
+    {
+        if (_checklistItems == null || AnomalyUnlockManager.Instance == null) return false;
+
+        foreach (ChecklistItem item in _checklistItems)
+        {
+            if (item == null) continue;
+            bool shouldBeLocked = !AnomalyUnlockManager.Instance.IsAnomalyUnlocked(item.AnomalyTypeName);
+            if (item.IsLocked != shouldBeLocked) return true;
+        }
+        return false;
     }
 
     private void OnDisable()

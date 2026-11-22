@@ -616,9 +616,9 @@ public class MutantEnemy : NetworkBehaviour
     /// True when this mutant has been flagged as a boss (see <see cref="SetBossHealthBar"/>) and
     /// should drive the screen-top <see cref="BossHealthBarUI"/>. Replicated to every peer.
     /// </summary>
-    public bool IsBoss => !_bossDisplayName.Value.IsEmpty;
+    public bool IsBoss => _isBoss.Value;
 
-    /// <summary>Boss name shown above the health bar. Empty for non-boss mutants. Replicated.</summary>
+    /// <summary>Boss name shown above the health bar. May be empty (nameless boss). Replicated.</summary>
     public string BossDisplayName => _bossDisplayName.Value.ToString();
 
     /// <summary>
@@ -699,8 +699,15 @@ public class MutantEnemy : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
-    // Boss health bar state. Empty name = not a boss (no bar). Health is 0–1 and only written
-    // while IsBoss. NetworkVariables (not RPCs) so late joiners see the bar mid-fight.
+    // Boss health bar state. _isBoss drives the bar; the name is optional (empty = no label).
+    // Health is 0–1 and only written while IsBoss. NetworkVariables (not RPCs) so late joiners
+    // see the bar mid-fight.
+    private readonly NetworkVariable<bool> _isBoss = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
+
     private readonly NetworkVariable<FixedString64Bytes> _bossDisplayName = new NetworkVariable<FixedString64Bytes>(
         default,
         NetworkVariableReadPermission.Everyone,
@@ -784,7 +791,7 @@ public class MutantEnemy : NetworkBehaviour
         ApplyLookTarget(_networkLookTargetId.Value);
 
         // All clients show the screen-top boss health bar while this mutant is flagged as a boss.
-        _bossDisplayName.OnValueChanged += OnBossDisplayNameChanged;
+        _isBoss.OnValueChanged += OnIsBossChanged;
         RefreshBossHealthBar();
 
         // Late joiner arriving after a permanent kill: it never received the death ClientRpcs,
@@ -808,7 +815,7 @@ public class MutantEnemy : NetworkBehaviour
         _networkSpeed.OnValueChanged -= OnNetworkSpeedChanged;
         _networkGrounded.OnValueChanged -= OnNetworkGroundedChanged;
         _networkLookTargetId.OnValueChanged -= OnNetworkLookTargetChanged;
-        _bossDisplayName.OnValueChanged -= OnBossDisplayNameChanged;
+        _isBoss.OnValueChanged -= OnIsBossChanged;
         BossHealthBarUI.Unregister(this);
 
         if (IsServer && ShiftManager.Instance != null)
@@ -820,15 +827,18 @@ public class MutantEnemy : NetworkBehaviour
     /// <summary>
     /// Server-only. Flags this mutant as a boss so every client shows its health in the
     /// screen-top <see cref="BossHealthBarUI"/>. Call after <see cref="NetworkObject.Spawn"/>.
-    /// Pass null/empty to clear.
+    /// A null/empty <paramref name="displayName"/> shows the bar without a name label.
+    /// Pass <paramref name="isBoss"/> = false to clear.
     /// </summary>
-    public void SetBossHealthBar(string displayName)
+    public void SetBossHealthBar(string displayName, bool isBoss = true)
     {
         if (!IsServer) return;
 
-        _bossDisplayName.Value = string.IsNullOrEmpty(displayName)
+        // Name first so clients already have it when the _isBoss change registers the bar.
+        _bossDisplayName.Value = !isBoss || string.IsNullOrEmpty(displayName)
             ? default
             : new FixedString64Bytes(displayName.Length > 60 ? displayName.Substring(0, 60) : displayName);
+        _isBoss.Value = isBoss;
 
         SyncBossHealth();
     }
@@ -842,7 +852,7 @@ public class MutantEnemy : NetworkBehaviour
         _bossHealthNormalized.Value = normalized;
     }
 
-    private void OnBossDisplayNameChanged(FixedString64Bytes previous, FixedString64Bytes current)
+    private void OnIsBossChanged(bool previous, bool current)
     {
         RefreshBossHealthBar();
     }

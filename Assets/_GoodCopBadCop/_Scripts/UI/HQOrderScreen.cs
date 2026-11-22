@@ -6,7 +6,7 @@ using UnityEngine.UI;
 /// <summary>
 /// Manages the "Call in Backup" logic in the HQ Order Screen.
 /// Availability is read from <see cref="ReviveManager"/>'s server-replicated roster and the
-/// revive (including the money deduction) is resolved server-side.
+/// revive is resolved server-side. Backup is free: the only requirement is a dead teammate.
 /// The option is always shown; when it can't be used, it is disabled and <see cref="_statusText"/>
 /// explains why, so the screen is never empty.
 /// </summary>
@@ -23,14 +23,14 @@ public class HQOrderScreen : MonoBehaviour
     [Tooltip("Shows the shared money pool.")]
     [SerializeField] private TextMeshProUGUI _fundsText;
 
-    private const int RespawnCost = 10;
-    private const string RespawnTextFormat = "Call in Backup  <sprite=0> {0}";
+    // Backup is intentionally free. ReviveManager skips the charge when the cost is 0.
+    private const int RespawnCost = 0;
+    private const string RespawnText = "Call in Backup";
     private const string FundsTextFormat = "Station Funds  <sprite=0> {0}";
 
     private const string StatusSolo = "No partner on record. Backup is unavailable for solo shifts.";
     private const string StatusTeammateAlive = "Your partner is alive and on duty. No backup required.";
-    private const string StatusNoFunds = "Insufficient funds. Backup costs <sprite=0> {0}.";
-    private const string StatusReady = "Your partner is down. HQ can send a replacement for <sprite=0> {0}.";
+    private const string StatusReady = "Your partner is down. HQ can send a replacement.";
 
     private int _lastFunds = int.MinValue;
     private string _lastStatus;
@@ -41,7 +41,7 @@ public class HQOrderScreen : MonoBehaviour
             _loopingAudio.Play();
 
         if (_respawnButtonText != null)
-            _respawnButtonText.text = string.Format(RespawnTextFormat, RespawnCost);
+            _respawnButtonText.text = RespawnText;
 
         _lastFunds = int.MinValue;
         _lastStatus = null;
@@ -58,7 +58,6 @@ public class HQOrderScreen : MonoBehaviour
         if (NetworkManager.Singleton == null) return;
 
         int funds = GlobalHostVariables.Instance != null ? GlobalHostVariables.Instance.money.Value : 0;
-        bool hasFunds = funds >= RespawnCost;
 
         // Read the server-replicated roster: ConnectedClientsList / PlayerObject are not reliable on
         // non-host clients, which previously left player 2 unable to see (and revive) a dead host.
@@ -68,7 +67,7 @@ public class HQOrderScreen : MonoBehaviour
         bool hasDeadTeammate = revive != null && revive.HasDeadTeammate(localClientId);
 
         if (_respawnButton != null)
-            _respawnButton.interactable = hasFunds && hasDeadTeammate;
+            _respawnButton.interactable = hasDeadTeammate;
 
         if (_fundsText != null && funds != _lastFunds)
         {
@@ -80,8 +79,7 @@ public class HQOrderScreen : MonoBehaviour
         {
             string status = !hasTeammate ? StatusSolo
                 : !hasDeadTeammate ? StatusTeammateAlive
-                : !hasFunds ? string.Format(StatusNoFunds, RespawnCost)
-                : string.Format(StatusReady, RespawnCost);
+                : StatusReady;
 
             if (status != _lastStatus)
             {
@@ -93,24 +91,16 @@ public class HQOrderScreen : MonoBehaviour
 
     /// <summary>
     /// Asks the server to revive a dead teammate. The server picks the target from its
-    /// authoritative client list, deducts the cost from the shared pool, and only charges
-    /// when the revive actually happens (booth on Day 1 before shift end, otherwise lobby).
+    /// authoritative client list and replaces the dead player object. Free of charge.
     /// </summary>
     public void CallInBackup()
     {
         ReviveManager revive = ReviveManager.Instance;
-        if (GlobalHostVariables.Instance == null ||
-            revive == null ||
-            NetworkManager.Singleton == null)
-        {
+        if (revive == null || NetworkManager.Singleton == null)
             return;
-        }
 
-        if (!revive.HasDeadTeammate(NetworkManager.Singleton.LocalClientId) ||
-            GlobalHostVariables.Instance.money.Value < RespawnCost)
-        {
+        if (!revive.HasDeadTeammate(NetworkManager.Singleton.LocalClientId))
             return;
-        }
 
         // Prevent duplicate click events while the authoritative revive request is in flight.
         if (_respawnButton != null)

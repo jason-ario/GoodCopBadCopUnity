@@ -711,7 +711,8 @@ public class MutantBreachManager : NetworkBehaviour
             _activeBreachMutants.Add(netObj);
 
             if (enemy != null && data.showUniqueMutantBossHealthBar && IsUniquePrefab(data, prefab))
-                enemy.SetBossHealthBar(string.IsNullOrEmpty(data.bossDisplayName) ? data.breachName : data.bossDisplayName);
+                enemy.SetBossHealthBar(!data.showBossName ? string.Empty
+                    : string.IsNullOrEmpty(data.bossDisplayName) ? data.breachName : data.bossDisplayName);
 
             if (i < spawnQueue.Count - 1)
                 yield return new WaitForSeconds(data.spawnStaggerSeconds);

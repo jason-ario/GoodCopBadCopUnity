@@ -10,11 +10,13 @@ public class ClickDetector : MonoBehaviour
 
     void Update()
     {
-        if (renderCamera == null)
-        {
-            if (PlayerInstance.Instance == null) return;
-            renderCamera = PlayerInstance.Instance.GetCamera();
-        }
+        // Resolve every frame — never cache across player objects. A revive spawns a new local
+        // PlayerObject but keeps the old one alive as a corpse with its camera merely disabled, so
+        // a cached reference never goes null and kept raycasting from the corpse's viewpoint,
+        // making every checklist click miss after being revived.
+        if (PlayerInstance.Instance == null) return;
+        renderCamera = PlayerInstance.Instance.GetCamera();
+        if (renderCamera == null) return;
 
         // When the cursor is hidden, clear any active hover and skip.
         if (!Cursor.visible)

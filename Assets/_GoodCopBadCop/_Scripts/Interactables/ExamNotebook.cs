@@ -840,9 +840,20 @@ public class ExamNotebook : PickableObject
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SetCheckboxServerRpc(int pageIndex, int itemIndex, bool value)
+    private void SetCheckboxServerRpc(int pageIndex, int itemIndex, bool value, ServerRpcParams rpcParams = default)
     {
-        if (pageIndex < 0 || pageIndex >= _pageBitmasks.Length) return;
+        // _pageBitmasks is built in InitializePageBehavior; use the backing variables directly so a
+        // server whose page wiring hasn't run (or failed) still accepts a client's tick.
+        _pageBitmasks ??= new NetworkVariable<int>[]
+        {
+            _pageBitmask0, _pageBitmask1, _pageBitmask2, _pageBitmask3, _pageBitmask4
+        };
+
+        if (pageIndex < 0 || pageIndex >= _pageBitmasks.Length)
+        {
+            Debug.LogWarning($"[ExamNotebook] SetCheckboxServerRpc from client {rpcParams.Receive.SenderClientId} rejected on '{name}': pageIndex {pageIndex} out of range.", this);
+            return;
+        }
         if (itemIndex < 0 || itemIndex >= 32) return;
 
         int bitmask = _pageBitmasks[pageIndex].Value;
@@ -856,6 +867,13 @@ public class ExamNotebook : PickableObject
 
     public void AnimateCheckMark(Transform ikAnimationTarget)
     {
+        // Cosmetic only — never let a missing holder reference throw out of the click path.
+        if (playerPickupController == null || playerPickupController.PlayerAnimationController == null)
+        {
+            Debug.LogWarning($"[ExamNotebook] AnimateCheckMark skipped on '{name}' — no local holder/animation controller.", this);
+            return;
+        }
+
         IsChecking = true;
         playerPickupController.PlayerAnimationController.RightArmIKTarget = ikAnimationTarget;
         StartCoroutine(TurnRightArmRigOff());

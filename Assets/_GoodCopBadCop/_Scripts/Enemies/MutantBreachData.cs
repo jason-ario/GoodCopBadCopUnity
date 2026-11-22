@@ -38,7 +38,11 @@ public class MutantBreachData : ScriptableObject
              "health is shown in a bar at the top of the screen on all clients (e.g. Day 4's Ocho).")]
     public bool showUniqueMutantBossHealthBar = false;
 
-    [Tooltip("Name shown above the boss health bar. Falls back to the breachName if empty.")]
+    [Tooltip("When false, the boss health bar is shown with no name above it (a mysterious boss).")]
+    public bool showBossName = true;
+
+    [Tooltip("Name shown above the boss health bar. Falls back to the breachName if empty. " +
+             "Ignored when showBossName is false.")]
     [LocalizeField] public string bossDisplayName = "";
 
     [Header("Timing")]

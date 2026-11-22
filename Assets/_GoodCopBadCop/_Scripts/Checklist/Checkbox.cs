@@ -65,17 +65,25 @@ public class Checkbox : MonoBehaviour, IClickable
     /// </summary>
     public void OnClick()
     {
-        if (!_isInteractable) return;
+        if (!_isInteractable)
+        {
+            Debug.Log($"[Checkbox] Click ignored on '{checklistItem?.name}' — not interactable " +
+                      $"(locked={checklistItem != null && checklistItem.IsLocked}, anomaly='{checklistItem?.AnomalyTypeName}').", this);
+            return;
+        }
 
         bool newValue = !IsChecked;
+
+        // Route the state change through the server FIRST so a failure in the purely cosmetic
+        // arm animation below can never swallow the toggle (the visual tick arrives via the
+        // notebook's NetworkVariable callback on every client, including this one).
+        checklistItem.OnCheckboxClicked(IsChecked);
 
         // Trigger the arm IK animation locally for the player doing the clicking.
         // This must NOT go through the network callback because AnimateCheckMark accesses
         // playerPickupController, which is only valid on the player holding the notebook.
         if (newValue)
             checklistItem.AnimateCheckMark(ikTargetTransform);
-
-        checklistItem.OnCheckboxClicked(IsChecked);
     }
 
     public void SetInteractable(bool value)

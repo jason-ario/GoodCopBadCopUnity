@@ -160,7 +160,9 @@ public class BossHealthBarUI : MonoBehaviour
 
     private void ResetFor(MutantEnemy boss)
     {
-        _label.text = boss.BossDisplayName;
+        string bossName = boss.BossDisplayName;
+        _label.text = bossName;
+        _label.gameObject.SetActive(!string.IsNullOrEmpty(bossName));
         _shown = Mathf.Clamp01(boss.BossHealthNormalized);
         _trailValue = _shown;
         _zeroSince = -1f;
