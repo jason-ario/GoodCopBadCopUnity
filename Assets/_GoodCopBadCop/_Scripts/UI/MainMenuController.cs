@@ -108,6 +108,8 @@ public class MainMenuController : MonoBehaviour
 
     private void Start()
     {
+        Debug.Log($"[LogoDiag] MainMenuController.Start frame={Time.frameCount} invitePending={LobbyManager.IsLaunchInviteJoinPending} " +
+                  $"splash={(splashScreen != null)} UIController={(UIController.Instance != null)} settingsView={(settingsMenuView != null)}", this);
         UIController.Instance.ClosePlayerUI();
         settingsMenuView.SetVisible(false);
 
@@ -156,6 +158,7 @@ public class MainMenuController : MonoBehaviour
                 onLogosFinished: ShowMainMenu,
                 onComplete: () => SetMenuInteractable(true));
 
+            Debug.Log($"[LogoDiag] MainMenuController splash TryPlay -> {playing}", this);
             if (playing)
                 return;
 
@@ -299,6 +302,7 @@ public class MainMenuController : MonoBehaviour
 
     private void SwitchToScreen(GameObject target)
     {
+        Debug.Log($"[LogoDiag] MainMenuController.SwitchToScreen '{(target != null ? target.name : "null")}' frame={Time.frameCount}", this);
         if (target == null)
             return;
 
@@ -632,6 +636,7 @@ public class MainMenuController : MonoBehaviour
 
     public void HideAllMenus()
     {
+        Debug.Log($"[LogoDiag] MainMenuController.HideAllMenus frame={Time.frameCount}\n{Environment.StackTrace}", this);
         foreach (var screen in _allScreens)
         {
             if (screen != null)

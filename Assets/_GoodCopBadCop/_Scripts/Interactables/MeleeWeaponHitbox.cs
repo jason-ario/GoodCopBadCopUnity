@@ -29,6 +29,9 @@ public class MeleeWeaponHitbox : NetworkBehaviour
     [Tooltip("Radius of the OverlapSphere centered on this transform.")]
     [SerializeField] private float hitRadius = 0.8f;
 
+    /// <summary>Radius of the swing OverlapSphere (centred on this transform).</summary>
+    public float HitRadius => hitRadius;
+
     [Header("Hit Effects")]
     [Tooltip("Particle prefab instantiated at the hit position when an enemy or player is struck.")]
     [SerializeField] private ParticleSystem _hitEffectPrefab;

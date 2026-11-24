@@ -49,6 +49,7 @@ public class LogoMaterialController : MonoBehaviour
 
     private void Awake()
     {
+        Debug.Log($"[LogoDiag] LogoMaterialController.Awake '{name}' frame={Time.frameCount} hasMaterial={_logoMaterial != null}", this);
         if (_logoMaterial == null)
             return;
 
@@ -62,6 +63,7 @@ public class LogoMaterialController : MonoBehaviour
 
     private void OnEnable()
     {
+        Debug.Log($"[LogoDiag] LogoMaterialController.OnEnable '{name}' frame={Time.frameCount} runtimeMat={_runtimeMaterial != null}", this);
         if (_runtimeMaterial == null)
             return;
 
@@ -91,6 +93,7 @@ public class LogoMaterialController : MonoBehaviour
 
             if (t >= 1f)
             {
+                Debug.Log($"[LogoDiag] LogoMaterialController burn finished '{name}' frame={Time.frameCount} burn={_runtimeMaterial.GetFloat(BurnProgressId):F3}", this);
                 _burnFinished = true;
                 if (_burnSound != null && SFXController.Instance != null)
                     SFXController.Instance.Play(_burnSound);
@@ -131,6 +134,7 @@ public class LogoMaterialController : MonoBehaviour
 
     private void OnDisable()
     {
+        Debug.Log($"[LogoDiag] LogoMaterialController.OnDisable '{name}' frame={Time.frameCount} burnFinished={_burnFinished}", this);
         // Reset glitch cleanly if the object is disabled mid-burst.
         if (_runtimeMaterial != null)
             _runtimeMaterial.SetFloat(GlitchStrengthId, 0f);
