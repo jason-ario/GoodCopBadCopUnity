@@ -467,6 +467,17 @@ public class MutantEnemy : NetworkBehaviour
     private float _fleeCommitUntil;
     private const float FleeTickSeconds = 0.25f;
 
+    // Committed flee steering (server only). The mutant holds one escape destination until it
+    // nears it or the player cuts it off, instead of re-pathing every tick (which made it hitch).
+    private NavMeshPath _fleeCandidatePath;
+    private Vector3 _fleeDestination;
+    private bool _hasFleeDestination;
+    private float _fleeApproachUntil;
+    private const float FleeDestinationDistance = 25f;
+    private const float FleeRepickRemainingDistance = 6f;
+    private const float FleeApproachCommitSeconds = 2.5f;
+    private static readonly float[] FleeCandidateAngles = { 0f, 35f, -35f, 70f, -70f, 110f, -110f };
+
     // Lose-interest state (server only)
     /// <summary>Seconds accumulated while stuck at an unreachable target (door banging / settled partial path).</summary>
     private float _frustrationTime;
@@ -2487,17 +2498,29 @@ public class MutantEnemy : NetworkBehaviour
             // the flee loop only re-evaluates every FleeTickSeconds.
             float passReach = Mathf.Max(data.attackRange * 1.5f, 2.5f, _agent.speed * FleeTickSeconds * 2f);
             if (obstacleDistance <= passReach)
+            {
                 RunThroughGate(obstacle, obstacleCenter);
+            }
             else
+            {
                 _agent.SetDestination(obstacleCenter); // partial path ends at the carved gate
+                BeginFleeApproachCommit();
+            }
             return true;
         }
 
         float reach = Mathf.Max(data.attackRange * 1.5f, 2f);
         if (obstacleDistance <= reach)
+        {
+            _fleeApproachUntil = 0f;
+            _hasFleeDestination = false;
             StartCoroutine(FleeBreakoutDoorRoutine(obstacle, obstacleComponent));
+        }
         else
+        {
             _agent.SetDestination(obstacleComponent.transform.position); // partial path ends at the carved obstacle
+            BeginFleeApproachCommit();
+        }
 
         return true;
     }
@@ -2525,11 +2548,26 @@ public class MutantEnemy : NetworkBehaviour
 
         _fleeCommitTarget = exit;
         _fleeCommitUntil = Time.time + fleeThroughGateCommitSeconds;
+        _fleeApproachUntil = 0f;
+        _hasFleeDestination = false; // pick a fresh escape route once out the other side
 
         // Keep running at the gate now; the gate's NavMeshObstacle un-carves next frame and the
         // flee loop re-paths to the committed exit point on its next tick.
         _agent.SetDestination(gateCenter);
         ResetFleeStuckAnchor();
+    }
+
+    /// <summary>
+    /// Once the fleeing mutant starts heading for a door/gate to break out, it keeps that plan for
+    /// <see cref="FleeApproachCommitSeconds"/>. Without this, the first metre of progress cleared the
+    /// "stuck" flag and it immediately turned back toward the away-from-player point, then got
+    /// pinned again — the start/stop flip-flop.
+    /// </summary>
+    private void BeginFleeApproachCommit()
+    {
+        if (Time.time >= _fleeApproachUntil)
+            _fleeApproachUntil = Time.time + FleeApproachCommitSeconds;
+        _hasFleeDestination = false;
     }
 
     private void ResetFleeStuckAnchor()
@@ -3780,9 +3818,33 @@ public class MutantEnemy : NetworkBehaviour
 
         DiedPermanently = false;
         _fleeBreakoutPending = false;
+        _fleeApproachUntil = 0f;
+        _hasFleeDestination = false;
+
+        // Hand the agent entirely to the flee. A shove, attack windup or immobilize that was in
+        // progress when the killing blow landed leaves isStopped = true (their "resume" steps skip
+        // once _isDead is set), and a still-running knockback keeps calling Move() against the path.
+        if (_knockbackCoroutine != null)
+        {
+            StopCoroutine(_knockbackCoroutine);
+            _knockbackCoroutine = null;
+        }
+        _currentTarget = null;
+        _fenceTarget = null;
+        _doorTarget = null;
 
         // Boost speed, stop any attack animation, and stop chase music on all clients.
+        // No braking at waypoints and snappier turning so it sprints instead of easing in and out.
         _agent.speed = fleeSpeed;
+        _agent.acceleration = Mathf.Max(data.acceleration, fleeSpeed * 3f);
+        _agent.angularSpeed = Mathf.Max(data.angularSpeed, 540f);
+        _agent.stoppingDistance = 0f;
+        _agent.autoBraking = false;
+        if (_agent.isOnNavMesh)
+        {
+            _agent.isStopped = false;
+            _agent.ResetPath();
+        }
         SetAttackAnimClientRpc(false);
         SetFleeingClientRpc(true);
         StopChaseMusicClientRpc();
@@ -3806,34 +3868,19 @@ public class MutantEnemy : NetworkBehaviour
             // the flee path isn't stuck waiting on a player to open it manually.
             TryOpenNearbyBlockingDoor();
 
-            if (!_fleeBreakoutPending && _agent.isOnNavMesh && Time.time < _fleeCommitUntil)
+            if (!_agent.isOnNavMesh)
             {
-                // Just burst through a gate — keep running out through the gap.
-                _agent.SetDestination(_fleeCommitTarget);
+                TryRecoverOntoNavMesh();
             }
-            else
+            else if (!_fleeBreakoutPending)
             {
-                // Continuously update destination away from the nearest player.
-                Transform player = FindNearestLivingPlayer();
-                bool stuck = IsFleeStuck();
-                if (player != null && !_fleeBreakoutPending)
-                {
-                    Vector3 awayDir = (transform.position - player.position).normalized;
-                    Vector3 fleeTarget = transform.position + awayDir * 20f;
+                if (_agent.isStopped)
+                    _agent.isStopped = false;
 
-                    // Clamp to NavMesh surface.
-                    if (UnityEngine.AI.NavMesh.SamplePosition(fleeTarget, out UnityEngine.AI.NavMeshHit hit, 15f, UnityEngine.AI.NavMesh.AllAreas))
-                    {
-                        // Trapped (inside the locked booth after a window climb-through, or pinned in a
-                        // gated lane): head for the nearest closed door/gate and force it, lock or not.
-                        if (!TryFleeBreakoutThroughDoor(hit.position, stuck))
-                            _agent.SetDestination(hit.position);
-                    }
-                }
-                else if (player == null && stuck && !_fleeBreakoutPending)
-                {
-                    TryFleeBreakoutThroughDoor(transform.position, true);
-                }
+                if (Time.time < _fleeCommitUntil)
+                    _agent.SetDestination(_fleeCommitTarget); // just burst through a gate — keep running out
+                else
+                    UpdateFleeSteering();
             }
 
             elapsed += FleeTickSeconds;
@@ -3845,6 +3892,168 @@ public class MutantEnemy : NetworkBehaviour
 
         if (IsSpawned)
             NetworkObject.Despawn();
+    }
+
+    /// <summary>
+    /// One flee tick. Holds a single committed escape destination and only re-picks when it's
+    /// nearly reached, its path broke, or the player now stands closer to it than the mutant does.
+    /// Pinned mutants commit to a door/gate breakout instead of flip-flopping back each tick.
+    /// </summary>
+    private void UpdateFleeSteering()
+    {
+        // Mid-approach to a door/gate breakout — stay on it until reached or the window lapses.
+        if (Time.time < _fleeApproachUntil)
+        {
+            if (TryFleeBreakoutThroughDoor(transform.position, true))
+                return;
+            _fleeApproachUntil = 0f;
+        }
+
+        if (IsFleeStuck())
+        {
+            _hasFleeDestination = false;
+            if (TryFleeBreakoutThroughDoor(transform.position, true))
+                return;
+            ResetFleeStuckAnchor(); // nothing to force — don't re-trigger every tick
+        }
+
+        Transform threat = FindNearestFleeThreat();
+        Vector3 awayDir = threat != null ? transform.position - threat.position : transform.forward;
+        awayDir.y = 0f;
+        if (awayDir.sqrMagnitude < 0.0001f)
+            awayDir = transform.forward;
+        awayDir.Normalize();
+
+        if (_hasFleeDestination && !NeedsNewFleeDestination(threat))
+            return;
+
+        if (TryPickFleeDestination(awayDir, threat, out Vector3 destination))
+        {
+            _fleeDestination = destination;
+            _hasFleeDestination = true;
+            if (!_agent.SetPath(_fleeCandidatePath))
+                _agent.SetDestination(destination);
+            return;
+        }
+
+        // No complete escape route (boxed in — e.g. inside the locked booth after a window climb):
+        // head for the nearest closed door/gate and force it, else run at the best partial point.
+        _hasFleeDestination = false;
+        Vector3 fallback = transform.position + awayDir * FleeDestinationDistance;
+        if (NavMesh.SamplePosition(fallback, out NavMeshHit hit, 15f, NavMesh.AllAreas))
+        {
+            if (!TryFleeBreakoutThroughDoor(hit.position, false))
+                _agent.SetDestination(hit.position);
+        }
+        else
+        {
+            TryFleeBreakoutThroughDoor(transform.position, true);
+        }
+    }
+
+    /// <summary>True when the committed flee destination should be replaced.</summary>
+    private bool NeedsNewFleeDestination(Transform threat)
+    {
+        if (_agent.pathPending)
+            return false;
+        if (!_agent.hasPath || _agent.pathStatus != NavMeshPathStatus.PathComplete)
+            return true;
+        if (_agent.remainingDistance <= FleeRepickRemainingDistance)
+            return true;
+
+        if (threat != null)
+        {
+            // The player cut across toward our goal — it now leads back toward them.
+            Vector3 selfToDest = _fleeDestination - transform.position;
+            Vector3 threatToDest = _fleeDestination - threat.position;
+            selfToDest.y = threatToDest.y = 0f;
+            if (threatToDest.sqrMagnitude < selfToDest.sqrMagnitude * 0.64f)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Fans out from straight-away-from-the-player and returns the first NavMesh point with a
+    /// complete path whose first leg doesn't run back toward a nearby player. The path is left in
+    /// <see cref="_fleeCandidatePath"/> so it can be applied without waiting on async pathing.
+    /// </summary>
+    private bool TryPickFleeDestination(Vector3 awayDir, Transform threat, out Vector3 destination)
+    {
+        destination = default;
+        _fleeCandidatePath ??= new NavMeshPath();
+        var filter = new NavMeshQueryFilter { agentTypeID = _agent.agentTypeID, areaMask = _agent.areaMask };
+        bool threatClose = threat != null && (threat.position - transform.position).sqrMagnitude < 12f * 12f;
+
+        foreach (float angle in FleeCandidateAngles)
+        {
+            Vector3 dir = Quaternion.AngleAxis(angle, Vector3.up) * awayDir;
+            Vector3 candidate = transform.position + dir * FleeDestinationDistance;
+
+            if (!NavMesh.SamplePosition(candidate, out NavMeshHit hit, 8f, filter))
+                continue;
+
+            // Must actually gain distance — rejects snaps back onto ground right next to us.
+            Vector3 gained = hit.position - transform.position;
+            gained.y = 0f;
+            if (gained.sqrMagnitude < FleeRepickRemainingDistance * FleeRepickRemainingDistance * 2f)
+                continue;
+
+            if (!NavMesh.CalculatePath(_agent.nextPosition, hit.position, filter, _fleeCandidatePath)
+                || _fleeCandidatePath.status != NavMeshPathStatus.PathComplete)
+                continue;
+
+            Vector3[] corners = _fleeCandidatePath.corners;
+            if (corners.Length < 2)
+                continue;
+
+            if (threatClose)
+            {
+                Vector3 firstLeg = corners[1] - corners[0];
+                firstLeg.y = 0f;
+                if (firstLeg.sqrMagnitude > 0.01f && Vector3.Dot(firstLeg.normalized, awayDir) < -0.3f)
+                    continue;
+            }
+
+            destination = hit.position;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Nearest living player at ANY distance — no detection radius, cutscene or lost-interest
+    /// filtering. A fleeing mutant must keep running from the player even after it outpaces its
+    /// chase detection radius (the old radius-capped lookup made it stop dead, then bolt again
+    /// once the player caught up).
+    /// </summary>
+    private Transform FindNearestFleeThreat()
+    {
+        if (NetworkManager.Singleton == null)
+            return null;
+
+        Transform nearest = null;
+        float nearestSqrDist = float.MaxValue;
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            if (client.PlayerObject == null)
+                continue;
+
+            PlayerHealth health = client.PlayerObject.GetComponent<PlayerHealth>();
+            if (health == null || health.IsDead)
+                continue;
+
+            float sqrDist = (client.PlayerObject.transform.position - transform.position).sqrMagnitude;
+            if (sqrDist < nearestSqrDist)
+            {
+                nearestSqrDist = sqrDist;
+                nearest = client.PlayerObject.transform;
+            }
+        }
+
+        return nearest;
     }
 
     [ClientRpc]

@@ -43,6 +43,26 @@ public class GameManager : NetworkBehaviour
     /// </summary>
     private static bool _isRestartingDay;
 
+    /// <summary>
+    /// Replicated copy of <see cref="_isRestartingDay"/> for the reloaded scene. The server sets it
+    /// in <see cref="OnNetworkSpawn"/> right after a Restart Day reload, so every client's freshly
+    /// loaded GameManager spawns with it already true and covers its default main menu with black
+    /// (and locks it) until <see cref="RestartDaySequence"/> moves everyone back into gameplay.
+    /// </summary>
+    private readonly NetworkVariable<bool> _networkIsRestartingDay = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// SERVER: upper bound on how long the restart waits for every client to finish loading the
+    /// reloaded scene. NGO's own LoadSceneTimeOut normally reports timed-out clients first.
+    /// </summary>
+    private const float RestartClientLoadWaitCap = 60f;
+
+    /// <summary>SERVER: set by <see cref="OnRestartSceneLoadCompleted"/> once all clients loaded.</summary>
+    private bool _restartSceneLoadCompleted;
+
 
     private readonly NetworkVariable<bool> _networkHasGameStarted = new NetworkVariable<bool>(
         false,
@@ -659,33 +679,177 @@ public class GameManager : NetworkBehaviour
         if (IsServer && _isRestartingDay)
         {
             _isRestartingDay = false;
+            _networkIsRestartingDay.Value = true;
+
+            // OnNetworkSpawn of in-scene objects runs before NGO registers the host as loaded,
+            // so this subscription can't miss the completion event.
+            _restartSceneLoadCompleted = false;
+            if (NetworkManager.Singleton.SceneManager != null)
+                NetworkManager.Singleton.SceneManager.OnLoadEventCompleted += OnRestartSceneLoadCompleted;
+            else
+                _restartSceneLoadCompleted = true;
+
             StartCoroutine(RestartDaySequence());
+        }
+        else if (!IsServer)
+        {
+            if (_networkIsRestartingDay.Value)
+                StartCoroutine(CoverMainMenuForRestart());
+            _networkIsRestartingDay.OnValueChanged += OnNetworkIsRestartingDayChanged;
         }
     }
 
+    public override void OnNetworkDespawn()
+    {
+        _networkIsRestartingDay.OnValueChanged -= OnNetworkIsRestartingDayChanged;
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.SceneManager != null)
+            NetworkManager.Singleton.SceneManager.OnLoadEventCompleted -= OnRestartSceneLoadCompleted;
+
+        base.OnNetworkDespawn();
+    }
+
+    private void OnNetworkIsRestartingDayChanged(bool previous, bool current)
+    {
+        if (current && !previous)
+            StartCoroutine(CoverMainMenuForRestart());
+    }
+
+    private void OnRestartSceneLoadCompleted(string sceneName, LoadSceneMode loadSceneMode,
+        System.Collections.Generic.List<ulong> clientsCompleted, System.Collections.Generic.List<ulong> clientsTimedOut)
+    {
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.SceneManager != null)
+            NetworkManager.Singleton.SceneManager.OnLoadEventCompleted -= OnRestartSceneLoadCompleted;
+
+        if (clientsTimedOut != null && clientsTimedOut.Count > 0)
+            Debug.LogWarning($"[GameManager] Restart Day: {clientsTimedOut.Count} client(s) timed out loading the reloaded scene; continuing without waiting for them.");
+
+        _restartSceneLoadCompleted = true;
+    }
+
     /// <summary>
-    /// Reloads the active scene for all connected clients via NGO's network scene manager,
-    /// preserving the network session and active save slot. A day loss discards every change
-    /// made since the last day-start checkpoint so the day replays from its beginning. SERVER ONLY.
+    /// LOCAL: after a Restart Day reload, the main menu is shown by default (MainMenuController.Start).
+    /// Snap to black and lock it so nobody sees or clicks the home screen while the host waits for
+    /// every client to load. The Day 1 lobby transition and the Day 2+ resumed-day path both start
+    /// from black, so they continue seamlessly from here.
+    /// </summary>
+    private IEnumerator CoverMainMenuForRestart()
+    {
+        // Let Start() run first (it opens the home screen and resets the menu/fade state).
+        yield return null;
+
+        MainMenuController.Instance?.LockForGameStart();
+        if (UIController.Instance != null && MainMenuController.Instance != null)
+            UIController.Instance.SetBlackImmediate();
+    }
+
+    /// <summary>
+    /// Restarts the current day for every connected player: reloads the active scene through NGO's
+    /// network scene manager (preserving the network session, party and active save slot) and then
+    /// runs <see cref="RestartDaySequence"/> to put everyone back into gameplay. A day loss discards
+    /// every change made since the last checkpoint so the day replays from it. SERVER ONLY.
     /// </summary>
     public void RestartDay()
     {
         if (!IsServer) return;
 
+        // Ignore repeated clicks while a restart is already under way.
+        if (_isRestartingDay || _networkIsRestartingDay.Value) return;
+
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null || !networkManager.IsListening || networkManager.SceneManager == null)
+        {
+            // Without a running network session there is nothing that could auto-start the day
+            // after a reload; never leave the static flag armed for the next session.
+            Debug.LogError("[GameManager] Restart Day requires an active network session with scene management enabled.");
+            return;
+        }
+
         _isRestartingDay = true;
         SaveDataManager.Instance?.RevertToLastCheckpoint();
-        string sceneName = SceneManager.GetActiveScene().name;
 
-        if (NetworkManager.Singleton.SceneManager != null)
-            NetworkManager.Singleton.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
-        else
-            SceneManager.LoadScene(SceneManager.GetActiveScene().path);
+        // Cover the death screen on every peer for the brief window between despawning the old
+        // players and the reload swapping scenes.
+        PrepareForRestartClientRpc();
+
+        DespawnSessionObjectsForRestart();
+
+        string sceneName = SceneManager.GetActiveScene().name;
+        SceneEventProgressStatus status = networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        if (status != SceneEventProgressStatus.Started)
+        {
+            _isRestartingDay = false;
+            Debug.LogError($"[GameManager] Restart Day: reloading '{sceneName}' failed to start ({status}).");
+        }
+    }
+
+    [ClientRpc]
+    private void PrepareForRestartClientRpc()
+    {
+        if (UIController.Instance != null && MainMenuController.Instance != null)
+            UIController.Instance.SetBlackImmediate();
+    }
+
+    /// <summary>
+    /// SERVER: despawns every dynamically spawned NetworkObject that NGO would otherwise carry
+    /// into the reloaded scene. Single-mode scene loads keep spawned objects whose
+    /// <see cref="NetworkObject.DestroyWithScene"/> is false — notably every player object
+    /// (<c>SpawnAsPlayerObject</c> defaults to false), retained corpses, and suspects. Keeping the
+    /// dead player objects meant <see cref="PlayerSpawner"/> skipped respawning ("already has a
+    /// player object"), leaving every player dead on top of the freshly loaded main menu instead
+    /// of back in the day. In-scene placed objects and DestroyWithScene objects are left to NGO.
+    /// </summary>
+    private void DespawnSessionObjectsForRestart()
+    {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null || networkManager.SpawnManager == null) return;
+
+        var spawned = new System.Collections.Generic.List<NetworkObject>(networkManager.SpawnManager.SpawnedObjectsList);
+        int despawned = 0;
+
+        foreach (NetworkObject networkObject in spawned)
+        {
+            if (networkObject == null || !networkObject.IsSpawned) continue;
+            if (networkObject.InScenePlaced || networkObject.DestroyWithScene) continue;
+
+            try
+            {
+                networkObject.Despawn(true);
+                despawned++;
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, networkObject);
+            }
+        }
+
+        Debug.Log($"[GameManager] Restart Day: despawned {despawned} session object(s) before reloading the scene.");
     }
 
     private IEnumerator RestartDaySequence()
     {
-        // Wait one frame for the new scene's objects to fully initialize.
+        // Wait one frame for the new scene's objects to fully initialize (Start runs first).
         yield return null;
+
+        // Hide and lock the default main menu on the host while clients finish loading.
+        yield return CoverMainMenuForRestart();
+
+        // Multiplayer: every RPC and spawn below must reach clients that have actually loaded the
+        // new scene. Starting immediately raced remote clients' (slower) async load.
+        float waited = 0f;
+        while (!_restartSceneLoadCompleted && waited < RestartClientLoadWaitCap)
+        {
+            waited += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        if (!_restartSceneLoadCompleted)
+        {
+            Debug.LogWarning($"[GameManager] Restart Day: gave up waiting for clients to load after {RestartClientLoadWaitCap:0}s; continuing.");
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.SceneManager != null)
+                NetworkManager.Singleton.SceneManager.OnLoadEventCompleted -= OnRestartSceneLoadCompleted;
+        }
+
+        _networkIsRestartingDay.Value = false;
         BeginLobbyTransition();
 
         // A retry on Day 2+ must follow the same direct-to-bunker route as loading a
