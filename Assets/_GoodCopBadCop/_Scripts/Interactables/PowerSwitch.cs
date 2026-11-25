@@ -159,9 +159,16 @@ public class PowerSwitch : Interactable, IDiegeticLever
             return;
         }
         if (DiegeticViewController.IsAnyViewActive) return;
-        if (_occupancy != null && !_occupancy.TryClaim(player)) return;
 
-        _diegeticView.Open(player);
+        // The view refuses to open during any dialogue/cutscene (e.g. the Day 3 power-outage HQ
+        // call flags every client in-cutscene). Bail before claiming, and roll back if Open() is
+        // still refused — otherwise the claim leaks and the switch reads "Interaction is busy"
+        // for everyone for the rest of the session.
+        if (DiegeticViewController.IsLocalPlayerInDialogue()) return;
+        if (_occupancy != null && !_occupancy.TryClaim(player, _diegeticView)) return;
+
+        if (!_diegeticView.Open(player))
+            _occupancy?.Release();
     }
 
     // ── Drag API (driven by LeverDiegeticController) ─────────────────────────

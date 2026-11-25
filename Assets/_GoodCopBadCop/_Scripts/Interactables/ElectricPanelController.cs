@@ -158,13 +158,21 @@ public class ElectricPanelController : Interactable
             return;
         }
 
-        if (_occupancy != null && !_occupancy.TryClaim(player)) return;
+        // Never claim (or swing the door open) for a view that won't open during dialogue.
+        if (DiegeticViewController.IsLocalPlayerInDialogue()) return;
+
+        if (_occupancy != null && !_occupancy.TryClaim(player, _diegeticController)) return;
+
+        // Open the diegetic view for the interacting player (local only). Roll the claim back if
+        // it's refused, and only open the door once the view is actually up.
+        if (_diegeticController != null && !_diegeticController.Open(player))
+        {
+            _occupancy?.Release();
+            return;
+        }
 
         // Request door open on the server — all clients will animate via NetworkVariable callback.
         OpenDoorServerRpc();
-
-        // Open the diegetic view immediately for the interacting player (local only).
-        _diegeticController?.Open(player);
     }
 
     // ─── Public API ──────────────────────────────────────────────────────────

@@ -179,7 +179,7 @@ public class ToolsLocker : Interactable, ILockable
         if (_diegeticController != null && DiegeticViewController.IsLocalPlayerInDialogue())
             return;
 
-        if (_occupancy != null && !_occupancy.TryClaim(player))
+        if (_occupancy != null && !_occupancy.TryClaim(player, _diegeticController))
             return;
 
         Debug.Log("Toggle Tool Locker");
@@ -215,13 +215,14 @@ public class ToolsLocker : Interactable, ILockable
     /// <summary>Called by each local client when they close the tool shop UI.
     /// Decrements the viewer count and closes the locker when no viewers remain.</summary>
     [ServerRpc(RequireOwnership = false)]
-    public void NotifyPlayerClosedServerRpc()
+    public void NotifyPlayerClosedServerRpc(ServerRpcParams rpcParams = default)
     {
         viewerCount.Value = Mathf.Max(0, viewerCount.Value - 1);
         if (viewerCount.Value == 0)
             CloseLockerInternal();
 
-        _occupancy?.Release();
+        // Release on behalf of the closing client only — never free another player's claim.
+        _occupancy?.ReleaseForClientServer(rpcParams.Receive.SenderClientId);
     }
 
     [ServerRpc(RequireOwnership = false)]

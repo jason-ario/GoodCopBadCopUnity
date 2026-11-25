@@ -35,6 +35,9 @@ public abstract class DiegeticViewController : MonoBehaviour
     /// <summary>Whether this view is currently open.</summary>
     protected bool IsActive { get; private set; }
 
+    /// <summary>Public read of <see cref="IsActive"/> (used by <see cref="DiegeticOccupancy"/>'s leak guard).</summary>
+    public bool IsOpen => IsActive;
+
     /// <summary>
     /// True while ANY diegetic view is open on this client.
     /// Used by external systems (e.g. <see cref="UIController"/>) to suppress

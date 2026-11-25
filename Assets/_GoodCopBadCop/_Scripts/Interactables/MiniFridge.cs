@@ -53,7 +53,7 @@ public class MiniFridge : Interactable
             if (DiegeticViewController.IsLocalPlayerInDialogue())
                 return;
 
-            if (_occupancy != null && !_occupancy.TryClaim(player))
+            if (_occupancy != null && !_occupancy.TryClaim(player, _diegeticController))
                 return;
 
             if (!_diegeticController.Open(player, this))

@@ -51,17 +51,19 @@ public class BunkerDoorInteractable : Interactable
         if (DiegeticViewController.IsAnyViewActive)
             return;
 
-        if (_occupancy != null && !_occupancy.TryClaim(player))
+        // Never claim for a view that won't open during dialogue.
+        if (DiegeticViewController.IsLocalPlayerInDialogue())
             return;
 
         DoorWheelDiegeticController nearestView = GetNearestWheelView(player.transform.position);
         if (nearestView == null)
-        {
-            _occupancy?.Release();
             return;
-        }
 
-        nearestView.Open(player);
+        if (_occupancy != null && !_occupancy.TryClaim(player, nearestView))
+            return;
+
+        if (!nearestView.Open(player))
+            _occupancy?.Release();
     }
 
     /// <summary>

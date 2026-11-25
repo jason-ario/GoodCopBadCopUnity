@@ -127,9 +127,13 @@ public class Lever : Interactable, IDiegeticLever
             return;
         }
         if (DiegeticViewController.IsAnyViewActive) return;
-        if (_occupancy != null && !_occupancy.TryClaim(player)) return;
 
-        _diegeticView.Open(player);
+        // Same leak guard as PowerSwitch: never claim for a view that won't open.
+        if (DiegeticViewController.IsLocalPlayerInDialogue()) return;
+        if (_occupancy != null && !_occupancy.TryClaim(player, _diegeticView)) return;
+
+        if (!_diegeticView.Open(player))
+            _occupancy?.Release();
     }
 
     // ── Drag API (driven by LeverDiegeticController) ─────────────────────────
