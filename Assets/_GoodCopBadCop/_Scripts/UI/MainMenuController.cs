@@ -376,12 +376,13 @@ public class MainMenuController : MonoBehaviour
         BackToHomeScreen();
     }
 
-    /// <summary>Returns to the multiplayer hub from the join screen. Backing out while a
-    /// cold-launch Steam invite is still connecting cancels that join.</summary>
+    /// <summary>Returns to the multiplayer hub from the join screen. Backing out cancels any join
+    /// still in progress (code search, browser/invite join, cold-launch invite), so it can't pull
+    /// the player into a lobby after they left the screen.</summary>
     public void BackToMultiplayerScreen()
     {
-        if (LobbyManager.IsLaunchInviteJoinPending)
-            LobbyManager.Instance?.CancelLaunchInviteJoin();
+        if (LobbyManager.Instance != null)
+            LobbyManager.Instance.CancelPendingJoin();
 
         SwitchToScreen(multiplayerScreen);
     }

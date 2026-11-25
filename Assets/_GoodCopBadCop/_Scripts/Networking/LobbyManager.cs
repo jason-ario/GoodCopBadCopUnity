@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using GoodCopBadCop.Networking;
 using Netcode.Transports.Facepunch;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Unity.Netcode;
 using Steamworks;
 using Steamworks.Data;
@@ -23,7 +25,81 @@ public class LobbyManager : MonoBehaviour
 
     public event Action OnLobbyUpdated;
     public event Action OnKicked;
+    /// <summary>Fires with a reason code (one of the JoinFail* constants or a Steam RoomEnter name) when
+    /// a join fails. Turn it into player-facing text with <see cref="DescribeJoinFailure"/>.</summary>
     public event Action<string> OnJoinFailed;
+
+    // Join failure reasons passed through OnJoinFailed (besides Steam's RoomEnter names and NGO's
+    // connection-approval reasons such as "LobbyFull").
+    public const string JoinFailCodeNotFound = "CODE_NOT_FOUND";
+    public const string JoinFailSteamNotReady = "STEAM_NOT_READY";
+    public const string JoinFailSteamOffline = "STEAM_OFFLINE";
+    public const string JoinFailVersionMismatch = "VERSION_MISMATCH";
+    public const string JoinFailAlreadyInLobby = "ALREADY_IN_LOBBY";
+    public const string JoinFailInProgress = "JOIN_IN_PROGRESS";
+    public const string JoinFailLobbyFull = "LobbyFull";
+    public const string JoinFailAbandoned = "LOBBY_ABANDONED";
+    public const string JoinFailHostUnreachable = "HOST_UNREACHABLE";
+    public const string JoinFailTimeout = "TIMEOUT";
+    public const string JoinFailDisconnected = "DISCONNECTED";
+    public const string JoinFailError = "Error";
+
+    // English source text; render-time localization translates it on labels, Loc.T in toasts.
+    private static readonly string MsgLobbyNotFound = Loc.N("LOBBY NOT FOUND");
+    private static readonly string MsgLobbyFull = Loc.N("LOBBY FULL");
+    private static readonly string MsgSteamNotReady = Loc.N("STEAM NOT CONNECTED");
+    private static readonly string MsgJoinFailed = Loc.N("UNABLE TO JOIN LOBBY");
+    private static readonly string MsgHostNoResponse = Loc.N("HOST DID NOT RESPOND");
+    private static readonly string MsgDisconnected = Loc.N("LOST CONNECTION TO HOST");
+    private static readonly string MsgVersionMismatch = Loc.N("HOST IS ON A DIFFERENT GAME VERSION");
+    private static readonly string MsgAlreadyInLobby = Loc.N("YOU'RE ALREADY IN THIS LOBBY");
+    private static readonly string MsgJoinInProgress = Loc.N("ALREADY JOINING A LOBBY");
+    private static readonly string MsgNotAllowed = Loc.N("LOBBY IS NOT ACCEPTING PLAYERS");
+    private static readonly string MsgBlocked = Loc.N("YOU CAN'T JOIN THIS LOBBY");
+    private static readonly string MsgLimitedAccount = Loc.N("LIMITED STEAM ACCOUNTS CAN'T JOIN LOBBIES");
+    private static readonly string MsgRateLimited = Loc.N("TOO MANY ATTEMPTS, TRY AGAIN SHORTLY");
+
+    /// <summary>English source text for a join failure reason (translated at display time).</summary>
+    public static string DescribeJoinFailure(string reason)
+    {
+        switch (reason)
+        {
+            case JoinFailCodeNotFound:
+            case JoinFailAbandoned:
+            case "DoesntExist":
+                return MsgLobbyNotFound;
+            case JoinFailSteamNotReady:
+            case JoinFailSteamOffline:
+                return MsgSteamNotReady;
+            case JoinFailLobbyFull:
+            case "Full":
+                return MsgLobbyFull;
+            case JoinFailVersionMismatch:
+                return MsgVersionMismatch;
+            case JoinFailAlreadyInLobby:
+                return MsgAlreadyInLobby;
+            case JoinFailInProgress:
+                return MsgJoinInProgress;
+            case JoinFailHostUnreachable:
+            case JoinFailTimeout:
+                return MsgHostNoResponse;
+            case JoinFailDisconnected:
+                return MsgDisconnected;
+            case "NotAllowed":
+                return MsgNotAllowed;
+            case "Banned":
+            case "CommunityBan":
+            case "MemberBlockedYou":
+            case "YouBlockedMember":
+                return MsgBlocked;
+            case "Limited":
+                return MsgLimitedAccount;
+            case "RatelimitExceeded":
+                return MsgRateLimited;
+            default:
+                return MsgJoinFailed;
+        }
+    }
 
     private FacepunchTransport facepunchTransport;
     private bool inviteOverlayWasOpenedByUs;
@@ -31,6 +107,8 @@ public class LobbyManager : MonoBehaviour
     private bool inviteOverlayActivated;
     // Bumped on every open/cancel so a stale watchdog can't close a newer invite request.
     private int inviteRequestId;
+    // Steam lobby we entered and immediately left (full, abandoned, wrong version, cancelled); its
+    // late OnLobbyEntered callback must not make it the current lobby again.
     private ulong _rejectedFullLobbyId;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -235,7 +313,12 @@ public class LobbyManager : MonoBehaviour
 
         // Capture the Steam-side failure reason (DoesntExist, Full, LobbyFull, ...) if the join fails.
         string joinFailReason = null;
-        void CaptureJoinFail(string r) => joinFailReason ??= r;
+        void CaptureJoinFail(string r)
+        {
+            // A rejected second join attempt doesn't mean this invite join failed.
+            if (r != JoinFailInProgress)
+                joinFailReason ??= r;
+        }
         OnJoinFailed += CaptureJoinFail;
         try
         {
@@ -422,18 +505,22 @@ public class LobbyManager : MonoBehaviour
         }
     }
 
-    /// <summary>Only the Steam lobby owner (the host) can change public/private.</summary>
-    public bool CanChangeLobbyVisibility => IsLocalLobbyOwner;
+    /// <summary>
+    /// Only the host can change public/private. Lobby ownership alone isn't enough: when the host
+    /// drops, Steam hands ownership to another member who isn't running the session.
+    /// </summary>
+    public bool CanChangeLobbyVisibility =>
+        IsLocalLobbyOwner && NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
 
     /// <summary>
     /// Host only: lists or unlists the lobby in the public browser. Join codes and Steam invites
-    /// keep working either way. Returns false when the local player isn't the lobby owner.
+    /// keep working either way. Returns false when the local player isn't the host.
     /// </summary>
     public bool SetLobbyPublic(bool isPublic)
     {
-        if (!IsLocalLobbyOwner)
+        if (!CanChangeLobbyVisibility)
         {
-            Debug.LogWarning("[LobbyManager] Only the lobby owner can change lobby visibility.");
+            Debug.LogWarning("[LobbyManager] Only the host can change lobby visibility.");
             return false;
         }
 
@@ -480,19 +567,31 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton == null || lobbyId == 0)
             return;
 
-        if (!SteamClient.IsValid)
+        if (!TryBeginJoin(out int requestId))
+            return;
+
+        string blocker = SteamJoinBlocker();
+        if (blocker != null)
         {
-            OnJoinFailed?.Invoke("STEAM_NOT_READY");
+            await FailJoin(requestId, blocker);
+            return;
+        }
+
+        if (CurrentLobby.Id.Value == lobbyId)
+        {
+            await FailJoin(requestId, JoinFailAlreadyInLobby);
             return;
         }
 
         // Same as JoinLobbyByCode: leave any lingering lobby/session so StartClient isn't skipped.
         if (CurrentLobby.Id != 0 || NetworkManager.Singleton.IsListening)
             await ExitLobbyAsync();
+        if (!IsJoinCurrent(requestId))
+            return;
 
         DevSpectatorRegistry.IsLocalSpectating = false;
         Debug.Log($"[JoinPublicLobby] Joining public lobby {lobbyId}.");
-        await JoinLobbyInternal(lobbyId, "127.0.0.1");
+        await JoinLobbyInternal(requestId, lobbyId, "127.0.0.1");
     }
 
     /// <summary>
@@ -710,9 +809,12 @@ public class LobbyManager : MonoBehaviour
     /// Pass lobbyId = 0 when using UnityTransport to fall through to the LAN path.</summary>
     public async void JoinLobby(ulong lobbyId)
     {
+        if (!TryBeginJoin(out int requestId))
+            return;
+
         // A regular join (invite, browser, code) always drops any previous spectator state.
         DevSpectatorRegistry.IsLocalSpectating = false;
-        await JoinLobbyInternal(lobbyId, "127.0.0.1");
+        await JoinLobbyInternal(requestId, lobbyId, "127.0.0.1");
     }
 
     /// <summary>
@@ -735,10 +837,13 @@ public class LobbyManager : MonoBehaviour
             return false;
         }
 
+        if (!TryBeginJoin(out int requestId))
+            return false;
+
         await ExitLobbyAsync();
 
         DevSpectatorRegistry.IsLocalSpectating = true;
-        await JoinLobbyInternal(lobbyId, "127.0.0.1");
+        await JoinLobbyInternal(requestId, lobbyId, "127.0.0.1");
 
         bool joined = CurrentLobby.Id.Value == lobbyId;
         if (!joined)
@@ -748,7 +853,13 @@ public class LobbyManager : MonoBehaviour
 
     /// <summary>Joins a LAN host at the given IP address using UnityTransport.
     /// Ignored when FacepunchTransport is the active transport.</summary>
-    public async void JoinLobbyLAN(string address) => await JoinLobbyInternal(0, address);
+    public async void JoinLobbyLAN(string address)
+    {
+        if (!TryBeginJoin(out int requestId))
+            return;
+
+        await JoinLobbyInternal(requestId, 0, address);
+    }
 
     /// <summary>
     /// Searches public Steam lobbies for one whose join_code metadata matches <paramref name="code"/>
@@ -760,12 +871,23 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton == null)
             return;
 
-        var normalizedCode = code.Trim().ToUpperInvariant();
+        var normalizedCode = (code ?? string.Empty).Trim().ToUpperInvariant();
 
-        if (!SteamClient.IsValid)
+        if (!TryBeginJoin(out int requestId))
+            return;
+
+        string blocker = SteamJoinBlocker();
+        if (blocker != null)
         {
-            Debug.LogError("[JoinLobbyByCode] Steam is not initialized — cannot search for lobbies.");
-            OnJoinFailed?.Invoke("STEAM_NOT_READY");
+            Debug.LogError($"[JoinLobbyByCode] Steam is not ready ({blocker}) — cannot search for lobbies.");
+            await FailJoin(requestId, blocker);
+            return;
+        }
+
+        // The host typing their own code would otherwise leave their own lobby and then fail to rejoin it.
+        if (CurrentLobby.Id != 0 && string.Equals(CurrentJoinCode, normalizedCode, StringComparison.Ordinal))
+        {
+            await FailJoin(requestId, JoinFailAlreadyInLobby);
             return;
         }
 
@@ -787,6 +909,14 @@ public class LobbyManager : MonoBehaviour
                 .WithKeyValue(LobbyDataKeyJoinCode, normalizedCode)
                 .RequestAsync();
 
+            // Player backed out (or another join replaced this one) while Steam was searching.
+            if (!IsJoinCurrent(requestId))
+                return;
+
+            // Never "find" the lobby we're already in.
+            if (lobbies != null)
+                lobbies = lobbies.Where(l => l.Id != CurrentLobby.Id || CurrentLobby.Id == 0).ToArray();
+
             if (lobbies != null && lobbies.Length > 0)
                 break;
 
@@ -794,6 +924,8 @@ public class LobbyManager : MonoBehaviour
             {
                 Debug.LogWarning($"[JoinLobbyByCode] Attempt {attempt}/{MaxSearchAttempts}: no lobby for '{normalizedCode}' yet — retrying in {SearchRetryDelaySeconds}s...");
                 await Task.Delay(TimeSpan.FromSeconds(SearchRetryDelaySeconds));
+                if (!IsJoinCurrent(requestId))
+                    return;
             }
         }
 
@@ -801,7 +933,7 @@ public class LobbyManager : MonoBehaviour
         {
             Debug.LogWarning($"[JoinLobbyByCode] No lobby found for code '{normalizedCode}'. " +
                              $"If the host is definitely online, confirm both players run the game under the same Steam AppId (local={SteamClient.AppId.Value}).");
-            OnJoinFailed?.Invoke("CODE_NOT_FOUND");
+            await FailJoin(requestId, JoinFailCodeNotFound);
             return;
         }
 
@@ -809,19 +941,27 @@ public class LobbyManager : MonoBehaviour
         // otherwise StartClient would be skipped because NetworkManager is still running.
         if (CurrentLobby.Id != 0 || NetworkManager.Singleton.IsListening)
             await ExitLobbyAsync();
+        if (!IsJoinCurrent(requestId))
+            return;
 
         DevSpectatorRegistry.IsLocalSpectating = false;
 
-        // Take the first match; codes are unique per active session.
-        var target = lobbies[0];
+        // Codes are unique per active session, but a stale lobby from an earlier session can
+        // linger in search results; prefer one that isn't full.
+        var target = lobbies.FirstOrDefault(l => !IsBrowserLobbyFull(l));
+        if (target.Id == 0)
+            target = lobbies[0];
         Debug.Log($"[JoinLobbyByCode] Found lobby {target.Id} for code '{normalizedCode}'.");
-        await JoinLobbyInternal(target.Id, "127.0.0.1");
+        await JoinLobbyInternal(requestId, target.Id, "127.0.0.1");
     }
 
-    private async Task JoinLobbyInternal(ulong lobbyId, string lanAddress)
+    private async Task JoinLobbyInternal(int requestId, ulong lobbyId, string lanAddress)
     {
         if (NetworkManager.Singleton == null)
+        {
+            await FailJoin(requestId, JoinFailError);
             return;
+        }
 
         var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
 
@@ -842,24 +982,63 @@ public class LobbyManager : MonoBehaviour
             for (int attempt = 1; attempt <= MaxJoinAttempts; attempt++)
             {
                 joinResult = await lobby.Join();
+
+                // Player backed out while Steam was processing the join: don't keep the seat.
+                if (!IsJoinCurrent(requestId))
+                {
+                    if (joinResult == RoomEnter.Success)
+                        LeaveRejectedLobby(lobby);
+                    return;
+                }
+
                 if (joinResult == RoomEnter.Success)
                     break;
 
+                // Only transient results are worth retrying; Full, Banned, NotAllowed... won't change.
+                bool retryable = joinResult == RoomEnter.Error || joinResult == RoomEnter.DoesntExist;
                 Debug.LogWarning($"[JoinLobby] Attempt {attempt}/{MaxJoinAttempts} failed to join lobby {lobbyId}. Result: {joinResult}" +
-                    (attempt < MaxJoinAttempts ? $" — retrying in {JoinRetryDelaySeconds}s..." : ""));
+                    (retryable && attempt < MaxJoinAttempts ? $" — retrying in {JoinRetryDelaySeconds}s..." : ""));
+
+                if (!retryable)
+                    break;
 
                 if (attempt < MaxJoinAttempts)
+                {
                     await Task.Delay(TimeSpan.FromSeconds(JoinRetryDelaySeconds));
+                    if (!IsJoinCurrent(requestId))
+                        return;
+                }
             }
 
             if (joinResult != RoomEnter.Success)
             {
-                Debug.LogError($"[JoinLobby] Failed to join lobby {lobbyId} after {MaxJoinAttempts} attempts. Result: {joinResult}");
-                OnJoinFailed?.Invoke(joinResult.ToString());
+                Debug.LogError($"[JoinLobby] Failed to join lobby {lobbyId}. Result: {joinResult}");
+                await FailJoin(requestId, joinResult.ToString());
                 return;
             }
 
             bool asSpectator = DevSpectatorRegistry.IsLocalSpectating;
+
+            // Abandoned lobby: the host is gone and Steam made us the owner of what's left.
+            // Nobody is running a session to connect to.
+            if (SteamClient.IsValid && lobby.Owner.Id == SteamClient.SteamId)
+            {
+                Debug.LogWarning($"[JoinLobby] Lobby {lobbyId} has no host (we became its owner) — leaving.");
+                LeaveRejectedLobby(lobby);
+                await FailJoin(requestId, JoinFailAbandoned);
+                return;
+            }
+
+            // Different builds can't connect (NGO rejects the config hash), so stop here with a clear
+            // reason instead of a generic connection failure. Code and invite joins never saw the
+            // browser's version check.
+            if (!IsLobbyVersionCompatible(lobby))
+            {
+                Debug.LogWarning($"[JoinLobby] Lobby {lobbyId} runs version '{GetLobbyVersion(lobby)}', local is '{Application.version}' — leaving.");
+                LeaveRejectedLobby(lobby);
+                await FailJoin(requestId, JoinFailVersionMismatch);
+                return;
+            }
 
             // Publish our role immediately so every other member can filter hidden spectators.
             lobby.SetMemberData(DevSpectatorConfig.MemberRoleKey,
@@ -870,11 +1049,8 @@ public class LobbyManager : MonoBehaviour
             if (!asSpectator && DevSpectatorConfig.CountVisibleMembers(lobby) > MaxLobbyMembers)
             {
                 Debug.LogWarning($"[JoinLobby] Lobby {lobbyId} is full ({MaxLobbyMembers} players) — leaving.");
-                _rejectedFullLobbyId = lobby.Id.Value;
-                lobby.Leave();
-                if (CurrentLobby.Id == lobby.Id)
-                    CurrentLobby = default;
-                OnJoinFailed?.Invoke("LobbyFull");
+                LeaveRejectedLobby(lobby);
+                await FailJoin(requestId, JoinFailLobbyFull);
                 return;
             }
 
@@ -885,6 +1061,7 @@ public class LobbyManager : MonoBehaviour
             if (facepunchTransport == null)
             {
                 Debug.LogError("[JoinLobby] facepunchTransport is null — cannot connect.");
+                await FailJoin(requestId, JoinFailError, leaveSession: true);
                 return;
             }
 
@@ -898,18 +1075,28 @@ public class LobbyManager : MonoBehaviour
                 // Hidden dev spectators drive their own setup and never get the late-join
                 // bootstrap RPC that dismisses the loader, so only players see it.
                 if (!asSpectator)
-                    GoodCopBadCop.Networking.JoinLoaderOverlay.Show();
+                    JoinLoaderOverlay.Show();
 
                 bool started = NetworkManager.Singleton.StartClient();
                 Debug.Log($"[JoinLobby] StartClient={started}");
 
                 if (!started)
-                    GoodCopBadCop.Networking.JoinLoaderOverlay.Cancel();
+                {
+                    JoinLoaderOverlay.Cancel();
+                    await FailJoin(requestId, JoinFailError, leaveSession: true);
+                    return;
+                }
             }
             else
             {
                 Debug.LogWarning($"[JoinLobby] Skipping StartClient — already IsClient={NetworkManager.Singleton.IsClient} IsHost={NetworkManager.Singleton.IsHost}");
             }
+
+            // Spectators run their own tooling flow; the hidden join needs no player feedback.
+            if (asSpectator)
+                EndJoinQuietly(requestId);
+            else
+                _ = WatchJoinCompletion(requestId, lobbyId);
         }
         else if (transport is UnityTransport unityTransport)
         {
@@ -919,11 +1106,247 @@ public class LobbyManager : MonoBehaviour
 
             if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsHost)
             {
-                GoodCopBadCop.Networking.JoinLoaderOverlay.Show();
+                JoinLoaderOverlay.Show();
                 if (!NetworkManager.Singleton.StartClient())
-                    GoodCopBadCop.Networking.JoinLoaderOverlay.Cancel();
+                {
+                    JoinLoaderOverlay.Cancel();
+                    await FailJoin(requestId, JoinFailError, leaveSession: true);
+                    return;
+                }
+            }
+
+            _ = WatchJoinCompletion(requestId, 0);
+        }
+        else
+        {
+            await FailJoin(requestId, JoinFailError);
+        }
+    }
+
+    // =========================
+    // JOIN STATE
+    // =========================
+
+    // One join at a time. Every awaited step re-checks the request id, so a join the player
+    // cancelled (or that was replaced) can't pull them into a lobby afterwards.
+    private int _joinRequestId;
+    private bool _joinInProgress;
+
+    /// <summary>Give up if the host never accepts the connection within this time.</summary>
+    private const float JoinConnectTimeoutSeconds = 25f;
+
+    /// <summary>Stop watching once connected for this long; the join loader's own safety net takes over.</summary>
+    private const float JoinSyncTimeoutSeconds = 240f;
+
+    /// <summary>
+    /// True from the moment a join starts until it reaches the lobby/game, fails, or is cancelled.
+    /// <see cref="ConnectionLossHandler"/> ignores disconnects meanwhile: a failed join is reported
+    /// with its real reason here, not as "Lost connection" plus a scene reload.
+    /// </summary>
+    public static bool IsJoinPending => Instance != null && Instance._joinInProgress;
+
+    private bool TryBeginJoin(out int requestId)
+    {
+        requestId = 0;
+
+        // Safety net: an exception inside a join task must not lock out every later join.
+        if (_joinInProgress && Time.realtimeSinceStartup - _joinStartedAt > JoinSyncTimeoutSeconds + 30f)
+        {
+            Debug.LogWarning("[LobbyManager] Previous join never finished — releasing it.");
+            _joinInProgress = false;
+        }
+
+        if (_joinInProgress)
+        {
+            Debug.LogWarning("[LobbyManager] A join is already in progress — ignoring the new request.");
+            ReportJoinFailure(JoinFailInProgress);
+            return false;
+        }
+
+        _joinInProgress = true;
+        _joinStartedAt = Time.realtimeSinceStartup;
+        requestId = ++_joinRequestId;
+        return true;
+    }
+
+    private float _joinStartedAt;
+
+    private bool IsJoinCurrent(int requestId) => this != null && _joinInProgress && requestId == _joinRequestId;
+
+    /// <summary>Null when Steam can be used for a join, otherwise the failure reason.</summary>
+    private static string SteamJoinBlocker()
+    {
+        if (!SteamClient.IsValid) return JoinFailSteamNotReady;
+        if (!SteamClient.IsLoggedOn) return JoinFailSteamOffline;
+        return null;
+    }
+
+    /// <summary>Leaves a Steam lobby we entered but won't stay in, and ignores its late enter callback.</summary>
+    private void LeaveRejectedLobby(Lobby lobby)
+    {
+        _rejectedFullLobbyId = lobby.Id.Value;
+        lobby.Leave();
+        if (CurrentLobby.Id == lobby.Id)
+            CurrentLobby = default;
+    }
+
+    /// <summary>
+    /// Ends a join as failed and reports why. <paramref name="leaveSession"/> tears down the Steam
+    /// lobby / NGO client this join already started (flagged intentional, so it isn't a lost connection).
+    /// </summary>
+    private async Task FailJoin(int requestId, string reason, bool leaveSession = false)
+    {
+        if (!IsJoinCurrent(requestId))
+            return;
+
+        _joinInProgress = false;
+        _joinRequestId++;
+        Debug.LogWarning($"[LobbyManager] Join failed: {reason}");
+
+        JoinLoaderOverlay.Cancel();
+        if (leaveSession && (CurrentLobby.Id != 0 || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)))
+            await ExitLobbyAsync();
+
+        ReportJoinFailure(reason);
+    }
+
+    private void ReportJoinFailure(string reason)
+    {
+        OnJoinFailed?.Invoke(reason);
+
+        // The join screen shows the reason in its status line; anywhere else (invite accepted from
+        // the home screen, pre-game lobby, ...) needs a toast or the player never learns why.
+        if (!JoinLobbyScreen.IsOpen)
+            LobbyToast.Error(Loc.T(DescribeJoinFailure(reason)));
+    }
+
+    private void CompleteJoin(int requestId)
+    {
+        if (!IsJoinCurrent(requestId))
+            return;
+
+        _joinInProgress = false;
+
+        string host = CurrentLobby.Id != 0 ? CurrentLobby.GetData("host") : null;
+        LobbyToast.Success(string.IsNullOrWhiteSpace(host)
+            ? Loc.T("Joined the lobby.")
+            // The Steam name must never go through localization.
+            : Loc.Verbatim(Loc.T("Joined {0}'s lobby.", host)));
+    }
+
+    private void EndJoinQuietly(int requestId)
+    {
+        if (IsJoinCurrent(requestId))
+            _joinInProgress = false;
+    }
+
+    /// <summary>
+    /// Player backed out of the join screen: abandons whatever join is in progress (code search,
+    /// Steam join or NGO connection) and leaves anything it already joined.
+    /// </summary>
+    public async void CancelPendingJoin()
+    {
+        bool wasLaunchInvite = IsLaunchInviteJoinPending;
+        if (wasLaunchInvite)
+            CancelLaunchInviteJoin(); // leaves the session itself
+
+        if (!_joinInProgress)
+            return;
+
+        _joinInProgress = false;
+        _joinRequestId++;
+        Debug.Log("[LobbyManager] Pending join cancelled by player.");
+
+        JoinLoaderOverlay.Cancel();
+        if (!wasLaunchInvite && (CurrentLobby.Id != 0 || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)))
+            await ExitLobbyAsync();
+    }
+
+    /// <summary>
+    /// After StartClient: waits for the host to route us to the ready-up screen or into gameplay.
+    /// Reports approval rejections (full), hosts that never answer, and drops mid-handshake.
+    /// </summary>
+    private async Task WatchJoinCompletion(int requestId, ulong lobbyId)
+    {
+        // Cold-launch invites have their own watchdog (TryJoinLobbyFromLaunchArgs) that reports
+        // failures on the join screen; only add the success toast for them.
+        bool launchInvite = IsLaunchInviteJoinPending;
+        bool everConnected = false;
+        float waited = 0f;
+
+        while (true)
+        {
+            await Task.Delay(100);
+            waited += 0.1f;
+
+            if (!IsJoinCurrent(requestId))
+                return;
+
+            if (launchInvite)
+            {
+                if (!_launchInviteResolved && waited < JoinSyncTimeoutSeconds)
+                    continue;
+
+                if (HasReachedLobbyOrGame())
+                    CompleteJoin(requestId);
+                else
+                    EndJoinQuietly(requestId);
+                return;
+            }
+
+            if (HasReachedLobbyOrGame())
+            {
+                CompleteJoin(requestId);
+                return;
+            }
+
+            NetworkManager nm = NetworkManager.Singleton;
+            if (nm == null || !nm.IsClient)
+            {
+                // NGO's approval reason ("LobbyFull", ...) when the host rejected us.
+                string reason = nm != null && !string.IsNullOrEmpty(nm.DisconnectReason)
+                    ? nm.DisconnectReason
+                    : everConnected ? JoinFailDisconnected : JoinFailHostUnreachable;
+                await FailJoin(requestId, reason, leaveSession: true);
+                return;
+            }
+
+            if (nm.IsConnectedClient)
+                everConnected = true;
+
+            if (lobbyId != 0 && CurrentLobby.Id.Value != lobbyId)
+            {
+                await FailJoin(requestId, JoinFailDisconnected, leaveSession: true);
+                return;
+            }
+
+            if (!everConnected && waited > JoinConnectTimeoutSeconds)
+            {
+                await FailJoin(requestId, JoinFailTimeout, leaveSession: true);
+                return;
+            }
+
+            if (waited > JoinSyncTimeoutSeconds)
+            {
+                Debug.LogWarning("[LobbyManager] Join still synchronizing after the watch window — no longer tracking it.");
+                EndJoinQuietly(requestId);
+                return;
             }
         }
+    }
+
+    /// <summary>The host routed us: ready-up screen open, or the menu hidden for gameplay.</summary>
+    private static bool HasReachedLobbyOrGame()
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsConnectedClient)
+            return false;
+
+        MainMenuController menu = MainMenuController.Instance;
+        if (menu != null)
+            return menu.IsInLobbyOrGame;
+
+        return nm.LocalClient != null && nm.LocalClient.PlayerObject != null;
     }
 
     // =========================
@@ -1059,7 +1482,75 @@ public class LobbyManager : MonoBehaviour
     private async void OnGameLobbyJoinRequested(Lobby lobby, SteamId friendId)
     {
         Debug.Log($"Steam invite accepted from {friendId} for lobby {lobby.Id}");
+
+        if (CurrentLobby.Id == lobby.Id)
+        {
+            LobbyToast.Show(Loc.T(MsgAlreadyInLobby));
+            return;
+        }
+
+        if (IsInGameplay)
+        {
+            await JoinInviteFromGameplay(lobby.Id);
+            return;
+        }
+
         await JoinLobbyFromInvite(lobby.Id);
+    }
+
+    /// <summary>Gameplay (or the committed transition into it) rather than the main menu screens.</summary>
+    private static bool IsInGameplay
+    {
+        get
+        {
+            MainMenuController menu = MainMenuController.Instance;
+            if (menu == null)
+                return false;
+            return menu.IsGameStartLocked || menu.mainMenu == null || !menu.mainMenu.activeSelf;
+        }
+    }
+
+    /// <summary>
+    /// Invite accepted mid-game. Joining in place used to shut the session down under the running
+    /// gameplay scene (player and camera despawned, stale game state), so instead leave like
+    /// "Return to main menu" does, reload the scene, and join through the cold-launch invite flow,
+    /// which shows the join screen's connecting state and reports failures there.
+    /// </summary>
+    private async Task JoinInviteFromGameplay(ulong lobbyId)
+    {
+        if (_joinInProgress || IsLaunchInviteJoinPending)
+        {
+            LobbyToast.Error(Loc.T(MsgJoinInProgress));
+            return;
+        }
+
+        Debug.Log($"[Invite] Invite accepted during gameplay — returning to the menu to join lobby {lobbyId}.");
+        LobbyToast.Show(Loc.T("Leaving the current game to join your friend..."));
+
+        // Same as the pause menu's Return to Main Menu: progress since the day start isn't kept.
+        SaveDataManager.Instance?.StopPlaytimeTracking();
+        SaveDataManager.Instance?.RevertToLastCheckpoint();
+
+        _launchInviteLobbyId = lobbyId;
+        _launchInviteResolved = false;
+        _launchArgsConsumed = false;
+        MainMenuSplashScreen.Suppress();
+
+        await ExitLobbyAsync();
+        if (this == null)
+            return;
+
+        SceneManager.sceneLoaded += OnSceneReloadedForInvite;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().path);
+    }
+
+    private void OnSceneReloadedForInvite(Scene scene, LoadSceneMode mode)
+    {
+        SceneManager.sceneLoaded -= OnSceneReloadedForInvite;
+        if (this == null)
+            return;
+
+        _ = TryJoinLobbyFromLaunchArgs();
     }
 
     /// <summary>Shared invite join path for both in-game (callback) and cold-launch (command line) invites.</summary>
@@ -1071,12 +1562,24 @@ public class LobbyManager : MonoBehaviour
             return;
         }
 
+        if (!TryBeginJoin(out int requestId))
+            return;
+
+        string blocker = SteamJoinBlocker();
+        if (blocker != null)
+        {
+            await FailJoin(requestId, blocker);
+            return;
+        }
+
         // Leave any lobby/session we're still in, otherwise StartClient would be skipped.
         if (CurrentLobby.Id != 0 || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening))
             await ExitLobbyAsync();
+        if (!IsJoinCurrent(requestId))
+            return;
 
         DevSpectatorRegistry.IsLocalSpectating = false;
-        await JoinLobbyInternal(lobbyId, "127.0.0.1");
+        await JoinLobbyInternal(requestId, lobbyId, "127.0.0.1");
     }
 
     // =========================
@@ -1187,13 +1690,24 @@ public class LobbyManager : MonoBehaviour
 
     private static void ShowMembershipNotification(string steamName, bool joined)
     {
-        if (UIController.Instance == null)
-            return;
-
         bool hasName = !string.IsNullOrWhiteSpace(steamName);
         string message = joined
             ? (hasName ? Loc.T("{0} has joined the game.", steamName) : Loc.T("A player has joined the game."))
             : (hasName ? Loc.T("{0} has left the game.", steamName) : Loc.T("A player has left the game."));
+        if (hasName)
+            message = Loc.Verbatim(message); // the Steam name must never go through localization
+
+        // The HUD stacks are hidden on the main menu (pre-game ready-up screen), so use the
+        // lobby toast there.
+        MainMenuController menu = MainMenuController.Instance;
+        if (menu != null && menu.mainMenu != null && menu.mainMenu.activeInHierarchy)
+        {
+            LobbyToast.Show(message);
+            return;
+        }
+
+        if (UIController.Instance == null)
+            return;
 
         // Small plain-text line in the top-left cash notification stack, kept out of the large
         // bottom-centre HUD queue so it doesn't compete with gameplay alerts.

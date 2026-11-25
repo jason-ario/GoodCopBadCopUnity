@@ -9,8 +9,9 @@ using UnityEngine.UI;
 /// </summary>
 public class LobbyBrowserRow : MonoBehaviour
 {
-    private const string JoinText     = "JOIN";
-    private const string MismatchText = "WRONG VERSION";
+    // English source text; render-time localization translates the button label when shown.
+    private static readonly string JoinText     = Loc.N("JOIN");
+    private static readonly string MismatchText = Loc.N("WRONG VERSION");
 
     [SerializeField] private TMP_Text hostNameText;
     [SerializeField] private TMP_Text versionText;
@@ -24,16 +25,21 @@ public class LobbyBrowserRow : MonoBehaviour
     /// <summary>Raw (unlocalized) host name, used by the browser's search filter.</summary>
     public string HostName { get; private set; } = string.Empty;
 
+    /// <summary>Steam lobby this row joins.</summary>
+    public ulong LobbyId { get; private set; }
+
     /// <summary>
     /// Fills the row. <paramref name="hostName"/>, <paramref name="version"/> and
     /// <paramref name="playerCount"/> are shown verbatim (never localized).
     /// </summary>
-    public void Populate(string hostName, string version, string playerCount, bool versionMatches, UnityAction onJoin)
+    public void Populate(ulong lobbyId, string hostName, string version, string playerCount, bool versionMatches, UnityAction onJoin)
     {
+        LobbyId = lobbyId;
         HostName = hostName ?? string.Empty;
         _canJoin = versionMatches;
 
-        hostNameText.text = Loc.Verbatim($"{HostName}'s Lobby");
+        // The template is translated; the Steam name inside it never goes through localization.
+        hostNameText.text = Loc.Verbatim(Loc.T("{0}'s Lobby", HostName));
         if (versionText != null)
             versionText.text = Loc.Verbatim(string.IsNullOrEmpty(version) ? "-" : $"v{version}");
         playerCountText.text = Loc.Verbatim(playerCount);

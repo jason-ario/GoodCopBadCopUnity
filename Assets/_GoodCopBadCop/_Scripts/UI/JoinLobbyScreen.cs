@@ -33,21 +33,26 @@ public class JoinLobbyScreen : MonoBehaviour
     [Tooltip("Optional: filters the listed lobbies by host name.")]
     [SerializeField] private TMP_InputField searchInput;
 
-    private const string ErrorEmptyCode     = "NO CODE ENTERED";
-    private const string ErrorInvalidCode   = "INVALID JOIN CODE";
-    private const string ErrorLobbyNotFound = "LOBBY NOT FOUND";
-    private const string ErrorLobbyFull     = "LOBBY FULL";
-    private const string ErrorSteamNotReady = "STEAM NOT CONNECTED";
-    private const string ErrorJoinFailed    = "UNABLE TO JOIN LOBBY";
-    private const string ErrorInvalidIP     = "INVALID IP ADDRESS";
-    private const string ErrorHostNoResponse = "HOST DID NOT RESPOND";
-    private const string StatusLANReady     = "READY — PRESS JOIN TO CONNECT";
-    private const string StatusJoiningInvite = "JOINING FRIEND'S LOBBY...";
-    private const string StatusSearching    = "SEARCHING FOR PUBLIC LOBBIES...";
-    private const string StatusNoLobbies    = "NO PUBLIC LOBBIES FOUND";
-    private const string StatusJoiningLobby = "JOINING LOBBY...";
-    private const string StatusSteamOnly    = "PUBLIC LOBBIES REQUIRE STEAM";
-    private const string StatusNoMatches    = "NO LOBBIES MATCH YOUR SEARCH";
+    // English source text; render-time localization translates these when they're shown.
+    // Join failure reasons come from LobbyManager.DescribeJoinFailure.
+    private static readonly string ErrorEmptyCode      = Loc.N("NO CODE ENTERED");
+    private static readonly string ErrorInvalidCode    = Loc.N("INVALID JOIN CODE");
+    private static readonly string ErrorInvalidIP      = Loc.N("INVALID IP ADDRESS");
+    private static readonly string StatusLANReady      = Loc.N("READY — PRESS JOIN TO CONNECT");
+    private static readonly string StatusJoiningInvite = Loc.N("JOINING FRIEND'S LOBBY...");
+    private static readonly string StatusSearching     = Loc.N("SEARCHING FOR PUBLIC LOBBIES...");
+    private static readonly string StatusNoLobbies     = Loc.N("NO PUBLIC LOBBIES FOUND");
+    private static readonly string StatusJoiningLobby  = Loc.N("JOINING LOBBY...");
+    private static readonly string StatusSteamOnly     = Loc.N("PUBLIC LOBBIES REQUIRE STEAM");
+    private static readonly string StatusNoMatches     = Loc.N("NO LOBBIES MATCH YOUR SEARCH");
+    private static readonly string CodePlaceholder     = Loc.N("Enter join code (e.g. ABC123)");
+
+    /// <summary>True while the Join Game screen is on screen; LobbyManager then reports join
+    /// failures in its status line instead of a toast.</summary>
+    public static bool IsOpen { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() => IsOpen = false;
 
     private enum Tab { Code, Public }
 
@@ -55,6 +60,7 @@ public class JoinLobbyScreen : MonoBehaviour
     private Tab _activeTab = Tab.Public;
     private bool _isJoining;
     private int _refreshRequestId;
+    private ulong _joiningLobbyId;
     private readonly List<LobbyBrowserRow> _lobbyRows = new List<LobbyBrowserRow>();
 
     private void Awake()
@@ -70,6 +76,7 @@ public class JoinLobbyScreen : MonoBehaviour
 
     private void OnEnable()
     {
+        IsOpen = true;
         LobbyManager.Instance.OnJoinFailed += OnJoinFailed;
         _isJoining = false;
         inviteCodeInput.interactable = true;
@@ -80,7 +87,9 @@ public class JoinLobbyScreen : MonoBehaviour
 
     private void OnDisable()
     {
-        LobbyManager.Instance.OnJoinFailed -= OnJoinFailed;
+        IsOpen = false;
+        if (LobbyManager.Instance != null)
+            LobbyManager.Instance.OnJoinFailed -= OnJoinFailed;
         SetConnectingAnimationVisible(false);
         _refreshRequestId++; // drop any in-flight lobby request
         ClearLobbyRows();
@@ -249,9 +258,9 @@ public class JoinLobbyScreen : MonoBehaviour
             return;
         }
 
-        if (!Steamworks.SteamClient.IsValid)
+        if (!Steamworks.SteamClient.IsValid || !Steamworks.SteamClient.IsLoggedOn)
         {
-            SetPublicStatus(ErrorSteamNotReady);
+            SetPublicStatus(LobbyManager.DescribeJoinFailure(LobbyManager.JoinFailSteamNotReady));
             return;
         }
 
@@ -292,7 +301,7 @@ public class JoinLobbyScreen : MonoBehaviour
         if (lobbyRowPrefab == null || lobbyListContent == null) return;
 
         string hostName = lobby.GetData("host");
-        if (string.IsNullOrEmpty(hostName)) hostName = "Unknown Host";
+        if (string.IsNullOrEmpty(hostName)) hostName = Loc.T("Unknown Host");
 
         ulong lobbyId = lobby.Id.Value;
         LobbyBrowserRow row = Instantiate(lobbyRowPrefab, lobbyListContent);
@@ -300,6 +309,7 @@ public class JoinLobbyScreen : MonoBehaviour
         row.gameObject.SetActive(true);
 
         row.Populate(
+            lobbyId,
             hostName,
             LobbyManager.GetLobbyVersion(lobby),
             DevSpectatorConfig.FormatBrowserPlayerCount(lobby),
@@ -334,6 +344,7 @@ public class JoinLobbyScreen : MonoBehaviour
         if (_isJoining) return;
 
         _isJoining = true;
+        _joiningLobbyId = lobbyId;
         _refreshRequestId++;
         SetLobbyRowsInteractable(false);
         if (refreshButton != null) refreshButton.interactable = false;
@@ -361,21 +372,39 @@ public class JoinLobbyScreen : MonoBehaviour
     private void OnJoinFailed(string reason)
     {
         Debug.LogWarning($"Join failed: {reason}");
+
+        // Also reached when LobbyManager refuses a click because another join (e.g. an accepted
+        // invite) is still running; unlock this screen either way so it never sticks on "JOINING".
         _isJoining = false;
         SetConnectingAnimationVisible(false);
         SetLobbyRowsInteractable(true);
         if (refreshButton != null) refreshButton.interactable = true;
 
-        SetStatus(reason switch
+        // The browser row for a lobby that's gone, full or on another build is useless now.
+        if (_joiningLobbyId != 0 && IsDeadLobbyReason(reason))
+            RemoveLobbyRow(_joiningLobbyId);
+        _joiningLobbyId = 0;
+
+        SetStatus(LobbyManager.DescribeJoinFailure(reason));
+    }
+
+    private static bool IsDeadLobbyReason(string reason) =>
+        reason == "DoesntExist" || reason == "Full" ||
+        reason == LobbyManager.JoinFailLobbyFull ||
+        reason == LobbyManager.JoinFailAbandoned ||
+        reason == LobbyManager.JoinFailVersionMismatch ||
+        reason == LobbyManager.JoinFailHostUnreachable ||
+        reason == LobbyManager.JoinFailTimeout;
+
+    private void RemoveLobbyRow(ulong lobbyId)
+    {
+        for (int i = _lobbyRows.Count - 1; i >= 0; i--)
         {
-            "CODE_NOT_FOUND"  => ErrorLobbyNotFound,
-            "STEAM_NOT_READY" => ErrorSteamNotReady,
-            "LobbyFull"       => ErrorLobbyFull,
-            "Full"            => ErrorLobbyFull,
-            "DoesntExist"     => ErrorLobbyNotFound,
-            "TIMEOUT"         => ErrorHostNoResponse,
-            _                 => ErrorJoinFailed,
-        });
+            LobbyBrowserRow row = _lobbyRows[i];
+            if (row == null || row.LobbyId != lobbyId) continue;
+            Destroy(row.gameObject);
+            _lobbyRows.RemoveAt(i);
+        }
     }
 
     private void SetConnectingAnimationVisible(bool visible)
@@ -436,7 +465,7 @@ public class JoinLobbyScreen : MonoBehaviour
     {
         var placeholder = inviteCodeInput.placeholder as TMP_Text;
         if (placeholder != null)
-            placeholder.text = "Enter join code (e.g. ABC123)";
+            placeholder.text = CodePlaceholder;
     }
 
     private static bool IsValidIPv4(string address)

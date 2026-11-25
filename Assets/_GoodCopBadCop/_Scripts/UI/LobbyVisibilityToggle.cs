@@ -48,7 +48,14 @@ public class LobbyVisibilityToggle : MonoBehaviour
         LobbyManager lobby = LobbyManager.Instance;
         if (lobby == null || !lobby.CanChangeLobbyVisibility) return;
 
-        lobby.SetLobbyPublic(!lobby.IsLobbyPublic);
+        bool makePublic = !lobby.IsLobbyPublic;
+        if (lobby.SetLobbyPublic(makePublic))
+        {
+            GoodCopBadCop.Networking.LobbyToast.Show(makePublic
+                ? Loc.T("Lobby is now public. Anyone can find it under Public Lobbies.")
+                : Loc.T("Lobby is now private. Players can only join with the code or an invite."));
+        }
+
         UpdateLabel();
     }
 

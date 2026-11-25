@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Threading.Tasks;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -75,6 +76,11 @@ public class ConnectionLossHandler : MonoBehaviour
         if (LobbyManager.IsLaunchInviteJoinPending)
             return;
 
+        // Same for any other join still connecting: LobbyManager reports the real reason
+        // (lobby full, host didn't respond, ...) and keeps the player on the menu.
+        if (LobbyManager.IsJoinPending)
+            return;
+
         // Only react to the local client losing its own connection, not other players
         // disconnecting from a session we're hosting.
         bool isLocalClient = _networkManager != null && clientId == _networkManager.LocalClientId;
@@ -94,7 +100,22 @@ public class ConnectionLossHandler : MonoBehaviour
         else
             Debug.LogWarning("[ConnectionLossHandler] No notification assigned — restarting scene without a visible message.");
 
-        yield return new WaitForSecondsRealtime(_delayBeforeRestart);
+        // LobbyManager survives the reload, and so did our Steam lobby membership. Staying in it
+        // kept the lobby alive (and listed in Public Lobbies if it was public) with nobody hosting,
+        // and could even make us its owner. Leave it properly before reloading.
+        float waited = 0f;
+        if (LobbyManager.Instance != null)
+        {
+            Task exit = LobbyManager.Instance.ExitLobbyAsync();
+            while (!exit.IsCompleted && waited < _delayBeforeRestart)
+            {
+                waited += Time.unscaledDeltaTime;
+                yield return null;
+            }
+        }
+
+        if (waited < _delayBeforeRestart)
+            yield return new WaitForSecondsRealtime(_delayBeforeRestart - waited);
 
         SceneManager.LoadScene(SceneManager.GetActiveScene().path);
     }
