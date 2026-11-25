@@ -559,6 +559,13 @@ public class SuspectController : NetworkBehaviour
             return false;
         }
 
+        // Re-check full-mutant state now: the mutant mesh follows the record's score, but the
+        // cutscene/no-paperwork flow follows the slot flag. They must agree, otherwise a fully
+        // mutated suspect walks up in mutant form and hands over paperwork. Debug-forced full
+        // mutants are exempt (they run the full-mutant path regardless).
+        if (!ForceNextSuspectAsFullMutant && !dailySuspectManager.ValidateFullMutantSlotForSpawn(lineupIndex))
+            return false;
+
         GameObject spawnedSuspect = Instantiate(suspectPrefab.gameObject, position, rotation);
         InjectLegacyDependencies(spawnedSuspect);
         NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
@@ -1054,6 +1061,15 @@ public class SuspectController : NetworkBehaviour
     {
         return shutterController != null && shutterController.IsOpen;
     }
+
+    /// <summary>
+    /// Server-only. True when a player is inside the booth and the window shutter is open — the
+    /// same condition <see cref="OnRotationComplete"/>/<see cref="WaitForBoothReady"/> require
+    /// before the entry dialogue. Delayed auto-start sequences (forced intro, full-mutant
+    /// cutscene) must re-check this after their settle beat, because the window can be closed
+    /// during it. Returns true when no controller exists so non-booth flows are never blocked.
+    /// </summary>
+    public static bool IsBoothReadyForDialogue() => Instance == null || Instance.IsBoothReadyForSuspect();
 
     /// <summary>
     /// Polls every half-second until at least one player is inside the booth

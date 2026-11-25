@@ -133,9 +133,10 @@ public abstract class DayBase : MonoBehaviour
              "normal campaign days; use only to showcase full mutants earlier for a demo/build.")]
     public bool ForceEarlyFullMutants;
 
-    [Tooltip("How many previously-seen, never-quarantined suspects to force into full-mutant form " +
-             "this day (1 or 2). Ignored when ForceEarlyFullMutants is false, or if fewer eligible " +
-             "candidates exist.")]
+    [Tooltip("Target number of full mutants in today's lineup (1 or 2). Full mutants already drawn " +
+             "naturally count toward it — the override only forces the shortfall, and fills any " +
+             "unneeded forced slot with a regular suspect so the lineup length never shrinks. " +
+             "Ignored when ForceEarlyFullMutants is false.")]
     [Range(1, 2)]
     public int ForcedFullMutantCount = 1;
 

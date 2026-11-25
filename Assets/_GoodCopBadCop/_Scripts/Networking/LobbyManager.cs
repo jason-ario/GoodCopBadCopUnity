@@ -384,6 +384,117 @@ public class LobbyManager : MonoBehaviour
 
     private string _localJoinCode;
 
+    // Public/private is lobby metadata, NOT Steam's lobby type: the Steam lobby must stay
+    // searchable (SetPublic) because join-by-code finds lobbies through the lobby list. The
+    // public lobby browser only lists lobbies whose "visibility" is "public".
+    private const string LobbyDataKeyVisibility = "visibility";
+    private const string VisibilityPublic = "public";
+    private const string VisibilityPrivate = "private";
+    private const int PublicLobbyMaxResults = 100;
+
+    // Build version the host is running; the browser greys out lobbies from other builds.
+    private const string LobbyDataKeyVersion = "version";
+
+    /// <summary>Build version a lobby's host is running (empty for lobbies created before it was published).</summary>
+    public static string GetLobbyVersion(Lobby lobby) => lobby.GetData(LobbyDataKeyVersion);
+
+    /// <summary>True when a browsed lobby is from the same build as the local game (or predates version tagging).</summary>
+    public static bool IsLobbyVersionCompatible(Lobby lobby)
+    {
+        string version = GetLobbyVersion(lobby);
+        return string.IsNullOrEmpty(version) || version == Application.version;
+    }
+
+    // Host-side cache so the toggle reads back instantly, before Steam echoes the data change.
+    private bool _hostLobbyIsPublic;
+
+    private bool IsLocalLobbyOwner =>
+        CurrentLobby.Id != 0 && SteamClient.IsValid && CurrentLobby.Owner.Id == SteamClient.SteamId;
+
+    /// <summary>True when the active Steam lobby is listed in the public lobby browser.</summary>
+    public bool IsLobbyPublic
+    {
+        get
+        {
+            if (CurrentLobby.Id == 0 || !SteamClient.IsValid) return false;
+            if (IsLocalLobbyOwner) return _hostLobbyIsPublic;
+            return CurrentLobby.GetData(LobbyDataKeyVisibility) == VisibilityPublic;
+        }
+    }
+
+    /// <summary>Only the Steam lobby owner (the host) can change public/private.</summary>
+    public bool CanChangeLobbyVisibility => IsLocalLobbyOwner;
+
+    /// <summary>
+    /// Host only: lists or unlists the lobby in the public browser. Join codes and Steam invites
+    /// keep working either way. Returns false when the local player isn't the lobby owner.
+    /// </summary>
+    public bool SetLobbyPublic(bool isPublic)
+    {
+        if (!IsLocalLobbyOwner)
+        {
+            Debug.LogWarning("[LobbyManager] Only the lobby owner can change lobby visibility.");
+            return false;
+        }
+
+        _hostLobbyIsPublic = isPublic;
+        CurrentLobby.SetData(LobbyDataKeyVisibility, isPublic ? VisibilityPublic : VisibilityPrivate);
+        Debug.Log($"[LobbyManager] Lobby {CurrentLobby.Id} is now {(isPublic ? "public" : "private")}.");
+        OnLobbyUpdated?.Invoke();
+        return true;
+    }
+
+    /// <summary>
+    /// Requests every public lobby worldwide for the Join Game browser, excluding the local
+    /// player's own lobby and lobbies whose visible player cap is already met.
+    /// </summary>
+    public async Task<Lobby[]> RequestPublicLobbiesAsync()
+    {
+        if (!SteamClient.IsValid || !(NetworkManager.Singleton?.NetworkConfig.NetworkTransport is FacepunchTransport))
+            return Array.Empty<Lobby>();
+
+        Lobby[] lobbies = await SteamMatchmaking.LobbyList
+            .FilterDistanceWorldwide()
+            .WithKeyValue(LobbyDataKeyVisibility, VisibilityPublic)
+            .WithMaxResults(PublicLobbyMaxResults)
+            .RequestAsync();
+
+        if (lobbies == null)
+            return Array.Empty<Lobby>();
+
+        ulong ownLobby = CurrentLobby.Id.Value;
+        return lobbies.Where(l => l.Id.Value != ownLobby && !IsBrowserLobbyFull(l)).ToArray();
+    }
+
+    /// <summary>Visible-player-cap check for a lobby seen from outside (no member data available).</summary>
+    private static bool IsBrowserLobbyFull(Lobby lobby)
+    {
+        int count = int.TryParse(lobby.GetData(DevSpectatorConfig.LobbyDataPlayerCount), out int c) ? c : lobby.MemberCount;
+        int max = int.TryParse(lobby.GetData(DevSpectatorConfig.LobbyDataMaxPlayers), out int m) ? m : MaxLobbyMembers;
+        return count >= max;
+    }
+
+    /// <summary>Joins a lobby picked from the public lobby browser. Fires <see cref="OnJoinFailed"/> on failure.</summary>
+    public async void JoinPublicLobby(ulong lobbyId)
+    {
+        if (NetworkManager.Singleton == null || lobbyId == 0)
+            return;
+
+        if (!SteamClient.IsValid)
+        {
+            OnJoinFailed?.Invoke("STEAM_NOT_READY");
+            return;
+        }
+
+        // Same as JoinLobbyByCode: leave any lingering lobby/session so StartClient isn't skipped.
+        if (CurrentLobby.Id != 0 || NetworkManager.Singleton.IsListening)
+            await ExitLobbyAsync();
+
+        DevSpectatorRegistry.IsLocalSpectating = false;
+        Debug.Log($"[JoinPublicLobby] Joining public lobby {lobbyId}.");
+        await JoinLobbyInternal(lobbyId, "127.0.0.1");
+    }
+
     /// <summary>
     /// The active lobby's join code. Only the host generates the code locally; everyone else
     /// (code/invite/browser joins) reads it from the Steam lobby's "join_code" metadata.
@@ -504,7 +615,8 @@ public class LobbyManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Creates and configures a Steam lobby (public, joinable, join code, player cap) and points the
+    /// Creates and configures a Steam lobby (searchable, joinable, join code, player cap, private
+    /// visibility by default) and points the
     /// Facepunch transport at the local host. Does NOT touch the NGO session — callers decide whether
     /// to start a host afterwards. Shared by <see cref="CreateLobby"/> and
     /// <see cref="CreateLobbyForRunningHost"/>.
@@ -535,10 +647,15 @@ public class LobbyManager : MonoBehaviour
         CurrentLobby.SetPublic();
         CurrentLobby.SetJoinable(true);
         CurrentLobby.SetData("host", SteamClient.Name);
+        CurrentLobby.SetData(LobbyDataKeyVersion, Application.version);
 
         CurrentLobby.SetMemberData(DevSpectatorConfig.MemberRoleKey, DevSpectatorConfig.RolePlayer);
         CurrentLobby.SetData(DevSpectatorConfig.LobbyDataMaxPlayers, MaxLobbyMembers.ToString());
         PublishVisiblePlayerCount();
+
+        // New lobbies are private (code/invite only) until the host lists them publicly.
+        _hostLobbyIsPublic = false;
+        CurrentLobby.SetData(LobbyDataKeyVisibility, VisibilityPrivate);
 
         CurrentJoinCode = GenerateJoinCode();
         CurrentLobby.SetData(LobbyDataKeyJoinCode, CurrentJoinCode);

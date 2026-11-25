@@ -140,13 +140,28 @@ public class SuspectEncounterManager : MonoBehaviour
         bool givesPaperwork = data.GivesPaperwork && !SuspectController.ForceNextSuspectNoPaperwork;
         SuspectController.ForceNextSuspectNoPaperwork = false;
 
-        // Natural settle beat — suspect finishes their rotation and faces the player.
-        yield return new WaitForSeconds(1.0f);
-
-        if (suspect == null)
+        // Natural settle beat — suspect finishes their rotation and faces the player. The window
+        // may be closed (or the booth emptied) during the beat, so re-check after it; if not
+        // ready, wait until it is and give a fresh settle beat before starting.
+        while (true)
         {
-            Debug.LogWarning($"[SuspectEncounterManager] PlayForcedIntroDialogue: '{data.name}' was destroyed during the settle beat — aborting before dialogue starts.");
-            yield break;
+            yield return new WaitForSeconds(1.0f);
+
+            if (suspect == null)
+            {
+                Debug.LogWarning($"[SuspectEncounterManager] PlayForcedIntroDialogue: '{data.name}' was destroyed during the settle beat — aborting before dialogue starts.");
+                yield break;
+            }
+
+            if (SuspectController.IsBoothReadyForDialogue()) break;
+
+            yield return new WaitUntil(() => suspect == null || SuspectController.IsBoothReadyForDialogue());
+
+            if (suspect == null)
+            {
+                Debug.LogWarning($"[SuspectEncounterManager] PlayForcedIntroDialogue: '{data.name}' was destroyed while waiting for the booth window — aborting before dialogue starts.");
+                yield break;
+            }
         }
 
         if (ScriptedDialogueRunner.Instance == null)

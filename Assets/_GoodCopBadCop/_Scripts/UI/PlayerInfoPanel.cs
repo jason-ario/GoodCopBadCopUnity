@@ -52,12 +52,18 @@ public class PlayerInfoPanel : MonoBehaviour
         Image background = GetComponentInChildren<Image>(true);
         if (background != null) background.color *= InviteBackgroundTint;
 
+        MakeClickable(background, onClick);
+    }
+
+    private Button MakeClickable(Image background, UnityAction onClick)
+    {
         if (!TryGetComponent(out Button button))
             button = gameObject.AddComponent<Button>();
         button.targetGraphic = background;
         button.transition = Selectable.Transition.ColorTint;
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(onClick);
+        return button;
     }
 
     private static readonly Color InviteLabelColor     = new Color(0f, 0f, 0f, 0.75f);

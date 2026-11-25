@@ -14,6 +14,8 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private TextButton[] _textButtons;
     [SerializeField] private RectTransform rootRectTransform;
     [SerializeField] private TextMeshProUGUI lobbyCodeText;
+    [Tooltip("Host-only Public/Private lobby toggle; hidden for clients and when there is no Steam lobby.")]
+    [SerializeField] private LobbyVisibilityToggle lobbyVisibilityToggle;
     [SerializeField] private GameObject menuBackground;
     [SerializeField] private GameObject menuHeader;
 
@@ -82,6 +84,9 @@ public class PauseMenuController : MonoBehaviour
     /// <summary>Updates the lobby code label. Shows the encoded code when in an active lobby, hides it otherwise.</summary>
     private void RefreshLobbyCode()
     {
+        if (lobbyVisibilityToggle != null)
+            lobbyVisibilityToggle.Refresh();
+
         if (lobbyCodeText == null) return;
 
         bool hasLobby = LobbyManager.Instance != null && LobbyManager.Instance.CurrentLobby.Id != 0;

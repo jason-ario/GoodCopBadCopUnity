@@ -33,6 +33,8 @@ public class StartCampaignScreen : MonoBehaviour
              "already in progress. Was previously left as static placeholder text (\"New Game - " +
              "Day 0\") and never updated to reflect the actual chosen save slot.")]
     [SerializeField] private TextMeshProUGUI dayNumberText;
+    [Tooltip("Host-only Public/Private lobby toggle. New lobbies start private (join code / invite only).")]
+    [SerializeField] private LobbyVisibilityToggle lobbyVisibilityToggle;
 
     [Header("Invite Slots")]
     [Tooltip("Left label on each empty seat in the player list. Clicking the row opens the Steam invite overlay.")]
@@ -199,6 +201,9 @@ public class StartCampaignScreen : MonoBehaviour
     private void RefreshUI()
     {
         RefreshDayNumberText();
+
+        if (lobbyVisibilityToggle != null)
+            lobbyVisibilityToggle.Refresh(_isMultiplayer);
 
         // Determine who is in the lobby right now.
         var members = LobbyManager.Instance.GetMembersSnapshot();

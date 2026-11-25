@@ -600,7 +600,17 @@ public class SuspectCharacter : Interactable
 
         // Settle beat — character finishes facing the player before the first line plays.
         // Matches the 1-second wait used by SuspectEncounterManager.PlayIntroDialogue.
-        yield return new WaitForSeconds(1f);
+        // The window may be closed (or the booth emptied) during the beat, so re-check after it;
+        // if not ready, wait until it is and give a fresh settle beat before starting.
+        while (true)
+        {
+            yield return new WaitForSeconds(1f);
+            if (!IsSpawned) yield break;
+            if (SuspectController.IsBoothReadyForDialogue()) break;
+
+            yield return new WaitUntil(() => !IsSpawned || SuspectController.IsBoothReadyForDialogue());
+            if (!IsSpawned) yield break;
+        }
 
         Debug.Log($"[SuspectCharacter] '{name}': starting full-mutant cutscene '{cutscene.name}'.");
         ScriptedDialogueRunner.Instance.PlayDialogue(this, cutscene, onComplete: BeginMutantBehavior);

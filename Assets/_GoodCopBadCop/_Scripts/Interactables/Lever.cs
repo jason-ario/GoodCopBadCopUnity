@@ -76,6 +76,14 @@ public class Lever : Interactable, IDiegeticLever
     /// </summary>
     private bool _localShutterOpen;
 
+    /// <summary>
+    /// Last lever state this client sent to the server during the current drag (seeded from
+    /// <see cref="_isUp"/> in <see cref="BeginDrag"/>). Threshold crossings are sent immediately so
+    /// the server's <see cref="ShutterController.IsOpen"/> never lags the dragging client's view —
+    /// otherwise the booth could think the window is still open while a client holds it shut.
+    /// </summary>
+    private bool _lastSentIsUp;
+
     private bool _isDragging;
     private bool _isInteractable = true;
 
@@ -135,6 +143,15 @@ public class Lever : Interactable, IDiegeticLever
         _leverArm?.DOKill();
         _dragT = _isUp.Value ? 1f : 0f;
         _localShutterOpen = _isUp.Value;
+        _lastSentIsUp = _isUp.Value;
+    }
+
+    /// <summary>Sends the lever state to the server unless it was already sent this drag.</summary>
+    private void SendLeverState(bool isUp)
+    {
+        if (isUp == _lastSentIsUp) return;
+        _lastSentIsUp = isUp;
+        SetLeverServerRpc(isUp, NetworkManager.Singleton.LocalClientId);
     }
 
     /// <summary>Moves the lever by a raw per-frame Mouse Y delta (positive = up).</summary>
@@ -274,9 +291,8 @@ public class Lever : Interactable, IDiegeticLever
             leverAudio.PlayOneShot(newIsUp ? leverOnSound : leverOffSound);
         }
 
-        // Only send RPC if the network variable needs to change.
-        if (newIsUp != _isUp.Value)
-            SetLeverServerRpc(newIsUp, NetworkManager.Singleton.LocalClientId);
+        // Threshold crossings were already sent mid-drag; only send if the final state differs.
+        SendLeverState(newIsUp);
     }
 
     /// <summary>
@@ -290,12 +306,14 @@ public class Lever : Interactable, IDiegeticLever
             _localShutterOpen = true;
             shutter.OpenShutter();
             leverAudio.PlayOneShot(leverOnSound);
+            SendLeverState(true);
         }
         else if (_dragT <= 0.1f && _localShutterOpen)
         {
             _localShutterOpen = false;
             shutter.CloseShutter();
             leverAudio.PlayOneShot(leverOffSound);
+            SendLeverState(false);
         }
     }
 
