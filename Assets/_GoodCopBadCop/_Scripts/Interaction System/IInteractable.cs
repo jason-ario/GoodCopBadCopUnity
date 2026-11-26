@@ -82,6 +82,12 @@ public enum HighlightHold
     /// moment a player takes the paper out (see <see cref="PostBox.PlaceNewspaperServer"/>).
     /// </summary>
     MailboxNewspaper = 1 << 4,
+
+    /// <summary>
+    /// Held on a freshly delivered <see cref="SupplyBox"/> until a player picks it up for the
+    /// first time (see <see cref="SupplyBox.MarkAwaitingFirstPickupServer"/>).
+    /// </summary>
+    SupplyDelivery = 1 << 5,
 }
 
 [RequireComponent(typeof(HighlightEffect))]

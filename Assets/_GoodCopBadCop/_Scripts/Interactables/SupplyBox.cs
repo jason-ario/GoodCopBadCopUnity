@@ -27,6 +27,15 @@ public class SupplyBox : PickableObject
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    /// <summary>
+    /// True from delivery until a player first picks the box up. Drives the
+    /// <see cref="HighlightHold.SupplyDelivery"/> glow on every peer (late joiners included).
+    /// </summary>
+    private readonly NetworkVariable<bool> _awaitingFirstPickup = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     /// <summary>Parent transform used to attach per-day items during delivery. Falls back to this transform if contents is unassigned.</summary>
     public Transform ContentsParent => contents != null ? contents.transform : transform;
 
@@ -87,8 +96,10 @@ public class SupplyBox : PickableObject
     {
         base.OnNetworkSpawn();
         _networkCanPickUp.OnValueChanged += OnNetworkCanPickUpChanged;
+        _awaitingFirstPickup.OnValueChanged += OnAwaitingFirstPickupChanged;
         canPickUp = _networkCanPickUp.Value;
         UpdateInteractText();
+        ApplyDeliveryHighlight();
     }
 
     public override void OnNetworkDespawn()
@@ -109,12 +120,39 @@ public class SupplyBox : PickableObject
 
         base.OnNetworkDespawn();
         _networkCanPickUp.OnValueChanged -= OnNetworkCanPickUpChanged;
+        _awaitingFirstPickup.OnValueChanged -= OnAwaitingFirstPickupChanged;
+        SetForceHighlight(false, HighlightHold.SupplyDelivery);
     }
 
     private void OnNetworkCanPickUpChanged(bool previous, bool current)
     {
         canPickUp = current;
         UpdateInteractText();
+    }
+
+    // ── Delivery Highlight ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Server-only. Lights the box with the persistent objective highlight (same pulsing outline
+    /// as the arrowed gate button) until a player picks it up for the first time.
+    /// </summary>
+    public void MarkAwaitingFirstPickupServer()
+    {
+        if (!IsServer) return;
+        _awaitingFirstPickup.Value = true;
+    }
+
+    private void OnAwaitingFirstPickupChanged(bool previous, bool current) => ApplyDeliveryHighlight();
+
+    private void ApplyDeliveryHighlight() =>
+        SetForceHighlight(_awaitingFirstPickup.Value, HighlightHold.SupplyDelivery);
+
+    private void Update()
+    {
+        // Server-authoritative: the first time the box is held by anyone, release the delivery glow
+        // for good (the base class already hides holds while carried, so it never shows in-hand).
+        if (IsServer && _awaitingFirstPickup.Value && IsHeld)
+            _awaitingFirstPickup.Value = false;
     }
 
     private void UpdateInteractText()

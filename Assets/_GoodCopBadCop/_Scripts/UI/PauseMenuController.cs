@@ -18,12 +18,18 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private LobbyVisibilityToggle lobbyVisibilityToggle;
     [SerializeField] private GameObject menuBackground;
     [SerializeField] private GameObject menuHeader;
+    [Tooltip("Lobby Settings screen (players, host, visibility, kick). Opened by the Lobby Settings button.")]
+    [SerializeField] private LobbySettingsPanel lobbySettingsPanel;
+    [Tooltip("Pause list button that opens the Lobby Settings screen; only shown in a Steam lobby.")]
+    [SerializeField] private GameObject lobbySettingsButton;
+    [Tooltip("Wishlist on Steam badge; hidden while Settings or Lobby Settings is open, shown on the pause list.")]
+    [SerializeField] private GameObject wishlistContainer;
 
     private static string LobbyCodeFormat => Loc.N("LOBBY CODE: {0}");
     private const string ReturnToMainMenuTitle = "Return to main menu?";
     private const string ReturnToMainMenuBody = "Current shift progress may be lost.";
-    private const string QuitGameTitle = "Quit game?";
-    private const string QuitGameBody = "Any unsaved progress will be lost.";
+    private static string QuitGameTitle => Loc.T("Leaving so soon?");
+    private static string QuitGameBody => Loc.T("Please make sure to <b>WISHLIST</b> the game on Steam");
     private const string ConfirmText = "Yes";
     private const string CancelText = "No";
 
@@ -38,6 +44,12 @@ public class PauseMenuController : MonoBehaviour
         settingsMenuView.BackRequested.Subscribe(_ => CloseSettingsMenu()).AddTo(ref settingsDisposables);
     }
 
+    private void Awake()
+    {
+        if (lobbySettingsPanel != null)
+            lobbySettingsPanel.BackRequested += CloseLobbySettings;
+    }
+
     public void ResumeGame()
     {
         UIController.Instance.ClosePauseMenu();
@@ -46,6 +58,8 @@ public class PauseMenuController : MonoBehaviour
     private void OnDestroy()
     {
         settingsDisposables.Dispose();
+        if (lobbySettingsPanel != null)
+            lobbySettingsPanel.BackRequested -= CloseLobbySettings;
     }
 
     private void OnEnable()
@@ -87,9 +101,12 @@ public class PauseMenuController : MonoBehaviour
         if (lobbyVisibilityToggle != null)
             lobbyVisibilityToggle.Refresh();
 
+        bool hasLobby = LobbyManager.Instance != null && LobbyManager.Instance.CurrentLobby.Id != 0;
+        if (lobbySettingsButton != null && lobbySettingsButton.activeSelf != hasLobby)
+            lobbySettingsButton.SetActive(hasLobby);
+
         if (lobbyCodeText == null) return;
 
-        bool hasLobby = LobbyManager.Instance != null && LobbyManager.Instance.CurrentLobby.Id != 0;
         lobbyCodeText.gameObject.SetActive(hasLobby);
 
         if (hasLobby)
@@ -107,6 +124,12 @@ public class PauseMenuController : MonoBehaviour
     {
         if (menuBackground != null) menuBackground.SetActive(visible);
         if (menuHeader != null) menuHeader.SetActive(visible);
+    }
+
+    private void SetWishlistVisible(bool visible)
+    {
+        if (wishlistContainer != null && wishlistContainer.activeSelf != visible)
+            wishlistContainer.SetActive(visible);
     }
 
     public void ShowAreYouSureMainMenu()
@@ -136,6 +159,7 @@ public class PauseMenuController : MonoBehaviour
         mainMenu.SetActive(false);
         SetPauseMenuShellVisible(false);
         confirmationDialog.Hide();
+        SetWishlistVisible(false);
         isSettingsOpen = true;
         settingsMenuView.SetVisible(true);
         UseUnscaledMenuAnimators();
@@ -162,6 +186,7 @@ public class PauseMenuController : MonoBehaviour
         HideTransientPanels();
         mainMenu.SetActive(true);
         SetPauseMenuShellVisible(true);
+        SetWishlistVisible(true);
         _returnedToMainListFrame = Time.frameCount;
     }
 
@@ -197,6 +222,28 @@ public class PauseMenuController : MonoBehaviour
         isSettingsOpen = false;
         settingsMenuView?.SetVisible(false);
         confirmationDialog?.Hide();
+        if (lobbySettingsPanel != null && lobbySettingsPanel.gameObject.activeSelf)
+            lobbySettingsPanel.gameObject.SetActive(false);
+    }
+
+    /// <summary>UnityEvent target for the pause menu Lobby Settings button.</summary>
+    public void ShowLobbySettings()
+    {
+        if (lobbySettingsPanel == null) return;
+        if (LobbyManager.Instance == null || LobbyManager.Instance.CurrentLobby.Id == 0) return;
+
+        HideTransientPanels();
+        mainMenu.SetActive(false);
+        SetWishlistVisible(false);
+        lobbySettingsPanel.gameObject.SetActive(true);
+        UseUnscaledMenuAnimators();
+    }
+
+    private void CloseLobbySettings()
+    {
+        if (lobbySettingsPanel == null || !lobbySettingsPanel.gameObject.activeSelf) return;
+        BackToMainMenu();
+        RefreshLobbyCode();
     }
 
     private async void ReturnToMainMenu()

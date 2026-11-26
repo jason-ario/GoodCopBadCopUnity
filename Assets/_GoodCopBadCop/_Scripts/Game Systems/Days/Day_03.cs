@@ -79,11 +79,10 @@ public class Day_03 : DayBase, IDailyTask
     {
         yield return new WaitForSeconds(_powerOutageCallDelaySeconds);
 
-        _answerPhoneThreat = new AnswerPhoneThreat();
-        TaskRegistry.Instance?.AddThreat(_answerPhoneThreat);
-        MarkRingingPhoneLocal();
-
-        Telephone.OnScriptedCallAnsweredAllClients += OnPowerOutageCallAnsweredAllClients;
+        // Note: this chain only runs on the server (ShiftManager.OnLastSuspectProcessed and the
+        // debug trigger are server-only). Clients show the same prompt from
+        // Telephone.OnScriptedRingStartedAllClients — see OnScriptedRingStartedAllClients_Day3.
+        ShowAnswerPhonePromptLocal();
 
         if (Telephone.Instance == null)
         {
@@ -97,6 +96,35 @@ public class Day_03 : DayBase, IDailyTask
         if (!NetworkManager.Singleton.IsServer) yield break;
 
         Telephone.Instance.TriggerScriptedCall(OnPowerOutageCallAnsweredServer);
+    }
+
+    /// <summary>
+    /// Local, idempotent. Adds the "Answer the Phone" guidebook task, points the tutorial arrow
+    /// (with highlight) at the phone, and listens for the call being answered.
+    /// </summary>
+    private void ShowAnswerPhonePromptLocal()
+    {
+        if (_answerPhoneThreat == null)
+        {
+            _answerPhoneThreat = new AnswerPhoneThreat();
+            TaskRegistry.Instance?.AddThreat(_answerPhoneThreat);
+        }
+
+        MarkRingingPhoneLocal();
+
+        Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
+        Telephone.OnScriptedCallAnsweredAllClients += OnPowerOutageCallAnsweredAllClients;
+    }
+
+    /// <summary>
+    /// Every client, via <see cref="Telephone.OnScriptedRingStartedAllClients"/>. Day 3's only
+    /// scripted call is HQ's power-outage call, so this shows the ring prompt on clients that
+    /// never ran the server-only outage chain. Skipped once Restore Power has been granted.
+    /// </summary>
+    private void OnScriptedRingStartedAllClients_Day3()
+    {
+        if (_powerOutageThreat != null) return;
+        ShowAnswerPhonePromptLocal();
     }
 
     /// <summary>
@@ -408,6 +436,9 @@ public class Day_03 : DayBase, IDailyTask
         // Every client grants "Restore Power" when the server broadcasts the HQ call's end.
         Telephone.OnScriptedCallCompletedAllClients += OnPowerOutageCallCompletedAllClients;
 
+        // Every client shows the "Answer the Phone" task + phone arrow when HQ's call rings.
+        Telephone.OnScriptedRingStartedAllClients += OnScriptedRingStartedAllClients_Day3;
+
         // Server: one-shot HQ reminder when someone tries the dead booth panel during the outage.
         _wrongPanelReminderPlayed = false;
         _wrongPanelReminderRunning = false;
@@ -460,6 +491,7 @@ public class Day_03 : DayBase, IDailyTask
         ShiftManager.OnLastSuspectProcessed -= OnAllSuspectsProcessed_Day3;
         Telephone.OnScriptedCallAnsweredAllClients -= OnPowerOutageCallAnsweredAllClients;
         Telephone.OnScriptedCallCompletedAllClients -= OnPowerOutageCallCompletedAllClients;
+        Telephone.OnScriptedRingStartedAllClients -= OnScriptedRingStartedAllClients_Day3;
         ElectricPanelController.OnDeadPanelUsedServer -= OnDeadPanelUsedServer_Day3;
 
         if (ElectricityController.Instance != null)

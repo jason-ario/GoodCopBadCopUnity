@@ -21,7 +21,7 @@ public class SuspectController : NetworkBehaviour
 
     /// <summary>
     /// Fired on the server exactly once, the very first time the player ever kills a suspect
-    /// (any day, any suspect). Consumed by <see cref="CampaignManager"/> to arm Ocho's booth
+    /// on Day 2 or later (any suspect; Day 1 kills are ignored). Consumed by <see cref="CampaignManager"/> to arm Ocho's booth
     /// encounter as the next suspect. Guarded by <see cref="_hasEverKilled"/> so it can never
     /// fire more than once per run.
     /// </summary>
@@ -29,6 +29,12 @@ public class SuspectController : NetworkBehaviour
 
     /// <summary>Set the first time <see cref="OnFirstKillEver"/> fires — guards it to a single shot.</summary>
     private static bool _hasEverKilled;
+
+    /// <summary>
+    /// Earliest campaign day on which a kill counts for <see cref="OnFirstKillEver"/>. Kills on
+    /// earlier days are ignored so Ocho's booth encounter / power outage never starts on Day 1.
+    /// </summary>
+    private const int OchoEncounterMinDay = 2;
 
     /// <summary>
     /// Fired on every peer (server and clients) whenever <see cref="suspectIndex"/> changes,
@@ -249,7 +255,7 @@ public class SuspectController : NetworkBehaviour
     [Header("Verdict Gate")]
     [Tooltip("Seconds after the current suspect hands over their paperwork before a stamped folder " +
              "placed at the window is accepted. Every handed-over document must also have been picked up.")]
-    [SerializeField, Min(0f)] private float verdictDelayAfterPaperwork = 10f;
+    [SerializeField, Min(0f)] private float verdictDelayAfterPaperwork = 5f;
 
     // Server-written, replicated: true once the current suspect's paperwork was handed over at least
     // verdictDelayAfterPaperwork seconds ago and every handed-over document has been picked up.
@@ -348,6 +354,14 @@ public class SuspectController : NetworkBehaviour
     /// counted as processed exactly once. Mutant intruders never set it. Server-side only.
     /// </summary>
     private bool _fullMutantEncounterPending = false;
+
+    /// <summary>
+    /// True while a lineup mutant intruder's booth encounter has not yet resolved. Mutant
+    /// intruders count toward <see cref="DailySuspectManager.TotalSuspectsThisShift"/>, so
+    /// <see cref="OnMutantIntruderComplete"/> tallies them as processed exactly once.
+    /// Server-side only.
+    /// </summary>
+    private bool _mutantIntruderEncounterPending = false;
 
     /// <summary>
     /// True when the current full-mutant suspect already had their full-mutant conversation on an
@@ -559,13 +573,6 @@ public class SuspectController : NetworkBehaviour
             return false;
         }
 
-        // Re-check full-mutant state now: the mutant mesh follows the record's score, but the
-        // cutscene/no-paperwork flow follows the slot flag. They must agree, otherwise a fully
-        // mutated suspect walks up in mutant form and hands over paperwork. Debug-forced full
-        // mutants are exempt (they run the full-mutant path regardless).
-        if (!ForceNextSuspectAsFullMutant && !dailySuspectManager.ValidateFullMutantSlotForSpawn(lineupIndex))
-            return false;
-
         GameObject spawnedSuspect = Instantiate(suspectPrefab.gameObject, position, rotation);
         InjectLegacyDependencies(spawnedSuspect);
         NetworkObject netObj = spawnedSuspect.GetComponent<NetworkObject>();
@@ -682,6 +689,7 @@ public class SuspectController : NetworkBehaviour
 
         InjectLegacyDependencies(character.gameObject);
         _fullMutantEncounterPending = false;
+        _mutantIntruderEncounterPending = false;
         _currentSuspectIsReturningFullMutant = false;
         NetworkObject netObj = character.GetComponent<NetworkObject>();
         if (netObj == null)
@@ -1061,7 +1069,6 @@ public class SuspectController : NetworkBehaviour
     {
         return shutterController != null && shutterController.IsOpen;
     }
-
     /// <summary>
     /// Server-only. True when a player is inside the booth and the window shutter is open — the
     /// same condition <see cref="OnRotationComplete"/>/<see cref="WaitForBoothReady"/> require
@@ -1070,6 +1077,8 @@ public class SuspectController : NetworkBehaviour
     /// during it. Returns true when no controller exists so non-booth flows are never blocked.
     /// </summary>
     public static bool IsBoothReadyForDialogue() => Instance == null || Instance.IsBoothReadyForSuspect();
+
+
 
     /// <summary>
     /// Polls every half-second until at least one player is inside the booth
@@ -2006,7 +2015,11 @@ public class SuspectController : NetworkBehaviour
             bool alreadyKilledBefore = _hasEverKilled ||
                 (SaveDataManager.Instance != null && SaveDataManager.Instance.HasEverKilledSuspect);
 
-            if (!alreadyKilledBefore)
+            // Day 1 kills never arm Ocho's booth encounter (and don't consume the one-shot flag),
+            // so the first kill on Day 2 or later is the one that triggers it.
+            bool canArmOcho = killRecord.killedOnDay >= OchoEncounterMinDay;
+
+            if (!alreadyKilledBefore && canArmOcho)
             {
                 _hasEverKilled = true;
                 if (SaveDataManager.Instance != null)
@@ -2321,6 +2334,7 @@ public class SuspectController : NetworkBehaviour
         Transform mutantStandPos = mutantBoothPos != null ? mutantBoothPos : standPos;
         behaviour.BeginLineup(data, mutantStandPos, despawnPos, climbThroughTargetPos, shutterController, this);
         _currentMutant = behaviour;
+        _mutantIntruderEncounterPending = true;
         dailySuspectManager?.RecordMutantSpawn(prefab);
         return true;
     }
@@ -2343,14 +2357,12 @@ public class SuspectController : NetworkBehaviour
                 netObj.Despawn();
         }
 
-        // Full-mutant suspects also end here. They are real suspects and count toward
-        // DailySuspectManager.TotalSuspectsThisShift, so tally them as processed (once).
-        // Mutant intruder slots are excluded from the suspect total entirely (they're a random
-        // combat threat, not a "suspect to process") — they only advance the lineup slot count
-        // so the shift still ends at the right time.
-        if (_fullMutantEncounterPending)
+        // Both full-mutant suspects and mutant intruders end here. Both count toward
+        // DailySuspectManager.TotalSuspectsThisShift, so tally the encounter as processed (once).
+        if (_fullMutantEncounterPending || _mutantIntruderEncounterPending)
         {
             _fullMutantEncounterPending = false;
+            _mutantIntruderEncounterPending = false;
             ShiftManager.Instance.SuspectResolvedWithoutVerdict();
         }
 

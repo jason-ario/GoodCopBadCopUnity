@@ -90,13 +90,20 @@ public class ConnectionLossHandler : MonoBehaviour
             return;
 
         _isHandlingDisconnect = true;
-        StartCoroutine(HandleLostConnection());
+
+        // The host kicked us: say so instead of "Lost connection".
+        bool kicked = LobbyManager.LocalKickReceived ||
+                      (_networkManager != null && _networkManager.DisconnectReason == LobbyManager.JoinFailKicked);
+        StartCoroutine(HandleLostConnection(kicked));
     }
 
-    private IEnumerator HandleLostConnection()
+    private IEnumerator HandleLostConnection(bool kicked)
     {
+        if (kicked)
+            GoodCopBadCop.Networking.LobbyToast.Error(Loc.T("You were kicked from the lobby by the host."));
+
         if (_notification != null)
-            _notification.Show("Lost connection");
+            _notification.Show(kicked ? Loc.T("Kicked from the lobby") : "Lost connection");
         else
             Debug.LogWarning("[ConnectionLossHandler] No notification assigned — restarting scene without a visible message.");
 

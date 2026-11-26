@@ -245,7 +245,14 @@ public class StartCampaignScreen : MonoBehaviour
                 ulong steamId = member.Id.Value;
                 // Solo: always show green READY. Multi: use actual ready state.
                 bool ready = !hasSecondPlayer || (_readyStates.TryGetValue(steamId, out bool r) && r);
-                SpawnPanel(member.Name, ready, isHost: steamId == hostSteamId);
+                PlayerInfoPanel panel = SpawnPanel(member.Name, ready, isHost: steamId == hostSteamId);
+
+                // Host-only kick button on everyone else's row.
+                if (panel != null && LobbyManager.Instance.CanKick(member))
+                {
+                    Friend target = member;
+                    panel.SetKickAction(() => LobbyManager.Instance.KickPlayer(target));
+                }
             }
         }
         else
@@ -264,15 +271,17 @@ public class StartCampaignScreen : MonoBehaviour
     }
 
     /// <summary>Instantiates one panel and adds it to the tracked list.</summary>
-    private void SpawnPanel(string playerName, bool isReady, bool isHost = false)
+    private PlayerInfoPanel SpawnPanel(string playerName, bool isReady, bool isHost = false)
     {
-        if (panelPrefab == null || panelsContainer == null) return;
+        if (panelPrefab == null || panelsContainer == null) return null;
 
         PlayerInfoPanel panel = Instantiate(panelPrefab, panelsContainer);
         panel.gameObject.SetActive(true);
         panel.PopulateInfo(playerName, isReady, isHost);
+        panel.SetKickAction(null);
         _spawnedPanels.Add(panel);
         _memberPanels.Add(panel);
+        return panel;
     }
 
     /// <summary>Identifies the set of rows on screen; ready state is deliberately excluded.</summary>
@@ -287,6 +296,7 @@ public class StartCampaignScreen : MonoBehaviour
         }
 
         sb.Append(LobbyManager.Instance.CurrentLobby.Owner.Id.Value).Append('|');
+        sb.Append(LobbyManager.Instance.CanKickPlayers ? 'K' : '-').Append('|');
         foreach (var member in members)
             sb.Append(member.Id.Value).Append(':').Append(member.Name).Append(';');
         return sb.ToString();

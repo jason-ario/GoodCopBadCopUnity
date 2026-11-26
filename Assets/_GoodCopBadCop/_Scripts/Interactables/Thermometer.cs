@@ -63,7 +63,7 @@ public class Thermometer : PickableObject
     public override void InteractWithItem(PlayerInteractionController playerInteractionController, PickableObject item)
     {
         base.InteractWithItem(playerInteractionController, item);
-        if (item.name == "Battery")
+        if (item.GetComponent<Battery>() != null)
         {
             if (internalBattery.GetBatteryLevel() < 1)
             {

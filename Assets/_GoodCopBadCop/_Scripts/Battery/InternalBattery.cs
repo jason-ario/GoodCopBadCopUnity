@@ -74,17 +74,21 @@ public class InternalBattery : NetworkBehaviour
         currentBatteryJuice.Value = Mathf.Max(currentBatteryJuice.Value - amount, 0f);
     }
 
+    /// <summary>
+    /// Recharges this battery. Callable from any peer: recharging is done by a player holding a
+    /// Battery and interacting with equipment that is usually lying in the world (server-owned),
+    /// so the caller is typically NOT the owner of this object.
+    /// </summary>
     public void Recharge(float amount)
     {
-        if (IsOwner)
-        {
-            RechargeServerRpc(amount);
-        }
+        if (!IsSpawned) return;
+        RechargeServerRpc(amount);
     }
 
-    [Rpc(SendTo.Server)]
+    [Rpc(SendTo.Server, RequireOwnership = false)]
     private void RechargeServerRpc(float amount)
     {
+        if (amount <= 0f) return;
         currentBatteryJuice.Value = Mathf.Min(currentBatteryJuice.Value + amount, maxBatteryCapacity);
     }
 

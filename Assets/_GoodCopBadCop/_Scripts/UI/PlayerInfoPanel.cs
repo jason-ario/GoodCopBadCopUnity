@@ -23,6 +23,106 @@ public class PlayerInfoPanel : MonoBehaviour
     /// <summary>Crown icon shown only for the lobby host.</summary>
     [SerializeField] private GameObject hostIcon;
 
+    [Header("Kick (host only)")]
+    [Tooltip("Optional host-only kick button. Hidden unless SetKickAction is given a callback.")]
+    [SerializeField] private Button kickButton;
+    [SerializeField] private TMP_Text kickButtonLabel;
+    [Tooltip("Seconds the button waits for the confirming second click.")]
+    [SerializeField] private float kickConfirmWindow = 3f;
+    [Tooltip("Gap between the kick button and the status label it pushes left.")]
+    [SerializeField] private float kickButtonSpacing = 12f;
+
+    // English source text; render-time localization translates code-set labels.
+    private static readonly string KickText = Loc.N("KICK");
+    private static readonly string KickConfirmText = Loc.N("SURE?");
+
+    private UnityAction _onKick;
+    private float _kickArmedUntil = -1f;
+    private RectTransform _readyRect;
+    private Vector2 _readyBasePosition;
+    private bool _readyBaseCached;
+
+    private void Awake()
+    {
+        if (kickButton != null)
+            kickButton.onClick.AddListener(OnKickClicked);
+    }
+
+    private void OnDisable() => DisarmKick();
+
+    private void Update()
+    {
+        if (_kickArmedUntil > 0f && Time.unscaledTime > _kickArmedUntil)
+            DisarmKick();
+    }
+
+    /// <summary>
+    /// Shows the kick button with <paramref name="onKick"/> (two clicks: KICK, then SURE?), or hides
+    /// it when null. The status label shifts left to make room.
+    /// </summary>
+    public void SetKickAction(UnityAction onKick)
+    {
+        _onKick = onKick;
+        DisarmKick();
+
+        bool show = onKick != null && kickButton != null;
+        if (kickButton != null && kickButton.gameObject.activeSelf != show)
+            kickButton.gameObject.SetActive(show);
+
+        CacheReadyBase();
+        if (_readyRect != null)
+        {
+            float offset = show ? ((RectTransform)kickButton.transform).rect.width + kickButtonSpacing : 0f;
+            _readyRect.anchoredPosition = _readyBasePosition - new Vector2(offset, 0f);
+        }
+    }
+
+    /// <summary>Replaces the READY / NOT READY label with free text (e.g. HOST / YOU in the pause menu).</summary>
+    public void SetStatus(string text, Color color)
+    {
+        if (readyIndicator == null) return;
+        readyIndicator.text = text;
+        readyIndicator.color = color;
+    }
+
+    private void CacheReadyBase()
+    {
+        if (_readyBaseCached || readyIndicator == null) return;
+        _readyRect = readyIndicator.rectTransform;
+        _readyBasePosition = _readyRect.anchoredPosition;
+        _readyBaseCached = true;
+    }
+
+    private void OnKickClicked()
+    {
+        if (_onKick == null) return;
+
+        if (_kickArmedUntil < 0f)
+        {
+            _kickArmedUntil = Time.unscaledTime + kickConfirmWindow;
+            if (kickButtonLabel != null) kickButtonLabel.text = KickConfirmText;
+            SetKickVisualArmed(true);
+            return;
+        }
+
+        UnityAction kick = _onKick;
+        DisarmKick();
+        kick.Invoke();
+    }
+
+    private void DisarmKick()
+    {
+        _kickArmedUntil = -1f;
+        if (kickButtonLabel != null) kickButtonLabel.text = KickText;
+        SetKickVisualArmed(false);
+    }
+
+    private void SetKickVisualArmed(bool armed)
+    {
+        if (kickButton != null && kickButton.TryGetComponent(out KickButtonVisual visual))
+            visual.SetArmed(armed);
+    }
+
     /// <summary>Populates the panel with a player name, optional ready state, and optional host flag.</summary>
     public void PopulateInfo(string userName, bool isReady = false, bool isHost = false)
     {
@@ -41,6 +141,7 @@ public class PlayerInfoPanel : MonoBehaviour
         userNameText.text = label;
         userNameText.color = InviteLabelColor;
         SetHost(false);
+        SetKickAction(null);
 
         if (readyIndicator != null)
         {

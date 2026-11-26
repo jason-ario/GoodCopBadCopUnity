@@ -151,9 +151,6 @@ public class GameSettings : ScriptableObject
              "variant (see DemoModeMenuToggle survey lists).")]
     [SerializeField] private bool _surveyEnabled = true;
 
-    [Tooltip("When enabled (and Survey Enabled is on), the survey opens in the default browser when the application exits.")]
-    [SerializeField] private bool _openSurveyOnGameExit = true;
-
     /// <summary>Whether survey UI is shown. Independent of <see cref="Channel"/>.</summary>
     public bool SurveyEnabled
     {
@@ -161,12 +158,21 @@ public class GameSettings : ScriptableObject
         set => _surveyEnabled = value;
     }
 
-    /// <summary>Whether the survey opens automatically when the application exits. Requires <see cref="SurveyEnabled"/>.</summary>
-    public bool OpenSurveyOnGameExit
+    [Header("Exit")]
+    [Tooltip("When enabled, the game's Steam store page (Release app) opens in the Steam overlay/client or default " +
+             "browser when the application exits. Independent of Survey Enabled.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("_openSurveyOnGameExit")]
+    [SerializeField] private bool _openStorePageOnGameExit = true;
+
+    /// <summary>Whether the Steam store page opens automatically when the application exits.</summary>
+    public bool OpenStorePageOnGameExit
     {
-        get => _openSurveyOnGameExit;
-        set => _openSurveyOnGameExit = value;
+        get => _openStorePageOnGameExit;
+        set => _openStorePageOnGameExit = value;
     }
+
+    /// <summary>Public Steam store page for the full game (always the Release app, regardless of <see cref="Channel"/>).</summary>
+    public static string SteamStorePageUrl => $"https://store.steampowered.com/app/{ReleaseAppId}/";
 
     /// <summary>
     /// How a non-engaged client overhears a <see cref="SuspectWorldDialogue"/> conversation that

@@ -58,7 +58,8 @@ public class MutantIntruderData : ScriptableObject
     public float retreatDespawnTimeout = 2f;
 
     [Header("Reward")]
-    [Tooltip("Coupons added to the shared pool when players defeat this lineup mutant (killed, or beaten until it flees). " +
+    [Tooltip("Coupons added to the shared pool when players defeat this lineup mutant (killed, or beaten until it flees) " +
+             "or thwart it (it loses interest at the booth window without getting in). Paid at most once per appearance. " +
              "Only applies to mutants that came through the booth suspect rotation. Set to 0 to disable.")]
     [Min(0)]
     public int defeatCouponReward = 10;

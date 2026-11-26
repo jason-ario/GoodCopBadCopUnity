@@ -1,15 +1,15 @@
 using UnityEngine;
 
 /// <summary>
-/// Opens the playtest survey link in the user's browser whenever the application quits,
+/// Opens the game's Steam store page in the user's browser whenever the application quits,
 /// for whatever reason (Quit button, closing the window, Alt+F4, task kill via OS signal, etc.).
+/// Gated by <see cref="GameSettings.OpenStorePageOnGameExit"/>.
 /// Self-installs at startup, so no manual scene setup is required.
 /// </summary>
+/// <remarks>Class name kept as QuitSurveyLauncher for history; it no longer opens the survey.</remarks>
 public class QuitSurveyLauncher : MonoBehaviour
 {
-    private const string SurveyUrl = "https://tinyurl.com/UncannyValleyPlaytestCPTSurvey";
-
-    private static bool _surveyOpened;
+    private static bool _pageOpened;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Install()
@@ -19,28 +19,27 @@ public class QuitSurveyLauncher : MonoBehaviour
             return;
         }
 
-        var go = new GameObject("QuitSurveyLauncher");
+        var go = new GameObject("QuitStorePageLauncher");
         go.AddComponent<QuitSurveyLauncher>();
         DontDestroyOnLoad(go);
     }
 
     private void OnApplicationQuit()
     {
-        var settings = GameSettings.Instance;
-        if (settings.SurveyEnabled && settings.OpenSurveyOnGameExit)
+        if (GameSettings.Instance.OpenStorePageOnGameExit)
         {
-            OpenSurveyOnce();
+            OpenStorePageOnce();
         }
     }
 
-    private static void OpenSurveyOnce()
+    private static void OpenStorePageOnce()
     {
-        if (_surveyOpened)
+        if (_pageOpened)
         {
             return;
         }
 
-        _surveyOpened = true;
-        Application.OpenURL(SurveyUrl);
+        _pageOpened = true;
+        Application.OpenURL(GameSettings.SteamStorePageUrl);
     }
 }

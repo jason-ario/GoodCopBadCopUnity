@@ -150,7 +150,7 @@ public class HeartRateScanner : PickableObject
     {
         base.InteractWithItem(playerInteractionController, item);
 
-        if (item.name != "Battery")
+        if (item.GetComponent<Battery>() == null)
             return;
 
         if (internalBattery.GetBatteryLevel() < 1f)

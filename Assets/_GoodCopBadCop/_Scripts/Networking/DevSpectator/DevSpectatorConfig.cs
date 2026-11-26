@@ -91,8 +91,16 @@ public static class DevSpectatorConfig
     /// networking connection, not the self-reported payload) matches <paramref name="claimedSteamId"/>.
     /// Fails closed: any lookup failure rejects the spectator request.
     /// </summary>
-    public static bool VerifyConnectionSteamId(NetworkManager networkManager, ulong clientNetworkId, ulong claimedSteamId)
+    public static bool VerifyConnectionSteamId(NetworkManager networkManager, ulong clientNetworkId, ulong claimedSteamId) =>
+        TryGetConnectionSteamId(networkManager, clientNetworkId, out ulong actualSteamId) && actualSteamId == claimedSteamId;
+
+    /// <summary>
+    /// SERVER: the Steam-authenticated identity of an NGO client, read from the Steam networking
+    /// connection (not a self-reported payload). False on non-Steam transports or any lookup failure.
+    /// </summary>
+    public static bool TryGetConnectionSteamId(NetworkManager networkManager, ulong clientNetworkId, out ulong steamId)
     {
+        steamId = 0;
         if (networkManager == null || !(networkManager.NetworkConfig.NetworkTransport is FacepunchTransport transport))
             return false;
 
@@ -113,12 +121,11 @@ public static class DevSpectatorConfig
             var (transportId, found) = ((ulong, bool))_clientIdToTransportIdMethod.Invoke(connectionManager, new object[] { clientNetworkId });
             if (!found) return false;
 
-            return transport.TryGetSteamIdForTransportClient(transportId, out ulong actualSteamId)
-                   && actualSteamId == claimedSteamId;
+            return transport.TryGetSteamIdForTransportClient(transportId, out steamId);
         }
         catch (Exception e)
         {
-            Debug.LogError($"[DevSpectator] Could not verify spectator identity: {e}");
+            Debug.LogError($"[DevSpectator] Could not read the Steam identity of clientId={clientNetworkId}: {e}");
             return false;
         }
     }

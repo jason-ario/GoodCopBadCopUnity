@@ -903,9 +903,8 @@ public class ShiftManager : NetworkBehaviour
 
         // Guard against ending the shift on a stale/unpopulated count. TotalLineupSlotsThisShift
         // (DailySuspectManager) is the single source of truth for "how many lineup slots exist
-        // this shift" INCLUDING mutant intruder slots — mutants still occupy a real slot that must
-        // be resolved before the shift can end, even though they're excluded from the player-facing
-        // suspect total (DailySuspectManager.TotalSuspectsThisShift). If the lineup hasn't finished
+        // this shift" INCLUDING mutant intruder slots (which also count toward the player-facing
+        // suspect total, DailySuspectManager.TotalSuspectsThisShift). If the lineup hasn't finished
         // populating yet, treat that as "not done" rather than risking an early end-of-shift on a
         // mismatched or zeroed-out count.
         DailySuspectManager suspectManager = DailySuspectManager.Instance;

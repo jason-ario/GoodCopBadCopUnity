@@ -43,6 +43,8 @@ public class LobbyManager : MonoBehaviour
     public const string JoinFailTimeout = "TIMEOUT";
     public const string JoinFailDisconnected = "DISCONNECTED";
     public const string JoinFailError = "Error";
+    /// <summary>NGO disconnect / connection-approval reason for a player the host kicked.</summary>
+    public const string JoinFailKicked = "KICKED";
 
     // English source text; render-time localization translates it on labels, Loc.T in toasts.
     private static readonly string MsgLobbyNotFound = Loc.N("LOBBY NOT FOUND");
@@ -58,6 +60,7 @@ public class LobbyManager : MonoBehaviour
     private static readonly string MsgBlocked = Loc.N("YOU CAN'T JOIN THIS LOBBY");
     private static readonly string MsgLimitedAccount = Loc.N("LIMITED STEAM ACCOUNTS CAN'T JOIN LOBBIES");
     private static readonly string MsgRateLimited = Loc.N("TOO MANY ATTEMPTS, TRY AGAIN SHORTLY");
+    private static readonly string MsgKicked = Loc.N("YOU WERE KICKED FROM THIS LOBBY");
 
     /// <summary>English source text for a join failure reason (translated at display time).</summary>
     public static string DescribeJoinFailure(string reason)
@@ -96,6 +99,8 @@ public class LobbyManager : MonoBehaviour
                 return MsgLimitedAccount;
             case "RatelimitExceeded":
                 return MsgRateLimited;
+            case JoinFailKicked:
+                return MsgKicked;
             default:
                 return MsgJoinFailed;
         }
@@ -752,6 +757,9 @@ public class LobbyManager : MonoBehaviour
         CurrentLobby.SetData(DevSpectatorConfig.LobbyDataMaxPlayers, MaxLobbyMembers.ToString());
         PublishVisiblePlayerCount();
 
+        // A fresh lobby starts with nobody kicked.
+        _kickedSteamIds.Clear();
+
         // New lobbies are private (code/invite only) until the host lists them publicly.
         _hostLobbyIsPublic = false;
         CurrentLobby.SetData(LobbyDataKeyVisibility, VisibilityPrivate);
@@ -1037,6 +1045,15 @@ public class LobbyManager : MonoBehaviour
                 Debug.LogWarning($"[JoinLobby] Lobby {lobbyId} runs version '{GetLobbyVersion(lobby)}', local is '{Application.version}' — leaving.");
                 LeaveRejectedLobby(lobby);
                 await FailJoin(requestId, JoinFailVersionMismatch);
+                return;
+            }
+
+            // The host kicked us from this lobby earlier: don't connect only to be rejected.
+            if (IsSteamIdKicked(lobby, SteamClient.SteamId.Value))
+            {
+                Debug.LogWarning($"[JoinLobby] Kicked from lobby {lobbyId} earlier — leaving.");
+                LeaveRejectedLobby(lobby);
+                await FailJoin(requestId, JoinFailKicked);
                 return;
             }
 
@@ -1682,6 +1699,10 @@ public class LobbyManager : MonoBehaviour
         if (_spectatorMemberIds.Contains(friend.Id.Value) || DevSpectatorConfig.IsSpectatorMember(lobby, friend))
             return false;
 
+        // A kicked player leaving already got its own "was kicked" toast on the host.
+        if (IsSteamIdKicked(lobby, friend.Id.Value))
+            return false;
+
         if (!nm.IsServer && facepunchTransport != null && friend.Id == facepunchTransport.targetSteamId)
             return false;
 
@@ -1735,6 +1756,12 @@ public class LobbyManager : MonoBehaviour
         if (CurrentLobby.Id == 0 || lobby.Id != CurrentLobby.Id)
             return;
 
+        if (!IsLocalLobbyOwner && SteamClient.IsValid && IsSteamIdKicked(lobby, SteamClient.SteamId.Value))
+        {
+            HandleLocalKick(lobby);
+            return;
+        }
+
         OnLobbyUpdated?.Invoke();
     }
 
@@ -1784,6 +1811,14 @@ public class LobbyManager : MonoBehaviour
             DevSpectatorRegistry.RegisterSpectator(request.ClientNetworkId);
             response.Approved = true;
             Debug.Log($"[DevSpectator] Approved hidden spectator clientId={request.ClientNetworkId} steamId={devSteamId}.");
+            return;
+        }
+
+        if (IsConnectingClientKicked(request))
+        {
+            response.Approved = false;
+            response.Reason = JoinFailKicked;
+            Debug.LogWarning($"[LobbyManager] Rejected clientId={request.ClientNetworkId} — kicked from this lobby earlier.");
             return;
         }
 
@@ -2000,16 +2035,182 @@ public class LobbyManager : MonoBehaviour
     }
 
     // =========================
+    // KICKING
+    // =========================
+
+    // Lobby data listing kicked Steam IDs (comma separated). Every member reads it: a kicked player
+    // leaves on their own (also while still connecting) and rosters hide them right away.
+    private const string LobbyDataKeyKicked = "kicked";
+
+    /// <summary>Kicked players' grace period to drop over NGO before their client leaves on its own.</summary>
+    private const float KickDisconnectGraceSeconds = 5f;
+
+    /// <summary>HOST: Steam IDs kicked from the current lobby; they're refused if they try to rejoin it.</summary>
+    private readonly System.Collections.Generic.HashSet<ulong> _kickedSteamIds = new();
+
+    private bool _localKickHandling;
+    private bool _localKickReceived;
+
+    /// <summary>
+    /// True once the host's kick notice reached this client. <see cref="ConnectionLossHandler"/> uses
+    /// it (with the NGO disconnect reason) to say "kicked" instead of "lost connection".
+    /// </summary>
+    public static bool LocalKickReceived => Instance != null && Instance._localKickReceived;
+
+    /// <summary>Only the host can kick (same rule as changing visibility).</summary>
+    public bool CanKickPlayers => CanChangeLobbyVisibility;
+
+    /// <summary>True when the local host can kick this lobby member (never themselves).</summary>
+    public bool CanKick(Friend member) =>
+        CanKickPlayers && SteamClient.IsValid && member.Id.Value != 0 && member.Id != SteamClient.SteamId;
+
+    /// <summary>
+    /// HOST: removes a player from the session and bars them from rejoining this lobby. Their NGO
+    /// connection is dropped with reason <see cref="JoinFailKicked"/>, and the lobby's kicked list
+    /// makes their client leave the Steam lobby even if they were still connecting.
+    /// </summary>
+    public bool KickPlayer(Friend member)
+    {
+        if (!CanKick(member))
+        {
+            Debug.LogWarning($"[LobbyManager] Can't kick {member.Name} ({member.Id.Value}) — not the host, or that's you.");
+            return false;
+        }
+
+        ulong steamId = member.Id.Value;
+        _kickedSteamIds.Add(steamId);
+        CurrentLobby.SetData(LobbyDataKeyKicked, string.Join(",", _kickedSteamIds));
+
+        NetworkManager nm = NetworkManager.Singleton;
+        int dropped = 0;
+        if (nm != null && nm.IsServer)
+        {
+            foreach (ulong clientId in nm.ConnectedClientsIds.ToArray())
+            {
+                if (clientId == NetworkManager.ServerClientId || !ClientMatchesSteamId(nm, clientId, steamId))
+                    continue;
+
+                nm.DisconnectClient(clientId, JoinFailKicked);
+                dropped++;
+            }
+        }
+
+        Debug.Log($"[LobbyManager] Kicked {member.Name} ({steamId}); dropped {dropped} NGO connection(s).");
+
+        string name = member.Name;
+        LobbyToast.Show(string.IsNullOrWhiteSpace(name)
+            ? Loc.T("The player was kicked from the lobby.")
+            // The Steam name must never go through localization.
+            : Loc.Verbatim(Loc.T("{0} was kicked from the lobby.", name)));
+
+        OnLobbyUpdated?.Invoke();
+        return true;
+    }
+
+    /// <summary>True when this lobby's kicked list contains <paramref name="steamId"/>.</summary>
+    private static bool IsSteamIdKicked(Lobby lobby, ulong steamId)
+    {
+        if (steamId == 0) return false;
+        string data = lobby.GetData(LobbyDataKeyKicked);
+        if (string.IsNullOrEmpty(data)) return false;
+
+        string id = steamId.ToString();
+        foreach (string entry in data.Split(','))
+        {
+            if (entry == id) return true;
+        }
+        return false;
+    }
+
+    /// <summary>SERVER: whether an NGO client is the given Steam user (Steam connection first, payload as fallback).</summary>
+    private static bool ClientMatchesSteamId(NetworkManager nm, ulong clientId, ulong steamId)
+    {
+        if (DevSpectatorConfig.TryGetConnectionSteamId(nm, clientId, out ulong connectionSteamId))
+            return connectionSteamId == steamId;
+
+        return PlayerSessionIdentity.TryGetIdentity(clientId, out string identity) && identity == "steam:" + steamId;
+    }
+
+    /// <summary>SERVER: connection approval check against the kicked list.</summary>
+    private bool IsConnectingClientKicked(NetworkManager.ConnectionApprovalRequest request)
+    {
+        if (_kickedSteamIds.Count == 0)
+            return false;
+
+        if (DevSpectatorConfig.TryGetConnectionSteamId(NetworkManager.Singleton, request.ClientNetworkId, out ulong steamId))
+            return _kickedSteamIds.Contains(steamId);
+
+        const string SteamPrefix = "steam:";
+        return PlayerSessionIdentity.TryParsePayload(request.Payload, out string identity)
+               && identity.StartsWith(SteamPrefix, StringComparison.Ordinal)
+               && ulong.TryParse(identity.Substring(SteamPrefix.Length), out steamId)
+               && _kickedSteamIds.Contains(steamId);
+    }
+
+    /// <summary>
+    /// CLIENT: the host put us on the kicked list. A join still connecting fails with "kicked"; a
+    /// connected client waits for the host's NGO disconnect (ConnectionLossHandler reloads to the
+    /// menu) and only leaves on its own if that never arrives; otherwise just leave the lobby.
+    /// </summary>
+    private async void HandleLocalKick(Lobby lobby)
+    {
+        if (_localKickHandling)
+            return;
+
+        _localKickHandling = true;
+        _localKickReceived = true;
+        Debug.LogWarning($"[LobbyManager] Kicked from lobby {lobby.Id} by the host.");
+
+        try
+        {
+            if (_joinInProgress)
+            {
+                int requestId = _joinRequestId;
+                LeaveRejectedLobby(lobby);
+                await FailJoin(requestId, JoinFailKicked, leaveSession: true);
+                return;
+            }
+
+            NetworkManager nm = NetworkManager.Singleton;
+            if (nm != null && nm.IsClient && !nm.IsServer)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(KickDisconnectGraceSeconds));
+                if (this == null || CurrentLobby.Id != lobby.Id)
+                    return; // ConnectionLossHandler already took us out.
+
+                LobbyToast.Error(Loc.T(MsgKicked));
+                await ExitLobbyAsync();
+                SceneManager.LoadScene(SceneManager.GetActiveScene().path);
+                return;
+            }
+
+            await ExitLobbyAsync();
+            LobbyToast.Error(Loc.T(MsgKicked));
+            OnKicked?.Invoke();
+        }
+        finally
+        {
+            if (this != null)
+            {
+                _localKickHandling = false;
+                _localKickReceived = false;
+            }
+        }
+    }
+
+    // =========================
     // HELPERS
     // =========================
-    /// <summary>Visible lobby members — hidden developer spectators are excluded.</summary>
+    /// <summary>Visible lobby members — hidden developer spectators and kicked players are excluded.</summary>
     public Friend[] GetMembersSnapshot()
     {
         if (CurrentLobby.Id == 0)
             return Array.Empty<Friend>();
 
         Lobby lobby = CurrentLobby;
-        return lobby.Members.Where(m => !DevSpectatorConfig.IsSpectatorMember(lobby, m)).ToArray();
+        return lobby.Members
+            .Where(m => !DevSpectatorConfig.IsSpectatorMember(lobby, m) && !IsSteamIdKicked(lobby, m.Id.Value))
+            .ToArray();
     }
 
     /// <summary>All Steam lobby members including hidden spectators (developer tooling only).</summary>

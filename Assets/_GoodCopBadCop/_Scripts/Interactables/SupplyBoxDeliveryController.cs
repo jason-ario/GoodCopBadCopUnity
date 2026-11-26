@@ -305,6 +305,7 @@ public class SupplyBoxDeliveryController : NetworkBehaviour
         _activeBox.SetCanPickUpNetworked(true);
         _activeBox.UnlockInteractableNetworked();
         _activeBox.FinalizeDeliveryClientRpc();
+        _activeBox.MarkAwaitingFirstPickupServer();
 
         // Contents stay locked (set in SpawnItems) — the box is delivered closed, and
         // SupplyBox.OpenBoxNetworked is the only path that unlocks them.

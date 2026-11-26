@@ -66,6 +66,21 @@ public class SaveDataManager : MonoBehaviour
     }
 
     /// <summary>
+    /// True once the Giorgi phantom has visited on this save slot. Lets
+    /// <see cref="GiorgiPhantomVisitController"/> guarantee exactly one visit per playthrough
+    /// (persisted at the next checkpoint; a lost/retried day reverts it like any other progress).
+    /// </summary>
+    public bool HasSeenGiorgiPhantom
+    {
+        get => ActiveSlot?.HasSeenGiorgiPhantom ?? false;
+        set
+        {
+            if (ActiveSlot == null) return;
+            ActiveSlot.HasSeenGiorgiPhantom = value;
+        }
+    }
+
+    /// <summary>
     /// Cash total as of the active slot's last day-start checkpoint. Kept in sync with the
     /// checkpoint's <see cref="WorkdaySaveState.Cash"/> by <see cref="CommitDayStartCheckpoint"/>.
     /// </summary>
@@ -989,6 +1004,12 @@ public class SaveSlot
     /// See <see cref="SaveDataManager.HasEverKilledSuspect"/> for the guarded wrapper.
     /// </summary>
     public bool HasEverKilledSuspect;
+
+    /// <summary>
+    /// True once the Giorgi phantom jumpscare has played on this save slot.
+    /// See <see cref="SaveDataManager.HasSeenGiorgiPhantom"/> for the guarded wrapper.
+    /// </summary>
+    public bool HasSeenGiorgiPhantom;
 
     /// <summary>
     /// Names of shop items unlocked through gameplay progression.

@@ -626,8 +626,8 @@ public class MainMenuController : MonoBehaviour
         }
 
         quitConfirmationDialog.Show(
-            title: "Quit Game",
-            body: "Are you sure you want to quit?",
+            title: Loc.T("Leaving so soon?"),
+            body: Loc.T("Please make sure to <b>WISHLIST</b> the game on Steam"),
             confirmText: "Yes",
             cancelText: "No",
             confirmCallback: () => Application.Quit(),

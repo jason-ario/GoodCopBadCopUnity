@@ -348,8 +348,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
     /// <summary>
     /// Dispenses coupons from the <see cref="ATM"/> when the mutant is removed because players beat it — a permanent kill or a
-    /// beaten-and-fled escape (both leave <see cref="MutantEnemy.IsDead"/> true). Removal for any
-    /// other reason pays nothing. Fires at most once per lineup appearance.
+    /// beaten-and-fled escape, paid once the flee finishes (both leave <see cref="MutantEnemy.IsDead"/> true).
+    /// Removal for any other reason pays nothing. Fires at most once per lineup appearance (shared
+    /// with the window thwart reward).
     /// </summary>
     private void HandleRemovedFromPlayForDefeatReward()
     {
@@ -359,13 +360,35 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         if (!IsServer || !wasArmed || _mutantEnemy == null || !_mutantEnemy.IsDead || _data == null)
             return;
 
+        DispenseLineupReward(thwartedAtWindow: false);
+    }
+
+    /// <summary>
+    /// Pays the lineup reward when the mutant loses interest at the booth window without getting
+    /// in (players kept it out with the shutter/glass). Consumes the same one-time reward as a
+    /// defeat, so a mutant that gives up and is then killed while retreating pays only once.
+    /// Server only.
+    /// </summary>
+    private void AwardThwartReward()
+    {
+        bool wasArmed = _defeatRewardArmed;
+        DisarmDefeatReward();
+
+        if (!IsServer || !wasArmed || _data == null)
+            return;
+
+        DispenseLineupReward(thwartedAtWindow: true);
+    }
+
+    private void DispenseLineupReward(bool thwartedAtWindow)
+    {
         int reward = _data.defeatCouponReward;
         if (reward <= 0)
             return;
 
         if (ATM.Instance == null)
         {
-            Debug.LogError("[MutantSuspectBehaviour] ATM.Instance is null — defeat reward coupons not dispensed.");
+            Debug.LogError("[MutantSuspectBehaviour] ATM.Instance is null — mutant reward coupons not dispensed.");
             return;
         }
 
@@ -375,8 +398,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         if (dispensed <= 0)
             return;
 
-        bool isFullMutant = TryGetComponent<SuspectCharacter>(out _);
-        ShowDefeatRewardClientRpc(dispensed, isFullMutant);
+        bool showFullMutantDefeated = !thwartedAtWindow && TryGetComponent<SuspectCharacter>(out _);
+        ShowDefeatRewardClientRpc(dispensed, showFullMutantDefeated);
     }
 
     [ClientRpc]
@@ -589,7 +612,8 @@ public class MutantSuspectBehaviour : NetworkBehaviour
 
             if (_isDone) yield break;
 
-            // Lost interest — either despawn or retreat.
+            // Lost interest — counts as thwarted. Then either despawn or retreat.
+            AwardThwartReward();
 
             if (DespawnInsteadOfRetreat)
             {
@@ -691,6 +715,9 @@ public class MutantSuspectBehaviour : NetworkBehaviour
         yield return new WaitForSeconds(GiveUpPauseDuration);
 
         if (_isDone) yield break;
+
+        // Kept out of the booth until it lost interest — players thwarted it.
+        AwardThwartReward();
 
         if (DespawnInsteadOfRetreat)
         {

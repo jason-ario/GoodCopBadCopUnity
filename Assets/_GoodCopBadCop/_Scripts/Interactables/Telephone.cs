@@ -14,6 +14,14 @@ public class Telephone : Interactable
 
     /// <summary>
     /// Fired on ALL clients (via ClientRpc) when a scripted call started with
+    /// <see cref="TriggerScriptedCall"/> begins ringing (including a queued one that rings later).
+    /// Use this for per-client ring prompts (task rows, tutorial arrows) — the server-side code
+    /// that requested the call usually runs on the host only.
+    /// </summary>
+    public static event Action OnScriptedRingStartedAllClients;
+
+    /// <summary>
+    /// Fired on ALL clients (via ClientRpc) when a scripted call started with
     /// <see cref="TriggerScriptedCall"/> is answered. Use this to register tasks or
     /// trigger any per-client setup that should happen the moment the handset is lifted.
     /// </summary>
@@ -340,7 +348,7 @@ public class Telephone : Interactable
         _pendingTaskIndex = taskIndex;
         _isRinging.Value = true;
 
-        StartRingingClientRpc();
+        StartRingingClientRpc(false);
         _ringTimeoutCoroutine = StartCoroutine(RingTimeoutRoutine());
     }
 
@@ -416,7 +424,7 @@ public class Telephone : Interactable
         _pendingTaskIndex = -2; // sentinel: scripted call — no task or debug voice delivered
         _isRinging.Value = true;
 
-        StartRingingClientRpc();
+        StartRingingClientRpc(true);
     }
 
     /// <summary>
@@ -513,7 +521,7 @@ public class Telephone : Interactable
         _pendingTaskIndex = -1;
         _isRinging.Value = true;
 
-        StartRingingClientRpc();
+        StartRingingClientRpc(false);
         _ringTimeoutCoroutine = StartCoroutine(RingTimeoutRoutine());
     }
 
@@ -572,13 +580,16 @@ public class Telephone : Interactable
     // ── Phone call – client RPCs ──────────────────────────────────────────────
 
     [ClientRpc]
-    private void StartRingingClientRpc()
+    private void StartRingingClientRpc(bool isScriptedCall)
     {
         if (_ringCycleCoroutine != null)
             StopCoroutine(_ringCycleCoroutine);
 
         _ringCycleCoroutine = StartCoroutine(RingCycleRoutine());
         OnRingStarted?.Invoke();
+
+        if (isScriptedCall)
+            OnScriptedRingStartedAllClients?.Invoke();
     }
 
     [ClientRpc]

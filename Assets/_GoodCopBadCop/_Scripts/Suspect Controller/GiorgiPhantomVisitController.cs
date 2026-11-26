@@ -6,7 +6,9 @@ using UnityEngine;
 /// Rolls and schedules the rare <see cref="GiorgiPhantomEncounter"/> jumpscare. Server-only logic;
 /// a plain scene MonoBehaviour (lives under <c>/---Suspect Controller</c>).
 ///
-/// Each shift start (from <see cref="_minDay"/> on) the server rolls <see cref="_chancePerShift"/>.
+/// Guaranteed once per playthrough inside the [<see cref="_firstWindowDay"/>, <see cref="_lastWindowDay"/>]
+/// window (default Days 3-4): each shift start in the window the server rolls 1 / (days left in window),
+/// so the last day is a certainty. "Visited" is stored on the save slot (<see cref="SaveDataManager.HasSeenGiorgiPhantom"/>).
 /// On success it picks a lineup slot and, when the switch is about to summon that slot, arms
 /// <see cref="SuspectController.InterceptNextSuspectSpawn"/> (only if no other scripted intercept
 /// is pending). The phantom is a bonus visitor like Ocho: once he vanishes the consumed slot is
@@ -21,16 +23,12 @@ public class GiorgiPhantomVisitController : MonoBehaviour
     [Tooltip("Network prefab with GiorgiPhantomEncounter (must be in DefaultNetworkPrefabs).")]
     [SerializeField] private GiorgiPhantomEncounter _phantomPrefab;
 
-    [Header("Rarity")]
-    [Tooltip("Chance (0-1) the phantom visits during any given shift.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float _chancePerShift = 0.12f;
+    [Header("Scheduling")]
+    [Tooltip("First campaign day of the guaranteed visit window.")]
+    [SerializeField] private int _firstWindowDay = 3;
 
-    [Tooltip("First campaign day the phantom can appear on (keeps him out of the Day 1 tutorial).")]
-    [SerializeField] private int _minDay = 2;
-
-    [Tooltip("If true, he can appear at most once per play session.")]
-    [SerializeField] private bool _oncePerSession = true;
+    [Tooltip("Last campaign day of the guaranteed visit window. If he hasn't come by this day, he comes on it.")]
+    [SerializeField] private int _lastWindowDay = 4;
 
     [Tooltip("Never take the very first slot of the shift (lets the shift settle in first).")]
     [SerializeField] private bool _skipFirstSlot = true;
@@ -81,6 +79,26 @@ public class GiorgiPhantomVisitController : MonoBehaviour
 
     private static int CurrentDay => ShiftManager.Instance != null ? ShiftManager.Instance.CurrentDay : 1;
 
+    /// <summary>
+    /// True once he has visited this playthrough. Uses the active save slot when there is one
+    /// (so a new campaign in the same session gets its own visit); otherwise the session flag.
+    /// </summary>
+    private bool HasVisited
+    {
+        get
+        {
+            SaveDataManager save = SaveDataManager.Instance;
+            if (save != null && save.ActiveSlot != null) return save.HasSeenGiorgiPhantom;
+            return _visitedThisSession;
+        }
+    }
+
+    private void MarkVisited()
+    {
+        _visitedThisSession = true;
+        if (SaveDataManager.Instance != null) SaveDataManager.Instance.HasSeenGiorgiPhantom = true;
+    }
+
     // ── Rolling ────────────────────────────────────────────────────────────
 
     private void HandleShiftStart()
@@ -92,21 +110,27 @@ public class GiorgiPhantomVisitController : MonoBehaviour
         _targetSlot = -1;
 
         if (_phantomPrefab == null) return;
-        if (_oncePerSession && _visitedThisSession) return;
-        if (CurrentDay < _minDay) return;
+        if (HasVisited) return;
 
+        int day = CurrentDay;
+        if (day < _firstWindowDay || day > _lastWindowDay) return;
+
+        // Spread the guarantee evenly over the days left in the window:
+        // Day 3 of a 3-4 window = 1/2, Day 4 = 1/1 (always).
+        int daysLeftInWindow = _lastWindowDay - day + 1;
+        float chance = 1f / daysLeftInWindow;
         float roll = Random.value;
-        if (roll >= _chancePerShift)
+        if (roll >= chance)
         {
-            if (_log) Debug.Log($"[GiorgiPhantom] Shift roll {roll:F2} >= {_chancePerShift:F2} — no visit this shift.");
+            if (_log) Debug.Log($"[GiorgiPhantom] Day {day} roll {roll:F2} >= {chance:F2} — he'll come on a later day of the window.");
             return;
         }
 
         // Pick the slot lazily (the lineup is populated on this same OnShiftStart).
-        StartCoroutine(PickTargetSlotWhenLineupReady());
+        StartCoroutine(PickTargetSlotWhenLineupReady(day >= _lastWindowDay));
     }
 
-    private IEnumerator PickTargetSlotWhenLineupReady()
+    private IEnumerator PickTargetSlotWhenLineupReady(bool isFinalChance)
     {
         float timeoutAt = Time.time + 10f;
         DailySuspectManager lineup = DailySuspectManager.Instance;
@@ -120,7 +144,10 @@ public class GiorgiPhantomVisitController : MonoBehaviour
 
         int total = lineup.TotalLineupSlotsThisShift;
         int min = _skipFirstSlot && total > 1 ? 1 : 0;
-        _targetSlot = Random.Range(min, total);
+        // On the last day of the window, keep the final slot free so a deferral (another
+        // scripted intercept or a breach on his slot) still has a later slot to land on.
+        int maxExclusive = isFinalChance && total - 1 > min ? total - 1 : total;
+        _targetSlot = Random.Range(min, maxExclusive);
 
         if (_log) Debug.Log($"[GiorgiPhantom] He'll come this shift, in place of lineup slot {_targetSlot} (of {total}).");
 
@@ -190,7 +217,7 @@ public class GiorgiPhantomVisitController : MonoBehaviour
         }
 
         netObj.Spawn(true);
-        _visitedThisSession = true;
+        MarkVisited();
         phantom.BeginEncounter(controller.StandPoint, controller.BoothInteriorPoint, ResumeLineup);
 
         if (_log) Debug.Log("[GiorgiPhantom] Spawned and walking to the window.");

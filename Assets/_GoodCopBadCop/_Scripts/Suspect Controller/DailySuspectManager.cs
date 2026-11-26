@@ -25,26 +25,24 @@ public class DailySuspectManager : MonoBehaviour
     /// <summary>
     /// SINGLE SOURCE OF TRUTH for "how many suspects the player must process this shift" — the
     /// number shown by the "Process N subjects" objective counter (<see cref="DayBase"/>) and the
-    /// Task Page total (<see cref="ProcessResidentsTask"/>). Deliberately EXCLUDES injected mutant
-    /// intruder slots (<see cref="_mutantSlotIndices"/>): mutants are a random combat threat added
-    /// on top of the shift, never a "suspect to process", and must never affect this total or the
-    /// displayed X/Y count. Doppelganger and full-mutant slots DO count — both are real suspects.
-    /// Full mutants, and suspects melee-killed or fled before a verdict, are counted as processed
-    /// via ShiftManager.SuspectResolvedWithoutVerdict so the counter still reaches this total.
+    /// Task Page total (<see cref="ProcessResidentsTask"/>). Every lineup slot counts, INCLUDING
+    /// injected mutant intruder slots (<see cref="_mutantSlotIndices"/>), doppelgangers and full
+    /// mutants. Mutant intruders and full mutants (on encounter end), and suspects melee-killed or
+    /// fled before a verdict, are counted as processed via ShiftManager.SuspectResolvedWithoutVerdict
+    /// so the counter still reaches this total.
     /// Returns 0 before the lineup has been populated for the day.
     ///
     /// MULTIPLAYER: only authoritative ON THE SERVER. Every peer runs PopulateShiftCharacters with its
     /// own local RNG, so this value differs per client. Client-facing UI must read the replicated
     /// <see cref="ProcessResidentsTask.TotalCount"/> instead (which the server fills from this).
     /// </summary>
-    public int TotalSuspectsThisShift => shiftSuspects.Count - _mutantSlotIndices.Count;
+    public int TotalSuspectsThisShift => shiftSuspects.Count;
 
     /// <summary>
     /// Total occupied lineup slots this shift, INCLUDING injected mutant intruder slots. This is
-    /// the number of times the lineup actually has to advance before the shift can end — mutants
-    /// still occupy a real slot and must still be resolved (killed/fled/etc.) even though they are
-    /// excluded from <see cref="TotalSuspectsThisShift"/>. Used only by
-    /// <see cref="ShiftManager.SetNextSuspectReady"/> to know when the lineup is exhausted.
+    /// the number of times the lineup actually has to advance before the shift can end. Currently
+    /// equal to <see cref="TotalSuspectsThisShift"/>; kept separate so the end-of-shift check
+    /// (<see cref="ShiftManager.SetNextSuspectReady"/>) stays independent of the display total.
     /// </summary>
     public int TotalLineupSlotsThisShift => shiftSuspects.Count;
 
@@ -193,7 +191,7 @@ public class DailySuspectManager : MonoBehaviour
             InjectMutantSlots();
             InjectDoppelgangerSlots();
             InjectForcedFullMutantSlots();
-            EnsureLineupDoesNotEndWithMutant();
+            ArrangeMutantSlots();
             InjectFullMutantSlots();
             AssignGuaranteedKillVerdictSuspects();
             IsLineupPopulated = true;
@@ -231,7 +229,7 @@ public class DailySuspectManager : MonoBehaviour
         InjectMutantSlots();
         InjectDoppelgangerSlots();
         InjectForcedFullMutantSlots();
-        EnsureLineupDoesNotEndWithMutant();
+        ArrangeMutantSlots();
         InjectFullMutantSlots();
         AssignGuaranteedKillVerdictSuspects();
         IsLineupPopulated = true;
@@ -506,54 +504,77 @@ public class DailySuspectManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Guarantees the lineup never ENDS with a mutant intruder slot. Mutant intruders are not
-    /// "suspects to process" (excluded from <see cref="TotalSuspectsThisShift"/>), but
-    /// <see cref="ShiftManager.SetNextSuspectReady"/> only ends the shift once the final lineup
-    /// slot resolves — so a trailing mutant would leave the shift hanging after every real suspect
-    /// was processed. Any trailing mutant slot(s) are relocated to a random position before the
-    /// last non-mutant slot, keeping every other slot-tracking index consistent.
+    /// Re-places every mutant intruder slot so that (a) no two mutant intruders are ever back to
+    /// back and (b) the lineup never ENDS with a mutant intruder. Each mutant is placed in a
+    /// distinct random "gap" immediately before a non-mutant slot, so every mutant is always
+    /// followed by a real suspect. The relative order of non-mutant slots is preserved and their
+    /// doppelganger/replacement/full-mutant tracking is carried over to the new indices.
+    /// If there are more mutants than non-mutant slots, the excess mutants are dropped (logged).
     /// Must run after every slot insertion and before <see cref="InjectFullMutantSlots"/>.
     /// </summary>
-    private void EnsureLineupDoesNotEndWithMutant()
+    private void ArrangeMutantSlots()
     {
-        int relocated = 0;
+        int mutantCount = _mutantSlotIndices.Count;
+        if (mutantCount == 0) return;
 
-        while (shiftSuspects.Count > 0 && _mutantSlotIndices.Contains(shiftSuspects.Count - 1))
+        var realSuspects = new List<SuspectData>();
+        var realDoppelgangers = new List<DoppelgangerData>();
+        var realIsReplacement = new List<bool>();
+        var realIsFullMutant = new List<bool>();
+
+        for (int i = 0; i < shiftSuspects.Count; i++)
         {
-            int lastNonMutant = -1;
-            for (int i = shiftSuspects.Count - 1; i >= 0; i--)
-            {
-                if (!_mutantSlotIndices.Contains(i)) { lastNonMutant = i; break; }
-            }
-
-            if (lastNonMutant < 0)
-            {
-                Debug.LogWarning("[DailySuspectManager] Lineup contains only mutant slots — cannot relocate trailing mutant.");
-                return;
-            }
-
-            // Removing the tail slot does not affect any other index.
-            int tailIndex = shiftSuspects.Count - 1;
-            shiftSuspects.RemoveAt(tailIndex);
-            _mutantSlotIndices.Remove(tailIndex);
-
-            // Inserting at lastNonMutant places the mutant immediately before (or anywhere ahead
-            // of) the final real suspect, which then shifts up and becomes the tail.
-            int insertIndex = UnityEngine.Random.Range(0, lastNonMutant + 1);
-            shiftSuspects.Insert(insertIndex, null);
-
-            ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
-            ShiftDoppelgangerSlotsAfterInsert(insertIndex);
-            ShiftReplacementSlotsAfterInsert(insertIndex);
-            ShiftHashSetIndicesAfterInsert(insertIndex, _fullMutantSlotIndices);
-            _mutantSlotIndices.Add(insertIndex);
-
-            relocated++;
-            Debug.Log($"[DailySuspectManager] Trailing mutant intruder slot relocated from index {tailIndex} to {insertIndex} so the lineup never ends with a mutant.");
+            if (_mutantSlotIndices.Contains(i)) continue;
+            realSuspects.Add(shiftSuspects[i]);
+            realDoppelgangers.Add(_doppelgangerSlots.TryGetValue(i, out DoppelgangerData d) ? d : null);
+            realIsReplacement.Add(_replacementSlotIndices.Contains(i));
+            realIsFullMutant.Add(_fullMutantSlotIndices.Contains(i));
         }
 
-        if (relocated > 0)
-            Debug.Log($"[DailySuspectManager] Relocated {relocated} trailing mutant slot(s); last lineup slot is now a processable suspect.");
+        int realCount = realSuspects.Count;
+        if (realCount == 0)
+        {
+            Debug.LogWarning("[DailySuspectManager] Lineup contains only mutant slots — cannot space them out.");
+            return;
+        }
+
+        // Gap g = directly before real slot g. There is no gap after the last real slot, which
+        // keeps a mutant off the tail and guarantees no two mutants are adjacent.
+        int placeable = Mathf.Min(mutantCount, realCount);
+        if (placeable < mutantCount)
+            Debug.LogWarning($"[DailySuspectManager] {mutantCount} mutant intruder(s) but only {realCount} other slot(s) — dropping {mutantCount - placeable} so no two mutants are back to back.");
+
+        var gaps = new List<int>(realCount);
+        for (int g = 0; g < realCount; g++) gaps.Add(g);
+        for (int k = 0; k < placeable; k++)
+        {
+            int swap = UnityEngine.Random.Range(k, gaps.Count);
+            (gaps[k], gaps[swap]) = (gaps[swap], gaps[k]);
+        }
+        var chosenGaps = new HashSet<int>(gaps.GetRange(0, placeable));
+
+        shiftSuspects.Clear();
+        _mutantSlotIndices.Clear();
+        _doppelgangerSlots.Clear();
+        _replacementSlotIndices.Clear();
+        _fullMutantSlotIndices.Clear();
+
+        for (int g = 0; g < realCount; g++)
+        {
+            if (chosenGaps.Contains(g))
+            {
+                _mutantSlotIndices.Add(shiftSuspects.Count);
+                shiftSuspects.Add(null);
+            }
+
+            int index = shiftSuspects.Count;
+            shiftSuspects.Add(realSuspects[g]);
+            if (realDoppelgangers[g] != null) _doppelgangerSlots[index] = realDoppelgangers[g];
+            if (realIsReplacement[g]) _replacementSlotIndices.Add(index);
+            if (realIsFullMutant[g]) _fullMutantSlotIndices.Add(index);
+        }
+
+        Debug.Log($"[DailySuspectManager] Mutant intruder slots spaced out at [{string.Join(", ", _mutantSlotIndices)}] of {shiftSuspects.Count} — none back to back, none last.");
     }
 
     /// <summary>
@@ -721,62 +742,42 @@ public class DailySuspectManager : MonoBehaviour
         int currentDay = CampaignManager.Instance != null ? CampaignManager.Instance.CurrentDay : 1;
         int targetCount = Mathf.Clamp(activeDay.ForcedFullMutantCount, 1, 2);
 
-        // Only force the shortfall: full mutants already drawn naturally today count toward the target.
-        int naturalCount = CountNaturalFullMutantSlots(runRecords);
-        int desiredCount = Mathf.Max(0, targetCount - naturalCount);
+        // Top up only: full mutants already occurring naturally in today's draw count toward the target.
+        int naturalCount = CountNaturalFullMutantSlots();
+        int desiredCount = targetCount - naturalCount;
+        if (desiredCount <= 0)
+        {
+            Debug.Log($"[DailySuspectManager] ForceEarlyFullMutants target {targetCount} already met by {naturalCount} natural full mutant(s) — none forced.");
+            return;
+        }
+        if (naturalCount > 0)
+            Debug.Log($"[DailySuspectManager] ForceEarlyFullMutants target {targetCount}: {naturalCount} natural full mutant(s) in lineup — forcing {desiredCount} more.");
 
-        List<SuspectRecord> chosenRecords = desiredCount > 0
-            ? SelectForcedFullMutantCandidates(runRecords, activeDay, currentDay, desiredCount)
-            : new List<SuspectRecord>();
+        List<SuspectRecord> chosenRecords = SelectForcedFullMutantCandidates(runRecords, activeDay, currentDay, desiredCount);
 
-        if (desiredCount > 0 && chosenRecords.Count < desiredCount)
+        if (chosenRecords.Count == 0)
+        {
+            Debug.LogWarning("[DailySuspectManager] ForceEarlyFullMutants enabled but no living, non-quarantined suspect with a fullMutantDialogue was available — none injected.");
+            return;
+        }
+
+        if (chosenRecords.Count < desiredCount)
             Debug.LogWarning($"[DailySuspectManager] ForceEarlyFullMutants wanted {desiredCount} but only {chosenRecords.Count} suspect(s) could be forced.");
 
         foreach (SuspectRecord chosen in chosenRecords)
         {
             runRecords.ForceFullMutation(chosen.SuspectData);
-            int insertIndex = InsertSlotAtRandomIndex(chosen.SuspectData);
+
+            int insertIndex = UnityEngine.Random.Range(0, shiftSuspects.Count + 1);
+            shiftSuspects.Insert(insertIndex, chosen.SuspectData);
+
+            ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
+            ShiftDoppelgangerSlotsAfterInsert(insertIndex);
+            ShiftReplacementSlotsAfterInsert(insertIndex);
+            ShiftHashSetIndicesAfterInsert(insertIndex, _fullMutantSlotIndices);
+
             Debug.Log($"[DailySuspectManager] Demo override — forced '{chosen.SuspectData.name}' into today's lineup as an early full mutant (slot {insertIndex}).");
         }
-
-        // Lineup length must not depend on how many were forced: every forced slot that wasn't
-        // needed (natural full mutants already present) or couldn't be filled gets a normal
-        // random suspect instead, so the shift is always base draw + ForcedFullMutantCount.
-        int fillerCount = targetCount - chosenRecords.Count;
-        if (fillerCount <= 0) return;
-
-        List<SuspectData> fillers = GetRandomSuspects(fillerCount, activeDay, shiftSuspects);
-        foreach (SuspectData filler in fillers)
-        {
-            int insertIndex = InsertSlotAtRandomIndex(filler);
-
-            SuspectRecord fillerRecord = runRecords.GetRecord(filler);
-            if (fillerRecord != null && fillerRecord.isReplacement)
-                _replacementSlotIndices.Add(insertIndex);
-
-            Debug.Log($"[DailySuspectManager] ForceEarlyFullMutants — {naturalCount} natural full mutant(s) already in the draw; filled spare forced slot with regular suspect '{filler.name}' (slot {insertIndex}).");
-        }
-
-        if (fillers.Count < fillerCount)
-            Debug.LogWarning($"[DailySuspectManager] ForceEarlyFullMutants needed {fillerCount} filler suspect(s) but the pool only had {fillers.Count} — lineup is {fillerCount - fillers.Count} short.");
-    }
-
-    /// <summary>
-    /// Inserts <paramref name="suspect"/> at a random lineup index and shifts every tracked slot
-    /// index at or after it. Registering the new slot (replacement, etc.) is the caller's job and
-    /// must happen after this returns.
-    /// </summary>
-    private int InsertSlotAtRandomIndex(SuspectData suspect)
-    {
-        int insertIndex = UnityEngine.Random.Range(0, shiftSuspects.Count + 1);
-        shiftSuspects.Insert(insertIndex, suspect);
-
-        ShiftHashSetIndicesAfterInsert(insertIndex, _mutantSlotIndices);
-        ShiftDoppelgangerSlotsAfterInsert(insertIndex);
-        ShiftReplacementSlotsAfterInsert(insertIndex);
-        ShiftHashSetIndicesAfterInsert(insertIndex, _fullMutantSlotIndices);
-
-        return insertIndex;
     }
 
     /// <summary>
@@ -847,64 +848,64 @@ public class DailySuspectManager : MonoBehaviour
         return chosen;
     }
 
-    /// <summary>
-    /// Number of slots already in <see cref="shiftSuspects"/> that <see cref="InjectFullMutantSlots"/>
-    /// will flag as full mutants without any forcing. Used so the forced-full-mutant override only
-    /// tops up to <see cref="DayBase.ForcedFullMutantCount"/> instead of always adding on top.
-    /// </summary>
-    private int CountNaturalFullMutantSlots(SuspectRunRecords runRecords)
-    {
-        int count = 0;
-        for (int i = 0; i < shiftSuspects.Count; i++)
-        {
-            if (IsFullMutantSlotCandidate(i, runRecords, out SuspectData suspect)
-                && !runRecords.IsFullMutantInstanceActive(suspect))
-                count++;
-        }
-        return count;
-    }
-
-    /// <summary>
-    /// Shared eligibility for full-mutant slot flagging (excludes the live-instance check, which
-    /// callers handle so they can log it). Keep <see cref="InjectFullMutantSlots"/> and
-    /// <see cref="CountNaturalFullMutantSlots"/> on this single rule set.
-    /// </summary>
-    private bool IsFullMutantSlotCandidate(int i, SuspectRunRecords runRecords, out SuspectData suspect)
-    {
-        suspect = shiftSuspects[i];
-        if (suspect == null || runRecords == null) return false;
-        if (_mutantSlotIndices.Contains(i)) return false;
-        if (_doppelgangerSlots.ContainsKey(i)) return false;
-        if (_replacementSlotIndices.Contains(i)) return false;
-
-        SuspectRecord record = runRecords.GetRecord(suspect);
-        if (record == null || !(record.IsFullyMutated || record.isLegacyMutant)) return false;
-
-        // First-time full mutants need their reveal conversation; returning ones skip it and
-        // attack the window immediately, so they don't need a dialogue asset.
-        if (suspect.fullMutantDialogue == null && !record.HasCompletedFullMutantEncounter) return false;
-
-        return true;
-    }
-
     private void InjectFullMutantSlots()
     {
         SuspectRunRecords runRecords = SuspectRunRecords.Instance;
 
         for (int i = 0; i < shiftSuspects.Count; i++)
         {
-            if (!IsFullMutantSlotCandidate(i, runRecords, out SuspectData suspect)) continue;
-            SuspectRecord record = runRecords.GetRecord(suspect);
-
-            if (runRecords.IsFullMutantInstanceActive(suspect))
-            {
-                Debug.Log($"[DailySuspectManager] '{suspect.name}' already has a live full-mutant instance elsewhere — slot {i} not flagged as full mutant.");
-                continue;
-            }
+            if (!IsFullMutantSlotCandidate(i, runRecords, logSkips: true, out SuspectRecord record)) continue;
 
             _fullMutantSlotIndices.Add(i);
-            Debug.Log($"[DailySuspectManager] '{suspect.name}' is {(record.IsFullyMutated ? "fully mutated" : "a legacy mutant")} — slot {i} flagged as full mutant.");
+            Debug.Log($"[DailySuspectManager] '{shiftSuspects[i].name}' is {(record.IsFullyMutated ? "fully mutated" : "a legacy mutant")} — slot {i} flagged as full mutant.");
         }
+    }
+
+    /// <summary>
+    /// Number of slots already in today's lineup that <see cref="InjectFullMutantSlots"/> will flag
+    /// as full mutants on its own (naturally fully mutated or returning legacy mutants). Used by
+    /// <see cref="InjectForcedFullMutantSlots"/> so forced full mutants only top up to the target.
+    /// </summary>
+    private int CountNaturalFullMutantSlots()
+    {
+        SuspectRunRecords runRecords = SuspectRunRecords.Instance;
+        int count = 0;
+        for (int i = 0; i < shiftSuspects.Count; i++)
+        {
+            if (IsFullMutantSlotCandidate(i, runRecords, logSkips: false, out _)) count++;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Single eligibility rule for "this lineup slot is a full mutant". Shared by
+    /// <see cref="InjectFullMutantSlots"/> and <see cref="CountNaturalFullMutantSlots"/> so the
+    /// count and the flagging always agree — put any new full-mutant rule here.
+    /// </summary>
+    private bool IsFullMutantSlotCandidate(int i, SuspectRunRecords runRecords, bool logSkips, out SuspectRecord record)
+    {
+        record = null;
+        SuspectData suspect = shiftSuspects[i];
+        if (suspect == null) return false;
+        if (_mutantSlotIndices.Contains(i)) return false;
+        if (_doppelgangerSlots.ContainsKey(i)) return false;
+        if (_replacementSlotIndices.Contains(i)) return false;
+
+        record = runRecords?.GetRecord(suspect);
+        if (record == null || !(record.IsFullyMutated || record.isLegacyMutant)) return false;
+
+        // First-time full mutants need their reveal conversation; returning ones skip it and
+        // attack the window immediately, so they don't need a dialogue asset.
+        if (suspect.fullMutantDialogue == null && !record.HasCompletedFullMutantEncounter) return false;
+
+        if (runRecords.IsFullMutantInstanceActive(suspect))
+        {
+            if (logSkips)
+                Debug.Log($"[DailySuspectManager] '{suspect.name}' already has a live full-mutant instance elsewhere — slot {i} not flagged as full mutant.");
+            return false;
+        }
+
+        return true;
     }
 
     private static bool IsExcludedToday(DayBase today, SuspectData suspect) =>
@@ -951,12 +952,6 @@ public class DailySuspectManager : MonoBehaviour
             if (record != null && record.IsOnQuarantineCooldown(currentDay))
             {
                 Debug.LogWarning($"[DailySuspectManager] Guaranteed suspect '{suspect.name}' is on quarantine cooldown — skipped on day {today.DayNumber}.");
-                continue;
-            }
-
-            if (SuspectRunRecords.Instance != null && SuspectRunRecords.Instance.IsFullMutantInstanceActive(suspect))
-            {
-                Debug.LogWarning($"[DailySuspectManager] Guaranteed suspect '{suspect.name}' has a live full-mutant instance — skipped on day {today.DayNumber}.");
                 continue;
             }
 
@@ -1011,7 +1006,7 @@ public class DailySuspectManager : MonoBehaviour
     /// replacement and full-mutant flags are cleared. If <paramref name="suspect"/> already holds
     /// a later slot, the two slots swap so the forced character never appears twice; the
     /// displaced character takes that later slot instead. Slot count is unchanged, so
-    /// <see cref="TotalSuspectsThisShift"/> only shifts if a mutant-intruder slot was overwritten.
+    /// <see cref="TotalSuspectsThisShift"/> is unchanged.
     /// Returns false if the index is out of range.
     /// </summary>
     public bool ForceSuspectIntoSlot(int lineupIndex, SuspectData suspect)
@@ -1054,38 +1049,6 @@ public class DailySuspectManager : MonoBehaviour
         if (!_fullMutantSlotIndices.Contains(lineupIndex)) return false;
         suspectData = lineupIndex < shiftSuspects.Count ? shiftSuspects[lineupIndex] : null;
         return suspectData != null;
-    }
-
-    /// <summary>
-    /// Spawn-time re-check of a lineup slot's full-mutant state. Lineup flags are computed once at
-    /// shift start, but a suspect can cross <see cref="AnomalyController.FULLY_MUTATED_THRESHOLD"/>
-    /// later the same day (e.g. <see cref="SuspectRunRecords.ForceFullMutation"/> after fleeing
-    /// wounded). Flags the slot now if it qualifies under <see cref="IsFullMutantSlotCandidate"/>.
-    /// Returns false when the suspect is fully mutated (or a legacy mutant) but can't run the
-    /// full-mutant path (live instance elsewhere, no dialogue); the caller must not spawn them as
-    /// a normal suspect, or they'd arrive in mutant form and hand over paperwork.
-    /// </summary>
-    public bool ValidateFullMutantSlotForSpawn(int lineupIndex)
-    {
-        if (_fullMutantSlotIndices.Contains(lineupIndex)) return true;
-        if (lineupIndex < 0 || lineupIndex >= shiftSuspects.Count) return true;
-
-        SuspectRunRecords runRecords = SuspectRunRecords.Instance;
-        SuspectData suspect = shiftSuspects[lineupIndex];
-        SuspectRecord record = runRecords != null && suspect != null ? runRecords.GetRecord(suspect) : null;
-        if (record == null || !(record.IsFullyMutated || record.isLegacyMutant)) return true;
-
-        if (IsFullMutantSlotCandidate(lineupIndex, runRecords, out _)
-            && !runRecords.IsFullMutantInstanceActive(suspect))
-        {
-            _fullMutantSlotIndices.Add(lineupIndex);
-            Debug.Log($"[DailySuspectManager] '{suspect.name}' became fully mutated after the lineup was built — slot {lineupIndex} flagged as full mutant at spawn.");
-            return true;
-        }
-
-        Debug.LogWarning($"[DailySuspectManager] '{suspect.name}' is fully mutated but can't run the full-mutant path " +
-                         $"(live instance elsewhere: {runRecords.IsFullMutantInstanceActive(suspect)}, has dialogue: {suspect.fullMutantDialogue != null}) — slot {lineupIndex} skipped.");
-        return false;
     }
 
     /// <summary>
@@ -1161,13 +1124,6 @@ public class DailySuspectManager : MonoBehaviour
             if (runRecord != null && runRecord.IsOnQuarantineCooldown(currentDay))
             {
                 Debug.Log($"[DailySuspectManager] '{suspect.name}' excluded — on quarantine cooldown (quarantined on day {runRecord.quarantinedOnDay}).");
-                continue;
-            }
-
-            // A suspect whose full-mutant instance is already roaming can't also walk up to the booth.
-            if (SuspectRunRecords.Instance != null && SuspectRunRecords.Instance.IsFullMutantInstanceActive(suspect))
-            {
-                Debug.Log($"[DailySuspectManager] '{suspect.name}' excluded — full-mutant instance already active.");
                 continue;
             }
 
