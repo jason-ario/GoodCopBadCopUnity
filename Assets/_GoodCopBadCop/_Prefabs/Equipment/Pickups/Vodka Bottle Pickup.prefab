@@ -275,7 +275,7 @@ MonoBehaviour:
   _maxAngle: 35
   _minHitInterval: 0.05
   _disableOnShatter:
-  - {fileID: 0}
+  - {fileID: 9096338740294494731}
   _shatterVFXPrefab: {fileID: 0}
   _shatterVFXLifetime: 4
   _respawnDelay: 0
@@ -293,6 +293,13 @@ MonoBehaviour:
   _dustGrowth: 2.2
   _dustSpeed: 1.2
   _dustLifetimeRange: {x: 0.9, y: 1.6}
+  _liquidMaterial: {fileID: 2100000, guid: c4d4365c3eeb8a54183f5af15699021d, type: 2}
+  _liquidCount: 50
+  _liquidColor: {r: 0.92, g: 0.96, b: 1, a: 0.85}
+  _liquidSizeRange: {x: 0.05, y: 0.14}
+  _liquidSpeed: 4.5
+  _liquidSpread: 0.75
+  _liquidLifetimeRange: {x: 0.5, y: 1.1}
 --- !u!114 &8006964996659251794
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -743,6 +750,11 @@ MonoBehaviour:
   itemData: {fileID: 11400000, guid: adb4e5e270472d642a60d6a1c2bea7df, type: 2}
   throwImpactSfxDuration: 3.5
   throwImpactSfxCooldown: 0.5
+  _drinkSound: {fileID: 8300000, guid: a83a1844f6982ca42b6f0d9ecb149b16, type: 3}
+  _drinkSoundVolume: 1
+  _sipDuration: 2.5
+  _minSmashSpeed: 3
+  _despawnDelay: 0.25
 --- !u!65 &4840650935146184757
 BoxCollider:
   m_ObjectHideFlags: 0

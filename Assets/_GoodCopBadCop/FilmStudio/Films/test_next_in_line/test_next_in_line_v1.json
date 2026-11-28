@@ -1,0 +1,214 @@
+{
+  "title": "Next In Line",
+  "logline": "A routine booth check goes very wrong.",
+  "hook": "He seems fine. He is not.",
+  "setId": "booth",
+  "fps": 30,
+  "durationSec": 9.5,
+  "cast": [
+    {
+      "actorId": "butcher",
+      "role": "suspect",
+      "startMarkId": "booth_not_seated_pos",
+      "variant": "base"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s1",
+      "start": 0.0,
+      "duration": 2.0,
+      "camera": {
+        "framing": "wide",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "dolly_in",
+        "moveAmount": 0.4,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "breathing_idle",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [],
+      "caption": "Next in line.",
+      "speed": 1.0,
+      "notes": "",
+      "locked": false
+    },
+    {
+      "id": "s2",
+      "start": 2.0,
+      "duration": 2.0,
+      "camera": {
+        "framing": "medium",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "static",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "talking",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.2,
+          "sfxId": "stamp",
+          "volume": 1.0
+        }
+      ],
+      "caption": "Papers look fine...",
+      "speed": 1.0,
+      "notes": "",
+      "locked": false
+    },
+    {
+      "id": "s3",
+      "start": 4.0,
+      "duration": 1.5,
+      "camera": {
+        "framing": "close_up",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "static",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.4,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "head_twitch",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [],
+      "caption": "",
+      "speed": 1.0,
+      "notes": "",
+      "locked": false
+    },
+    {
+      "id": "s4",
+      "start": 5.5,
+      "duration": 1.5,
+      "camera": {
+        "framing": "extreme_close_up",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "crash_zoom",
+        "moveAmount": 0.8,
+        "dutch": 12.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "variant_swap",
+          "clipId": "",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        },
+        {
+          "actorId": "butcher",
+          "t": 0.05,
+          "type": "anim",
+          "clipId": "body_twitch",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.0,
+          "sfxId": "396797_scorpion67890_mutant_scream",
+          "volume": 1.0
+        }
+      ],
+      "caption": "",
+      "speed": 1.0,
+      "notes": "",
+      "locked": false
+    },
+    {
+      "id": "s5",
+      "start": 7.0,
+      "duration": 2.5,
+      "camera": {
+        "framing": "wide",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "dolly_out",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "move",
+          "clipId": "",
+          "toMarkId": "booth_stand_pos",
+          "faceTargetId": "",
+          "moveSpeed": 1.6
+        },
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "mutant_walking",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.3,
+          "sfxId": "638390_ulrich_wehner_horror_stinger_13_killing_machine",
+          "volume": 0.9
+        }
+      ],
+      "caption": "Denied.",
+      "speed": 1.0,
+      "notes": "",
+      "locked": false
+    }
+  ]
+}

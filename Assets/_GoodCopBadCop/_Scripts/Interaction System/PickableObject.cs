@@ -34,6 +34,14 @@ public class PickableObject : Interactable
 
     /// <summary>Earliest Time.time at which the next impact sound is allowed to play.</summary>
     private float _nextImpactSfxAllowedTime;
+
+    /// <summary>
+    /// Server-only. Time.time until which collisions count as impacts of a player throw
+    /// (<see cref="ThrowServerRpc"/>), feeding <see cref="OnPlayerThrowImpactServer"/>. Forced
+    /// physics drops (death, disconnect) deliberately do not open it. -1 while inactive.
+    /// </summary>
+    private float _playerThrowImpactEndTime = -1f;
+    private ulong _playerThrowerClientId = ulong.MaxValue;
     private ParentConstraint _parentConstraint;
     private SocketFollow _socketFollow;
     private InteractableCollider[] interactableColliders = Array.Empty<InteractableCollider>();
@@ -867,6 +875,13 @@ public class PickableObject : Interactable
         // A guidebook hide belongs to the hand that applied it; never let it outlive that hold.
         if (previous != current)
             ClearHiddenForGuidebookServer();
+
+        // Being grabbed ends any in-flight throw, so a later place/drop is never treated as an impact.
+        if (current != ulong.MaxValue)
+        {
+            _playerThrowImpactEndTime = -1f;
+            _playerThrowerClientId = ulong.MaxValue;
+        }
 
         // An item becomes physically independent as soon as a player claims it. The server
         // clears the replicated containment state, allowing the usual held/drop/throw flow to
@@ -1727,8 +1742,11 @@ public class PickableObject : Interactable
     /// the server runs the physics simulation.
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    public void ThrowServerRpc(Vector3 position, Vector3 velocity)
+    public void ThrowServerRpc(Vector3 position, Vector3 velocity, ServerRpcParams rpcParams = default)
     {
+        _playerThrowImpactEndTime = Time.time + throwImpactSfxDuration;
+        _playerThrowerClientId = rpcParams.Receive.SenderClientId;
+
         RemoveParent();
         ClearFolderSlotServer();
         transform.position = position;
@@ -1817,8 +1835,19 @@ public class PickableObject : Interactable
         _nextImpactSfxAllowedTime = Time.time;
     }
 
+    /// <summary>
+    /// Server-only hook for every collision while a player throw is in flight (from
+    /// <see cref="ThrowServerRpc"/> until the impact window ends or the item is grabbed).
+    /// Override for throw reactions such as breaking on impact. <paramref name="throwerClientId"/>
+    /// lets overrides ignore the thrower's own body right after release.
+    /// </summary>
+    protected virtual void OnPlayerThrowImpactServer(Collision collision, ulong throwerClientId) { }
+
     private void OnCollisionEnter(Collision collision)
     {
+        if (IsServer && Time.time <= _playerThrowImpactEndTime)
+            OnPlayerThrowImpactServer(collision, _playerThrowerClientId);
+
         if (Time.time > _throwImpactWindowEndTime) return;
         if (Time.time < _nextImpactSfxAllowedTime) return;
         if (itemData == null || itemData.PickupSound == null) return;

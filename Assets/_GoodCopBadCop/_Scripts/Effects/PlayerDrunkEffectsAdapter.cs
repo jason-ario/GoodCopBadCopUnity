@@ -9,7 +9,8 @@ namespace GoodCopBadCop.Effects
     /// <summary>
     /// Drives the drunk fullscreen effect while <see cref="PlayerDrunkState.IsDrunk"/> is true.
     /// Fires <see cref="EffectKeys.PlayerDrunk"/> immediately on drunk start, then repeats
-    /// every <see cref="EffectRepeatInterval"/> seconds until the state clears.
+    /// every <see cref="EffectRepeatInterval"/> seconds until the state clears. Also fades the
+    /// sustained <see cref="DrunkScreenEffectView"/> look (vignette + woozy lens) in and out.
     /// </summary>
     public sealed class PlayerDrunkEffectsAdapter : IInitializable, IDisposable, ITickable
     {
@@ -21,6 +22,7 @@ namespace GoodCopBadCop.Effects
         private DisposableBag disposables;
         private PlayerDrunkState playerDrunkState;
         private float nextEffectTime = float.MaxValue;
+        private DrunkScreenEffectView screenEffectView;
 
         public PlayerDrunkEffectsAdapter(
             IPlayerRuntimeModel playerRuntimeModel,
@@ -43,6 +45,10 @@ namespace GoodCopBadCop.Effects
         {
             DetachFromDrunkState();
             disposables.Dispose();
+
+            if (screenEffectView != null)
+                UnityEngine.Object.Destroy(screenEffectView.gameObject);
+            screenEffectView = null;
         }
 
         public void Tick()
@@ -83,6 +89,7 @@ namespace GoodCopBadCop.Effects
             playerDrunkState.OnDrunkChanged -= HandleDrunkChanged;
             playerDrunkState = null;
             nextEffectTime = float.MaxValue;
+            SetScreenEffect(false);
         }
 
         private void HandleDrunkChanged(bool isDrunk)
@@ -90,10 +97,29 @@ namespace GoodCopBadCop.Effects
             if (isDrunk)
                 ScheduleImmediately();
             else
+            {
                 nextEffectTime = float.MaxValue;
+                SetScreenEffect(false);
+            }
         }
 
         /// <summary>Schedules the effect to fire on the very next <see cref="Tick"/>.</summary>
-        private void ScheduleImmediately() => nextEffectTime = 0f;
+        private void ScheduleImmediately()
+        {
+            nextEffectTime = 0f;
+            SetScreenEffect(true);
+        }
+
+        /// <summary>Fades the sustained drunk look; the view is created the first time it is needed.</summary>
+        private void SetScreenEffect(bool isDrunk)
+        {
+            if (screenEffectView == null)
+            {
+                if (!isDrunk) return;
+                screenEffectView = DrunkScreenEffectView.CreateDefaultView();
+            }
+
+            screenEffectView.SetDrunk(isDrunk);
+        }
     }
 }

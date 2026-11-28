@@ -52,6 +52,25 @@ public class ShatterableProp : HittableProp
     [SerializeField] private float _dustSpeed = 1.2f;
     [SerializeField] private Vector2 _dustLifetimeRange = new Vector2(0.9f, 1.6f);
 
+    [Header("Liquid Splash")]
+    [Tooltip("Droplet material (e.g. WaterDropSmall). Leave empty to skip the liquid splash.")]
+    [SerializeField] private Material _liquidMaterial;
+    [SerializeField, Range(0, 128)] private int _liquidCount = 45;
+    [SerializeField] private Color _liquidColor = new Color(0.9f, 0.95f, 1f, 0.85f);
+    [Tooltip("Droplet size range in metres.")]
+    [SerializeField] private Vector2 _liquidSizeRange = new Vector2(0.03f, 0.09f);
+    [Tooltip("Max droplet speed (m/s).")]
+    [SerializeField] private float _liquidSpeed = 4.5f;
+    [Tooltip("How widely droplets fan out around the splash direction (0 = tight jet, 1 = hemisphere).")]
+    [SerializeField, Range(0f, 1f)] private float _liquidSpread = 0.75f;
+    [SerializeField] private Vector2 _liquidLifetimeRange = new Vector2(0.5f, 1.1f);
+
+    /// <summary>Raised on this machine after the prop shatters (hit point, splash direction).</summary>
+    public event System.Action<Vector3, Vector3> Shattered;
+
+    /// <summary>Runtime switch for the liquid splash (e.g. off once a bottle has been drunk empty).</summary>
+    public bool LiquidEnabled { get; set; } = true;
+
 
     // Internal
 
@@ -78,6 +97,7 @@ public class ShatterableProp : HittableProp
         PlayHitSound(hitPoint);
         SpawnShards(bounds, dir);
         SpawnDust(bounds, dir);
+        SpawnLiquid(bounds, dir);
 
         if (_shatterVFXPrefab != null)
         {
@@ -89,6 +109,8 @@ public class ShatterableProp : HittableProp
 
         if (_respawnDelay > 0f)
             Invoke(nameof(Restore), _respawnDelay);
+
+        Shattered?.Invoke(hitPoint, dir);
     }
 
     /// <summary>Restores the prop to its intact state.</summary>
@@ -308,6 +330,77 @@ public class ShatterableProp : HittableProp
         }
 
         Destroy(go, _dustLifetimeRange.y + 1f);
+    }
+
+    /// <summary>
+    /// Bursts stretched liquid droplets from the prop's centre along <paramref name="direction"/>,
+    /// falling under gravity and dying on contact so they read as a splash rather than bouncing.
+    /// </summary>
+    private void SpawnLiquid(Bounds bounds, Vector3 direction)
+    {
+        if (!LiquidEnabled || _liquidMaterial == null || _liquidCount <= 0) return;
+
+        GameObject go = new GameObject($"{name} Splash");
+        go.transform.position = bounds.center;
+
+        ParticleSystem ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        ParticleSystem.MainModule main = ps.main;
+        main.playOnAwake     = false;
+        main.loop            = false;
+        main.duration        = 0.1f;
+        main.startLifetime   = new ParticleSystem.MinMaxCurve(_liquidLifetimeRange.x, _liquidLifetimeRange.y);
+        main.gravityModifier = 1.2f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles    = _liquidCount;
+        main.stopAction      = ParticleSystemStopAction.Destroy;
+
+        ParticleSystem.EmissionModule emission = ps.emission;
+        emission.enabled = false;
+
+        ParticleSystem.ShapeModule shape = ps.shape;
+        shape.enabled = false;
+
+        ParticleSystem.SizeOverLifetimeModule shrink = ps.sizeOverLifetime;
+        shrink.enabled = true;
+        shrink.size = new ParticleSystem.MinMaxCurve(1f,
+            new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(0.7f, 0.85f), new Keyframe(1f, 0f)));
+
+        ParticleSystem.CollisionModule collision = ps.collision;
+        collision.enabled      = true;
+        collision.type         = ParticleSystemCollisionType.World;
+        collision.mode         = ParticleSystemCollisionMode.Collision3D;
+        collision.quality      = ParticleSystemCollisionQuality.Medium;
+        collision.bounce       = 0f;
+        collision.dampen       = 1f;
+        collision.lifetimeLoss = 1f;
+        collision.radiusScale  = 0.3f;
+
+        ParticleSystemRenderer psRenderer = go.GetComponent<ParticleSystemRenderer>();
+        psRenderer.renderMode        = ParticleSystemRenderMode.Stretch;
+        psRenderer.velocityScale     = 0.06f;
+        psRenderer.lengthScale       = 1.5f;
+        psRenderer.sharedMaterial    = _liquidMaterial;
+        psRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        psRenderer.receiveShadows    = false;
+
+        ps.Play();
+
+        ParticleSystem.EmitParams emit = new ParticleSystem.EmitParams();
+        for (int i = 0; i < _liquidCount; i++)
+        {
+            Vector3 jitter = Random.insideUnitSphere * _liquidSpread;
+            Vector3 burst  = (direction + jitter + Vector3.up * 0.35f).normalized;
+
+            emit.position   = bounds.center + Vector3.Scale(Random.insideUnitSphere, bounds.extents) * 0.4f;
+            emit.velocity   = burst * Random.Range(_liquidSpeed * 0.35f, _liquidSpeed);
+            emit.startSize  = Random.Range(_liquidSizeRange.x, _liquidSizeRange.y);
+            emit.startColor = _liquidColor;
+            ps.Emit(emit, 1);
+        }
+
+        Destroy(go, _liquidLifetimeRange.y + 1f);
     }
 
     /// <summary>Shared, double-sided, irregular triangle used for every shard (1 unit across).</summary>

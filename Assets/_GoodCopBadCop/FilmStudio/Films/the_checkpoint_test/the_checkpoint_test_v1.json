@@ -1,0 +1,615 @@
+{
+  "title": "The Checkpoint Test",
+  "logline": "The viewer gets a quick gut-check test: shoot the bandaged butcher or let the sweet granny through. Then they find out which choice was the trap.",
+  "hook": "A crash zoom onto the Butcher's bandaged face with a sharp beep and the caption \"Quick test. Don't think.\" It challenges the viewer straight away.",
+  "setId": "booth",
+  "fps": 30,
+  "durationSec": 30.0,
+  "cast": [
+    {
+      "actorId": "butcher",
+      "role": "The obvious suspect (innocent)",
+      "startMarkId": "booth_stand_pos",
+      "variant": "base"
+    },
+    {
+      "actorId": "mzia",
+      "role": "The sweet granny (the doppelganger)",
+      "startMarkId": "booth_chair",
+      "variant": "base"
+    },
+    {
+      "actorId": "soldier_at_post",
+      "role": "The officer: the viewer's trigger finger",
+      "startMarkId": "booth_look_pos",
+      "variant": "base"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s01",
+      "start": 0.0,
+      "duration": 1.4,
+      "camera": {
+        "framing": "extreme_close_up",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "crash_zoom",
+        "moveAmount": 0.7,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "breathing_idle",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.0,
+          "sfxId": "33786_jobro_4_beep_c",
+          "volume": 0.9
+        }
+      ],
+      "caption": "Quick test. Don't think.",
+      "speed": 1.0,
+      "notes": "Hook: bandaged face slams into frame and stares at the viewer.",
+      "locked": false
+    },
+    {
+      "id": "s02",
+      "start": 1.4,
+      "duration": 1.6,
+      "camera": {
+        "framing": "close_up",
+        "subjectActorId": "mzia",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "static",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "mzia",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "sitting_idle",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.1,
+          "sfxId": "411749_natty23_bell_ding",
+          "volume": 0.7
+        }
+      ],
+      "caption": "One of them is a monster.",
+      "speed": 1.0,
+      "notes": "Cuddly granny, framed warm and still. Sets up the choice.",
+      "locked": false
+    },
+    {
+      "id": "s03",
+      "start": 3.0,
+      "duration": 2.4,
+      "camera": {
+        "framing": "medium",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "dolly_in",
+        "moveAmount": 0.3,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "give",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.6,
+          "sfxId": "364740_newagesoup_open_cardboard_box_compartment",
+          "volume": 0.5
+        }
+      ],
+      "caption": "Bandages. \"Meat grinder accident.\"",
+      "speed": 1.0,
+      "notes": "Clue #1 is meant to make him look guilty. He hands over his papers a little too slowly.",
+      "locked": false
+    },
+    {
+      "id": "s04",
+      "start": 5.4,
+      "duration": 2.2,
+      "camera": {
+        "framing": "close_up",
+        "subjectActorId": "mzia",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "dolly_in",
+        "moveAmount": 0.2,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "ease"
+      },
+      "actions": [
+        {
+          "actorId": "mzia",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "sitting_idle",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [],
+      "caption": "Shaky hands. Kind smile.",
+      "speed": 1.0,
+      "notes": "Clue #2 is meant to make her look innocent. Hold soft and gentle.",
+      "locked": false
+    },
+    {
+      "id": "s05",
+      "start": 7.60000038,
+      "duration": 1.8,
+      "camera": {
+        "framing": "close_up",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "static",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.3,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.2,
+          "type": "anim",
+          "clipId": "shocked_1",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.2,
+          "sfxId": "376607_soundkrampf_window_hit_without_breaking",
+          "volume": 0.6
+        }
+      ],
+      "caption": "He flinched.",
+      "speed": 1.0,
+      "notes": "A jumpy reaction we read as guilt. In truth he's just nervous.",
+      "locked": false
+    },
+    {
+      "id": "s06",
+      "start": 9.400001,
+      "duration": 2.2,
+      "camera": {
+        "framing": "medium",
+        "subjectActorId": "mzia",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "static",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "mzia",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "give",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [],
+      "caption": "She brought you papers. Sweet.",
+      "speed": 1.0,
+      "notes": "Granny politely hands over her documents. Lull the viewer.",
+      "locked": false
+    },
+    {
+      "id": "s07",
+      "start": 11.6,
+      "duration": 2.4,
+      "camera": {
+        "framing": "over_shoulder",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "soldier_at_post",
+        "fov": 0.0,
+        "move": "dolly_in",
+        "moveAmount": 0.4,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "soldier_at_post",
+          "t": 0.0,
+          "type": "face",
+          "clipId": "",
+          "toMarkId": "",
+          "faceTargetId": "butcher",
+          "moveSpeed": 0.0
+        },
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "shocked_1",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.8,
+          "sfxId": "154447_lucaslara_metal_latching_1_2",
+          "volume": 0.8
+        }
+      ],
+      "caption": "You already chose.",
+      "speed": 1.0,
+      "notes": "Over the soldier's shoulder. A rifle latch clicks. The viewer's choice is acted out.",
+      "locked": false
+    },
+    {
+      "id": "s08",
+      "start": 14.0,
+      "duration": 1.0,
+      "camera": {
+        "framing": "close_up",
+        "subjectActorId": "soldier_at_post",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "static",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.8,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "soldier_at_post",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "firing_rifle",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.0,
+          "sfxId": "427595_michorvath_20_gauge_shotgun_gunshot",
+          "volume": 1.0
+        }
+      ],
+      "caption": "",
+      "speed": 1.0,
+      "notes": "Gunshot with heavy shake.",
+      "locked": false
+    },
+    {
+      "id": "s09",
+      "start": 15.0,
+      "duration": 3.0,
+      "camera": {
+        "framing": "medium",
+        "subjectActorId": "butcher",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "crane_up",
+        "moveAmount": 0.3,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "butcher",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "die",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.6,
+          "sfxId": "31625_srehpog_heavy_crate_smash",
+          "volume": 0.6
+        }
+      ],
+      "caption": "Wrong.",
+      "speed": 0.6,
+      "notes": "Slow-motion fall. The one-word caption is the gut punch.",
+      "locked": false
+    },
+    {
+      "id": "s10",
+      "start": 18.0,
+      "duration": 2.2,
+      "camera": {
+        "framing": "close_up",
+        "subjectActorId": "mzia",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "dolly_in",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "mzia",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "sitting_idle",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        },
+        {
+          "actorId": "mzia",
+          "t": 0.0,
+          "type": "face",
+          "clipId": "",
+          "toMarkId": "",
+          "faceTargetId": "soldier_at_post",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.4,
+          "sfxId": "164670_deleted_user_2104797_lock_rattle_5",
+          "volume": 0.4
+        }
+      ],
+      "caption": "He was the nice one.",
+      "speed": 1.0,
+      "notes": "Granny turns to the officer, too calm. Slow push in to build dread.",
+      "locked": false
+    },
+    {
+      "id": "s11",
+      "start": 20.2,
+      "duration": 1.0,
+      "camera": {
+        "framing": "extreme_close_up",
+        "subjectActorId": "mzia",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "crash_zoom",
+        "moveAmount": 0.9,
+        "dutch": 0.0,
+        "shake": 0.6,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "mzia",
+          "t": 0.2,
+          "type": "variant_swap",
+          "clipId": "",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        },
+        {
+          "actorId": "mzia",
+          "t": 0.25,
+          "type": "anim",
+          "clipId": "shocked_1",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.2,
+          "sfxId": "396797_scorpion67890_mutant_scream",
+          "volume": 1.0
+        }
+      ],
+      "caption": "",
+      "speed": 1.0,
+      "notes": "Signature reveal: granny mutates on the crash zoom with a scream.",
+      "locked": false
+    },
+    {
+      "id": "s12",
+      "start": 21.2,
+      "duration": 1.6,
+      "camera": {
+        "framing": "close_up",
+        "subjectActorId": "soldier_at_post",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "dolly_out",
+        "moveAmount": 0.4,
+        "dutch": 0.0,
+        "shake": 0.4,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "soldier_at_post",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "shocked_1",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.0,
+          "sfxId": "238320_chevyskulls_grunido_3",
+          "volume": 0.8
+        }
+      ],
+      "caption": "",
+      "speed": 1.0,
+      "notes": "The officer, standing in for the viewer, recoils.",
+      "locked": false
+    },
+    {
+      "id": "s13",
+      "start": 22.8000011,
+      "duration": 3.0,
+      "camera": {
+        "framing": "medium",
+        "subjectActorId": "mzia",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "dolly_in",
+        "moveAmount": 0.3,
+        "dutch": 12.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "mzia",
+          "t": 0.0,
+          "type": "move",
+          "clipId": "",
+          "toMarkId": "booth_stand_pos",
+          "faceTargetId": "",
+          "moveSpeed": 0.8
+        }
+      ],
+      "sfx": [
+        {
+          "t": 0.3,
+          "sfxId": "133794_julien_nicolas_blatte_corps",
+          "volume": 0.6
+        }
+      ],
+      "caption": "Faces lie. You trusted one.",
+      "speed": 1.0,
+      "notes": "The mutated granny rises and moves to the stand mark where the Butcher fell. Tilted frame.",
+      "locked": false
+    },
+    {
+      "id": "s14",
+      "start": 25.8000011,
+      "duration": 2.4,
+      "camera": {
+        "framing": "extreme_close_up",
+        "subjectActorId": "mzia",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "static",
+        "moveAmount": 0.5,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "mzia",
+          "t": 0.0,
+          "type": "anim",
+          "clipId": "breathing_idle",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 2.0,
+          "sfxId": "173419_lightyarn_flashlight_off",
+          "volume": 0.8
+        }
+      ],
+      "caption": "Result: easily manipulated.",
+      "speed": 1.0,
+      "notes": "Verdict for the viewer. The flashlight-off click cuts the scene.",
+      "locked": false
+    },
+    {
+      "id": "s15",
+      "start": 28.2,
+      "duration": 1.8,
+      "camera": {
+        "framing": "extreme_close_up",
+        "subjectActorId": "soldier_at_post",
+        "secondaryActorId": "",
+        "fov": 0.0,
+        "move": "crash_zoom",
+        "moveAmount": 0.6,
+        "dutch": 0.0,
+        "shake": 0.0,
+        "blendIn": "cut"
+      },
+      "actions": [
+        {
+          "actorId": "soldier_at_post",
+          "t": 0.5,
+          "type": "anim",
+          "clipId": "head_twitch",
+          "toMarkId": "",
+          "faceTargetId": "",
+          "moveSpeed": 0.0
+        }
+      ],
+      "sfx": [
+        {
+          "t": 1.4,
+          "sfxId": "33786_jobro_4_beep_c",
+          "volume": 0.9
+        }
+      ],
+      "caption": "Test #2 starts now.",
+      "speed": 1.0,
+      "notes": "Sting: the masked officer twitches too. The closing beep matches s01's beep, so it loops back to the start.",
+      "locked": false
+    }
+  ]
+}
